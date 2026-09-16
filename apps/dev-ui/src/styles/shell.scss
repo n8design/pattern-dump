@@ -1,0 +1,5 @@
+// shell.scss — single compiled entry for the dev-UI shell.
+// Each layer @uses the layer below only via the layer index; no direct cross-layer imports.
+@use 'base';
+@use 'layout';
+@use 'regions';

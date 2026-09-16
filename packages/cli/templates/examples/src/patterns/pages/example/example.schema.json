@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Example page",
+  "type": "object",
+  "required": ["title", "intro", "ctaLabel"],
+  "properties": {
+    "title":       { "type": "string" },
+    "intro":       { "type": "string" },
+    "ctaLabel":    { "type": "string" },
+    "inputLabel":  { "type": "string" },
+    "placeholder": { "type": "string" },
+    "buttonLabel": { "type": "string" }
+  }
+}

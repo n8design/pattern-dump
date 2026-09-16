@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    # Raised from 20: this job now also runs lint, typecheck and unit tests on top of installing
+    # browsers and running 280 serial E2E specs (workers:1, required while HMR specs mutate
+    # test-bench in place).
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint CSS
+        run: npm run lint:css --workspace @pattern-dump/dev-ui
+
+      - name: Lint JS/TS
+        run: npm run lint
+
+      # Before the build: a type error is cheap to surface and the build is the slow step.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build packages
+        run: npm run build
+
+      # After the build: dev-server's test target dependsOn renderer:build.
+      - name: Unit tests
+        run: npm test
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        run: npm run e2e --workspace @pattern-dump/dev-ui
+
+      - name: Upload Playwright traces and videos on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            apps/dev-ui/test-results/
+            apps/dev-ui/playwright-report/
+          retention-days: 7

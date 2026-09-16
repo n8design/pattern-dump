@@ -1,0 +1,9 @@
+// Nested-barrel fixture — the ql-icon twin.
+// A directory-level _index.scss barrel that AUTHORS a class directly and maps to no component.
+// Its origin normalises to "01-atoms/quicklinks/index"; the @use-graph resolver drops barrels,
+// so this class's provenance is ONLY recoverable via the keepBarrel resolver path — which no flat
+// fixture exercises. Mirrors hTWOo's atoms/icons/_index.scss authoring .hoo-ql-media.
+.tb-ql-nested {
+  gap: 4px;
+  color: rgb(11, 22, 33);
+}

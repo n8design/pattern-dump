@@ -1,0 +1,128 @@
+# Configuration
+
+Pattern Dump reads `pattern-dump.config.ts` from the project root, or `pattern-dump.config.json` if there
+is no TypeScript file. `--config <path>` uses a file elsewhere.
+
+**Every path in the config resolves against the project root**: the folder `pd` runs in, or `--root`.
+Not against the config file's location, even when `--config` points outside the root.
+
+```ts
+import { defineConfig } from "pattern-dump";
+
+export default defineConfig({
+  sourceDir: "./src",
+  patternsDir: "./src/patterns",
+  outDir: "./dist",
+
+  styles: { strategy: "parallel", dir: "./src/styles" },
+  documentBase: ["base"],
+
+  themes: {
+    dir: "./themes",
+    default: "light",
+    switch: "attribute",
+    swatch: { slots: ["--color-surface", "--color-primary", "--color-text"] },
+  },
+
+  assets: { strategy: "central", dir: "./assets" },
+
+  scriptsDir: "./src/scripts",
+  // globalScripts: ["<id>"],
+
+  // packages: ["@acme/design-system"],
+
+  shell: {
+    brand: { title: "My Design System" },
+  },
+});
+```
+
+`defineConfig` only adds type checking; it returns the object unchanged.
+
+## Reference
+
+### Required
+
+| Option | Type | Description |
+|---|---|---|
+| `sourceDir` | string | The project's source folder |
+| `patternsDir` | string | Where components live. Every `.hbs` below it is a component ([authoring.md](authoring.md#components)) |
+| `outDir` | string | Default output folder, used by `pd build` when neither `--out` nor `build.outDir` is given |
+| `styles` | object | See [styles](#styles) |
+
+### styles
+
+| Option | Type | Description |
+|---|---|---|
+| `styles.strategy` | `"parallel"` | Styles live in a separate tree mirroring the patterns |
+| `styles.dir` | string | The SCSS tree |
+| `styles.entry` | string or string[] | Compile only these files (relative to `styles.dir`). Without it, every `.scss` not starting with `_` is compiled. Name one design-system bundle here rather than several overlapping ones |
+
+### documentBase
+
+`string[]`, relative to `styles.dir`. The shared base layer: files or folders with rules no single
+component owns (resets, `:root` defaults, `@font-face`). The compiled layer is linked into every preview,
+beneath the component styles. Without it, no base layer is linked.
+
+### themes
+
+| Option | Type | Description |
+|---|---|---|
+| `themes.dir` | string | Folder of `<name>.theme.scss` files |
+| `themes.default` | string | The theme previews start with |
+| `themes.switch` | `"attribute"` (default) or `"stylesheet"` | How themes switch; see [themes.md](themes.md#switching) |
+| `themes.swatch.slots` | string[] | Custom properties shown as colour swatches in the theme picker. Default: `["--bodyBackground", "--themePrimary", "--accent"]` |
+
+### assets
+
+| Option | Type | Description |
+|---|---|---|
+| `assets.strategy` | `"central"` | Assets live in their own folder |
+| `assets.dir` | string or string[] | Served at `/assets/`. With several folders, each is served under its folder name (`/assets/images/…`), and relative references in markup such as `../../images/x.svg` are rewritten to `/assets/images/x.svg` |
+| `assets.css` | string[] | Stylesheets (relative to the assets folder) linked into every preview before the component styles |
+
+### Scripts
+
+| Option | Type | Description |
+|---|---|---|
+| `scriptsDir` | string | Folder of behaviour scripts (`<id>.ts`), loaded with `requireScript` ([authoring.md](authoring.md#behaviour-scripts)) |
+| `globalScripts` | string[] | Scripts loaded into every preview: an id from `scriptsDir`, or a full URL. They load after the markup and before a component's own scripts |
+
+### Data and helpers
+
+| Option | Type | Description |
+|---|---|---|
+| `dataDir` | string | Every `*.json` in this folder is merged into one global data object, beneath each component's own data. Read once at startup: restart `pd dev` after changing it |
+| `helpers` | string | A Handlebars helper module or a folder of them. A module either exports a function that receives `Handlebars` and registers helpers (the PatternLab form), or exports named functions. Read once at startup |
+
+### Workbench
+
+| Option | Type | Description |
+|---|---|---|
+| `overviews` | boolean | Folder gallery pages. Default `true`; a folder's `index.md` can turn off its own with `overview: false` |
+| `shell.brand.title` | string | Title at the top of the Nav Rail. Default: "Pattern Dump" |
+| `shell.brand.logo` | string or `{ light, dark }` | Image shown instead of the title; `{ light, dark }` switches with the colour scheme |
+| `shell.brand.logoAlt` | string | Alternative text for the logo |
+| `shell.brand.href` | string | Makes the brand a link |
+
+### Pattern packages
+
+| Option | Type | Description |
+|---|---|---|
+| `packages` | array | Pattern packages from `node_modules` used next to your own patterns: a package name, or `{ name, exclude }` to hide some of its templates (globs relative to its patterns folder). See [pattern-packages.md](pattern-packages.md) |
+| `exclude` | string[] | Globs, relative to `patternsDir`, of your own templates to leave out |
+
+### build
+
+Defaults for `pd build`; the command line overrides each. See [static-build.md](static-build.md).
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `build.outDir` | string | `outDir`, then `dist` | Output folder, relative to the root. Emptied before each build |
+| `build.basePath` | string | `/` | Where the site will be hosted, such as `/docs/` |
+| `build.audit` | boolean | `true` | Include the corpus audit and the Audit tab |
+
+## When changes take effect
+
+`pd dev` picks up edits to components, docs, styles, themes and scripts while it runs. Restart it after
+changing `pattern-dump.config.ts`, anything in `dataDir` or `helpers`, or an installed pattern package.

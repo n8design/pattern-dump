@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Button",
+  "type": "object",
+  "required": ["label", "variant", "type"],
+  "properties": {
+    "label":   { "type": "string", "description": "Visible text, or the accessible name of the icon variant" },
+    "variant": { "type": "string", "enum": ["primary", "secondary"], "default": "primary" },
+    "type":    { "type": "string", "enum": ["button", "submit", "reset"], "default": "button" }
+  }
+}

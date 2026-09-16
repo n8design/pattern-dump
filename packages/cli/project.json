@@ -1,0 +1,12 @@
+{
+  "name": "cli",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/cli/src",
+  "projectType": "library",
+  "targets": {
+    "build":     { "executor": "nx:run-commands", "options": { "command": "npm run build", "cwd": "packages/cli" } },
+    "test":      { "executor": "nx:run-commands", "options": { "command": "npm run test", "cwd": "packages/cli" } },
+    "lint":      { "executor": "nx:run-commands", "options": { "command": "npm run lint", "cwd": "packages/cli" } },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "npm run typecheck", "cwd": "packages/cli" } }
+  }
+}

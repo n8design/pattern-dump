@@ -1,0 +1,89 @@
+// Shell design tokens — transcribed from docs/development/palette.md (the value authority).
+// light-dark() wrappers are ready for the dark pass; flip color-scheme to `light dark` then.
+:root {
+  color-scheme: light;
+
+  /* ── Cool family — structure + text ── */
+  --pd-surface:       light-dark(#F4F7FA, #F4F7FA); /* dark: stub */
+  --pd-border-rest:   light-dark(#D4DAE0, #D4DAE0); /* dark: stub */
+  --pd-border-hover:  light-dark(#B7C0C8, #B7C0C8); /* dark: stub */
+  --pd-border-active: light-dark(#9AA5AE, #9AA5AE); /* dark: stub */
+
+  --pd-ink:         light-dark(#3B4B59, #3B4B59); /* dark: stub */
+  --pd-ink-muted:   light-dark(color-mix(in srgb, #3B4B59 80%, transparent), color-mix(in srgb, #3B4B59 80%, transparent)); /* dark: stub */
+  --pd-ink-overlay: light-dark(color-mix(in srgb, #3B4B59 80%, transparent), color-mix(in srgb, #3B4B59 80%, transparent)); /* dark: stub */
+
+  /* Link tone — the ink slate pushed bluer (raised chroma + a lightness step) so a link reads as
+     interactive: a recognizable sibling of --pd-ink, not a foreign accent, and NOT the severity
+     red/orange. In-gamut; #2A6CBA, 4.94:1 on --pd-surface (#F4F7FA) — above the 4.5:1 link ideal.
+     Eye-picked from 3 candidates (bluer/brighter of the set). dark: stub */
+  --pd-link:        light-dark(oklch(53% 0.14 255deg), oklch(53% 0.14 255deg));
+
+  /* ── Warm family — signal + warm structure ── */
+  --pd-brand:      #CD0B0B; /* theming swap point — brand themes set this, nothing else */
+  --pd-accent:     light-dark(var(--pd-brand), var(--pd-brand)); /* dark: stub */
+  --pd-accent-ink: light-dark(white, white); /* dark: stub */
+  --pd-warning:    light-dark(oklch(72% 0.16 65deg), oklch(72% 0.16 65deg)); /* #E78C08 — warning signal; approved by eye through PD's CVD sim, in-gamut, CVD-separable from --pd-accent by luminance. dark: stub */
+  --pd-warm-sand:  light-dark(#E0CCC5, #E0CCC5); /* dark: stub */
+
+  --pd-region-radius: 0;
+
+  --pd-divider: light-dark(var(--pd-warm-sand), var(--pd-warm-sand)); /* dark: stub */
+
+  --pd-rail-icon-size: 2rem; /* icon-button hit target — applies to .rail-toggle and .rail-vp-btn */
+  --pd-rail-min: 18rem;      /* track floor: 7 icons + readout/label row clears overflow:hidden */
+
+  --pd-mark:           var(--pd-border-active); /* corner crop-mark color — firmer hairline for readability */
+  --pd-mark-size:      12px; /* arm length */
+  --pd-mark-gap:       4px;  /* gap between arm and frame corner */
+  --pd-mark-thickness: 2px;  /* arm weight — 2px reads as intentional crop mark at viewing distance */
+  --pd-mark-bleed:     4px;  /* extra clearance above TL/TR arms so overflow:hidden doesn't clip the V arm tips */
+  --pd-drag-thickness: 4px;  /* drag-handle hover bar weight — stacks with region seam-firm to read as one bold edge */
+}
+
+// Global reset + root structural shell.
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--pd-surface);
+  color: var(--pd-ink);
+}
+
+code,
+pre {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+// Single-row grid: .main fills the full viewport height. Header retired.
+.app {
+  display: grid;
+  grid-template-rows: 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+// Suppress the UA <details> marker on every summary — custom disclosures use .disclosure-caret.
+summary {
+  list-style: none;
+
+  &::marker,
+  &::-webkit-details-marker {
+    display: none;
+  }
+}
+
+// ARIA-driven display suppression — applies to any element the JS sets [hidden] on.
+[hidden] {
+  /* stylelint-disable-next-line declaration-no-important -- intentional: guarantees [hidden] wins regardless of component CSS specificity */
+  display: none !important;
+}

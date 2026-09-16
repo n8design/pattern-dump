@@ -1,0 +1,28 @@
+# Dependencies and build output
+node_modules
+dist
+.nx
+
+# TS / test caches and reports
+*.tsbuildinfo
+.vitest/
+.playwright/
+playwright-report/
+test-results/
+apps/dev-ui/test-results/
+
+# Local env (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Editors
+.vscode/
+.idea/
+.DS_Store
+
+# Distributable package build output (npm run pack:pd)
+.pd-pack/
+
+# Scaffolds written by packages/cli/src/init/starter.spec.ts (removed after each run)
+packages/cli/.test-scaffold-*/

@@ -1,0 +1,107 @@
+@use '../abstracts' as a;
+
+// Custom properties drive the resizable track sizes.
+// JS splitter writes px values; clamp() enforces the hard bounds.
+// Defaults are set here; JS overwrites the .main inline style on drag + load.
+// --pd-panel-track is 0 by default so the closed panel takes no column space.
+// [data-panel-open] switches it to the clamp expression; the transition animates between them.
+.main {
+  --pd-sidebar-w: 20rem;
+  --pd-panel-w:   20rem;
+  --pd-dock-h:    11.25rem;
+  --pd-panel-track: 0;
+
+  // Snap the RESOLVED track to a whole device pixel (round wraps the clamp — outermost — so even the
+  // 100vh−20vh max lands on-grid). Device step calc(1px / var(--dpr)), NOT 1px: at fractional dpr
+  // (1.5×) a whole CSS px ≠ a whole device px. Keeps the dock top / tab baselines / pill crisp at any
+  // drag position, window size, and dpr — while --pd-dock-h stays stored as vh (fluid, proportional).
+  // The 1px here is the device-pixel rounding STEP (1px / dpr), the only way to express one device
+  // pixel — not a chrome length, so the unit rule is disabled for this line with cause.
+  /* stylelint-disable-next-line unit-disallowed-list */
+  --pd-dock-track: round(clamp(5rem, var(--pd-dock-h), calc(100vh - var(--pd-stage-min-h))), calc(1px / var(--dpr)));
+
+  // Stage floors — sole dividers between the two rails.
+  --pd-stage-min:   20rem; // horizontal (rem: layout dimension — resolves to 320px at 16px root)
+  --pd-stage-min-h: 20vh;  // vertical; dock ceiling = 100vh − 20vh = 80vh
+
+  display: grid;
+  grid-template-areas:
+    "sidebar stage  panel"
+    "sidebar dock   panel";
+  grid-template-columns:
+    clamp(var(--pd-rail-min), var(--pd-sidebar-w), calc(100vw - var(--pd-stage-min)))
+    minmax(var(--pd-stage-min), 1fr)
+    var(--pd-panel-track);
+  grid-template-rows:
+    1fr
+    var(--pd-dock-track);
+  overflow: hidden;
+  min-height: 0;
+  transition: grid-template-columns 150ms ease, grid-template-rows 150ms ease;
+}
+
+.main[data-dock-hidden] {
+  --pd-dock-track: 0;
+}
+
+// Open: activate the clamped panel track (floor = 320px, same as --pd-stage-min).
+.main[data-panel-open] {
+  --pd-panel-track: clamp(20rem, var(--pd-panel-w), calc(100vw - var(--pd-stage-min)));
+}
+
+// Overview mode: panel.hidden = true while data-panel-open may still be present.
+// Collapse the track back to 0 so the hidden panel leaves no gap.
+.main[data-panel-open]:has(.panel[hidden]) {
+  --pd-panel-track: 0;
+}
+
+// Suppress transition on initial paint so the panel appears open without animating (see main.ts init).
+// Also covers the preview iframe — keeps disco and splitter drag instant.
+.main[data-no-transition],
+.main[data-no-transition] #preview-frame {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main {
+    transition: none;
+  }
+}
+
+// Component-switch crossfade via View Transitions API.
+// Asymmetric dissolve: new arrives fast (ease-out), old stays opaque-ish then drops (ease-in).
+// Keeps outgoing + incoming opacity sum ≥ ~0.9 throughout, so the white stage backdrop
+// never flashes through both semi-transparent layers at once.
+@keyframes pd-fade-out { from { opacity: 1 } to { opacity: 0 } }
+@keyframes pd-fade-in  { from { opacity: 0 } to { opacity: 1 } }
+
+::view-transition-old(root) { animation: pd-fade-out 120ms ease-in  both; }
+::view-transition-new(root) { animation: pd-fade-in  120ms ease-out both; }
+
+// Below the narrow breakpoint the right panel auto-hides.
+// JS sets data-panel-open on .main to show it as a positioned overlay.
+@media (max-width: #{a.$bp-narrow}) {
+  .main {
+    grid-template-areas:
+      "sidebar stage"
+      "sidebar dock";
+    grid-template-columns:
+      clamp(var(--pd-rail-min), var(--pd-sidebar-w), calc(100vw - var(--pd-stage-min)))
+      minmax(var(--pd-stage-min), 1fr);
+  }
+
+  // Specificity (0,2,0) wins over regions/_panel.scss's .panel { display: flex } (0,1,0).
+  .main .panel {
+    display: none;
+  }
+
+  .main[data-panel-open] .panel {
+    display: flex;
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: 10;
+    background: var(--pd-surface);
+    height: 100%;
+  }
+}

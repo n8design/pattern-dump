@@ -1,0 +1,58 @@
+@use '../abstracts' as a;
+
+// Right panel — docs + relationships. Width driven by --pd-panel-w custom property.
+.panel {
+  position: relative; // anchor for [data-resize="panel-w"] splitter handle
+  grid-area: panel;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--pd-border-rest);
+  border-radius: var(--pd-region-radius);
+}
+
+.panel:hover,
+.panel:focus-within                        { border-left-color: var(--pd-border-active); }
+.panel:has([data-resize="panel-w"]:hover)  { border-left-color: var(--pd-border-active); }
+.panel:has([data-resize="panel-w"]:active) { border-left-color: var(--pd-border-active); }
+
+
+.panel-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: thin solid var(--pd-border-rest); // shared baseline tone — matches the nav line + rail border (#D4DAE0), not sand
+
+  button {
+    flex: 0 1 auto; // content-width, left-packed — match the dock tabs (was 1 1 0% equal halves)
+    cursor: pointer;
+    padding-inline: 0.5rem; // match dock side padding (was 0.25rem)
+    padding-block: 0.5rem 0.35rem; // breathing room above the label; 0.35rem text-to-underline gap
+    font-size: 0.85em;
+    border: 0; // flat on the shared baseline — kills the UA button box; focus uses the UA outline
+    background: none;
+
+    &[aria-selected="true"] {
+      font-weight: bold;
+    }
+  }
+}
+
+.panel-content {
+  flex: 1;
+  @include a.scroll-region(both);
+
+  // margin-top (NOT padding-top): pushes the scroll box down off the tab baseline, so the gap
+  // below the strip holds at any scroll position. Padding-top would only gap at scrollTop 0 —
+  // it scrolls away like the content's own margin, leaving text jammed on the baseline (verified).
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.85em;
+  }
+}
+

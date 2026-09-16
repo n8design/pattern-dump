@@ -1,0 +1,52 @@
+{
+  "extends": ["stylelint-config-standard-scss"],
+  "rules": {
+    "unit-disallowed-list": [
+      ["px"],
+      {
+        "severity": "error",
+        "message": "Use rem/em for type, vw/vh for chrome, fr/auto for grid. px only for hairline borders/outlines/radii/shadows and in media/container query conditions.",
+        "ignoreProperties": {
+          "px": ["/^border/", "/^outline/", "box-shadow", "text-shadow", "/^--pd-mark/", "/^--pd-drag/"]
+        },
+        "ignoreMediaFeatureNames": {
+          "px": [
+            "min-width", "max-width", "width",
+            "min-height", "max-height", "height",
+            "min-inline-size", "max-inline-size", "inline-size",
+            "min-block-size", "max-block-size", "block-size"
+          ]
+        }
+      }
+    ],
+
+    "declaration-no-important": true,
+    "at-rule-disallowed-list": ["import"],
+    "selector-class-pattern": [
+      "^(?!(is|has)-)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      {
+        "message": "OOCSS kebab-case object/adjective classes; no is-/has- prefix, no BEM __ or --.",
+        "resolveNestedSelectors": true
+      }
+    ],
+    "declaration-property-unit-allowed-list": {
+      "/^font-size$/": ["rem", "em"],
+      "letter-spacing": ["rem", "em"],
+      "line-height": []
+    },
+    "selector-max-specificity": ["0,4,0", { "severity": "warning" }],
+
+    "declaration-block-no-redundant-longhand-properties": [
+      true,
+      { "ignoreShorthands": ["grid-template", "overflow"] }
+    ],
+    "declaration-empty-line-before": null,
+    "at-rule-empty-line-before": null,
+    "scss/at-rule-no-unknown": true,
+    "alpha-value-notation": null,
+    "color-function-notation": null,
+    "no-descending-specificity": null,
+    "custom-property-empty-line-before": null
+  },
+  "ignoreFiles": ["**/dist/**", "**/node_modules/**", "**/test-bench/**"]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@pattern-dump/a11y",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Accessibility checks: axe-core rule tiers and the structural producer.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@pattern-dump/contracts": "*",
+    "axe-core": "*",
+    "jsdom": "^27.0.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "*"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js",
+    "classify": "node --experimental-strip-types src/classifier.ts",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  }
+}

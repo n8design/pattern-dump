@@ -1,0 +1,12 @@
+{
+  "name": "dev-server",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/dev-server/src",
+  "projectType": "library",
+  "targets": {
+    "build":     { "executor": "nx:run-commands", "options": { "command": "npm run build", "cwd": "packages/dev-server" } },
+    "test":      { "executor": "nx:run-commands", "dependsOn": ["build", { "projects": ["renderer"], "target": "build" }], "options": { "command": "npm run test", "cwd": "packages/dev-server" } },
+    "lint":      { "executor": "nx:run-commands", "options": { "command": "npm run lint", "cwd": "packages/dev-server" } },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "npm run typecheck", "cwd": "packages/dev-server" } }
+  }
+}

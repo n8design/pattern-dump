@@ -1,0 +1,7 @@
+// Deliberate contrast failure fixture for M4.11 E2E tests.
+// color-contrast ratio: #bbb on #fff = 1.91:1 (needs 4.5:1 for WCAG AA normal text).
+.contrast-fail-text {
+  color: #bbbbbb;
+  background-color: #ffffff;
+  padding: 0.5rem;
+}

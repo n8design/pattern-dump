@@ -1,0 +1,4 @@
+// Non-underscore entry so the _index barrel's CSS is emitted — test-bench compiles per-file and
+// skips _partials, so a barrel needs an entry to pull it in (as hTWOo's htwoo.scss bundle does).
+// The emitted .tb-ql-nested rule's source-map origin is _index.scss → attributes to __base__.
+@use "index";

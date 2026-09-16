@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Button",
+  "type": "object",
+  "required": ["label", "variant"],
+  "properties": {
+    "label":    { "type": "string", "description": "Button text" },
+    "variant":  { "type": "string", "enum": ["primary", "secondary"], "default": "primary" },
+    "type":     { "type": "string", "enum": ["button", "submit", "reset"], "default": "button" },
+    "disabled": { "type": "boolean", "default": false }
+  }
+}

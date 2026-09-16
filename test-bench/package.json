@@ -1,0 +1,13 @@
+{
+  "name": "test-bench",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@pattern-dump/cli": "*",
+    "pd-fixture-ui": "file:./packages/pd-fixture-ui"
+  },
+  "scripts": {
+    "dev": "pd dev"
+  }
+}

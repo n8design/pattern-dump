@@ -1,0 +1,13 @@
+<div class="cvd-card" role="img" aria-label="Colour-vision reference card">
+  {{#each rows as |row|}}
+    {{#each row.patches as |patch|}}
+      <div class="cvd-chip">
+        <div class="cvd-swatch" style="background:{{patch.hex}}"></div>
+        <div class="cvd-meta">
+          <span class="cvd-name">{{patch.name}}</span>
+          <span class="cvd-code">{{patch.hex}}</span>
+        </div>
+      </div>
+    {{/each}}
+  {{/each}}
+</div>

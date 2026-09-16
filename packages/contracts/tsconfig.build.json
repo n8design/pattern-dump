@@ -1,0 +1,15 @@
+{
+  // Declaration emit only. esbuild produces dist/index.js but cannot produce .d.ts, so
+  // package.json's "types": "./dist/index.d.ts" pointed at a file that never existed. In-repo that
+  // went unnoticed because tsconfig.base.json aliases @pattern-dump/* straight to src/index.ts —
+  // the claim only breaks for a consumer resolving through package "exports".
+  //
+  // Separate from tsconfig.json so specs stay TYPECHECKED (they live in src/) without emitting
+  // dist/*.spec.d.ts alongside the real surface.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
+  },
+  "exclude": ["src/**/*.spec.ts"]
+}

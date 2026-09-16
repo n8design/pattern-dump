@@ -1,0 +1,13 @@
+@use "../base/tokens";
+
+.search-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: tokens.$space-sm;
+}
+
+.search-field-status {
+  flex-basis: 100%;
+  margin: 0;
+}

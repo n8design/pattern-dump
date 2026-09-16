@@ -1,0 +1,3 @@
+// Barrel — re-exports all base tokens via @forward.
+// Used in tests: a component @use-ing this barrel depends on the forwarded leaf modules.
+@forward "tokens";

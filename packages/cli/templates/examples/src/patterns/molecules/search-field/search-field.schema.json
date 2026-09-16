@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Search field",
+  "type": "object",
+  "required": ["inputLabel", "buttonLabel"],
+  "properties": {
+    "inputLabel":  { "type": "string", "description": "Label of the search input" },
+    "placeholder": { "type": "string" },
+    "buttonLabel": { "type": "string", "description": "Text of the submit button" }
+  }
+}

@@ -1,0 +1,1 @@
+{ "saveBtn": { "label": "Save", "variant": "primary", "type": "button" }, "cancelBtn": { "label": "Cancel", "variant": "ghost", "type": "button" } }

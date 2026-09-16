@@ -1,0 +1,262 @@
+// Stage — the center-top region: variant bar + preview figure.
+.stage {
+  grid-area: stage;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.variant-bar {
+  padding: 0.25rem 0.5rem;
+  flex-shrink: 0;
+  border-bottom: thin solid var(--pd-divider);
+
+  // Reads like the preview breadcrumb caption (.preview-caption): same 0.8em size + the muted-ink
+  // token. --pd-ink-muted bakes the 80% alpha into the COLOUR, so the select's arrow/border aren't
+  // faded unevenly the way element opacity would. Mutes the label and themes the select text in one move.
+  font-size: 0.8em;
+  color: var(--pd-ink-muted);
+}
+
+// Native <select> doesn't inherit font-size; pull the caption size + muted ink from .variant-bar so the
+// control reads as caption, not the UA 13px black default. (font: inherit also gives weight 400 normal.)
+.variant-select {
+  font: inherit;
+  color: inherit;
+
+  // font: inherit pulls the label's weight (now bold) — reset so only the "Variant:" label reads
+  // bold and the selected value stays normal (bold-label / normal-value caption pattern).
+  font-weight: normal;
+
+  // appearance:none is the ONE mechanism that works in every browser (no @supports fork): it kills the
+  // UA arrow AND the base-select default box, and makes the border styleable. Hairline outline in the
+  // shell's STRUCTURAL tone (--pd-border-rest cool-gray — same as the nav line / tab baseline; NOT the
+  // sand --pd-divider), square (--pd-region-radius: 0, the flat shell). Right padding clears the chevron.
+  appearance: none;
+  border: thin solid var(--pd-border-rest);
+  border-radius: var(--pd-region-radius);
+  padding: 0.1rem 1.5rem 0.1rem 0.4rem;
+}
+
+// The chevron. Native <select> can't host a pseudo-element and a mask ON the select would clip its text,
+// so draw it on the label's ::after overlaying the select's right gutter. MASK (not background-image) so
+// background-color themes the shape to the caption ink — a background SVG's currentColor resolves to
+// black and wouldn't theme. Shape mirrors svgIcon('chevron') (icons/index.ts:81), rotated 90° to point
+// DOWN (dropdown affordance), sized 0.875rem to match .disclosure-caret.
+// DRIFT DEBT: the codebase has no Sass icon-inline fn and no standalone chevron.svg — the icon lives as
+// a TS string, so this data-URI is a hand-mirror. Keep in sync with svgIcon('chevron').
+.variant-bar label {
+  position: relative;
+  font-weight: bold;
+}
+
+.variant-bar label::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  width: 0.875rem;
+  height: 0.875rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg transform='rotate(90 8 8)'%3E%3Cpath d='M6 3.5 L10.5 8 L6 12.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  background-color: var(--pd-ink-muted);
+}
+
+// stage-view: the scrollable area holding the preview figure or gallery.
+// position:relative anchors the .pd-mark-overlay (corner crop marks).
+// padding-block-start: the frame sits flush with the stage-view top without it, which clips
+// the upward-extending V arms of the TL/TR marks (overflow:hidden is the clipping agent).
+// calc(gap + arm-length) = 16px with current tokens — exactly clears the arm extent.
+.stage-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+
+  // Framed default: reserve the crop-mark clearance (= mark arm extent, ~20px). Kept as the base so
+  // any framed mode — presets, content-centered, a preset under a full-layout fixture, any future one
+  // — clears its marks by default; only the explicit fill modes below opt out. Fail-safe: a missed
+  // mode keeps clearance rather than clipping marks (overflow:hidden is the clipper).
+  padding-block-start: calc(var(--pd-mark-gap) + var(--pd-mark-size) + var(--pd-mark-bleed));
+}
+
+// Fill-the-stage modes go top-flush: the preview fills the stage edge-to-edge, syncMarks() hides the
+// crop marks (frame not smaller than the stage on both axes), so there is nothing to clear and the
+// base clearance is just an unwanted offset. Fill = fit/fullpage (iframe .vp-fit) and content under a
+// full-layout fixture (.vp-content in a [data-layout="full"] stage — fills like fit). Presets stay
+// framed even under a full-layout fixture (fixed width < stage → marks show), so they are NOT zeroed.
+.stage-view:has(.vp-fit),
+.stage-view[data-layout="full"]:has(.vp-content) {
+  padding-block-start: 0;
+}
+
+// ---- Preview figure ----
+// <figure> fills stage-view; grid splits it into an iframe area (1fr) + caption row (auto).
+figure.preview {
+  margin: 0;
+}
+
+.single-preview {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr; // explicit column so the track fills the stage (implicit auto collapses to iframe width)
+  grid-template-rows: 1fr auto;
+  overflow: auto;
+  position: relative;
+
+  // container-type:size makes this element a size-query container so that .vp-content can use
+  // 100cqb for max-height. max-height:100% would silently resolve to 'none' because the
+  // containing block height is flex/grid-derived (indefinite for % resolution).
+  container-type: size;
+}
+
+// Width driven by --vp-w (fit = 100%, preset/drag = px); height content-fits via pd-height (--vp-h).
+// margin-inline: auto centers the iframe horizontally when it's narrower than the 1fr track.
+.single-preview iframe {
+  display: block;
+  border: none;
+  min-height: 0;
+  width:  var(--vp-w, 100%);
+  height: var(--vp-h, auto);
+  margin-inline: auto;
+  transition: width 2s ease;
+}
+
+// The preview document is intentionally transparent (zero shell-authored style in the srcdoc).
+// Canvas backdrop lives here on the ELEMENT — shell styles its own furniture, not the doc.
+// Shell :root { color-scheme: light } pins Canvas → white even on dark OS.
+// TODO: dark-mode pass — conditional the color-scheme pin and let Canvas track the OS.
+#preview-frame {
+  background: Canvas;
+}
+
+// Fit mode: cap the frame at 100% of stage width. This prevents the 2s width transition from
+// overflowing the stage when switching from a wide preset (e.g. mobile=375px) to fit in a narrow
+// stage. Preset mode intentionally omits this class so the fixed width holds and stage scrolls.
+.single-preview iframe.vp-fit {
+  max-width: 100%;
+}
+
+// Content mode: frame shrinks to the specimen's intrinsic dimensions.
+// max-width/max-height are the PRIMARY bounds contract — JS sets raw measured values (--vp-w,
+// --vp-h) without clamping; CSS clips them against the container on every paint, so
+// stage resizes (rail drag, window resize) are handled without re-messaging.
+// max-height uses 100cqb (not 100%) because percentage max-height silently resolves to 'none'
+// in a flex/grid-derived containing block (indefinite block size). .single-preview carries
+// container-type:size so 100cqb resolves against its measured block size.
+.single-preview iframe.vp-content {
+  max-width: 100%;
+  max-height: 100cqb;
+}
+
+// Focus outline: replaces the old always-on .vp-sized border.
+// .frame-focused is toggled by JS (syncFrameFocusListeners) — CSS :focus/:focus-within
+// don't cross the srcdoc boundary. Applies in all viewport modes, not just presets.
+#preview-frame.frame-focused {
+  outline: 1px solid var(--pd-border-active);
+  outline-offset: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .single-preview iframe {
+    transition: none;
+  }
+}
+
+// Full layout: .single-preview becomes a flex column; overflow:auto lets tall pages scroll.
+.stage-view[data-layout="full"] .single-preview {
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+// Full-page layout fills the stage in BOTH dimensions (width is already viewport-inert). flex:1
+// makes the iframe grow to the stage; a taller page scrolls inside it. Height is NOT content-fit
+// here — pd-height is ignored for full layout (see main.ts) — because viewport-relative page
+// content (100vh / min-height:100%) sized from a content-fit iframe is circular and balloons.
+.stage-view[data-layout="full"] .single-preview iframe {
+  flex: 1;
+  min-height: 0;
+}
+
+// Caption row: pins to the bottom of the figure, directly above the dock.
+.preview-caption {
+  font-size: 0.8em;
+  padding: 0.125rem 0.5rem;
+  color: var(--pd-ink-muted);
+}
+
+.preview-id {
+  color: var(--pd-ink-muted);
+}
+
+// ---- Overview gallery ----
+// Overview iframes use auto height (not stage-filling).
+.overview {
+  padding: 0.5rem;
+  overflow-y: auto;
+  overflow-x: hidden;       /* vertical-scrollbar never spawns h-scroll; no sideways content */
+  scrollbar-gutter: stable; /* reserve gutter always so bar appearance doesn't steal width */
+  flex: 1;
+}
+
+.overview-doc {
+  margin-bottom: 1rem;
+}
+
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+// "Hide packages" (see _sidebar.scss): pattern-package items leave folder galleries too.
+.hide-packages .gallery-item[data-package] {
+  display: none;
+}
+
+.gallery-item {
+  border-top: thin solid currentcolor;
+  padding-top: 0.5rem;
+
+  iframe {
+    width: 100%;
+    height: var(--vp-h, auto); /* pd-height sets --vp-h; auto = UA 150px until first fire */
+    border: none;
+    display: block;
+    min-height: 2rem;
+  }
+}
+
+.gallery-label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.375rem;
+}
+
+.gallery-label-link {
+  color: inherit;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+// ---- Variants gallery ----
+// Top-aligned scrolling gallery of all variants, reuses .gallery / .gallery-item structure.
+.variants-gallery {
+  padding: 0.5rem;
+  overflow-y: auto;
+  flex: 1;
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Schema Guard",
+  "type": "object",
+  "required": ["label"],
+  "properties": {
+    "label": { "type": "string", "description": "Display text" },
+    "count": { "type": "number", "description": "An optional count" }
+  }
+}

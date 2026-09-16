@@ -1,0 +1,5 @@
+// Demonstrates two partial-resolution forms:
+//   1. @use with `as` alias — extension-omitted form, with alias: atoms/button edge expected.
+//   2. Index-file resolution — @use of a dir with _index.scss: atoms/badge edge expected.
+@use "../01-atoms/button" as btn;
+@use "../01-atoms/badge";

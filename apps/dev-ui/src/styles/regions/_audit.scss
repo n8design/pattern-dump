@@ -1,0 +1,204 @@
+@use '../abstracts' as a;
+
+// Audit facet (Inspector › Audit tab) — the CORPUS diagnostics view: the shipped bipartite graph
+// rolled up (buildAuditRollup, shared with `pd audit`) into rule→components + component→rules pivots.
+// Selection-independent (whole corpus, never the selected component). Structure + attribution, not
+// alarm: the rollup carries no per-occurrence severity, so this facet spends ink / muted-ink and the
+// tag colour channel only — never the diagnostics red/orange. Markup is imperative DOM (audit-view.ts).
+.audit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.audit-loading,
+.audit-error,
+.audit-empty {
+  margin: 0;
+  color: var(--pd-ink-muted);
+}
+
+// ---- Headline + subject sha ----
+.audit-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.audit-headline {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--pd-ink);
+}
+
+.audit-sha {
+  margin: 0;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--pd-ink-muted);
+}
+
+// ---- Totals ----
+.audit-totals {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.15rem 0.6rem;
+  margin: 0;
+}
+
+.audit-stat-label {
+  font-size: 0.8rem;
+  color: var(--pd-ink-muted);
+}
+
+.audit-stat-value {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--pd-ink);
+}
+
+// ---- Section headings ----
+.audit-h {
+  margin: 0.5rem 0 0.25rem;
+  padding-top: 0.5rem;
+  border-top: thin solid var(--pd-border-rest);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--pd-ink);
+}
+
+// ---- Rule → components pivot ----
+.audit-rules,
+.audit-components,
+.audit-findings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+}
+
+.audit-rule-id,
+.audit-finding-rule,
+.audit-finding-path {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--pd-ink);
+}
+
+.audit-rule-count {
+  font-size: 0.78rem;
+  color: var(--pd-ink-muted);
+}
+
+// ---- Component → rules pivot ----
+.audit-component {
+  padding: 0.3rem 0;
+  border-top: thin solid var(--pd-border-rest);
+}
+
+.audit-component:first-child {
+  border-top: 0;
+}
+
+.audit-component-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.audit-link {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--pd-link);
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+.audit-render {
+  font-size: 0.72rem;
+  color: var(--pd-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+
+  &[data-render='error'] {
+    color: var(--pd-accent);
+  }
+}
+
+.audit-findings {
+  margin-top: 0.2rem;
+  padding-left: 0.6rem;
+}
+
+.audit-finding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.1rem 0;
+}
+
+.audit-finding-msg {
+  font-size: 0.8rem;
+  color: var(--pd-ink);
+}
+
+.audit-finding-path {
+  color: var(--pd-ink-muted);
+}
+
+// ---- Tag attribution — the badge that makes the corpus number defensible ----
+// SUBJECT-DEBT is the common case (the subject's own debt) → quiet, muted. PD-GAP is PD's own fault
+// → it must stand out, so it borrows the accent channel (the one place this facet uses it, and for
+// attribution, not severity).
+.audit-tag {
+  flex: none;
+  padding: 0 0.3rem;
+  border: thin solid var(--pd-border-rest);
+  border-radius: 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--pd-ink-muted);
+
+  &[data-tag='PD-GAP'] {
+    border-color: var(--pd-accent);
+    color: var(--pd-accent);
+  }
+}
+
+// ---- Scope boundary — the honest caveat, never hidden by default ----
+.audit-scope {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: thin solid var(--pd-border-rest);
+}
+
+.audit-scope-summary {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--pd-ink-muted);
+  cursor: pointer;
+}
+
+.audit-scope-body {
+  margin: 0.4rem 0 0;
+  overflow-x: auto;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--pd-ink-muted);
+}

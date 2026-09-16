@@ -1,0 +1,19 @@
+@use "../00-base" as base;
+@use "../01-atoms/button"; // convention violation: component @uses another component — degrades to 01-atoms/button in styleUsesModules
+
+// Owns df-field, df-field__label, df-field__hint.
+// The &__label and &__hint variants only exist after Sass resolves nesting — source-map required.
+.df-field {
+  display: flex;
+  flex-direction: column;
+  gap: base.$df-space-sm;
+
+  &__label {
+    font-weight: 500;
+  }
+
+  &__hint {
+    font-size: 12px;
+    opacity: 0.7;
+  }
+}

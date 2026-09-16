@@ -1,0 +1,20 @@
+@use "../00-base" as base;
+
+.responsive-demo {
+  padding: base.$df-space-md;
+  font-family: sans-serif;
+}
+
+.responsive-indicator {
+  width: 4rem;
+  height: 4rem;
+  border-radius: base.$df-radius;
+  background-color: #c00;
+  margin-bottom: base.$df-space-sm;
+}
+
+@media (min-width: 600px) {
+  .responsive-indicator {
+    background-color: #0c0;
+  }
+}

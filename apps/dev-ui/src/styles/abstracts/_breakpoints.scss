@@ -1,0 +1,4 @@
+// $bp-narrow: the one breakpoint where the right panel auto-collapses.
+// px is permitted in media/container query conditions per the units rule.
+// stylelint-disable-next-line unit-disallowed-list
+$bp-narrow: 900px;

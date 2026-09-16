@@ -1,0 +1,184 @@
+<div class="app">
+  <div class="main">
+    <nav class="sidebar" aria-label="Components">
+      <div class="rail-brand">
+        <span class="rail-brand-title">Pattern Dump</span>
+      </div>
+      <details class="theme-picker">
+        <summary class="theme-picker-summary">
+          <span class="disclosure-caret" aria-hidden="true"><!--pd-icon:chevron--></span>
+          <span class="theme-picker-swatch" aria-hidden="true"></span>
+          <span class="theme-picker-current-name"></span>
+        </summary>
+        <ul class="theme-picker-list" role="radiogroup" aria-label="Component theme"></ul>
+        <p class="theme-picker-readout" aria-live="polite"></p>
+      </details>
+      <details class="a11y-picker">
+        <summary class="a11y-picker-summary" aria-label="Accessibility">
+          <span class="disclosure-caret" aria-hidden="true"><!--pd-icon:chevron--></span>
+          <span class="a11y-icon" aria-hidden="true"><!--pd-icon:a11y--></span>
+          <span class="a11y-label">
+            <span class="a11y-label-full" aria-hidden="true">Accessibility</span>
+            <span class="a11y-label-short" aria-hidden="true">A11y</span>
+          </span>
+        </summary>
+        <div class="a11y-cvd-panel">
+          <div role="radiogroup" aria-label="Deficiency type" class="cvd-type-group">
+            <button class="cvd-type-btn" role="radio" data-cvd-type="none"
+                    aria-checked="true"  tabindex="0" >None</button>
+            <button class="cvd-type-btn" role="radio" data-cvd-type="protanopia"
+                    aria-checked="false" tabindex="-1">Protanopia</button>
+            <button class="cvd-type-btn" role="radio" data-cvd-type="deuteranopia"
+                    aria-checked="false" tabindex="-1">Deuteranopia</button>
+            <button class="cvd-type-btn" role="radio" data-cvd-type="tritanopia"
+                    aria-checked="false" tabindex="-1">Tritanopia</button>
+            <button class="cvd-type-btn" role="radio" data-cvd-type="achromatopsia"
+                    aria-checked="false" tabindex="-1">Achromatopsia</button>
+          </div>
+          <label class="cvd-severity-label">
+            <span>Severity</span>
+            <input type="range" class="cvd-severity-slider"
+                   min="0" max="1" step="0.01" value="1"
+                   aria-label="Severity" disabled>
+          </label>
+        </div>
+      </details>
+      <div class="rail-toggle-cluster" role="group" aria-label="Layout controls">
+        <button class="rail-toggle panel-toggle-btn"
+                aria-label="Docs panel"
+                aria-expanded="false" aria-controls="app-panel"
+                data-label-open="Hide docs panel"
+                data-label-closed="Show docs panel">
+          <!--pd-icon:panel-->
+        </button>
+        <button class="rail-toggle dock-toggle-btn"
+                aria-label="Source dock"
+                aria-expanded="true" aria-controls="app-dock"
+                data-label-open="Hide source dock"
+                data-label-closed="Show source dock">
+          <!--pd-icon:dock-fill-->
+        </button>
+        <span class="rail-toggle-label" aria-hidden="true"></span>
+      </div>
+      <div class="rail-vp-cluster" role="group" aria-label="Viewport">
+        <output class="vp-readout">— × —</output>
+        <div role="radiogroup" aria-label="Viewport size">
+          <button class="rail-vp-btn" data-vp="fit"
+                  role="radio" aria-checked="true"  tabindex="0"
+                  aria-label="Fit"><!--pd-icon:vp-fit-fill--></button>
+          <button class="rail-vp-btn" data-vp="content"
+                  role="radio" aria-checked="false" tabindex="-1"
+                  aria-label="Fit content"><!--pd-icon:vp-content--></button>
+          <button class="rail-vp-btn" data-vp="mobile"
+                  role="radio" aria-checked="false" tabindex="-1"
+                  aria-label="Mobile"><!--pd-icon:vp-mobile--></button>
+          <button class="rail-vp-btn" data-vp="tablet"
+                  role="radio" aria-checked="false" tabindex="-1"
+                  aria-label="Tablet"><!--pd-icon:vp-tablet--></button>
+          <button class="rail-vp-btn" data-vp="desktop"
+                  role="radio" aria-checked="false" tabindex="-1"
+                  aria-label="Desktop"><!--pd-icon:vp-desktop--></button>
+        </div>
+        <button class="rail-vp-btn vp-disco-btn"
+                aria-pressed="false"
+                aria-label="Disco mode"
+                data-label-off="Start disco"
+                data-label-on="Stop disco"><!--pd-icon:vp-disco--></button>
+        <button class="rail-vp-btn fullpage-btn"
+                aria-haspopup="dialog"
+                aria-label="Full-page preview"><!--pd-icon:vp-fullpage--></button>
+        <span class="vp-mode-label" aria-hidden="true"></span>
+      </div>
+      <div class="sidebar-search">
+        <input type="search" placeholder="Search components…" aria-label="Search components">
+      </div>
+      <div class="sidebar-controls">
+        <label class="internals-label"><input type="checkbox" class="show-internals-check"> Show private</label>
+        <label class="internals-label hide-packages-label" hidden><input type="checkbox" class="hide-packages-check"> Hide packages</label>
+      </div>
+      <ul class="sidebar-tree" role="list"></ul>
+      <div class="rail-status" role="status" aria-label="Server connection status"
+           data-state="connected">
+        <span class="rail-status-icon" aria-hidden="true"><!--pd-icon:warning--></span>
+        <span class="rail-status-label">Connected</span>
+      </div>
+      <div data-resize="sidebar-w" aria-hidden="true"></div>
+    </nav>
+    <main class="stage">
+      <div class="variant-bar" hidden>
+        <label>Variant: <select class="variant-select"><option value="">default</option></select></label>
+      </div>
+      <div class="stage-view">
+        <figure class="preview single-preview" id="single-preview" hidden>
+          <iframe id="preview-frame" title="Component preview"></iframe>
+
+          <figcaption class="preview-caption"></figcaption>
+        </figure>
+        <div class="overview" id="category-overview" tabindex="0" hidden></div>
+        <div class="variants-gallery" id="variants-gallery" hidden></div>
+      </div>
+    </main>
+    <section class="dock" id="app-dock" aria-label="Console">
+      <div data-resize="dock-h" aria-hidden="true"></div>
+      <div class="dock-header">
+        <div class="dock-tabs" role="tablist" aria-label="Source and console">
+          <button role="tab" id="dock-tab-source" class="dock-tab" data-tab="source" aria-selected="true" aria-controls="dock-panel-hbs"><span class="tab-content"><span class="tab-label">Source</span></span></button>
+          <button role="tab" id="dock-tab-html" class="dock-tab" data-tab="html" aria-selected="false" aria-controls="dock-panel-html"><span class="tab-content"><span class="tab-label">HTML</span></span></button>
+          <button role="tab" id="dock-tab-diagnostics" class="dock-tab" data-tab="diagnostics" aria-selected="false" aria-controls="dock-panel-diagnostics"><span class="tab-content"><span class="tab-label">Diagnostics</span><span class="tab-marker" aria-hidden="true"><span class="tab-marker-count"></span></span></span></button>
+          <button role="tab" id="dock-tab-console" class="dock-tab" data-tab="console" aria-selected="false" aria-controls="dock-panel-console"><span class="tab-content"><span class="tab-label">Console</span></span></button>
+        </div>
+      </div>
+      <div class="dock-facets">
+        <div class="source-facets" role="tablist" aria-label="Source format">
+          <button role="tab" id="dock-facet-hbs" class="dock-facet" data-facet="hbs" aria-selected="true" aria-controls="dock-panel-hbs"><span class="tab-content"><span class="tab-label">Handlebars</span></span></button>
+          <button role="tab" id="dock-facet-data" class="dock-facet" data-facet="data" aria-selected="false" aria-controls="dock-panel-data" hidden><span class="tab-content"><span class="tab-label">Data</span></span></button>
+          <button role="tab" id="dock-facet-schema" class="dock-facet" data-facet="schema" aria-selected="false" aria-controls="dock-panel-schema" hidden><span class="tab-content"><span class="tab-label">Schema</span></span></button>
+        </div>
+        <button class="dock-copy-btn" aria-label="Copy Handlebars">Copy Handlebars</button>
+      </div>
+      <div id="dock-panel-hbs" class="dock-panel" role="tabpanel" aria-labelledby="dock-facet-hbs">
+        <div class="source-body"></div>
+      </div>
+      <div id="dock-panel-data" class="dock-panel" role="tabpanel" aria-labelledby="dock-facet-data" hidden>
+        <div class="source-body"></div>
+      </div>
+      <div id="dock-panel-schema" class="dock-panel" role="tabpanel" aria-labelledby="dock-facet-schema" hidden>
+        <div class="source-body"></div>
+      </div>
+      <div id="dock-panel-html" class="dock-panel" role="tabpanel" aria-labelledby="dock-tab-html" hidden>
+        <div class="source-body"></div>
+      </div>
+      <div id="dock-panel-diagnostics" class="dock-panel dock-panel-diagnostics" role="tabpanel" aria-labelledby="dock-tab-diagnostics" hidden>
+        <div class="pd-a11y-controls">
+          <button class="pd-run-rendered" type="button">Run rendered checks</button>
+        </div>
+        <div class="diagnostics" role="region" aria-label="Diagnostics"></div>
+      </div>
+      <div id="dock-panel-console" class="dock-panel" role="tabpanel" aria-labelledby="dock-tab-console" hidden>
+        <div class="console" role="log" aria-live="polite"></div>
+      </div>
+    </section>
+    <aside class="panel" id="app-panel" aria-label="Inspector">
+      <div data-resize="panel-w" aria-hidden="true"></div>
+      <div class="panel-tabs" role="tablist" aria-label="Panel tabs">
+        <button role="tab" data-tab="docs" aria-selected="true"><span class="tab-content"><span class="tab-label">Docs</span></span></button>
+        <button role="tab" data-tab="relationships"><span class="tab-content"><span class="tab-label">Relationships</span></span></button>
+        <button role="tab" data-tab="audit"><span class="tab-content"><span class="tab-label">Audit</span></span></button>
+      </div>
+      <div class="panel-content" role="tabpanel"></div>
+    </aside>
+  </div>
+  <dialog id="fullpage-dialog" class="fullpage" aria-label="Full-page preview">
+    <button class="fullpage-close" aria-label="Close full-page preview"><!--pd-icon:x--></button>
+    <iframe id="fullpage-frame" title="Full-page preview"></iframe>
+  </dialog>
+  <svg aria-hidden="true" focusable="false"
+       style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+      <filter id="cvd-filter" color-interpolation-filters="linearRGB">
+        <feColorMatrix id="cvd-matrix-vals" type="matrix"
+                       values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>
+      </filter>
+    </defs>
+  </svg>
+</div>

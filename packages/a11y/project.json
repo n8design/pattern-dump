@@ -1,0 +1,13 @@
+{
+  "name": "a11y",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/a11y/src",
+  "projectType": "library",
+  "targets": {
+    "build":     { "executor": "nx:run-commands", "options": { "command": "npm run build", "cwd": "packages/a11y" } },
+    "classify":  { "executor": "nx:run-commands", "options": { "command": "npm run classify", "cwd": "packages/a11y" } },
+    "test":      { "executor": "nx:run-commands", "options": { "command": "npm run test", "cwd": "packages/a11y" } },
+    "lint":      { "executor": "nx:run-commands", "options": { "command": "npm run lint", "cwd": "packages/a11y" } },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "npm run typecheck", "cwd": "packages/a11y" } }
+  }
+}

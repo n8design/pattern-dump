@@ -1,0 +1,18 @@
+@use "tokens";
+
+// The document defaults every preview sits on — the base layer named by `documentBase` in the config.
+// Fallbacks keep a preview readable before a theme is chosen.
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: tokens.$font-family;
+  line-height: 1.5;
+  color: var(--color-text, #1b1b1f);
+  background: var(--color-surface, #ffffff);
+}

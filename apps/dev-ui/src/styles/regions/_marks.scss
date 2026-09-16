@@ -1,0 +1,98 @@
+// Corner crop marks — shell furniture overlaid on the preview frame.
+// Overlay is JS-positioned to match the iframe's rendered rect relative to .stage-view.
+// Each corner span is 0×0 at the corner; ::before = H arm, ::after = V arm.
+// Marks are shown only when the frame is smaller than the stage on both axes (see syncMarks()).
+
+.pd-mark-overlay {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.pd-mark {
+  position: absolute;
+  width: 0;
+  height: 0;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    background: var(--pd-mark);
+  }
+
+  &::before {
+    width: var(--pd-mark-size);
+    height: var(--pd-mark-thickness);
+  }
+
+  &::after {
+    width: var(--pd-mark-thickness);
+    height: var(--pd-mark-size);
+  }
+}
+
+// TL: H arm extends left, V arm extends up
+.pd-mark-tl {
+  top: 0;
+  left: 0;
+
+  &::before {
+    right: var(--pd-mark-gap);
+    top: 0;
+  }
+
+  &::after {
+    left: 0;
+    bottom: var(--pd-mark-gap);
+  }
+}
+
+// TR: H arm extends right, V arm extends up
+.pd-mark-tr {
+  top: 0;
+  right: 0;
+
+  &::before {
+    left: var(--pd-mark-gap);
+    top: 0;
+  }
+
+  &::after {
+    right: 0;
+    bottom: var(--pd-mark-gap);
+  }
+}
+
+// BL: H arm extends left, V arm extends down
+.pd-mark-bl {
+  bottom: 0;
+  left: 0;
+
+  &::before {
+    right: var(--pd-mark-gap);
+    bottom: 0;
+  }
+
+  &::after {
+    left: 0;
+    top: var(--pd-mark-gap);
+  }
+}
+
+// BR: H arm extends right, V arm extends down
+.pd-mark-br {
+  bottom: 0;
+  right: 0;
+
+  &::before {
+    left: var(--pd-mark-gap);
+    bottom: 0;
+  }
+
+  &::after {
+    right: 0;
+    top: var(--pd-mark-gap);
+  }
+}

@@ -1,0 +1,5 @@
+// Demonstrates: @use via a @forward barrel (_base.scss re-exports _tokens.scss).
+// Both the barrel and the leaf token module are shared/unowned → no component edge,
+// but both should appear in styleUsesModules (barrel + forwarded leaf).
+@use "../00-base/base" as t;
+.button { font-size: t.$size; }

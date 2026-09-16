@@ -1,0 +1,28 @@
+@use "../base/tokens";
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: tokens.$space-md;
+  padding: tokens.$space-lg;
+  border-bottom: 1px solid var(--color-border, #6b7280);
+}
+
+.page-title {
+  margin: 0;
+}
+
+.page-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: tokens.$space-md;
+  padding: tokens.$space-lg;
+}
+
+.page-content p {
+  flex-basis: 100%;
+  margin: 0;
+}

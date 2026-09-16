@@ -1,0 +1,28 @@
+{
+  "name": "@pattern-dump/build",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build core: Sass and esbuild compilation, file watching and the SCSS dependency graph.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@pattern-dump/contracts": "*",
+    "autoprefixer": "^10.4.0",
+    "esbuild": "^0.28.2",
+    "postcss": "^8.4.0",
+    "sass": "^1.77.0"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  }
+}

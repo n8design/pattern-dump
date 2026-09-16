@@ -1,0 +1,27 @@
+// Full-page preview dialog — fills the viewport for native device emulation.
+dialog.fullpage {
+  position: fixed; inset: 0;
+  max-width: none; max-height: none;
+  margin: 0; padding: 0; border: 0;
+  background: var(--pd-surface);
+  width: 100%; height: 100%;
+}
+
+dialog.fullpage::backdrop { background: transparent; }
+
+dialog.fullpage iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.fullpage-close {
+  position: fixed; top: 0.75rem; right: 0.75rem;
+  background: var(--pd-ink-overlay); color: white;
+  border: 0; border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem; cursor: pointer;
+  opacity: 0; transition: opacity 0.2s;
+}
+
+dialog.fullpage.fp-chrome-visible .fullpage-close { opacity: 1; }

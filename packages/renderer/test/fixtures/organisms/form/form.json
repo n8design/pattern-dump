@@ -1,0 +1,4 @@
+{
+  "firstField":  { "label": "Name",  "input": { "type": "text" },  "hint": "Your full name." },
+  "secondField": { "label": "Email", "input": { "type": "email" }, "hint": "Never shared." }
+}

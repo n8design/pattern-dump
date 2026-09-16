@@ -1,0 +1,8 @@
+// Component-specific rule for .tb-dual — authored here (origin: atoms/dual), so it attributes to
+// the atoms/dual component bucket, NOT __base__. The SHARED rule for the same class lives in
+// 00-base/shared-family.scss. Together they are the dual-origin (.hoo-buttonaction) shape.
+.tb-dual {
+  border-width: 3px;
+  border-style: solid;
+  border-color: rgb(70, 80, 90);
+}

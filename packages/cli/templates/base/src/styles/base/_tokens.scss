@@ -1,0 +1,8 @@
+// Sass tokens shared by every stylesheet. Emits no CSS; @use it where needed.
+// Colours are NOT here: they come from the active theme (themes/*.theme.scss) as custom properties.
+$space-xs: 0.25rem;
+$space-sm: 0.5rem;
+$space-md: 1rem;
+$space-lg: 2rem;
+$radius: 0.375rem;
+$font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

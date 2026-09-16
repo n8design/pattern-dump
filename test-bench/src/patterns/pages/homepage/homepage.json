@@ -1,0 +1,9 @@
+{
+  "title": "Welcome",
+  "subtitle": "A full-width page template — exercises the full layout mode.",
+  "section": {
+    "heading": "Getting started",
+    "body": "This page component renders at full width inside the stage. The inner <main> fills the stage column (layout: full), as pages and templates should."
+  },
+  "footer": "Pattern Dump test-bench"
+}

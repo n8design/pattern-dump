@@ -1,0 +1,21 @@
+{
+  "name": "@pattern-dump/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The seams between Pattern Dump's packages: shared types, the dev-server ↔ workbench protocol and a few pure helpers.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js && tsc -p tsconfig.build.json",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  }
+}

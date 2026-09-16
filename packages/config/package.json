@@ -1,0 +1,24 @@
+{
+  "name": "@pattern-dump/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Loads and types pattern-dump.config.ts / .json.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@pattern-dump/contracts": "*"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  }
+}

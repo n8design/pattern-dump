@@ -1,0 +1,58 @@
+// JS splitter handles — absolutely positioned on the boundary of each resizable region.
+// Parent regions carry position: relative so these can be placed flush to their edge.
+// Pointer events are wired in main.ts (pointerdown/move/up, no external library).
+// Values computed in px during drag; written back as vw/vh and persisted to localStorage (via store).
+
+[data-resize] {
+  position: absolute;
+  z-index: 5;
+}
+
+// Sidebar right edge: drag to widen/narrow the sidebar.
+[data-resize="sidebar-w"] {
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 0.5rem;
+  cursor: col-resize;
+}
+
+// Panel left edge: drag to widen/narrow the right panel.
+[data-resize="panel-w"] {
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 0.5rem;
+  cursor: col-resize;
+}
+
+// Dock top edge: drag up/down to grow/shrink the dock.
+[data-resize="dock-h"] {
+  inset-inline: 0;
+  inset-block-start: 0;
+  height: 0.5rem;
+  cursor: row-resize;
+}
+
+// ── Drag-handle hover affordance ─────────────────────────────────────────────
+// Solid --pd-drag-thickness strip on the drag face via background gradient (paint-only).
+// Co-located with the region :has() seam-firm — stacks into one bold readable edge.
+
+[data-resize="sidebar-w"]:hover,
+[data-resize="sidebar-w"]:active {
+  background: linear-gradient(to left,
+    var(--pd-border-active) var(--pd-drag-thickness),
+    transparent var(--pd-drag-thickness));
+}
+
+[data-resize="panel-w"]:hover,
+[data-resize="panel-w"]:active {
+  background: linear-gradient(to right,
+    var(--pd-border-active) var(--pd-drag-thickness),
+    transparent var(--pd-drag-thickness));
+}
+
+[data-resize="dock-h"]:hover,
+[data-resize="dock-h"]:active {
+  background: linear-gradient(to bottom,
+    var(--pd-border-active) var(--pd-drag-thickness),
+    transparent var(--pd-drag-thickness));
+}

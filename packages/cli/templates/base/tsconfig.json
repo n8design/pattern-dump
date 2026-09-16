@@ -1,0 +1,19 @@
+{
+  // Behaviour scripts in src/scripts. `pd dev` compiles them itself with esbuild — this file is for
+  // `npm run typecheck` (tsc --noEmit) and `npm run build:scripts` (tsc → lib/scripts).
+  // Self-contained on purpose: it extends nothing, so it never inherits a parent project's settings.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "rootDir": "src/scripts",
+    "outDir": "lib/scripts",
+    "declaration": true
+  },
+  "include": ["src/scripts"]
+}

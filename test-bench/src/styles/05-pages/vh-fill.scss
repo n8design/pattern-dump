@@ -1,0 +1,7 @@
+// A viewport-relative page: fills the stage. Content-fitting its height would be circular (the
+// content derives its height from the iframe the shell would derive from the content) → unbounded
+// growth. Guards that full layout is height-inert.
+.tb-vh {
+  height: 100vh;
+  background: repeating-linear-gradient(45deg, #eee, #eee 10px, #ddd 10px, #ddd 20px);
+}

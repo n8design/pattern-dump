@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "White noise",
+  "description": "Needs-review contrast fixture: white text on white background (axe equalRatio incomplete).",
+  "type": "object",
+  "properties": {}
+}

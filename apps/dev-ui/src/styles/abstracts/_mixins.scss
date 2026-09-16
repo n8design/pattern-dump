@@ -1,0 +1,27 @@
+// Shared structural mixins. No CSS output here — only callable patterns.
+
+// scroll-region: a flex child that needs its own scroll axis.
+@mixin scroll-region($axis: y) {
+  @if $axis == y {
+    overflow-y: auto;
+    overflow-x: hidden;
+  } @else if $axis == x {
+    overflow-x: auto;
+    overflow-y: hidden;
+  } @else {
+    overflow: auto;
+  }
+}
+
+// guide-line: the ink membership line shared by the nav tree, diagnostics accordion, and
+// relationships panel. A border-inline-start on a members container, sitting on the chevron-tip
+// column — 0.9375rem = summary padding-left 0.5rem + half the 0.875rem .disclosure-caret glyph.
+// Transparent by default so it reserves layout without shifting (nav's reserved-then-coloured
+// pattern); pass a token colour for an always-on line (diagnostics, relationships). Callers keep
+// their own gating (nav's :has() selection vs always-on), vertical rhythm (margin-block/padding),
+// and text gutter.
+@mixin guide-line($color: transparent) {
+  margin-inline-start: 0.9375rem;
+  list-style: none;
+  border-inline-start: 0.0625rem solid $color;
+}

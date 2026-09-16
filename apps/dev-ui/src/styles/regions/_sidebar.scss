@@ -1,0 +1,323 @@
+@use '../abstracts' as a;
+
+.sidebar {
+  position: relative; // anchor for [data-resize="sidebar-w"] splitter handle
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--pd-border-rest);
+  border-radius: var(--pd-region-radius);
+  --tree-header-h: 1.25rem; /* depth-0 row = 20px: summary 12px + margin-block 4px×2 — whole px */
+}
+
+.sidebar:hover,
+.sidebar:focus-within                          { border-right-color: var(--pd-border-active); }
+.sidebar:has([data-resize="sidebar-w"]:hover)  { border-right-color: var(--pd-border-active); }
+.sidebar:has([data-resize="sidebar-w"]:active) { border-right-color: var(--pd-border-active); }
+
+.sidebar-search {
+  padding: 0.25rem;
+
+  input {
+    width: 100%;
+  }
+}
+
+.sidebar-controls {
+  padding: 0.125rem 0.25rem;
+  font-size: 0.8em;
+}
+
+// ---- Tree ----
+// Mounts once; open/close via native <details>/<summary> toggle; aria-current updated on nav.
+// <ul> siblings of .tree-folder-row are hidden by default; CSS :has() reveals them when open.
+.sidebar-tree {
+  flex: 1;
+  min-height: 0;    // required: prevents flex child expanding to content size before scrolling
+  @include a.scroll-region(y);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  ul {
+    // Membership-by-indent removed: the former 1.25rem step is gone so members sit flush
+    // under their header. Membership is now carried by the selection-scoped ink guide-line
+    // (see the `border-inline-start` rules below), not by indentation.
+    padding-left: 0;
+    margin: 0;
+  }
+}
+
+.tree-node {
+  list-style: none;
+}
+
+// Children list is hidden by default; revealed when the sibling .tree-details is open.
+.tree-node > ul {
+  display: none;
+
+  // Reconcile the children list 0.9375rem to the right so its inline-start edge — and the
+  // guide-line drawn on it — lands on the parent header's chevron TIP: the expanded caret's
+  // downward point, i.e. the caret glyph's horizontal centre. That tip sits a constant
+  // 0.9375rem right of this list's box-left at every depth — summary padding-left 0.5rem +
+  // half the 0.875rem caret box (0.4375rem) — so one fixed reconcile holds for all depths.
+  // Members keep their header's per-level step, so depth still reads; the link's own 0.625rem
+  // padding then opens a ~10px gutter from the line to the text, landing member text glyph-flush
+  // with the header label (that gutter is where the commit-2 pill rides the line). A transparent
+  // border is reserved always so toggling the selection colour never shifts layout.
+  @include a.guide-line; // margin-inline-start 0.9375rem + reserved transparent border-inline-start
+}
+
+.tree-node:has(> .tree-folder-row > :where(.tree-details[open])) > ul {
+  display: revert;
+}
+
+// ---- Selection-scoped guide-line ----
+// Marks the current item's IMMEDIATE parent group only: the two-hop child chain
+// (ul > .tree-node > .tree-link[aria-current]) means an ancestor <ul> — whose current
+// descendant is deeper than one .tree-node level — never matches, so grandparents never draw.
+// Colour is the rail's own border token (--pd-border-rest): a quiet structural tone matched to the
+// rail's right edge, so the line recedes and only the red accent bar pops. State over structure —
+// never --pd-accent red (state), never a strong ink.
+// Subject is a bare `ul` (not `.tree-node > ul`) so specificity stays 0,3,1, under the
+// 0,4,0 stylelint ceiling; the visible border only exists on `.tree-node > ul` anyway.
+ul:has(> .tree-node > .tree-link[aria-current="page"]) {
+  border-inline-start-color: var(--pd-border-rest);
+}
+
+// Sticky folder header: <details> (toggle) + optional show-all link, side-by-side.
+// The show-all link is a sibling of <details> (NOT inside <summary>) to avoid nested-interactive.
+.tree-folder-row {
+  display: flex;
+  align-items: center;
+  position: sticky;
+  background: var(--pd-surface);
+}
+
+// Sticky depth stacking — rows pin and stack from top.
+.tree-folder-row[data-depth="0"] {
+  top: 0;
+  z-index: 3;
+
+  // Scroll-state container so the section head can query its own stuck state (obscured-parent
+  // accent below). Only depth-0 heads are containers — nested pinned heads never take the accent.
+  // scroll-state imposes no size/layout containment, so it coexists with the sticky pin.
+  container-type: scroll-state;
+}
+
+.tree-folder-row[data-depth="1"] {
+  top: var(--tree-header-h);
+  z-index: 2;
+}
+
+.tree-folder-row[data-depth="2"] {
+  top: calc(var(--tree-header-h) * 2);
+  z-index: 1;
+}
+
+// <details> fills the row horizontally; summary is the clickable toggle.
+.tree-details {
+  flex: 1;
+  min-width: 0;
+}
+
+// Folder summary: chevron icon + label. Clicking toggles native <details>.
+summary.tree-folder {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.2rem 0.5rem;
+  font-weight: bold;
+  color: var(--pd-ink-muted); // caret + label: muted at all depths (overridden per-depth below)
+  cursor: pointer;
+}
+
+// Caret span wrapping the chevron SVG icon — rotates on open, inherits color from summary.
+.disclosure-caret {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 0.875rem;  // 14px — stroke-width 2/16 × 14 = 1.75px stroke, balanced weight
+  height: 0.875rem;
+  line-height: 0;
+  transition: transform 150ms ease;
+}
+
+details[open] .disclosure-caret {
+  transform: rotate(90deg);
+}
+
+// "All" link — always visible sibling of <details>; navigates to folder overview.
+.tree-show-all {
+  font-size: 0.8em;
+  font-weight: normal;
+  text-decoration: none;
+  color: var(--pd-ink-muted);
+  padding: 0.2rem 0.5rem;
+  white-space: nowrap;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--pd-ink);
+    text-decoration: underline;
+  }
+
+  &[aria-current="page"] {
+    color: var(--pd-accent);
+    font-weight: bold;
+  }
+}
+
+.tree-link {
+  display: block;
+  position: relative;
+
+  // 28px row: padding-block 2px×2 + line box locked at 24px (1.5rem floor).
+  // line-height unitless 1.846 = 24px at 13px; min-block-size guards the 24px floor
+  // so any system-font rounding never collapses the row below 28px.
+  padding: 0.125rem 0.5rem 0.125rem 0.625rem; // 0.625rem reserves gutter for pill
+  font-size: 0.8125rem;
+  line-height: 1.846;
+  min-block-size: 1.5rem;
+  text-decoration: none;
+  color: var(--pd-ink);
+
+  &::before {
+    content: '';
+    position: absolute;
+
+    // -2px centres the 3px bar on the guide-line / chevron-tip column: the member link box always
+    // sits exactly 1px right of the line (the members-<ul> 1px border), at every depth, so this
+    // puts bar-left at line−1 and the bar's centre pixel on the line (line−1 → line+1). One
+    // constant offset holds at all depths; the opaque bar covers the line (ink shows above/below).
+    left: -0.125rem;
+
+    // top + bottom edge-anchors derive height from the row box, not a separate rem value.
+    // 6px each on a 28px row = 16px pill; stays whole regardless of the row's layout origin.
+    top: 0.375rem;
+    bottom: 0.375rem;
+    width: 0.1875rem;  // 3px
+    border-radius: 0.125rem; // 2px
+    background: transparent;
+  }
+
+  &:hover::before,
+  &:focus-visible::before {
+    background: var(--pd-ink);
+  }
+
+  &:focus-visible {
+    outline: 0.125rem solid var(--pd-accent);
+    outline-offset: -0.0625rem; // pull ring inside row boundary
+  }
+
+  &[aria-current="page"] {
+    color: var(--pd-ink);
+
+    // font-weight 500 removed: system stack has no 500 face → snaps to 700, shifts row metrics.
+    // Accent pill alone carries "you are here". Re-add once a variable font with 500 is loaded.
+
+    &::before {
+      background: var(--pd-accent);
+    }
+  }
+}
+
+// Private components hidden by default; revealed by show-internals toggle.
+.tree-node[data-private] {
+  display: none;
+}
+
+.sidebar-tree.show-internals .tree-node[data-private] {
+  display: list-item;
+}
+
+// "Hide packages" — pattern-package components leave the rail (and folder galleries, see
+// _stage.scss); `.hide-packages` sits on `.main`, the ancestor of both.
+.hide-packages .tree-node[data-package] {
+  display: none;
+}
+
+.private-badge {
+  font-size: 0.75em;
+  color: var(--pd-ink-muted);
+}
+
+// ---- Type hierarchy ----
+
+// Section heads: depth-0 folder labels (Atoms, Molecules, organisms, pages).
+// Full-ink uppercase — case + scale carry the header role vs. items; muted was washed at scale.
+// Row height (14px) is set by the flex parent, not line-height; min-block-size: 0.625rem
+// guards a 10px floor but flex already exceeds it. line-height: 1.2 is a normal text ratio.
+.tree-folder-row[data-depth="0"] > .tree-details > summary.tree-folder {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pd-ink);
+  line-height: 1.2;
+  min-block-size: 0.625rem;
+  padding-block: 0;
+  margin-block: 0.25rem;  // 4px each (was 0.275rem → 4.4px fractional)
+}
+
+// Keyboard focus on a depth-0 head: accent text + thin inset ring. Mouse click gets no ring
+// (:focus-visible is keyboard/heuristic only). ring-offset -1px hugs the row like .tree-link.
+.tree-folder-row[data-depth="0"] > .tree-details > summary.tree-folder:focus-visible {
+  color: var(--pd-accent);
+  outline: 0.0625rem solid var(--pd-accent);
+  outline-offset: -0.0625rem;
+}
+
+// Disclosure-group rows (depth-1+): same item-level type as .tree-link.
+// Overrides the generic summary.tree-folder bold so these read as items, not section heads.
+.tree-folder-row[data-depth="1"] > .tree-details > summary.tree-folder {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.9;
+  color: var(--pd-ink-muted);
+}
+
+// Even spacing above all depth-0 sections including the first.
+// margin-block-start on the <li> doesn't affect --tree-header-h (row height only).
+.sidebar-tree > .tree-node {
+  margin-block-start: 0.75rem;  // 12px whole
+}
+
+// ---- Parent trail marker ----
+// Collapsed disclosure whose subtree contains the current item.
+// Fires when user manually collapses after navigating (auto-open keeps ancestors open normally).
+// Selector anchored on .tree-node (NOT .tree-details): <details> only contains <summary>;
+// [aria-current] lives in the sibling <ul>, so .tree-details:has([aria-current]) never fires.
+// :has() matches through display:none -- correct, collapsed <ul> still exists in DOM.
+.tree-node:has(> .tree-folder-row > .tree-details:not([open])):has([aria-current="page"])
+  > .tree-folder-row > .tree-details > summary.tree-folder {
+  color: var(--pd-accent);
+}
+
+// Second obscuring trigger for the SAME principle: a stuck (pinned) section head. Same accent as
+// the collapsed trail above; the trigger is genuine stuck state via a scroll-state container query
+// on the depth-0 head (container-type set above), not :not([open]). Contains-descendant + stuck.
+// Depth-0 only: only section heads are scroll-state containers, and a head's folder-row is an
+// ancestor of ONLY its own summary (nested content is in the sibling <ul>), so the query gates the
+// accent to exactly the pinned section head that holds the selection. Off-capable — a pinned head
+// with no selected descendant fails the :has gate and stays ink.
+// ---
+// The target chain MIRRORS the collapsed-parent rule above (> .tree-folder-row > .tree-details >
+// summary.tree-folder) on purpose: the depth-0 head has its own ink-colour rule at 0,4,1
+// (.tree-folder-row[data-depth="0"] > .tree-details > summary.tree-folder), so a leaner selector
+// (0,3,1) loses the cascade and the accent never paints. This chain computes ~0,5,1, beating the
+// ink rule — the same reason the collapsed sibling works. It sits above the 0,4,0 stylelint ceiling
+// (one advisory warning, same tree-family exception the collapsed + ink rules already carry).
+// ---
+// NOTE: scroll-state(stuck) is compositor-observed — it fires on a real (wheel/gesture) scroll and
+// CANNOT be verified via synthetic `scrollTop` in automation (proven false-negative). It is also
+// cascade-sensitive: assert the PAINTED colour on a genuinely-stuck head, not just that the selector
+// matches — a matching selector can still lose to a higher-specificity colour rule.
+@container scroll-state(stuck: top) {
+  .tree-node:has([aria-current="page"]) > .tree-folder-row > .tree-details > summary.tree-folder {
+    color: var(--pd-accent);
+  }
+}

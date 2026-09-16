@@ -1,0 +1,9 @@
+<!--
+  Diagnostics-graph guard fixture: the spec's canonical HTML content-model defect — a <div> (block)
+  under <summary>, which browsers silently tolerate. html-validate fires element-permitted-content;
+  the finding is [SUBJECT-DEBT] (the subject's template owns it).
+-->
+<details>
+  <summary><div>block content under summary</div></summary>
+  <p>details body</p>
+</details>

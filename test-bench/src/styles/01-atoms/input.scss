@@ -1,0 +1,7 @@
+@use "../00-base" as base;
+
+.df-input {
+  padding: base.$df-space-sm base.$df-space-md;
+  border: 1px solid base.$df-color-border;
+  border-radius: base.$df-radius;
+}

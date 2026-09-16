@@ -1,0 +1,8 @@
+@use "../00-base" as base;
+
+// toolbar owns only df-toolbar; it BORROWS df-button/--primary/--ghost from atoms/button
+// directly in markup (no partial). That class-borrowing creates the styleUses→button edge.
+.df-toolbar {
+  display: inline-flex;
+  gap: base.$df-space-sm;
+}

@@ -1,0 +1,224 @@
+// Docs Markdown rendering.
+//
+// SECURITY, load-bearing. The docs panel renders into the SHELL (the parent document), not the
+// preview iframe, so this module is the boundary that keeps author markdown from becoming shell
+// script. Two mechanisms, both configured on the singleton below and both easy to lose in a move:
+//
+//   `html: false`   — raw HTML in a .md is escaped, never injected.
+//   `validateLink`  — a POSITIVE allowlist. Anything not http(s)/mailto/tel, not relative
+//                     (`.` `#` `/`), and not `pattern:` is refused, so markdown-it emits no anchor
+//                     at all and the source stays inert literal text.
+//
+// The `_md` singleton MUST travel with BOTH mutations. Moving it without the fence rule silently
+// degrades every fence to a plain <pre>; without validateLink it silently opens `javascript:`.
+// Guarded by test/docs.spec.ts, which asserts over HTTP and so is indifferent to where this lives.
+//
+// THE ONE DELIBERATE EXCEPTION is the `pattern` fence, which injects live rendered component HTML
+// into the shell — the workbench self-trust boundary, marked at its emit site. `src-html` is its
+// escaped twin. Do not "consistently" escape the pattern fence; that kills live embeds.
+//
+// Per-render state travels in markdown-it's `env` (the resolvedFences map), never on the singleton,
+// which is what makes concurrent renders safe.
+
+import { readFile } from "node:fs/promises";
+import MarkdownIt from "markdown-it";
+import type { DiscoveryMap } from "@pattern-dump/contracts";
+import { highlight, wrapWithCopyButton, deepMerge } from "@pattern-dump/renderer";
+import { escapeHtml } from "./http-utils.js";
+
+const _md = new MarkdownIt({ html: false, linkify: false });
+
+// Positive allowlist: block javascript:, data:, vbscript:, etc.
+// html: false already escapes raw HTML in source; this covers link/image hrefs.
+// pattern: is allowed through so the link resolver can intercept it below.
+_md.validateLink = (url: string) => {
+  const t = url.trim();
+  return /^(https?|mailto|tel):/i.test(t) || /^[.#/]/.test(t) || t.startsWith("pattern:");
+};
+
+// Fence rule set once at instance creation — reads pre-resolved HTML from env,
+// never mutates shared state during render, safe for parallel builds.
+_md.renderer.rules["fence"] = (tokens, idx, _opts, env) => {
+  const map = (env as { resolvedFences?: Map<number, string> }).resolvedFences;
+  return map?.get(idx) ?? _mdPlainPre(tokens[idx]?.content ?? "");
+};
+
+function _mdPlainPre(code: string): string {
+  return `<pre><code>${escapeHtml(code)}</code></pre>`;
+}
+
+
+/** Shared parser for pattern specs used by both fence blocks and cross-links. */
+function _parsePatternSpec(spec: string): { compId: string; variant?: string } {
+  const tildeIdx = spec.indexOf("~");
+  return {
+    compId:  tildeIdx >= 0 ? spec.slice(0, tildeIdx) : spec,
+    variant: tildeIdx >= 0 ? spec.slice(tildeIdx + 1) : undefined,
+  };
+}
+
+/**
+ * Walk inline token children, find link_open tokens with href="pattern:…",
+ * and mutate them in-place before rendering. Resolved targets get class + data
+ * attributes; unresolved targets get .pattern-link--unresolved + aria-disabled.
+ * Variant validation is full: pattern:atoms/button~ghost is unresolved if
+ * button~ghost is not in the discovery map.
+ */
+function _resolvePatternLinks(
+  tokens: ReturnType<typeof _md.parse>,
+  discoveryMap: DiscoveryMap
+): void {
+  for (const blockTok of tokens) {
+    if (blockTok.type !== "inline" || !blockTok.children) continue;
+    for (const child of blockTok.children) {
+      if (child.type !== "link_open") continue;
+      const href = child.attrGet("href") ?? "";
+      if (!href.startsWith("pattern:")) continue;
+      const { compId, variant } = _parsePatternSpec(href.slice("pattern:".length));
+      // Check the full variant id — pattern:atoms/button~ghost is unresolved if
+      // button~ghost isn't in the map (variant typos surface instead of falling back silently).
+      const fullId = variant ? `${compId}~${variant}` : compId;
+      if (discoveryMap.has(fullId)) {
+        child.attrSet("href", "/" + compId + (variant ? "#" + variant : ""));
+        child.attrPush(["class", "pattern-link"]);
+        child.attrPush(["data-pattern-id", compId]);
+        if (variant) child.attrPush(["data-variant", variant]);
+      } else {
+        child.attrSet("href", "#");
+        child.attrPush(["class", "pattern-link--unresolved"]);
+        child.attrPush(["aria-disabled", "true"]);
+      }
+    }
+  }
+}
+
+export async function renderDoc(
+  body: string,
+  renderComponent: (id: string, variant?: string) => Promise<string>,
+  discoveryMap: DiscoveryMap
+): Promise<string> {
+  const tokens = _md.parse(body, {});
+
+  // Resolve pattern: cross-links synchronously (discoveryMap.has is sync).
+  _resolvePatternLinks(tokens, discoveryMap);
+
+  // Resolve all fence tokens asynchronously — identification via markdown-it's tokenizer,
+  // not a regex pre-scan (which breaks on indented fences, fences inside blockquotes, etc.).
+  const resolvedFences = new Map<number, string>();
+  await Promise.all(
+    tokens.flatMap((tok, idx) =>
+      tok.type === "fence" ? [_resolveFence(tok.info, tok.content, idx, renderComponent, resolvedFences, discoveryMap)] : []
+    )
+  );
+
+  return _md.renderer.render(tokens, _md.options, { resolvedFences });
+}
+
+// renderer throws "[renderer] Component not found: ..." / "[renderer] Variant not found: ..." for
+// missing components — expected content conditions (author typo, demo fences). Anything else is
+// a real renderer bug that warrants a signal.
+function _isRendererNotFound(e: unknown): boolean {
+  return e instanceof Error && e.message.startsWith("[renderer]") && e.message.includes("not found");
+}
+
+async function _resolveFence(
+  info: string,
+  content: string,
+  idx: number,
+  renderComponent: (id: string, variant?: string) => Promise<string>,
+  out: Map<number, string>,
+  discoveryMap: DiscoveryMap
+): Promise<void> {
+  const lang = info.trim();
+  const code = content;
+
+  if (lang === "pattern" || lang.startsWith("pattern ")) {
+    const spec = lang.startsWith("pattern ") ? lang.slice("pattern ".length).trim() : code.split("\n")[0]?.trim() ?? "";
+    if (!spec) { out.set(idx, `<pre><code></code></pre>`); return; }
+    const { compId, variant } = _parsePatternSpec(spec);
+    try {
+      const html = await renderComponent(compId, variant);
+      // WORKBENCH SELF-TRUST BOUNDARY: pattern embeds inject rendered component HTML into the
+      // shell. Safe for an author's own design system. Intersects the deferred public-preview /
+      // CSP gate — externally-sourced package docs with pattern embeds change the calculus.
+      out.set(idx, `<div class="doc-example">${html}</div>`);
+    } catch (e) {
+      if (!_isRendererNotFound(e)) console.warn(`[dev-server] Pattern block render error [${spec}]:`, e);
+      out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — render error]</p>`);
+    }
+    return;
+  }
+
+  if (lang === "src-template" || lang.startsWith("src-template ")) {
+    const spec = lang.startsWith("src-template ") ? lang.slice("src-template ".length).trim() : code.split("\n")[0]?.trim() ?? "";
+    if (!spec) { out.set(idx, _mdPlainPre("")); return; }
+    const { compId } = _parsePatternSpec(spec);  // variant ignored — all variants share the base template
+    const entry = discoveryMap.get(compId);
+    if (!entry?.hbsPath) {
+      out.set(idx, `<p class="doc-error">[src-template: ${escapeHtml(spec)} — no template file]</p>`);
+      return;
+    }
+    try {
+      const src = await readFile(entry.hbsPath, "utf-8");
+      out.set(idx, wrapWithCopyButton(highlight(src, "handlebars"), src));
+    } catch (e) {
+      console.warn(`[dev-server] src-template read error [${spec}]:`, e);
+      out.set(idx, `<p class="doc-error">[src-template: ${escapeHtml(spec)} — read error]</p>`);
+    }
+    return;
+  }
+
+  if (lang === "src-data" || lang.startsWith("src-data ")) {
+    const spec = lang.startsWith("src-data ") ? lang.slice("src-data ".length).trim() : code.split("\n")[0]?.trim() ?? "";
+    if (!spec) { out.set(idx, _mdPlainPre("")); return; }
+    const { compId, variant } = _parsePatternSpec(spec);
+    const lookupId = variant ? `${compId}~${variant}` : compId;
+    try {
+      if (variant) {
+        // Resolved context: base defaults merged with variant layer — the same context renderComponent renders from.
+        const variantEntry = discoveryMap.get(lookupId);
+        if (!variantEntry) {
+          out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} — unknown variant]</p>`);
+          return;
+        }
+        const baseJsonPath    = discoveryMap.get(compId)?.jsonPath;
+        const variantJsonPath = variantEntry.jsonPath;
+        const baseData: Record<string, unknown>    = baseJsonPath    ? JSON.parse(await readFile(baseJsonPath,    "utf-8")) : {};
+        const variantData: Record<string, unknown> = variantJsonPath ? JSON.parse(await readFile(variantJsonPath, "utf-8")) : {};
+        const merged = deepMerge(structuredClone(baseData), variantData);
+        const src = JSON.stringify(merged, null, 2);
+        out.set(idx, wrapWithCopyButton(highlight(src, "json"), src));
+      } else {
+        // Base component: no parent to merge from — show its own data file as-is.
+        const jsonPath = discoveryMap.get(compId)?.jsonPath;
+        if (!jsonPath) {
+          out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} — no data file]</p>`);
+          return;
+        }
+        const src = await readFile(jsonPath, "utf-8");
+        out.set(idx, wrapWithCopyButton(highlight(src, "json"), src));
+      }
+    } catch (e) {
+      console.warn(`[dev-server] src-data read error [${spec}]:`, e);
+      out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} — read error]</p>`);
+    }
+    return;
+  }
+
+  if (lang === "src-html" || lang.startsWith("src-html ")) {
+    const spec = lang.startsWith("src-html ") ? lang.slice("src-html ".length).trim() : code.split("\n")[0]?.trim() ?? "";
+    if (!spec) { out.set(idx, _mdPlainPre("")); return; }
+    const { compId, variant } = _parsePatternSpec(spec);
+    try {
+      const html = await renderComponent(compId, variant);
+      out.set(idx, wrapWithCopyButton(highlight(html, "html"), html));
+    } catch (e) {
+      if (!_isRendererNotFound(e)) console.warn(`[dev-server] src-html render error [${spec}]:`, e);
+      out.set(idx, `<p class="doc-error">[src-html: ${escapeHtml(spec)} — render error]</p>`);
+    }
+    return;
+  }
+
+  const highlighted = highlight(code, lang);
+  out.set(idx, wrapWithCopyButton(highlighted, code));
+}

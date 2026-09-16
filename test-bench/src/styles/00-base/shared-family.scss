@@ -1,0 +1,20 @@
+// Guard fixture for documentBase (the shared base layer).
+// A GENUINE shared partial: family-level classes with NO owning component. Their origin resolves
+// to no pattern, so they land in the __base__ bucket — the ".hoo-buttonaction / _button-general"
+// shape distilled into test-bench. They only reach a preview when documentBase injects the base
+// layer. Literal values (no @use) so this compiles as its own entry standalone.
+
+// .tb-shared-only — owned by no component. Paints only via the injected base layer.
+.tb-shared-only {
+  padding: 7px;
+  color: rgb(10, 20, 30);
+}
+
+// .tb-dual — the dual-origin case: this SHARED rule (outline) plus a COMPONENT-SPECIFIC rule
+// (border, authored in 01-atoms/dual.scss and attributed to atoms/dual). One class, two legitimate
+// origins: base carries the shared rule, the component bucket carries its own.
+.tb-dual {
+  outline-width: 2px;
+  outline-style: solid;
+  outline-color: rgb(40, 50, 60);
+}

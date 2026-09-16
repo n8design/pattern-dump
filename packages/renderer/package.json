@@ -1,0 +1,34 @@
+{
+  "name": "@pattern-dump/renderer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Renders components: Handlebars templates, the data cascade, helpers and syntax highlighting.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@pattern-dump/contracts": "*",
+    "@pattern-dump/discovery": "*",
+    "@shikijs/transformers": "^4.1.0",
+    "culori": "^4.0.2",
+    "handlebars": "^4.7.8",
+    "html-validate": "^11",
+    "shiki": "^4.1.0"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/culori": "^4.0.1",
+    "@types/node": "^25.9.1"
+  }
+}

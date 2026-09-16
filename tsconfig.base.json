@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "declaration": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@pattern-dump/contracts": ["packages/contracts/src/index.ts"],
+      "@pattern-dump/config": ["packages/config/src/index.ts"],
+      "@pattern-dump/renderer": ["packages/renderer/src/index.ts"],
+      "@pattern-dump/a11y": ["packages/a11y/src/index.ts"],
+      "@pattern-dump/dev-server": ["packages/dev-server/src/index.ts"],
+      "@pattern-dump/core": ["packages/core/src/index.ts"],
+      "@pattern-dump/cli": ["packages/cli/src/index.ts"],
+      "@pattern-dump/build": ["packages/build/src/index.ts"],
+      "@pattern-dump/hotreloader": ["packages/hotreloader/src/index.ts"],
+      "@pattern-dump/discovery": ["packages/discovery/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}

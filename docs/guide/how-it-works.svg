@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" width="1000" height="500" role="img" aria-labelledby="title desc">
+  <title id="title">How Pattern Dump works</title>
+  <desc id="desc">Your project holds patterns, styles, themes, scripts and assets, optionally with pattern packages from node_modules. pattern-dump.config.ts tells Pattern Dump where everything is. Pattern Dump discovers, renders, checks and relates the components, and produces three outputs: pd dev opens the live workbench, pd audit writes a report, and pd build writes a static site.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .box { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.5; }
+    .box-accent { fill: #ddf4ff; stroke: #0969da; stroke-width: 2; }
+    .panel { fill: none; stroke: #d0d7de; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .t { fill: #1f2328; font: 600 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .h { fill: #1f2328; font: 700 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .s { fill: #59636e; font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .m { fill: #59636e; font: 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .a { fill: #0969da; }
+    .edge { fill: none; stroke: #818b98; stroke-width: 1.5; }
+    .edge-accent { fill: none; stroke: #0969da; stroke-width: 1.75; }
+    .dash { stroke-dasharray: 5 4; }
+    .head { fill: #818b98; }
+    .head-accent { fill: #0969da; }
+    .num { fill: #0969da; }
+    .num-t { fill: #ffffff; font: 700 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .box { fill: #151b23; stroke: #3d444d; }
+      .box-accent { fill: #0c2d6b; stroke: #4493f8; }
+      .panel { stroke: #3d444d; }
+      .t, .h { fill: #f0f6fc; }
+      .s, .m { fill: #9198a1; }
+      .a { fill: #4493f8; }
+      .edge { stroke: #656c76; }
+      .edge-accent { stroke: #4493f8; }
+      .head { fill: #656c76; }
+      .head-accent, .num { fill: #4493f8; }
+      .num-t { fill: #0d1117; }
+    }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path class="head" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+    <marker id="arr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path class="head-accent" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1000" height="500" rx="12"/>
+  <rect class="panel" x="20" y="20" width="290" height="460" rx="12"/>
+  <text class="h" x="40" y="52" text-anchor="start">Your project</text>
+  <rect class="box" x="40" y="70" width="250" height="56" rx="8"/>
+  <text class="t" x="56" y="94" text-anchor="start">src/patterns/</text>
+  <text class="s" x="56" y="114" text-anchor="start">.hbs · .json · .md · .schema.json</text>
+  <rect class="box" x="40" y="136" width="250" height="56" rx="8"/>
+  <text class="t" x="56" y="160" text-anchor="start">src/styles/</text>
+  <text class="s" x="56" y="180" text-anchor="start">SCSS, mirroring the patterns</text>
+  <rect class="box" x="40" y="202" width="250" height="56" rx="8"/>
+  <text class="t" x="56" y="226" text-anchor="start">themes/</text>
+  <text class="s" x="56" y="246" text-anchor="start">custom-property value sets</text>
+  <rect class="box" x="40" y="268" width="250" height="56" rx="8"/>
+  <text class="t" x="56" y="292" text-anchor="start">src/scripts/</text>
+  <text class="s" x="56" y="312" text-anchor="start">TypeScript behaviour</text>
+  <rect class="box" x="40" y="334" width="250" height="56" rx="8"/>
+  <text class="t" x="56" y="358" text-anchor="start">assets/</text>
+  <text class="s" x="56" y="378" text-anchor="start">images, fonts, icons</text>
+  <rect class="box" x="40" y="410" width="250" height="56" rx="8"/>
+  <text class="t" x="56" y="434" text-anchor="start">node_modules/</text>
+  <text class="s" x="56" y="454" text-anchor="start">pattern packages (optional)</text>
+  <rect class="box" x="370" y="110" width="220" height="56" rx="8"/>
+  <text class="t" x="480" y="136" text-anchor="middle">pattern-dump.config.ts</text>
+  <text class="s" x="480" y="156" text-anchor="middle">where everything is</text>
+  <rect class="box-accent" x="370" y="220" width="220" height="110" rx="12"/>
+  <text class="h" x="480" y="262" text-anchor="middle">Pattern Dump</text>
+  <text class="s" x="480" y="286" text-anchor="middle">discovers components</text>
+  <text class="s" x="480" y="306" text-anchor="middle">renders · checks · relates</text>
+  <path class="edge" d="M480,166 L480,216" marker-end="url(#arr)"/>
+  <path class="edge-accent" d="M314,275 L366,275" marker-end="url(#arr-a)"/>
+  <rect class="box" x="650" y="40" width="330" height="120" rx="8"/>
+  <text class="t a" x="670" y="72">pd dev</text>
+  <text class="h" x="770" y="72" text-anchor="start">Workbench</text>
+  <text class="s" x="670" y="106" text-anchor="start">Nav Rail · Stage · Inspector · Console</text>
+  <text class="s" x="670" y="130" text-anchor="start">live reload on every save</text>
+  <path class="edge-accent" d="M594,275 C622,275 622,100 646,100" marker-end="url(#arr-a)"/>
+  <rect class="box" x="650" y="190" width="330" height="120" rx="8"/>
+  <text class="t a" x="670" y="222">pd audit</text>
+  <text class="h" x="770" y="222" text-anchor="start">Audit report</text>
+  <text class="s" x="670" y="256" text-anchor="start">Markdown · text · JSON for CI</text>
+  <text class="s" x="670" y="280" text-anchor="start">defects across all components</text>
+  <path class="edge-accent" d="M594,275 C622,275 622,250 646,250" marker-end="url(#arr-a)"/>
+  <rect class="box" x="650" y="340" width="330" height="120" rx="8"/>
+  <text class="t a" x="670" y="372">pd build</text>
+  <text class="h" x="770" y="372" text-anchor="start">Static site</text>
+  <text class="s" x="670" y="406" text-anchor="start">plain files for any host</text>
+  <text class="s" x="670" y="430" text-anchor="start">GitHub Pages · CDN · nginx</text>
+  <path class="edge-accent" d="M594,275 C622,275 622,400 646,400" marker-end="url(#arr-a)"/>
+</svg>

@@ -1,0 +1,6 @@
+@use "../00-base" as base;
+
+.df-buttonbar {
+  display: flex;
+  gap: base.$df-space-md;
+}

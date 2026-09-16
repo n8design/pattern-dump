@@ -1,0 +1,3 @@
+// Barrel: re-exports all base modules. Every component @uses this barrel so
+// @forward is exercised by the whole bench — no standalone forward-demo needed.
+@forward "tokens";

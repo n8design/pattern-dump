@@ -1,0 +1,69 @@
+{
+  "name": "pattern-dump",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A workbench for HTML and CSS design systems: live component previews, docs, checks and static publishing.",
+  "author": "Stefan Bauer <stefan.bauer@n8d.at> (https://n8d.at)",
+  "license": "MIT",
+  "homepage": "https://github.com/n8design/pattern-dump#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/n8design/pattern-dump.git"
+  },
+  "bugs": "https://github.com/n8design/pattern-dump/issues",
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/stfbauer"
+    },
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/n8design"
+    }
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "test-bench"
+  ],
+  "scripts": {
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "lint": "nx run-many -t lint",
+    "typecheck": "nx run-many -t typecheck",
+    "e2e": "nx run dev-ui:e2e",
+    "dev:check": "node scripts/check-server-fresh.mjs",
+    "pack:pd": "npm run build && node packages/cli/scripts/pack.mjs",
+    "verify:install": "node scripts/verify-install.mjs",
+    "graph": "nx graph",
+    "affected": "nx affected -t build test lint typecheck",
+    "dev": "npm run dev --workspace test-bench",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@playwright/test": "^1.45.0",
+    "autoprefixer": "^10.4.0",
+    "axe-core": "^4.9.0",
+    "chokidar": "^3.6.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.0.0",
+    "handlebars": "^4.7.8",
+    "husky": "^9.1.7",
+    "nx": "^19.0.0",
+    "postcss": "^8.4.0",
+    "sass": "^1.77.0",
+    "stylelint": "^17.12.0",
+    "stylelint-config-standard-scss": "^17.0.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^2.0.0",
+    "ws": "^8.17.0"
+  }
+}

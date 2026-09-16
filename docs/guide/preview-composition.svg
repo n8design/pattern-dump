@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 630" width="800" height="630" role="img" aria-labelledby="title desc">
+  <title id="title">What a preview document contains</title>
+  <desc id="desc">In the head: 1 the base layer from documentBase, 2 asset stylesheets from assets.css, 3 theme stylesheets, 4 the component CSS closure. In the body, which carries data-theme: 5 inlined SVG symbol sets from requireAssets, 6 the rendered markup inside main, 7 module scripts, globalScripts first, then requireScript.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .box { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.5; }
+    .box-accent { fill: #ddf4ff; stroke: #0969da; stroke-width: 2; }
+    .panel { fill: none; stroke: #d0d7de; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .t { fill: #1f2328; font: 600 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .h { fill: #1f2328; font: 700 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .s { fill: #59636e; font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .m { fill: #59636e; font: 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .a { fill: #0969da; }
+    .edge { fill: none; stroke: #818b98; stroke-width: 1.5; }
+    .edge-accent { fill: none; stroke: #0969da; stroke-width: 1.75; }
+    .dash { stroke-dasharray: 5 4; }
+    .head { fill: #818b98; }
+    .head-accent { fill: #0969da; }
+    .num { fill: #0969da; }
+    .num-t { fill: #ffffff; font: 700 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .box { fill: #151b23; stroke: #3d444d; }
+      .box-accent { fill: #0c2d6b; stroke: #4493f8; }
+      .panel { stroke: #3d444d; }
+      .t, .h { fill: #f0f6fc; }
+      .s, .m { fill: #9198a1; }
+      .a { fill: #4493f8; }
+      .edge { stroke: #656c76; }
+      .edge-accent { stroke: #4493f8; }
+      .head { fill: #656c76; }
+      .head-accent, .num { fill: #4493f8; }
+      .num-t { fill: #0d1117; }
+    }
+  </style>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path class="head" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+    <marker id="arr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path class="head-accent" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="800" height="630" rx="12"/>
+  <rect class="panel" x="20" y="20" width="760" height="590" rx="12"/>
+  <text class="h" x="44" y="54" text-anchor="start">Preview document</text>
+  <text class="s" x="760" y="54" text-anchor="end">server-built; the shell adds nothing</text>
+  <text class="m" x="44" y="96" text-anchor="start">&lt;head&gt;</text>
+  <rect class="box" x="44" y="110" width="712" height="50" rx="8"/>
+  <circle class="num" cx="72" cy="135" r="13"/>
+  <text class="num-t" x="72" y="140" text-anchor="middle">1</text>
+  <text class="t" x="98" y="131" text-anchor="start">Base layer</text>
+  <text class="s" x="98" y="150" text-anchor="start">resets, :root defaults, @font-face; beneath everything</text>
+  <text class="m" x="740" y="141" text-anchor="end">documentBase</text>
+  <rect class="box" x="44" y="168" width="712" height="50" rx="8"/>
+  <circle class="num" cx="72" cy="193" r="13"/>
+  <text class="num-t" x="72" y="198" text-anchor="middle">2</text>
+  <text class="t" x="98" y="189" text-anchor="start">Asset stylesheets</text>
+  <text class="s" x="98" y="208" text-anchor="start">linked into every preview</text>
+  <text class="m" x="740" y="199" text-anchor="end">assets.css</text>
+  <rect class="box" x="44" y="226" width="712" height="50" rx="8"/>
+  <circle class="num" cx="72" cy="251" r="13"/>
+  <text class="num-t" x="72" y="256" text-anchor="middle">3</text>
+  <text class="t" x="98" y="247" text-anchor="start">Theme stylesheets</text>
+  <text class="s" x="98" y="266" text-anchor="start">all themes (attribute) or the active one (stylesheet)</text>
+  <text class="m" x="740" y="257" text-anchor="end">themes</text>
+  <rect class="box" x="44" y="284" width="712" height="50" rx="8"/>
+  <circle class="num" cx="72" cy="309" r="13"/>
+  <text class="num-t" x="72" y="314" text-anchor="middle">4</text>
+  <text class="t" x="98" y="305" text-anchor="start">Component CSS</text>
+  <text class="s" x="98" y="324" text-anchor="start">the component and everything it uses, dependencies first</text>
+  <text class="m" x="740" y="315" text-anchor="end">src/styles</text>
+  <text class="m" x="44" y="372" text-anchor="start">&lt;body data-theme=&quot;…&quot;&gt;</text>
+  <rect class="box" x="44" y="386" width="712" height="50" rx="8"/>
+  <circle class="num" cx="72" cy="411" r="13"/>
+  <text class="num-t" x="72" y="416" text-anchor="middle">5</text>
+  <text class="t" x="98" y="407" text-anchor="start">SVG symbol sets</text>
+  <text class="s" x="98" y="426" text-anchor="start">inlined and hidden, for &lt;use href=&quot;#icon&quot;&gt;</text>
+  <text class="m" x="740" y="417" text-anchor="end">requireAssets</text>
+  <rect class="box" x="44" y="444" width="712" height="50" rx="8"/>
+  <circle class="num" cx="72" cy="469" r="13"/>
+  <text class="num-t" x="72" y="474" text-anchor="middle">6</text>
+  <text class="t" x="98" y="465" text-anchor="start">Rendered markup</text>
+  <text class="s" x="98" y="484" text-anchor="start">the component, inside &lt;main&gt;</text>
+  <text class="m" x="740" y="475" text-anchor="end">.hbs + data</text>
+  <rect class="box" x="44" y="502" width="712" height="50" rx="8"/>
+  <circle class="num" cx="72" cy="527" r="13"/>
+  <text class="num-t" x="72" y="532" text-anchor="middle">7</text>
+  <text class="t" x="98" y="523" text-anchor="start">Module scripts</text>
+  <text class="s" x="98" y="542" text-anchor="start">global scripts first, then the component&#x27;s own</text>
+  <text class="m" x="740" y="533" text-anchor="end">globalScripts · requireScript</text>
+  <text class="s" x="44" y="588" text-anchor="start">Later stylesheets win the cascade: component CSS overrides themes, themes override the base layer.</text>
+</svg>

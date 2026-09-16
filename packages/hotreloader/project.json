@@ -1,0 +1,12 @@
+{
+  "name": "hotreloader",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/hotreloader/src",
+  "projectType": "library",
+  "targets": {
+    "build":     { "executor": "nx:run-commands", "options": { "command": "npm run build", "cwd": "packages/hotreloader" } },
+    "test":      { "executor": "nx:run-commands", "options": { "command": "npm run test", "cwd": "packages/hotreloader" } },
+    "lint":      { "executor": "nx:run-commands", "options": { "command": "npm run lint", "cwd": "packages/hotreloader" } },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "npm run typecheck", "cwd": "packages/hotreloader" } }
+  }
+}

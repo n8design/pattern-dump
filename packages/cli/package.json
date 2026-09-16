@@ -1,0 +1,31 @@
+{
+  "name": "@pattern-dump/cli",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "The pd command and the published pattern-dump package.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "pd": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@pattern-dump/core": "*"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@pattern-dump/contracts": "*",
+    "@pattern-dump/dev-server": "*"
+  }
+}

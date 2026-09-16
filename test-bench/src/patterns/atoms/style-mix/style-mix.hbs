@@ -1,0 +1,8 @@
+<!--
+  Guard fixture for styleModules separation. This component's markup wears TWO borrowed classes
+  of different provenance:
+    - .df-button      → authored by the atoms/button component  → a styleUses (component) edge
+    - .tb-shared-only → authored by 00-base/shared-family (no component) → a styleModules edge
+  It owns neither. The two relationships must land in different fields, correctly separated.
+-->
+<div class="df-button tb-shared-only">borrows a component class (df-button) and a shared-module class (tb-shared-only)</div>

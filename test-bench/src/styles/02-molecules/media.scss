@@ -1,0 +1,16 @@
+@use "../00-base" as base;
+
+// Owns df-media, df-media__figure, df-media__body.
+// The &__ variants require source-map attribution — regex on source would miss them.
+.df-media {
+  display: flex;
+  gap: base.$df-space-md;
+
+  &__figure {
+    flex: 0 0 auto;
+  }
+
+  &__body {
+    flex: 1 1 auto;
+  }
+}

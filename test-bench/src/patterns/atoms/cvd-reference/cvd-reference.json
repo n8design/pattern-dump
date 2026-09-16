@@ -1,0 +1,48 @@
+{
+  "rows": [
+    {
+      "id": "A",
+      "patches": [
+        { "name": "Red",    "hex": "#C8322D" },
+        { "name": "Green",  "hex": "#3FA34D" },
+        { "name": "Orange", "hex": "#E08A1E" },
+        { "name": "Olive",  "hex": "#7A7B2E" },
+        { "name": "Brown",  "hex": "#8A5A3C" },
+        { "name": "Pink",   "hex": "#D98A9E" }
+      ]
+    },
+    {
+      "id": "B",
+      "patches": [
+        { "name": "Blue",   "hex": "#2D5BC8" },
+        { "name": "Teal",   "hex": "#2E8B8B" },
+        { "name": "Yellow", "hex": "#E6C12E" },
+        { "name": "Violet", "hex": "#7A4FB0" },
+        { "name": "Sky",    "hex": "#4FA6D9" },
+        { "name": "Rose",   "hex": "#D96A8A" }
+      ]
+    },
+    {
+      "id": "C",
+      "patches": [
+        { "name": "Red",     "hex": "#E11D1D" },
+        { "name": "Green",   "hex": "#1FA81F" },
+        { "name": "Blue",    "hex": "#1D3FE1" },
+        { "name": "Cyan",    "hex": "#1FA8A8" },
+        { "name": "Magenta", "hex": "#B01FB0" },
+        { "name": "Yellow",  "hex": "#D9D920" }
+      ]
+    },
+    {
+      "id": "D",
+      "patches": [
+        { "name": "White",      "hex": "#FFFFFF" },
+        { "name": "Light grey", "hex": "#C8C8C8" },
+        { "name": "18% grey",   "hex": "#7E7E7E" },
+        { "name": "Mid grey",   "hex": "#5A5A5A" },
+        { "name": "Dark grey",  "hex": "#2E2E2E" },
+        { "name": "Black",      "hex": "#000000" }
+      ]
+    }
+  ]
+}

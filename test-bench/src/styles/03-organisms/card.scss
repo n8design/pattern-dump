@@ -1,0 +1,11 @@
+@use "../00-base" as base;
+
+.df-card {
+  padding: base.$df-space-md;
+  border: 1px solid base.$df-color-border;
+  border-radius: base.$df-radius;
+}
+
+.df-reset {
+  box-sizing: border-box;
+}

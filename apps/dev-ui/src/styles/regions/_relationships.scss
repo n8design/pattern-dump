@@ -1,0 +1,159 @@
+@use '../abstracts' as a;
+
+// Relationships panel (Inspector › Relationships tab) — the composition + style graph rendered as a
+// tree in the shell's language. This is STRUCTURE, not state: ink / muted-ink / --pd-link only,
+// never the severity red/orange (findings here are descriptive, not alarms — see FEAT doc). Markup
+// is imperative DOM from main.ts renderPanel(); every rel-* hook already exists — this is CSS-only.
+.rel-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+// ---- Sections ----
+// Four flat sections (Uses / Used by / Style / chips), hairline-separated with the STRUCTURAL
+// cool-grey (--pd-border-rest — the nav-line/rail tone), NOT sand --pd-divider. No accordion:
+// relationship lists are short, collapsing would hide what already fits.
+.rel-panel > .rel-group-heading,
+.rel-panel > .rel-style-umbrella,
+.rel-panel > .rel-chips {
+  margin-top: 0.75rem; // section padding above the hairline — one value, every section
+  padding-top: 0.75rem; // section padding below the hairline — the same value, symmetric
+  border-top: thin solid var(--pd-border-rest);
+}
+
+// First section owns no divider above it.
+.rel-panel > :first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+// ---- Headings — four distinct tiers ----
+// Hierarchy needs contrast BETWEEN levels, not one uniform size. Each tier below is smaller and/or
+// lighter than the one above, so the nesting (section → sub-section → category → leaf) reads at a
+// glance. Semantic <h3>/<h4> are kept; only size/weight/colour change (a11y hierarchy preserved).
+// (No type-scale token exists yet; these stay literals here as elsewhere.)
+
+// Tier 1 — top-level section headings (<h3>: Uses / Used by / Style). UI type, not article type:
+// it must sit INSIDE the shell's type world (nav/tabs/diagnostics ≈13px), reading as a heading via
+// size + weight + colour together, not by towering over everything.
+.rel-group-heading {
+  margin: 0 0 0.3rem; // heading → its content — one value
+  font-size: 1rem; // 16px
+  font-weight: 600;
+  color: var(--pd-ink);
+}
+
+// Tier 2 — Style sub-section heads (<h4>: Style uses / Style modules). Visibly SMALLER + LIGHTER
+// than their parent "Style" — that contrast is what makes the grouping legible. The two sub-groups
+// are separated by breathing room INSIDE the umbrella, never by a hairline (spaced, not ruled).
+.rel-style-umbrella h4.rel-group-heading {
+  margin-top: 0.5rem; // content → next sub-heading (also the gap between Style's two sub-groups)
+  font-size: 0.875rem; // 14px
+  font-weight: 500;
+  color: var(--pd-ink-muted);
+}
+
+// Tier 3 — tree category label ("Organisms"). NOT bold, NOT a heading size — it must read as
+// SUBORDINATE to the <h3> above it (fixing the earlier inversion where it rendered heavier). The
+// guide-line does the structural work; the label just names the group.
+.rel-category-heading {
+  display: block;
+  font-size: 0.8125rem; // 13px — subordinate: smaller + lighter than the 16px/600 <h3> above it
+  font-weight: 400;
+  color: var(--pd-ink-muted);
+}
+
+// ---- The tree (category → component) ----
+// Kill the disc/circle bullets on both tiers; the guide-line carries membership.
+.rel-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rel-category + .rel-category {
+  margin-top: 0.3rem;
+}
+
+// Members container = the guide-line. Always-on ink variant (like diagnostics, no selection gating);
+// the shared mixin supplies the chevron-tip inset (0.9375rem), list-style reset, and border. The
+// caller adds the text gutter so the line runs the full height of its member rows.
+.rel-category-list {
+  @include a.guide-line(var(--pd-border-rest));
+  padding-inline-start: 0.6rem; // gutter from the ink line to the member text
+}
+
+.rel-item {
+  padding-block: 0.1rem;
+  line-height: 1.4;
+}
+
+// ---- Links ----
+// --pd-link (oklch(53% 0.14 255deg), ~4.94:1 on the surface) — a bluer sibling of the ink, NOT the
+// severity red. :visited pinned to the same so a followed component link never goes UA-purple.
+.rel-link {
+  font-size: 0.875rem; // 14px — a content leaf; must not inherit a heading size
+  color: var(--pd-link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+
+  &:visited {
+    color: var(--pd-link);
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: color-mix(in oklch, var(--pd-link), black 20%); // hover strengthens (matches diag docs-link)
+    text-decoration-thickness: 0.1em;
+  }
+}
+
+// ---- Style modules (non-navigable) ----
+// The plain group emits bare <li class="rel-item"> as DIRECT children of .rel-list (navigable items
+// always live one tier deeper, under .rel-category-list) — so this child combinator hits modules
+// only. They are file paths (e.g. 00-base/tokens) → mono + muted, no link styling.
+.rel-list > .rel-item {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8125rem; // 13px mono leaf
+  color: var(--pd-ink-muted);
+}
+
+// ---- Empty states ----
+// The literal "none" — an absence, so it recedes: muted ink + italic, not content weight.
+.rel-empty {
+  margin: 0.1rem 0 0;
+  font-size: 0.875rem; // 14px leaf
+  color: var(--pd-ink-muted);
+  font-style: italic;
+}
+
+// ---- Chips + private badge ----
+// Descriptive findings (inline styles / utility classes / unattributed classes), NOT severities:
+// small, flat, square hairline chips, muted ink — differentiated by LABEL, never by colour. If an
+// unattributed class ever warrants a warning, that belongs in Diagnostics with the orange, not here.
+.rel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.rel-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.8em;
+  color: var(--pd-ink-muted);
+  border: thin solid var(--pd-border-rest);
+  border-radius: var(--pd-region-radius); // 0 — square, consistent with the shell's region corners
+}
+
+// The per-component "private" marker — same quiet chip family, a marker not an alarm.
+.rel-private-badge {
+  margin-inline-start: 0.4em;
+  padding: 0 0.3em;
+  font-size: 0.8em;
+  color: var(--pd-ink-muted);
+  border: thin solid var(--pd-border-rest);
+  border-radius: var(--pd-region-radius);
+}

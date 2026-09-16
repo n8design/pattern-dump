@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/n8design/pattern-dump/tree/main/docs
+    about: Guides for authoring, configuration, themes, static builds and the command line.
+  - name: Questions and ideas
+    url: https://github.com/n8design/pattern-dump/discussions
+    about: Ask how to do something or discuss an idea before opening an issue.

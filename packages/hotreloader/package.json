@@ -1,0 +1,28 @@
+{
+  "name": "@pattern-dump/hotreloader",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Live-reload core: a WebSocket server and the messages that update the workbench.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@pattern-dump/contracts": "*",
+    "ws": "^8.17.0"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}

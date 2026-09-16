@@ -1,0 +1,557 @@
+// Left-rail brand slot, theme-picker disclosure, and layout toggle cluster.
+// Visual finish is deferred to the design-tokens milestone (system #1).
+
+// Brand slot — sits at the top of the sidebar above the theme picker.
+.rail-brand {
+  padding: 0.4rem 0.5rem 0.25rem;
+  border-bottom: thin solid var(--pd-divider);
+}
+
+.rail-brand-title {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.rail-brand-link {
+  color: inherit;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+.rail-brand-logo {
+  max-height: 2rem;
+  display: block;
+}
+
+// Theme picker — <details>/<summary> disclosure, same primitive as the nav tree.
+.theme-picker {
+  border-bottom: thin solid var(--pd-divider);
+}
+
+.theme-picker-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+// Summary swatch — strip showing the active theme's colours at a glance.
+.theme-picker-swatch {
+  flex-shrink: 0;
+}
+
+// Name readout in the summary shows the current theme; updates on hover/focus.
+.theme-picker-current-name {
+  font-style: italic;
+  color: var(--pd-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Hover/focus name readout below the grid.
+.theme-picker-readout {
+  margin: 0;
+  padding: 0.1rem 0.5rem 0.25rem;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--pd-ink-muted);
+  min-height: 1.2em;
+}
+
+// Theme grid list.
+.theme-picker-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+}
+
+// Visually hidden radio — state is owned by :checked, never by aria styling hooks.
+.theme-radio {
+  position: absolute;
+  width: 0.0625rem;
+  height: 0.0625rem;
+  margin: -0.0625rem;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+// Swatch chip — the clickable label wrapping the colour strip.
+.theme-swatch-chip {
+  display: block;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  overflow: hidden;
+
+  &:hover,
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 1px;
+  }
+}
+
+// Selected chip: styled off :checked state, not an aria hook.
+.theme-radio:checked + .theme-swatch-chip {
+  border-color: currentcolor;
+}
+
+// Swatch strip — flex row of colour bands inside a chip or the summary.
+.theme-swatch-strip {
+  display: flex;
+  height: 1.4rem;
+  width: 2.8rem;
+}
+
+// Single colour band inside a strip.
+.theme-swatch-band {
+  flex: 1;
+}
+
+// Undefined band — slot not declared by this theme (honesty spine: never fabricate).
+.theme-swatch-undefined {
+  /* stylelint-disable unit-disallowed-list -- hairline stripe pattern; must not scale with font-size */
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 3px,
+    currentcolor 3px,
+    currentcolor 4px
+  );
+  /* stylelint-enable unit-disallowed-list */
+  opacity: 0.25;
+}
+
+// ---- A11y picker — CVD simulator disclosure ----
+
+.a11y-picker {
+  border-bottom: thin solid var(--pd-divider);
+  container-type: inline-size; // responsive label breakpoints
+}
+
+.a11y-picker-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.a11y-icon {
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.a11y-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1 1 0;
+}
+
+// Responsive label: full → short → icon-only as the rail narrows.
+.a11y-label-short { display: none; }
+
+@container (max-width: 150px) {
+  .a11y-label-full  { display: none; }
+  .a11y-label-short { display: inline; }
+}
+
+@container (max-width: 80px) {
+  .a11y-label-short { display: none; }
+}
+
+// Active CVD signal — injected into the summary when type !== none AND severity > 0.
+// Removed from DOM entirely when inactive: TRUE absence, not opacity:0.
+.a11y-signal {
+  margin-left: auto;
+  font-size: 0.75em;
+  font-variant-numeric: tabular-nums;
+  color: var(--pd-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+// CVD controls inside the disclosure.
+.a11y-cvd-panel {
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.cvd-type-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-bottom: 0.4rem;
+}
+
+.cvd-type-btn {
+  font-size: 0.8rem;
+  padding: 0.15rem 0.4rem;
+  background: none;
+  border: thin solid var(--pd-border-rest);
+  border-radius: 3px;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+
+  &[aria-checked="true"] {
+    opacity: 1;
+    font-weight: 600;
+  }
+
+  &:not([data-cvd-type="none"])[aria-checked="true"] {
+    background: var(--pd-accent);
+    color: var(--pd-accent-ink);
+  }
+
+  &:hover,
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 1px;
+  }
+}
+
+.cvd-severity-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+// CVD severity slider — native <input type=range> brought into the shell language: ink thumb, red
+// fill GATED on an active simulation. The red here is NOT the position-indicator red the shell keeps
+// off (tabs/viewport/variant): an engaged CVD sim means the preview is lying to you — genuine state
+// with a real off, like the disco toggle. Red only when a simulation is actually distorting:
+// type=None → :disabled (no red at any value); type selected + severity=0 → --fill 0% (no red);
+// severity>0 → red proportional.
+// FORM restores affordance (this commit): the shell's hairline/flat/square vocabulary is for SURFACES and
+// borders. An interactive control needs enough physical presence to invite touch — restraint is for
+// decoration, not affordance (same call as the variant <select>'s visible bordered trigger). So the
+// track is a 6px bar (the red reads as a bar, not a line) and the thumb is a real ~14px grab handle,
+// rounded — a handle is the one place a round form is functionally right, not a surface.
+.cvd-severity-slider {
+  flex: 1;
+  appearance: none;
+  -webkit-appearance: none; /* stylelint-disable-line property-no-vendor-prefix -- Safari still needs it to drop UA range chrome */
+  height: 1rem; // hit area — clears the ~14px thumb without clipping
+  background: transparent;
+  cursor: pointer;
+
+  // Track — a 6px bar (not a hairline) in structural cool-grey (--pd-border-rest, NOT sand), subtly
+  // pill-rounded. No native "fill" pseudo, so the red is a linear-gradient with a hard stop at
+  // --fill (a %, set from the value in JS) — the filled portion reads as a bar.
+  &::-webkit-slider-runnable-track {
+    height: 0.375rem;
+    border-radius: 0.1875rem; // pill (half the height) — reads better than a hard rect at this size
+    background: linear-gradient(to right,
+      var(--pd-accent) 0 var(--fill, 0%),
+      var(--pd-border-rest) var(--fill, 0%) 100%);
+  }
+
+  &::-moz-range-track {
+    height: 0.375rem;
+    border-radius: 0.1875rem;
+    background: var(--pd-border-rest);
+  }
+
+  // Firefox's native progress pseudo carries the red (cleaner than the gradient on -moz).
+  &::-moz-range-progress {
+    height: 0.375rem;
+    border-radius: 0.1875rem;
+    background: var(--pd-accent);
+  }
+
+  // Thumb — a real grab handle: ~14px, rounded (functionally right for a handle, not a surface),
+  // --pd-ink, flat (no bevel/gloss/shadow). Webkit needs its own appearance reset and a negative
+  // margin-top to re-centre the thumb on the 6px track ((0.375 - 0.875) / 2 = -0.25rem).
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none; /* stylelint-disable-line property-no-vendor-prefix -- required to style the webkit thumb */
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-top: -0.25rem;
+    border: none;
+    border-radius: 50%;
+    background: var(--pd-ink);
+  }
+
+  &::-moz-range-thumb {
+    width: 0.875rem;
+    height: 0.875rem;
+    border: none;
+    border-radius: 50%;
+    background: var(--pd-ink);
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 2px;
+  }
+
+  // Disabled (type=None) — no red anywhere: track + progress fall to hairline, thumb muted.
+  &:disabled {
+    cursor: not-allowed;
+
+    &::-webkit-slider-runnable-track { background: var(--pd-border-rest); }
+    &::-webkit-slider-thumb { background: var(--pd-ink-muted); }
+    &::-moz-range-track { background: var(--pd-border-rest); }
+    &::-moz-range-progress { background: var(--pd-border-rest); }
+    &::-moz-range-thumb { background: var(--pd-ink-muted); }
+  }
+}
+
+// ---- Layout toggle cluster ----
+// Pinned above the scroll container; both toggles are independent on/off controls.
+
+.rail-toggle-cluster {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-bottom: thin solid var(--pd-divider);
+}
+
+// Icon-button reset — no background, no border, inherits currentColor for SVG.
+.rail-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 0;
+  border-radius: 3px;
+  min-inline-size: var(--pd-rail-icon-size);
+  min-block-size: var(--pd-rail-icon-size);
+
+  svg {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  &:hover,
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 1px;
+  }
+
+  // Expanded state — structural differentiation only; tokens milestone adds colour finish.
+  &[aria-expanded="true"] {
+    opacity: 1;
+  }
+
+  &[aria-expanded="false"] {
+    opacity: 0.55;
+  }
+}
+
+// Shared state-description label — right-anchored in the toggle cluster, visible on hover/focus.
+// Opacity-gated (not display/content) so the slot always occupies space once first populated —
+// prevents margin-inline-start:auto from shifting buttons when the label appears.
+.rail-toggle-label {
+  margin-inline-start: auto;
+  align-self: center;
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+  color: inherit;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+
+  // 0.8, not 0.7: at 0.7 this 12px label composites to 3.8:1 on the rail surface and fails
+  // WCAG AA (4.5:1) — one of the four serious axe violations on PD's own chrome. Measured on
+  // the rendered DOM, ink rgb(59, 75, 89) over rgb(244, 247, 250): 0.70 -> 3.83, 0.75 -> 4.33,
+  // 0.80 -> 4.91. 0.8 is the lowest 0.05 step that clears the threshold, so the label stays as
+  // muted as AA allows.
+  &:not(:empty) {
+    opacity: 0.8;
+  }
+}
+
+// The 0.1s fade passes through low opacities on its way to 0.8, and at those intermediate
+// values the label is briefly under the AA contrast floor. Honouring the reduced-motion
+// preference removes that window for the users most likely to be harmed by it — and makes the
+// axe assertion deterministic, since a scan fired right after the toggle click was otherwise
+// sampling mid-fade (axe read 3.59 where the settled value is 3.83).
+@media (prefers-reduced-motion: reduce) {
+  .rail-toggle-label,
+  .vp-mode-label {
+    transition: none;
+  }
+}
+
+// ---- Viewport cluster ----
+// 7-col grid: row 1 = icons auto-placed, row 2 = readout (3 cols) + mode-label (4 cols).
+// Fixed 2rem (32px) columns + justify-content:start packs the grid left; free space trails right.
+
+.rail-vp-cluster {
+  display: grid;
+  grid-template-columns: repeat(7, 2rem);
+  justify-content: start;
+  grid-template-areas:
+    ". . . . . . ."
+    "readout readout readout label label label label";
+  gap: 0.375rem;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-bottom: thin solid var(--pd-divider);
+}
+
+// Collapse the radiogroup wrapper so its 5 children become direct grid items.
+// role="radiogroup" + aria-label are AT attributes and survive display:contents fine.
+.rail-vp-cluster [role="radiogroup"] {
+  display: contents;
+}
+
+// Icon-button reset — same primitive as .rail-toggle.
+// grid-row: 1 locks all 7 buttons to the icon row; auto-flow assigns columns left→right.
+.rail-vp-btn {
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.2rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 0;
+  border-radius: 3px;
+  min-inline-size: var(--pd-rail-icon-size);
+  min-block-size: var(--pd-rail-icon-size);
+
+  svg {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  &:hover,
+  &:focus-visible {
+    outline: 2px solid currentcolor;
+    outline-offset: 1px;
+  }
+
+  // Active state is carried by fill vs regular glyph weight, opacity, AND the accent colour tint
+  // (the .rail-vp-cluster accent rules below) — opacity is no longer the sole signal. (resolves the
+  // old TODO(design-tokens): replace opacity with a colour tint.)
+  &[aria-checked="false"],
+  &[aria-pressed="false"] {
+    opacity: 0.55;
+  }
+
+  &[aria-checked="true"],
+  &[aria-pressed="true"] {
+    opacity: 1;
+  }
+}
+
+// Active viewport mode = accent, but ONLY while disco isn't engaged. Disco engaged = accent. The
+// data-disco-active flag (set in start/stopDisco) makes the two mutually exclusive → exactly one red
+// in the cluster at a time. Red is STATE here (disco has a genuine off, aria-pressed true/false) —
+// the sole-accent-as-state rule working, not the position-indicator case we keep red off (tabs, nav
+// line). This is the one rail spot accent is correct — do not "consistency-fix" it to ink. (from 1a3e5a9)
+.rail-vp-cluster:not([data-disco-active]) .rail-vp-btn[aria-checked="true"] {
+  color: var(--pd-accent);
+}
+
+.rail-vp-cluster .vp-disco-btn[aria-pressed="true"] {
+  color: var(--pd-accent);
+}
+
+// Readout — grid area row 2 left (3 cols).
+.vp-readout {
+  grid-area: readout;
+  justify-self: start;
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  color: var(--pd-ink-muted);
+  white-space: nowrap;
+}
+
+// Mode-name label — grid area row 2 right (4 cols). AT-silent (aria-hidden).
+.vp-mode-label {
+  grid-area: label;
+  justify-self: end;
+  text-align: right;
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+  color: inherit;
+
+  // 0.8 for WCAG AA — see the note on .rail-toggle-label; same ink, same surface, same measured
+  // ramp (0.70 -> 3.83, 0.80 -> 4.91 against the required 4.5:1).
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+// ---- Rail-foot status indicator ----
+// Always present; CSS reveals connected dot or disconnected warning per data-state.
+// Connected dot = --pd-accent; disconnected = --pd-warning (the token milestone's warning colour).
+
+.rail-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  margin-top: auto;      // pushes to foot when sidebar-tree has spare space
+  border-top: thin solid var(--pd-divider);
+  flex-shrink: 0;        // never squashed by the tree above it
+}
+
+// Connected: small dot via ::before + "Connected" label; warning icon hidden.
+.rail-status[data-state="connected"] {
+  &::before {
+    content: "";
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--pd-accent);
+    flex-shrink: 0;
+  }
+
+  .rail-status-icon  { display: none; }
+}
+
+// Disconnected: warning icon + label visible; dot hidden. Warning colour tints the icon
+// (currentColor) + label — genuine state (HMR down has a real off), the same red/warning
+// signal-vs-position discipline the tab severity marker follows.
+.rail-status[data-state="disconnected"] {
+  color: var(--pd-warning);
+
+  &::before { display: none; }
+
+  // .rail-status-icon and .rail-status-label are visible by default (no override needed)
+}
+
+// Static build: no server to be connected to, so neither the dot nor the warning — just the
+// build label, in the muted ink of other descriptive text.
+.rail-status[data-state="static"] {
+  color: var(--pd-ink-muted);
+
+  .rail-status-icon { display: none; }
+}

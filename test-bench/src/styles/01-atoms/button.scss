@@ -1,0 +1,26 @@
+@use "../00-base" as base;
+
+// Owns df-button, df-button--primary, df-button--ghost.
+// The &-- variants only exist after Sass resolves nesting — source-map attribution required.
+.df-button {
+  padding: base.$df-space-sm base.$df-space-md;
+  border-radius: base.$df-radius;
+  border: 1px solid transparent;
+  cursor: pointer;
+
+  &--primary {
+    background: var(--buttonPrimaryBackground, #{base.$df-color-primary});
+    color: var(--buttonPrimaryText, #fff);
+  }
+
+  &--ghost {
+    background: transparent;
+    border-color: base.$df-color-border;
+    color: base.$df-color-primary;
+  }
+
+  &[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

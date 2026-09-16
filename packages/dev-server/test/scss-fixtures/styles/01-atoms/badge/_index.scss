@@ -1,0 +1,7 @@
+// Index-file entry for atoms/badge. Reached via @use "../01-atoms/badge".
+// BEM modifier defined via nesting — &__label resolves to .badge__label in compiled CSS.
+// The source-map test verifies this is correctly attributed to atoms/badge (regex would miss it).
+.badge {
+  display: inline-block;
+  &__label { font-weight: bold; }
+}

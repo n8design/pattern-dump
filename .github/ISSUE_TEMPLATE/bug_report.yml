@@ -1,0 +1,87 @@
+name: Bug report
+description: Something in Pattern Dump doesn't work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A small project or component that shows the problem helps most.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe the problem. Include what you saw in the workbench or the terminal.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The files involved (template, data, docs, config) and the commands you ran.
+      placeholder: |
+        1. Create src/patterns/atoms/badge/badge.hbs with …
+        2. Run npm run dev
+        3. Open atoms/badge
+    validations:
+      required: true
+  - type: dropdown
+    id: command
+    attributes:
+      label: Command
+      options:
+        - pd dev (the workbench)
+        - pd audit
+        - pd build
+        - pd export
+        - pd init
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Pattern Dump version
+      description: The output of `npm ls pattern-dump` in your project.
+      placeholder: pattern-dump@0.1.0-alpha.0
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      description: The output of `node --version`.
+      placeholder: v22.0.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15, Windows 11, Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: For problems in the workbench.
+      placeholder: Chrome 140, Firefox 143, Safari 19
+  - type: textarea
+    id: output
+    attributes:
+      label: Terminal output or diagnostics
+      description: Relevant output from the terminal or the Console's Diagnostics tab.
+      render: shell
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Existing issues
+      options:
+        - label: I searched the existing issues and this hasn't been reported.
+          required: true

@@ -1,0 +1,404 @@
+@use '../abstracts' as a;
+
+// Dock — bottom-center region: Source | HTML | Console primary tabs; Source expands Handlebars/Data/Schema facets.
+// Height driven by --pd-dock-h custom property; [data-resize="dock-h"] handle on top edge.
+.dock {
+  position: relative; // anchor for [data-resize="dock-h"] splitter handle
+  grid-area: dock;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin-top: 0.25rem; // gap between the breadcrumb/preview above and the tab-area top hairline
+  overflow: hidden;
+  border-top: 1px solid var(--pd-border-rest);
+  border-inline: 1px solid var(--pd-border-rest);
+  border-radius: var(--pd-region-radius);
+}
+
+.dock:hover,
+.dock:focus-within                       { border-color: var(--pd-border-active); }
+.dock:has([data-resize="dock-h"]:hover)  { border-color: var(--pd-border-active); }
+.dock:has([data-resize="dock-h"]:active) { border-color: var(--pd-border-active); }
+
+// Dock header row: tablist only, never scrolls.
+.dock-header {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: thin solid var(--pd-border-rest); // shared baseline tone — matches the nav line + rail border (#D4DAE0), not sand
+}
+
+// Tab bar — flex row inside dock-header.
+.dock-tabs {
+  display: contents; // let tabs participate directly in dock-header's flex
+
+  [role="tab"] {
+    cursor: pointer;
+    padding-inline: 0.5rem;
+    padding-block: 0.5rem 0.35rem; // breathing room above the label; 0.35rem text-to-underline gap
+    font-size: 0.85em;
+    white-space: nowrap;
+    border: 0; // flat on the shared baseline — kills the UA button box; focus uses the UA outline
+    background: none;
+
+    &[aria-selected="true"] {
+      font-weight: bold;
+    }
+
+    // ---- Severity marker (Diagnostics tab) ----
+    // Evolves the old dormant [data-activity] dot into the real signal. Lives inside .tab-content
+    // after .tab-label (a child <span>, not ::after — ::after can't carry shape AND a count crisply),
+    // so the active pill (anchored .tab-content::after) spans label+marker as one unit. Hidden until
+    // the tab button gets [data-severity]. THREE channels: colour (--pd-accent error / --pd-warning
+    // warning), SHAPE (● dot / ▲ triangle — carries the severity split where #E78C08's ~2.4
+    // light-strip contrast and the CVD hue-merge can't), and the count digit (the hard contrast the
+    // colour lacks). Light #F4F7FA is the governing surface — legible there ⇒ fine on the dark panel.
+    // Baseline discipline: .tab-content is align-items:baseline, so the marker's COUNT digit rides the
+    // label's text baseline (not floating low like the old vertical-align:middle did).
+    .tab-marker {
+      display: none; // shown only when the tab carries [data-severity]
+      align-items: baseline; // count digit sits on the label baseline
+      gap: 0.25em;
+      margin-left: 0.35em;
+      font-size: 0.85em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    // The glyph itself is now the shared .pd-sev-glyph (see below, de-nested) — one source for the
+    // tab marker, the accordion head marker, and the per-row dots. The wrapper keeps colour+display:
+    // colour still rides currentcolor onto the COUNT digit (red/orange), display shows the marker.
+    &[data-severity="error"] .tab-marker {
+      display: inline-flex;
+      color: var(--pd-accent); // red — the ONE place accent is a state marker, not a position
+    }
+
+    &[data-severity="warning"] .tab-marker {
+      display: inline-flex;
+      color: var(--pd-warning); // orange
+    }
+  }
+}
+
+// ---- Shared severity glyph (severityGlyph builder → .pd-sev-glyph) ----
+// De-nested OUT of .dock-tab so the accordion (commit 2) and per-row dots can consume the SAME
+// mark by construction — not a look-alike that drifts. Self-contained: shape AND colour key off
+// the element's OWN [data-severity], so a bare dot works with no ancestor context. Filled shape
+// sized in em (rides the host font-size). Values lifted verbatim from the old .tab-marker-glyph;
+// align-self:center optically centres the ●/▲ on the neighbouring text box (reads as an inline
+// bullet, not a low-sitting shape). Colour is set directly here (was currentcolor inherited from
+// .tab-marker); computed background is identical (--pd-accent / --pd-warning).
+.pd-sev-glyph {
+  width: 0.7em;
+  height: 0.7em;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.pd-sev-glyph[data-severity="error"] {
+  background: var(--pd-accent);
+  border-radius: 50%; // ● filled dot
+}
+
+.pd-sev-glyph[data-severity="warning"] {
+  background: var(--pd-warning);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%); // ▲ filled triangle
+}
+
+// ---- Active-tab ink pill ----
+// Shared across ALL three strips (dock primary, source facets, inspector) — the selector is global
+// on [role="tab"], so this one rule covers every tab regardless of which region file styles it.
+// The pill anchors to the .tab-content span (label + any severity marker), content-width — whole at
+// both tab widths (content-width dock tabs and flex:1 inspector tabs; a full-button pill on flex:1
+// was the panel-tab-arc bug, NOT reintroduced — .tab-content is inline-flex, hugs its content). The
+// pill spans label THROUGH marker so the underline runs under "Diagnostics ● 1" as one unit. It rides
+// the strip's --pd-border-rest baseline, rounded ends. Ink (--pd-ink), never --pd-accent: active-tab
+// is a position marker, not a state. Specificity 0,3,1, under the 0,4,0 ceiling.
+.tab-content {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline; // label + marker share one text baseline; keeps the box bottom = label bottom
+}
+
+[role="tab"][aria-selected="true"] .tab-content::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8.1px; /* stylelint-disable-line unit-disallowed-list -- DOM-tuned for 0.35rem padding-block-end: centers the 3px pill on the 1px baseline (computed center ≈ 8.094px; label-bottom→baseline gap ~6.6px + half-pill 1.5). Uniform across all three strips. Device-pixel-symmetric (ink ≈2px above / ≈2px below the baseline at DPR 2). Residual: edges antialias softly because .dock starts off the device grid (0.766 device-px, inherited from the preview above) — full hard-edge crispness needs the preview on a whole pixel, a separate layout concern, not forced here. */
+  height: 0.1875rem; // 3px
+  border-radius: 0.1875rem; // ≥ half-height → fully rounded ends (pill)
+  background: var(--pd-ink);
+}
+
+// Copy button sits at the far right of .dock-facets (after source facets or alone for HTML tab).
+.dock-copy-btn {
+  margin-left: auto;
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 0.2rem 0.5rem;
+  white-space: nowrap;
+  border: thin solid var(--pd-border-rest);
+  background: none;
+}
+
+// Facets bar — secondary row below dock-header; source-facets + copy button side-by-side.
+// Visible for Source and HTML tabs; hidden (JS) for Console.
+.dock-facets {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: thin solid var(--pd-border-rest); // shared baseline tone — matches the nav line + rail border (#D4DAE0), not sand
+}
+
+.source-facets {
+  display: flex;
+  align-items: center;
+}
+
+.dock-facet {
+  cursor: pointer;
+  padding-inline: 0.5rem;
+  padding-block: 0.5rem 0.35rem; // unified with primary tabs — breathing room + 0.35rem underline gap
+  font-size: 0.8em;
+  opacity: 0.7;
+  white-space: nowrap;
+  border: 0; // flat on the shared baseline — kills the UA button box; focus uses the UA outline
+  background: none;
+
+  &[aria-selected="true"] {
+    opacity: 1;
+    font-weight: bold;
+  }
+}
+
+// Tab panels — one visible at a time. flex: 1 fills remaining dock height.
+.dock-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding-top: 0.75rem; // breathing room below the tab strip; sits outside the inner scroll body so it holds
+  overflow: hidden;
+  min-height: 0;
+
+  // [hidden] override from _root.scss keeps inactive panels out of layout.
+}
+
+// Source body: scrollable code area with horizontal room for long lines.
+.source-body {
+  flex: 1;
+  @include a.scroll-region(both);
+  font-family: monospace;
+  font-size: 0.85em;
+
+  pre {
+    margin: 0;
+    padding: 0.5rem;
+    white-space: pre; // preserve long lines — horizontal scroll is the point of the dock
+  }
+}
+
+// Shiki per-block copy button (inside source panels).
+.shiki-container {
+  position: relative;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 0.75em;
+  padding: 0.125rem 0.375rem;
+
+  .shiki-container:hover & {
+    opacity: 1;
+  }
+}
+
+// Console log area.
+.console {
+  flex: 1;
+  @include a.scroll-region(y);
+  padding: 0.25rem;
+  font-family: monospace;
+  font-size: 0.85em;
+
+  p {
+    margin: 0 0 0.125rem;
+  }
+
+  // Build/render failures pushed over HMR. Colour only — the message text already carries the
+  // meaning and the Console is monospace log output, so no glyph or badge chrome.
+  p[data-level="error"] {
+    color: var(--pd-accent);
+  }
+}
+
+// Primary action for the Diagnostics panel — ink (a neutral "run"), NOT --pd-accent: a red button
+// reads as danger, and red stays reserved for severity. Flat + square like the rest of the shell
+// (no pill, no border chrome). White text — the palette has no general on-ink/text-inverse token
+// (--pd-accent-ink is scoped to accent backgrounds), so this is a literal until that gap is filled.
+// Ink is already dark, so hover/active LIGHTEN toward white to feel pressable. Focus ring: the UA
+// :focus-visible outline is left intact (same as the dock tabs) — never outline:none.
+.pd-run-rendered {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85em;
+  color: #fff;
+  background: var(--pd-ink);
+  border: 0;
+  border-radius: var(--pd-region-radius); // 0 — flat shell
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in oklch, var(--pd-ink), white 12%);
+  }
+
+  &:active {
+    background: color-mix(in oklch, var(--pd-ink), white 20%);
+  }
+}
+
+// Diagnostics panel content insets 1rem from the panel edges (breathing room around the "Run
+// rendered checks" toolbar + the accordion tree). .dock-panel is shared across all dock panels, so
+// this is scoped by the panel's own class (0,2,0 — under the 0,4,0 ceiling); it overrides the
+// shared padding-top with a full 1rem inset. Not a scroll container (no inner scroll-region), so
+// padding cleanly insets both children.
+.dock-panel.dock-panel-diagnostics {
+  padding: 1rem;
+}
+
+// Overview mode: Source and HTML primary tabs + copy button are hidden (console only).
+// The facets bar is hidden via JS (hidden attr on .dock-facets); this is belt-and-suspenders.
+.dock[data-mode="overview"] [role="tab"][data-tab="source"],
+.dock[data-mode="overview"] [role="tab"][data-tab="html"],
+.dock[data-mode="overview"] .dock-copy-btn {
+  display: none;
+}
+
+// ---- Diagnostics accordion — tree treatment ----
+// The panel is native <details name="pd-diagnostics"> / <summary>: exclusive, expand/collapse and
+// chevron rotation 100% native (global `details[open] .disclosure-caret`). We style WITHIN it — no
+// JS disclosure, no aria-expanded toggling. Colour law: the ONLY colour here is severity (red
+// --pd-accent errors, orange --pd-warning warnings). Chevron, guide-line, head/row text and [docs]
+// stay ink/muted — red is state, structure is quiet.
+.diagnostics {
+  font-size: 0.85em;
+
+  // Group + review heads — flex row: caret · label · marker(s) · review clause, on one baseline.
+  summary {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    padding: 0.35rem 0.5rem;
+    cursor: pointer;
+    color: var(--pd-ink);
+  }
+
+  // Flat hairline separating the top-level group heads — the STRUCTURAL tone (--pd-border-rest,
+  // the nav-line/rail grey), never sand --pd-divider.
+  > details > summary {
+    border-bottom: thin solid var(--pd-border-rest);
+  }
+
+  // Head severity marker — one construction shared with the tab (severityGlyph → .pd-sev-glyph).
+  // The segment carries the severity colour onto its count digit via currentcolor; the glyph paints
+  // itself. Uniform group = one segment (● N / ▲ N); mixed = ● N ▲ M (error then warning).
+  .pd-diag-head-seg {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pd-diag-head-seg[data-severity="error"]   { color: var(--pd-accent); }
+  .pd-diag-head-seg[data-severity="warning"] { color: var(--pd-warning); }
+
+  // Needs-review is a certainty axis, not severity — quiet muted ink, never a severity colour.
+  .pd-diag-head-review {
+    color: var(--pd-ink-muted);
+  }
+
+  // Row list = the guide-line. A transparent border is reserved always (the ink line never shifts
+  // layout), coloured the quiet structural tone matched to the nav guide-line (_sidebar.scss:71) —
+  // but with NO aria-current/selection accent: the accordion line has no selection state, it is
+  // plain structure. Border-on-container runs the FULL WRAPPED HEIGHT of the rows, including the
+  // 2–3-line a11y messages. Applies to the confirmed list AND the nested review list.
+  details > ul {
+    margin-block: 0; // reset the UA <ul> block margin (previously folded into the `margin` shorthand)
+    padding: 0.25rem 0 0.25rem 0.75rem;
+
+    // guide-line: inset lands on the chevron tip (0.9375rem) — corrected from the earlier 0.9rem,
+    // which sat 0.6px short of its own stated target. Always-on ink, no selection gating.
+    @include a.guide-line(var(--pd-border-rest));
+  }
+
+  li {
+    max-width: 85ch; // cap the measure — long a11y messages are ~200 chars at full width. ch is
+    line-height: 1.5; // font-relative (row's 0.85em, not mono); left-aligned, whitespace to the
+    padding: 0.15rem 0.5rem 0.15rem 0; // right. Narrower text → more wrapped lines → taller row;
+    color: var(--pd-ink); // the guide-line (border on the <ul>) spans the full wrapped height.
+    overflow-wrap: break-word; // long selectors/messages still break rather than force h-scroll
+  }
+
+  // Severity word — its own element so it reads as a label: bold, NO colour (inherits row ink).
+  // The head marker + row dot already carry the severity colour; bolding the word labels it without
+  // spending red/orange a third time.
+  .diag-sev {
+    font-weight: 600;
+  }
+
+  // Separator between the bold label and the message — a quiet divider: muted ink, normal weight,
+  // so it reads as punctuation, not part of the label.
+  .diag-sep {
+    color: var(--pd-ink-muted);
+    font-weight: 400;
+  }
+
+  // Per-row severity dot — inline before the row text. Present ONLY in mixed groups; in a uniform
+  // group the head marker already carries the severity, so the dots are noise → gated off here.
+  // The gate targets rows only; the head marker (in <summary>) is untouched.
+  li .pd-sev-glyph {
+    display: inline-block;
+    margin-inline-end: 0.4em;
+    vertical-align: middle;
+  }
+
+  details:not([data-mixed]) li .pd-sev-glyph {
+    display: none;
+  }
+
+  // "See docs" link — leading shared external-link glyph + label, recognizable as a link: --pd-link
+  // blue + underline at rest. inline-flex keeps glyph+label as one unit; nowrap so it never orphans;
+  // small leading gap off the preceding text. Normal weight, NOT accent red — the link is a distinct
+  // interactive channel from severity. Hover darkens.
+  li a.diag-docs {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    margin-inline-start: 0.4em;
+    color: var(--pd-link);
+    text-decoration: none; // underline lives on the label span (flex containers drop propagation)
+    white-space: nowrap;
+
+    // Leading glyph inherits the link colour (currentColor) and sits ~0.875em to the text.
+    svg {
+      width: 0.875em;
+      height: 0.875em;
+      flex-shrink: 0;
+    }
+
+    span {
+      text-decoration: underline;
+    }
+
+    &:hover,
+    &:focus-visible {
+      color: color-mix(in oklch, var(--pd-link), black 20%);
+    }
+  }
+}
+

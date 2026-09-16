@@ -1,0 +1,4 @@
+{
+  "saveBtn":   { "label": "Save",   "variant": "primary" },
+  "cancelBtn": { "label": "Cancel", "variant": "secondary" }
+}

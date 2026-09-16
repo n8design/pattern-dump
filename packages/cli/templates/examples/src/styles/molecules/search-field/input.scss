@@ -1,0 +1,21 @@
+@use "../../base/tokens";
+
+.input {
+  display: flex;
+  flex-direction: column;
+  gap: tokens.$space-xs;
+}
+
+.input-label {
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #4b5563);
+}
+
+.input-control {
+  padding: tokens.$space-sm;
+  border: 1px solid var(--color-border, #6b7280);
+  border-radius: tokens.$radius;
+  font: inherit;
+  color: inherit;
+  background: var(--color-surface, #ffffff);
+}

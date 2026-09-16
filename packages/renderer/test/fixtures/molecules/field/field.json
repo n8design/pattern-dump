@@ -1,0 +1,7 @@
+{
+    "label": "Email",
+    "input": {
+        "type": "email"
+    },
+    "hint": "We never share it."
+}
