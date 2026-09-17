@@ -135,6 +135,7 @@ figure.preview {
 // Canvas backdrop lives here on the ELEMENT — shell styles its own furniture, not the doc.
 // Shell :root { color-scheme: light } pins Canvas → white even on dark OS.
 // TODO: dark-mode pass — conditional the color-scheme pin and let Canvas track the OS.
+// stylelint-disable-next-line selector-max-specificity -- #preview-frame is the shell's one styleable hook on the preview (an id by contract)
 #preview-frame {
   background: Canvas;
 }
@@ -161,6 +162,7 @@ figure.preview {
 // Focus outline: replaces the old always-on .vp-sized border.
 // .frame-focused is toggled by JS (syncFrameFocusListeners) — CSS :focus/:focus-within
 // don't cross the srcdoc boundary. Applies in all viewport modes, not just presets.
+// stylelint-disable-next-line selector-max-specificity -- #preview-frame is the shell's one styleable hook on the preview (an id by contract)
 #preview-frame.frame-focused {
   outline: 1px solid var(--pd-border-active);
   outline-offset: -1px;

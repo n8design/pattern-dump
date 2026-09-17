@@ -251,6 +251,7 @@ details[open] .disclosure-caret {
 // Full-ink uppercase — case + scale carry the header role vs. items; muted was washed at scale.
 // Row height (14px) is set by the flex parent, not line-height; min-block-size: 0.625rem
 // guards a 10px floor but flex already exceeds it. line-height: 1.2 is a normal text ratio.
+// stylelint-disable-next-line selector-max-specificity -- must beat the generic summary.tree-folder rules; see the type-hierarchy notes above
 .tree-folder-row[data-depth="0"] > .tree-details > summary.tree-folder {
   font-size: 0.6875rem;
   font-weight: 500;
@@ -265,6 +266,7 @@ details[open] .disclosure-caret {
 
 // Keyboard focus on a depth-0 head: accent text + thin inset ring. Mouse click gets no ring
 // (:focus-visible is keyboard/heuristic only). ring-offset -1px hugs the row like .tree-link.
+// stylelint-disable-next-line selector-max-specificity -- focus state of the depth-0 head must beat its 0,4,1 ink rule
 .tree-folder-row[data-depth="0"] > .tree-details > summary.tree-folder:focus-visible {
   color: var(--pd-accent);
   outline: 0.0625rem solid var(--pd-accent);
@@ -273,6 +275,7 @@ details[open] .disclosure-caret {
 
 // Disclosure-group rows (depth-1+): same item-level type as .tree-link.
 // Overrides the generic summary.tree-folder bold so these read as items, not section heads.
+// stylelint-disable-next-line selector-max-specificity -- depth-1 rows must override the generic summary.tree-folder bold
 .tree-folder-row[data-depth="1"] > .tree-details > summary.tree-folder {
   font-size: 0.8125rem;
   font-weight: 400;
@@ -292,6 +295,7 @@ details[open] .disclosure-caret {
 // Selector anchored on .tree-node (NOT .tree-details): <details> only contains <summary>;
 // [aria-current] lives in the sibling <ul>, so .tree-details:has([aria-current]) never fires.
 // :has() matches through display:none -- correct, collapsed <ul> still exists in DOM.
+// stylelint-disable-next-line selector-max-specificity -- the accent must beat the depth-0 ink rule (0,4,1) or it never paints
 .tree-node:has(> .tree-folder-row > .tree-details:not([open])):has([aria-current="page"])
   > .tree-folder-row > .tree-details > summary.tree-folder {
   color: var(--pd-accent);
@@ -317,6 +321,7 @@ details[open] .disclosure-caret {
 // cascade-sensitive: assert the PAINTED colour on a genuinely-stuck head, not just that the selector
 // matches — a matching selector can still lose to a higher-specificity colour rule.
 @container scroll-state(stuck: top) {
+  // stylelint-disable-next-line selector-max-specificity -- mirrors the collapsed-parent chain above so the accent beats the depth-0 ink rule
   .tree-node:has([aria-current="page"]) > .tree-folder-row > .tree-details > summary.tree-folder {
     color: var(--pd-accent);
   }

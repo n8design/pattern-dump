@@ -57,10 +57,12 @@
 
 // Suppress transition on initial paint so the panel appears open without animating (see main.ts init).
 // Also covers the preview iframe — keeps disco and splitter drag instant.
+// stylelint-disable selector-max-specificity -- #preview-frame is the shell's one styleable hook on the preview (an id by contract)
 .main[data-no-transition],
 .main[data-no-transition] #preview-frame {
   transition: none;
 }
+// stylelint-enable selector-max-specificity
 
 @media (prefers-reduced-motion: reduce) {
   .main {
