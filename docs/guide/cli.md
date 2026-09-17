@@ -7,6 +7,21 @@ pd <command> [options]
 Run it through npm scripts (`npm run dev`) or `npx pd` inside a project. `pd help [command]` prints the
 built-in help.
 
+## Global or local
+
+`pd` is installed per project: `pd init` adds `pattern-dump` as a development dependency, and the
+project's `pattern-dump.config.ts` imports `defineConfig` from it.
+
+You can also install `pd` globally (`npm install --global pattern-dump@alpha`) to create projects with
+`pd init` from anywhere. Keep two things in mind:
+
+- **A project still needs its local dependency.** The config's `import … from "pattern-dump"` resolves
+  from the project's own `node_modules`; without it, `pd dev` and the other commands can't load the
+  config.
+- **A global `pd` runs its own version.** It does not switch to the version the project depends on, so
+  if the two differ, the workbench, checks and static build come from the global one. Inside a project,
+  use `npm run dev`, `npm run audit` or `npx pd <command>`, which run the project's version.
+
 Commands that read a project (`dev`, `audit`, `build`, `export`) share two options:
 
 | Option | Description |

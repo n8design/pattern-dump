@@ -38,6 +38,9 @@ Once the package is published, this becomes `npx pattern-dump@alpha init my-desi
 `--yes` accepts every default without asking. In a folder that already has a `package.json`, `pd init`
 adds to the project and never overwrites a file; a script name that is taken gets a `pd:` prefix instead.
 
+A global install (`npm install --global pattern-dump@alpha`) also works for creating projects, but each
+project still uses its own local copy; see [global or local](cli.md#global-or-local).
+
 ## 2. What you get
 
 ```

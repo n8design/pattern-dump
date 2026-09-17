@@ -32,6 +32,18 @@ npx pd init
 few starter components, and adds `dev`, `audit`, `typecheck` and `build:scripts` scripts. It never
 overwrites an existing file.
 
+### Installing `pd` globally
+
+```bash
+npm install --global {{name}}@alpha
+pd init my-design-system
+```
+
+A global `pd` is handy for creating projects, but each project still needs its own local
+`{{name}}` (which `pd init` installs): the config file imports `defineConfig` from it. A global `pd`
+runs its own version, not the project's, so inside a project prefer `npm run dev`, `npm run audit`
+and `npx pd build`, which always use the version the project depends on.
+
 ## Commands
 
 | Command | What it does |
