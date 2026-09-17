@@ -15,7 +15,7 @@ import {
   previewUrl, renderedSourceUrl, dataSourceUrl, overviewUrl,
   componentUrl, componentCssUrl, themeCssUrl, scriptUrl, PD_ROUTES, PD_ROUTE_PREFIX,
   staticPathFor, normalizeBasePath,
-  buildAuditRollup, SCOPE_BOUNDARY, PD_PROTOCOL_VERSION,
+  buildAuditRollup, AUDIT_SCOPE, PD_PROTOCOL_VERSION,
   type DiagnosticsGraph, type HmrMessage,
   type DiagnosticComponentNode, type DiagnosticOccurrence,
   type DiagnosticEngine, type RenderOutcome,
@@ -259,7 +259,17 @@ describe("buildAuditRollup — contract guarantees", () => {
   });
 
   it("always carries the scope boundary — a number without its caveat is not shippable", () => {
-    expect(buildAuditRollup(graph()).scope).toBe(SCOPE_BOUNDARY);
+    expect(buildAuditRollup(graph()).scope).toBe(AUDIT_SCOPE);
+  });
+
+  it("the scope is plain data: named areas with details, and no Markdown in any field", () => {
+    expect(AUDIT_SCOPE.covered.length).toBeGreaterThan(0);
+    expect(AUDIT_SCOPE.notCovered.length).toBeGreaterThan(0);
+    const texts = [...AUDIT_SCOPE.covered, ...AUDIT_SCOPE.notCovered].flatMap(i => [i.name, i.detail]).concat(AUDIT_SCOPE.note);
+    for (const t of texts) {
+      expect(t.trim(), t).not.toBe("");
+      expect(t, t).not.toMatch(/\*\*|^#|\n/);
+    }
   });
 
   it("omits subjectSha unless one is supplied", () => {

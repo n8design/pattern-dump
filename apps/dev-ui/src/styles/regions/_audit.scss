@@ -193,12 +193,38 @@
   cursor: pointer;
 }
 
-.audit-scope-body {
-  margin: 0.4rem 0 0;
-  overflow-x: auto;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 0.72rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
+.audit-scope-label {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--pd-ink-muted);
+}
+
+.audit-scope-list {
+  margin: 0;
+  padding-inline-start: 1rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--pd-ink-muted);
+}
+
+.audit-scope-item + .audit-scope-item {
+  margin-top: 0.2rem;
+}
+
+.audit-scope-name {
+  color: var(--pd-ink);
+  font-weight: 600;
+}
+
+.audit-scope-code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.95em;
+}
+
+.audit-scope-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pd-ink);
 }

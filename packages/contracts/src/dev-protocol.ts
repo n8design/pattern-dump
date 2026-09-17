@@ -219,31 +219,38 @@ export interface DiagnosticsGraph {
 //      browser/server seam render from ONE builder (`buildAuditRollup`) — a tool whose thesis is
 //      "derived views can't go stale" cannot have two implementations of its own rollup. ----
 
-/** The §0 scope boundary — embedded verbatim in every report/view so the artifact states its own
- *  limits. Corrected for the sweep's real coverage: the rendered-contrast (needsRendering) axe tier
- *  is a named exclusion (it needs browser layout the static jsdom sweep cannot produce). */
-export const SCOPE_BOUNDARY = `## Scope — the boundary is part of the artifact
+/** One line of the audit scope: a named area and what it means. */
+export interface AuditScopeItem {
+  name: string;
+  detail: string;
+}
 
-**Covers** — machine-detectable, static, single-render (no browser layout):
-- **HTML content-model** (html-validate) — nesting/permitted-content violations.
-- **Structural a11y** (axe, alwaysOn tier) — labels, names, ARIA, roles, image-alt.
-- **Schema** — required/shape violations against \`component.schema.json\`.
-- **Render outcome** — blank / error / ok (metadata, never itself a defect).
+/** What the corpus audit checks and what it deliberately leaves out. Carried with every audit result
+ *  (every `pd audit` format and the workbench's Audit tab), because a defect count is only meaningful
+ *  next to its limits. Data, not formatted text: each renderer (Markdown, plain text, JSON, the
+ *  workbench's DOM) formats it for its own medium. */
+export interface AuditScope {
+  covered: AuditScopeItem[];
+  notCovered: AuditScopeItem[];
+  /** The closing statement on what zero findings means. */
+  note: string;
+}
 
-**Deliberately NOT covered — named boundaries, not misses:**
-- **Rendered-contrast (axe needsRendering tier)** — contrast, aria-hidden-focus, duplicate-id-aria.
-  These require real browser layout/paint; the static jsdom sweep cannot produce them. The
-  per-component panel shows them (live iframe); this aggregate does not. Fewer rule types here is a
-  scope boundary, not a gap.
-- **Structural/graph findings** — dead subtrees, a shared-base "component", flattened variant families.
-  Those are the style graph's lens, not this one.
-- **PD reporting gaps** — PD under-claiming (e.g. missing provenance) is not a subject defect.
-- **Interactive / behavioural** — focus traps, keyboard flow, escape handling. Single static render only.
-- **Data-masked** — a component that renders empty for want of data won't throw the violations it would
-  when populated; findings are annotated with render outcome wherever it is blank.
-
-A component with zero findings is **not "clean" — it is "clean of static machine-detectable defects."**
-That is the honest claim; never "clean".`;
+export const AUDIT_SCOPE: AuditScope = {
+  covered: [
+    { name: "HTML content model", detail: "invalid nesting and content that isn't permitted where it appears (html-validate)." },
+    { name: "Structural accessibility", detail: "labels, accessible names, ARIA attributes, roles and image alternatives (the axe-core rules that don't need layout)." },
+    { name: "Schema", detail: "missing required fields and values of the wrong type, checked against each component's `<name>.schema.json`." },
+    { name: "Render outcome", detail: "whether each component rendered, rendered empty or failed. It is reported with the component, not counted as a defect." },
+  ],
+  notCovered: [
+    { name: "Checks that need a rendered page", detail: "colour contrast, focusable content hidden with aria-hidden, and duplicate ids referenced by ARIA. They need real browser layout; the Console's Diagnostics tab runs them for the component on screen." },
+    { name: "Interaction", detail: "focus traps, keyboard flow and Escape handling. The audit looks at a single static render." },
+    { name: "Structure", detail: "unused components, shared bases and near-duplicate copies. The Relationships tab and `pd export` cover those." },
+    { name: "Components that need data", detail: "a component that renders empty without data can't show the problems it would have with data. Its findings carry the render outcome." },
+  ],
+  note: "No findings means no static, machine-detectable defects, not that a component is fully accessible or correct.",
+};
 
 /** Per-rule roll-up: blast radius (distinct components) primary, occurrences secondary. */
 export interface AuditRuleRollup {
@@ -256,8 +263,8 @@ export interface AuditComponentRollup {
 /** The `pd audit` report as structured data — the single rollup every output format serializes.
  *  All roll-ups (headline numbers, rule blast-radius table, per-component list) are computed ONCE in
  *  `buildAuditRollup`; `md`/`text`/`json` (and the workbench facet) are renderers over this object,
- *  never independent string builders. A CI consumer reading the `json` gets `scope` (the §0 boundary)
- *  + `headline` alongside the count, never a bare number. */
+ *  never independent string builders. A CI consumer reading the `json` gets `scope` (what the audit covers)
+ *  and `headline` alongside the count, never a bare number. */
 export interface AuditRollup {
   subjectSha?: string;
   /** The headline sentence, plain (no markdown emphasis); renderers wrap/position it. */
@@ -266,8 +273,8 @@ export interface AuditRollup {
   renderOutcomes: { ok: number; blank: number; error: number };
   rulesByBlast: AuditRuleRollup[];
   perComponent: AuditComponentRollup[];
-  /** The §0 scope boundary, verbatim (SCOPE_BOUNDARY). Carried in every format. */
-  scope: string;
+  /** What the audit covers and leaves out (AUDIT_SCOPE). Carried in every format. */
+  scope: AuditScope;
 }
 
 /** Build the structured rollup from the graph — the numbers exist as data here, not only as strings.
@@ -312,7 +319,7 @@ export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: s
     renderOutcomes: { ok: outcomes["ok"] ?? 0, blank: outcomes["blank"] ?? 0, error: outcomes["error"] ?? 0 },
     rulesByBlast,
     perComponent,
-    scope: SCOPE_BOUNDARY,
+    scope: AUDIT_SCOPE,
   };
 }
 

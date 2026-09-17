@@ -6,15 +6,40 @@
 // No I/O, no server state. `formatAudit` and `AuditFormat` are part of the package's public
 // contract (packages/core imports both), so index.ts re-exports them.
 
-import { buildAuditRollup, SCOPE_BOUNDARY } from "@pattern-dump/contracts";
-import type { AuditRollup, DiagnosticsGraph } from "@pattern-dump/contracts";
+import { buildAuditRollup } from "@pattern-dump/contracts";
+import type { AuditRollup, AuditScope, DiagnosticsGraph } from "@pattern-dump/contracts";
 
 /** The `pd audit` output formats. The renderers below serialize the shared `AuditRollup`
  *  (now defined in `@pattern-dump/contracts`, so the workbench facet renders from the same builder). */
 export type AuditFormat = "md" | "text" | "json";
 
-/** Markdown renderer — MUST stay byte-identical to the pre-refactor `formatAuditReport` output.
- *  Guarded by a same-graph→same-md regression test. */
+/** The scope as Markdown: a heading, two lists and the closing note. */
+function scopeMarkdown(scope: AuditScope): string[] {
+  const item = (i: AuditScope["covered"][number]) => `- **${i.name}:** ${i.detail}`;
+  return [
+    "## Scope", "",
+    "Covered: static checks on a single render, without browser layout.", "",
+    ...scope.covered.map(item), "",
+    "Not covered:", "",
+    ...scope.notCovered.map(item), "",
+    scope.note,
+  ];
+}
+
+/** The scope as plain text: the same content, no Markdown. */
+function scopeText(scope: AuditScope): string[] {
+  const item = (i: AuditScope["covered"][number]) => `  - ${i.name}: ${i.detail}`;
+  return [
+    "Scope", "",
+    "Covered: static checks on a single render, without browser layout.",
+    ...scope.covered.map(item), "",
+    "Not covered:",
+    ...scope.notCovered.map(item), "",
+    scope.note,
+  ];
+}
+
+/** Markdown renderer. The part above the scope is guarded by a same-graph→same-md regression test. */
 function renderAuditMarkdown(r: AuditRollup): string {
   const lines: string[] = [];
   lines.push(`# Diagnostics audit${r.subjectSha ? ` — ${r.subjectSha}` : ""}`);
@@ -41,12 +66,12 @@ function renderAuditMarkdown(r: AuditRollup): string {
     }
     lines.push("");
   }
-  lines.push(SCOPE_BOUNDARY);
+  lines.push(...scopeMarkdown(r.scope));
   lines.push("");
   return lines.join("\n");
 }
 
-/** Plain-text renderer — the same information, markdown stripped; SCOPE_BOUNDARY + headline verbatim. */
+/** Plain-text renderer — the same information, Markdown stripped; the headline and scope included. */
 function renderAuditText(r: AuditRollup): string {
   const lines: string[] = [];
   lines.push(`Diagnostics audit${r.subjectSha ? ` — ${r.subjectSha}` : ""}`);
@@ -71,7 +96,7 @@ function renderAuditText(r: AuditRollup): string {
     }
   }
   lines.push("");
-  lines.push(r.scope);
+  lines.push(...scopeText(r.scope));
   lines.push("");
   return lines.join("\n");
 }
@@ -91,7 +116,7 @@ export function formatAudit(graph: DiagnosticsGraph, format: AuditFormat = "md",
 }
 
 /** Format the diagnostics graph as the `pd audit` Markdown report: headline, rules sorted by blast
- *  radius (component-count; occurrences secondary), per-component list, and the §0 boundary verbatim.
+ *  radius (component-count; occurrences secondary), per-component list, and the scope.
  *  Retained for back-compat; identical to `formatAudit(graph, "md", opts)`. */
 export function formatAuditReport(graph: DiagnosticsGraph, opts: { subjectSha?: string } = {}): string {
   return renderAuditMarkdown(buildAuditRollup(graph, opts));

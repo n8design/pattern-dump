@@ -8,7 +8,7 @@
 // Selection-INDEPENDENT: the facet shows the whole corpus, never the selected component. It stays
 // mounted across component navigation and only refetches on open / on an HMR content change (Commit 5).
 
-import type { AuditResponse, AuditRollup } from "@pattern-dump/contracts";
+import type { AuditResponse, AuditRollup, AuditScopeItem } from "@pattern-dump/contracts";
 import { buildAuditRollup, PD_ROUTES } from "@pattern-dump/contracts";
 import { routeHref, runtime } from "../core/runtime.js";
 
@@ -41,6 +41,14 @@ const el = <K extends keyof HTMLElementTagNameMap>(
   if (text !== undefined) n.textContent = text;
   return n;
 };
+
+/** Append text to a node, turning `backticked` spans into <code>. Text only — never parsed as HTML. */
+function appendWithCode(parent: HTMLElement, text: string): void {
+  text.split("`").forEach((part, i) => {
+    if (part === "") return;
+    parent.appendChild(i % 2 === 1 ? el("code", "audit-scope-code", part) : document.createTextNode(part));
+  });
+}
 
 /** `[SUBJECT-DEBT]` / `[PD-GAP]` badge — the attribution that makes a corpus number defensible. */
 function tagBadge(tag: string): HTMLSpanElement {
@@ -137,12 +145,26 @@ export function renderAuditView(rollup: AuditRollup): HTMLElement {
     section.appendChild(ul);
   }
 
-  // Scope boundary — NOT optional. The number is only honest next to what it excludes. Collapsible,
-  // open by default so the caveat is seen. Raw §0 text (pre-wrap), no markdown parser needed.
+  // Scope — NOT optional. The number is only meaningful next to what it excludes. Collapsible, open
+  // by default so the caveat is seen. Built from the structured scope, never from formatted text.
   const scope = el("details", "audit-scope");
   scope.open = true;
-  scope.appendChild(el("summary", "audit-scope-summary", "Scope — what this count does and does not cover"));
-  scope.appendChild(el("pre", "audit-scope-body", rollup.scope));
+  scope.appendChild(el("summary", "audit-scope-summary", "Scope: what this count does and does not cover"));
+  const scopeList = (label: string, items: AuditScopeItem[], kind: string): void => {
+    scope.appendChild(el("p", "audit-scope-label", label));
+    const list = el("ul", "audit-scope-list");
+    list.dataset.scope = kind;
+    for (const item of items) {
+      const li = el("li", "audit-scope-item");
+      li.appendChild(el("strong", "audit-scope-name", `${item.name}: `));
+      appendWithCode(li, item.detail);
+      list.appendChild(li);
+    }
+    scope.appendChild(list);
+  };
+  scopeList("Covered: static checks on a single render, without browser layout.", rollup.scope.covered, "covered");
+  scopeList("Not covered:", rollup.scope.notCovered, "not-covered");
+  scope.appendChild(el("p", "audit-scope-note", rollup.scope.note));
   section.appendChild(scope);
 
   return section;

@@ -43,6 +43,16 @@ test.describe("Audit facet — corpus diagnostics", () => {
 
     // The scope boundary is not optional — the count is only honest beside what it excludes.
     await expect(page.locator(`${auditPanel} .audit-scope`)).toHaveAttribute("open", "");
+
+    // It renders as real lists, not formatted source: no Markdown syntax reaches the page.
+    const scope = page.locator(`${auditPanel} .audit-scope`);
+    await expect(scope.locator(".audit-scope-list[data-scope='covered'] > li").first()).toBeVisible();
+    await expect(scope.locator(".audit-scope-list[data-scope='not-covered'] > li").first()).toBeVisible();
+    await expect(scope.locator(".audit-scope-note")).toHaveText(/^No findings means/);
+    await expect(scope.locator("code").first()).toBeVisible();
+    const scopeText = (await scope.innerText()) ?? "";
+    expect(scopeText).not.toMatch(/\*\*|^#+ |`/m);
+    expect(await scope.locator(".audit-scope-name").first().evaluate(e => getComputedStyle(e).fontWeight)).toBe("600");
   });
 
   test("shows the loading placeholder while the rollup is in flight", async ({ page }) => {

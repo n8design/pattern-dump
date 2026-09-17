@@ -105,7 +105,7 @@ export { collapseFamily, deriveFamilyNaming, buildRewriteMap, rewriteIncludes } 
 export type { CollapsedFamily, CollapsedVariant, FamilyMember, CollapseResult, SkipReason, SiteRewrite } from "./export.js";
 // Audit view model now lives in contracts (shared with the workbench facet); re-exported here so
 // existing `@pattern-dump/dev-server` consumers (CLI, tests) keep importing it from this package.
-export { buildAuditRollup, SCOPE_BOUNDARY } from "@pattern-dump/contracts";
+export { buildAuditRollup, AUDIT_SCOPE } from "@pattern-dump/contracts";
 export type { AuditRollup, AuditRuleRollup, AuditComponentRollup } from "@pattern-dump/contracts";
 
 export interface DevServerOptions {

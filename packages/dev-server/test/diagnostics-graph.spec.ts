@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { readFile, writeFile, cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
-import { startDevServer, formatAuditReport, formatAudit, buildAuditRollup } from "@pattern-dump/dev-server";
+import { startDevServer, formatAuditReport, formatAudit, buildAuditRollup, AUDIT_SCOPE } from "@pattern-dump/dev-server";
 import type { DiagnosticsGraph } from "@pattern-dump/contracts";
 import { defineConfig } from "@pattern-dump/config";
 
@@ -68,7 +68,8 @@ describe("diagnostics graph — corpus sweep + guards", () => {
     // The honest-claim phrasing is embedded verbatim in every report.
     const report = formatAuditReport({ rules: [], components: [{ id: "x", render: "ok" }], occurrences: [] });
     expect(report).toContain("clean of static machine-detectable defects");
-    expect(report).toMatch(/never "clean"/);
+    // Zero findings is stated for what it is, never as a bare "clean".
+    expect(report).toContain("No findings means no static, machine-detectable defects, not that a component is fully accessible or correct.");
   }, 20000);
 
   it("shared identity: a diagnostics component node uses the SAME discovery id composition keys on", async () => {
@@ -139,7 +140,8 @@ describe("pd audit — report formats (--format md|text|json)", () => {
       { engine: "axe", ruleId: "label", component: "atoms/button", severity: "error", message: "no label", tag: "SUBJECT-DEBT" },
     ],
   };
-  const SCOPE_MARKER = "## Scope — the boundary is part of the artifact";
+  const SCOPE_MARKER = "## Scope";
+  const SCOPE_NOTE = "No findings means no static, machine-detectable defects, not that a component is fully accessible or correct.";
 
   it("md: byte-identical no-drift — formatAudit('md') === formatAuditReport; algorithm head frozen", () => {
     // formatAuditReport was proven byte-identical to the pre-refactor (cc8df47) output out-of-band;
@@ -173,12 +175,31 @@ describe("pd audit — report formats (--format md|text|json)", () => {
 
       "
     `);
-    // The §0 boundary + honest-claim phrasing survive verbatim in md.
-    expect(md).toContain(SCOPE_MARKER);
-    expect(md.trimEnd().endsWith('never "clean".')).toBe(true);
+    // The scope follows the report: a real Markdown heading and lists, ending with the note.
+    expect(md.split(SCOPE_MARKER)[1]).toMatchInlineSnapshot(`
+      "
+
+      Covered: static checks on a single render, without browser layout.
+
+      - **HTML content model:** invalid nesting and content that isn't permitted where it appears (html-validate).
+      - **Structural accessibility:** labels, accessible names, ARIA attributes, roles and image alternatives (the axe-core rules that don't need layout).
+      - **Schema:** missing required fields and values of the wrong type, checked against each component's \`<name>.schema.json\`.
+      - **Render outcome:** whether each component rendered, rendered empty or failed. It is reported with the component, not counted as a defect.
+
+      Not covered:
+
+      - **Checks that need a rendered page:** colour contrast, focusable content hidden with aria-hidden, and duplicate ids referenced by ARIA. They need real browser layout; the Console's Diagnostics tab runs them for the component on screen.
+      - **Interaction:** focus traps, keyboard flow and Escape handling. The audit looks at a single static render.
+      - **Structure:** unused components, shared bases and near-duplicate copies. The Relationships tab and \`pd export\` cover those.
+      - **Components that need data:** a component that renders empty without data can't show the problems it would have with data. Its findings carry the render outcome.
+
+      No findings means no static, machine-detectable defects, not that a component is fully accessible or correct.
+      "
+    `);
+    expect(md.trimEnd().endsWith(SCOPE_NOTE)).toBe(true);
   });
 
-  it("text: same information, markdown stripped; headline + SCOPE_BOUNDARY verbatim", () => {
+  it("text: same information, Markdown stripped; headline and scope included", () => {
     const txt = formatAudit(FIXTURE, "text");
     // headline verbatim (plain, no ** emphasis)
     expect(txt).toContain("2 machine-detectable static defects across 1 of 2 components — 50% clean of static machine-detectable defects.");
@@ -191,9 +212,11 @@ describe("pd audit — report formats (--format md|text|json)", () => {
     expect(txt).toContain("axe:label [SUBJECT-DEBT] no label");
     expect(txt).toContain("html-validate:element-permitted-content [SUBJECT-DEBT] bad nesting — button > div");
     expect(txt).toContain("atoms/field (render: blank)");
-    // SCOPE_BOUNDARY verbatim (its heading + honest-claim line — a text CI reader gets the caveat too)
-    expect(txt).toContain(SCOPE_MARKER);
-    expect(txt.trimEnd().endsWith('never "clean".')).toBe(true);
+    // The scope in plain form, so a text reader gets the caveat too — without Markdown syntax.
+    expect(txt).toContain("\nScope\n");
+    expect(txt).toContain("  - Schema: missing required fields");
+    expect(txt.split("\nScope\n")[1]).not.toMatch(/\*\*|^#/m);
+    expect(txt.trimEnd().endsWith(SCOPE_NOTE)).toBe(true);
   });
 
   it("json: CI-consumable rollup — pure JSON, scope + headline travel WITH the count", () => {
@@ -201,8 +224,8 @@ describe("pd audit — report formats (--format md|text|json)", () => {
     const parsed = JSON.parse(json); // must parse — no human meta mixed into the report string
     // the caveat rides alongside the number: a CI consumer never reads a bare count
     expect(parsed.headline).toBe("2 machine-detectable static defects across 1 of 2 components — 50% clean of static machine-detectable defects.");
-    expect(parsed.scope).toContain(SCOPE_MARKER);
-    expect(parsed.scope).toContain('never "clean".');
+    expect(parsed.scope).toEqual(AUDIT_SCOPE);
+    expect(parsed.scope.note).toBe(SCOPE_NOTE);
     // numbers as data, not strings — the smell the refactor fixed
     expect(parsed.totals).toEqual({ components: 2, affected: 1, cleanPct: 50, defects: 2 });
     expect(parsed.renderOutcomes).toEqual({ ok: 1, blank: 1, error: 0 });
