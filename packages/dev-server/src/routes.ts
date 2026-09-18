@@ -113,7 +113,7 @@ export async function handleRequest(
     // --- Document-base layer (reset + font-face; no component rules) ---
     if (pathname === PD_ROUTES.baseCss) {
       res.writeHead(200, { "Content-Type": "text/css" });
-      res.end(state.baseCss);
+      res.end(normalizeAssetRefs(state.baseCss, assetRootNames));
       return;
     }
 
@@ -124,7 +124,7 @@ export async function handleRequest(
       const componentId = pathname.slice(PD_ROUTE_PREFIX.componentCss.length, -".css".length);
       const css = state.perComponentCss.get(componentId) ?? "";
       res.writeHead(200, { "Content-Type": "text/css" });
-      res.end(css);
+      res.end(normalizeAssetRefs(css, assetRootNames));
       return;
     }
 
@@ -136,7 +136,7 @@ export async function handleRequest(
       );
       if (state.themeCss.has(themeName)) {
         res.writeHead(200, { "Content-Type": "text/css" });
-        res.end(state.themeCss.get(themeName));
+        res.end(normalizeAssetRefs(state.themeCss.get(themeName)!, assetRootNames));
       } else {
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end("Theme not found");

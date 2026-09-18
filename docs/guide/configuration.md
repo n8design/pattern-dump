@@ -78,7 +78,7 @@ beneath the component styles. Without it, no base layer is linked.
 | Option | Type | Description |
 |---|---|---|
 | `assets.strategy` | `"central"` | Assets live in their own folder |
-| `assets.dir` | string or string[] | Served at `/assets/`. With several folders, each is served under its folder name (`/assets/images/…`), and relative references in markup such as `../../images/x.svg` are rewritten to `/assets/images/x.svg` |
+| `assets.dir` | string or string[] | Served at `/assets/`. With several folders, each is served under its folder name (`/assets/images/…`). References that start with a folder's name, relative (`../../images/x.svg`) or root-absolute (`/images/x.svg`), are rewritten to `/assets/images/x.svg` in markup and in `url()` in your compiled CSS |
 | `assets.css` | string[] | Stylesheets (relative to the assets folder) linked into every preview before the component styles |
 
 ### Scripts

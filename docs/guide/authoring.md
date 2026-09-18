@@ -273,6 +273,10 @@ Files in the assets folder are served at `/assets/`, with the path mirroring the
 `assets/images/logo.svg` is `/assets/images/logo.svg`. Use that path in templates and CSS. With several
 asset folders, each is served under its folder name (`/assets/images/…`, `/assets/fonts/…`).
 
+A reference that starts with an asset folder's name also works, as PatternLab projects write it:
+`/images/logo.svg` and `../../images/logo.svg` are rewritten to `/assets/images/logo.svg`, in templates
+and in `url()` in your styles and themes. Stylesheets listed in `assets.css` are served as they are.
+
 A path to a file that doesn't exist returns 404, so a broken image, font or `url()` shows up as a failed
 request in the browser's network panel.
 

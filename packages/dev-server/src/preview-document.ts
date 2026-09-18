@@ -155,18 +155,26 @@ ${scriptTags}
 }
 
 /**
- * Rewrite relative asset references in rendered markup to the `/assets/<root>/…` served path.
- * hTWOo's `<use href="../../images/icons.svg#…">` is frozen and cannot be codemodded, so PD
- * normalizes at render (PROJECT-STRUCTURE's served-mode converter, applied in authored mode).
+ * Rewrite asset references to the `/assets/<root>/…` served path. Applied to rendered markup and to
+ * the compiled CSS PD serves (base, component and theme stylesheets), so `url()` works too.
  *
- * Keys on a root BASENAME (e.g. `images`, `fonts`), NOT on the `../` count — `../../images/x` and
- * `../images/x` both normalize to `/assets/images/x`. That is deliberately depth-independent: a
- * scheme that computed a mount point so `../../` happens to resolve breaks the moment a pattern's
- * nesting depth changes; this does not.
+ * Two forms, both keyed on an asset root's BASENAME (e.g. `images`, `fonts`):
+ *  - relative: `../../images/x` and `../images/x` both become `/assets/images/x`. Deliberately
+ *    depth-independent: hTWOo's `<use href="../../images/icons.svg#…">` is frozen and cannot be
+ *    codemodded, and a scheme that made `../../` resolve breaks when a pattern's nesting changes.
+ *  - root-absolute: `/images/x`, the form PatternLab projects use, becomes `/assets/images/x`. Only at
+ *    the start of a URL (after a quote, `(`, `=`, `,` or whitespace), so other hosts' paths and
+ *    already-served `/assets/…` paths are left alone.
  */
-export function normalizeAssetRefs(html: string, rootNames: string[]): string {
-  if (rootNames.length === 0) return html;
-  const alt = rootNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+export function normalizeAssetRefs(text: string, rootNames: string[]): string {
+  if (rootNames.length === 0) return text;
+  const alt = (names: string[]) => names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
   // one or more ./ or ../ segments, then a known asset-root basename, then /
-  return html.replace(new RegExp(`(?:\\.\\.?/)+(${alt})/`, "g"), "/assets/$1/");
+  let out = text.replace(new RegExp(`(?:\\.\\.?/)+(${alt(rootNames)})/`, "g"), "/assets/$1/");
+  // A root named `assets` is already the served prefix: /assets/… needs no rewrite.
+  const absNames = rootNames.filter(n => n !== "assets");
+  if (absNames.length > 0) {
+    out = out.replace(new RegExp(`(^|["'(=,\\s])/(${alt(absNames)})/`, "g"), "$1/assets/$2/");
+  }
+  return out;
 }
