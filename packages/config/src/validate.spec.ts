@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { configProblems, validateConfig } from "./validate.js";
+import { defineConfig } from "./index.js";
 
 const valid = {
   sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
@@ -19,7 +20,10 @@ describe("configProblems", () => {
   });
 
   it("accepts the minimal config, with no strategy", () => {
-    expect(configProblems({ sourceDir: "s", patternsDir: "p", outDir: "o", styles: { dir: "d" } })).toEqual([]);
+    // Also a type check: defineConfig must accept it, so `npm run typecheck` fails if strategy
+    // becomes required again.
+    const minimal = defineConfig({ sourceDir: "s", patternsDir: "p", outDir: "o", styles: { dir: "d" } });
+    expect(configProblems(minimal)).toEqual([]);
   });
 
   it("names a missing required key, and the typo that probably meant it", () => {

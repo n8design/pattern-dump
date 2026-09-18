@@ -5,7 +5,8 @@ export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
 export { ConfigError, configProblems, validateConfig } from "./validate.js";
 
 export interface AssetsConfig {
-  /** 'central' (default) serves the central assets dir; 'component-relative' resolves from component folder. */
+  /** Where assets live. Only 'central' (the default: one assets dir, served at /assets/) is supported
+   *  so far; 'component-relative' is reserved, and the config check rejects it as not supported yet. */
   strategy?: "central" | "component-relative";
   /**
    * Asset directory (relative to project root), served at /assets/. Accepts an ARRAY of roots —
@@ -20,8 +21,9 @@ export interface AssetsConfig {
 }
 
 export interface StylesConfig {
-  /** 'parallel' (default, hTWOo-native) or 'co-located' (framework-oriented). */
-  strategy: "parallel" | "co-located";
+  /** Where styles live. Only 'parallel' (the default: a separate tree mirroring the patterns) is
+   *  supported so far; 'co-located' is reserved, and the config check rejects it as not supported yet. */
+  strategy?: "parallel" | "co-located";
   /** Source tree root; also the home for global/base/theme styles. */
   dir: string;
   /**

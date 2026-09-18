@@ -62,7 +62,7 @@ export default defineConfig({
 
 | Option | Type | Description |
 |---|---|---|
-| `styles.strategy` | `"parallel"` | Styles live in a separate tree mirroring the patterns, the only layout supported so far |
+| `styles.strategy` | `"parallel"` | Optional. Styles live in a separate tree mirroring the patterns, the only layout supported so far |
 | `styles.dir` | string | The SCSS tree |
 | `styles.entry` | string or string[] | Compile only these files (relative to `styles.dir`). Without it, every `.scss` not starting with `_` is compiled. Name one design-system bundle here rather than several overlapping ones |
 
