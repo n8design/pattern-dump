@@ -16,7 +16,8 @@ export interface AssetsConfig {
    * normalized to `/assets/…` by matching a root basename — depth-independent.
    */
   dir?: string | string[];
-  /** CSS files (relative to assets dir) to link in every preview document, before component CSS. */
+  /** Stylesheets to link in every preview document, before component CSS: a path relative to the
+   *  assets dir, or a full URL (e.g. a web-font stylesheet), which is linked as it is. */
   css?: string[];
 }
 

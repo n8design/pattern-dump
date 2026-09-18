@@ -94,8 +94,10 @@ export function buildPreviewDocument(
   const baseLink = linkBase ? `<link rel="stylesheet" href="${escapeAttr(baseHrefV)}">` : "";
 
   // Layer 1a: project asset CSS (htwoo.min.css, htwoo-themes.css, etc.) — linked before component CSS.
+  // A full URL (a web-font stylesheet, a CDN) is linked as it is, the same rule as globalScripts;
+  // anything else is a path in the assets folder.
   const assetCssLinks = (assetsCss ?? [])
-    .map(p => `<link rel="stylesheet" href="${escapeAttr(`/assets/${p}`)}">`)
+    .map(p => `<link rel="stylesheet" href="${escapeAttr(p.includes("://") ? p : `/assets/${p}`)}">`)
     .join("\n");
 
   // Layer 2: theme sets.

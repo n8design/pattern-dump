@@ -87,7 +87,7 @@ beneath the component styles. Without it, no base layer is linked.
 |---|---|---|
 | `assets.strategy` | `"central"` | Optional. Assets live in their own folder, the only layout supported so far |
 | `assets.dir` | string or string[] | Served at `/assets/`. With several folders, each is served under its folder name (`/assets/images/…`). References that start with a folder's name, relative (`../../images/x.svg`) or root-absolute (`/images/x.svg`), are rewritten to `/assets/images/x.svg` in markup and in `url()` in your compiled CSS |
-| `assets.css` | string[] | Stylesheets (relative to the assets folder) linked into every preview before the component styles |
+| `assets.css` | string[] | Stylesheets linked into every preview before the component styles: a path relative to the assets folder, or a full URL such as a web-font stylesheet |
 
 ### Scripts
 

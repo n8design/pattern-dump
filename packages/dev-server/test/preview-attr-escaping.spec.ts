@@ -49,4 +49,12 @@ describe("preview document attribute escaping", () => {
     expect(scripts).toEqual(["https://cdn.example/a.js", "/_pd/scripts/toggle.js"]);
     expect(links).toEqual(["/assets/site.css", "/_pd/themes/light.css", "/_pd/components/atoms/button.css"]);
   });
+
+  it("an assets.css entry that is a full URL is linked as it is, in order", () => {
+    const fonts = "https://fonts.googleapis.com/css2?family=Arimo&display=swap";
+    const doc = buildPreviewDocument("<p>x</p>", [], "centered", [], undefined, undefined, undefined,
+      [fonts, "css/site.css"]);
+    expect(doc).toContain(`href="https://fonts.googleapis.com/css2?family=Arimo&amp;display=swap"`);
+    expect(head(doc).links).toEqual([fonts, "/assets/css/site.css"]);
+  });
 });

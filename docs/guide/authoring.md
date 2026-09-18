@@ -280,8 +280,15 @@ and in `url()` in your styles and themes. Stylesheets listed in `assets.css` are
 A path to a file that doesn't exist returns 404, so a broken image, font or `url()` shows up as a failed
 request in the browser's network panel.
 
-`assets.css` in the config lists stylesheets (relative to the assets folder) to link into every preview,
-before the component styles.
+`assets.css` in the config lists stylesheets to link into every preview, before the component styles:
+paths relative to the assets folder, or full URLs, for example a web-font stylesheet:
+
+```ts
+assets: {
+  dir: "./assets",
+  css: ["https://fonts.googleapis.com/css2?family=Arimo&display=swap", "css/site.css"],
+},
+```
 
 ### SVG
 
