@@ -15,10 +15,11 @@ components; they never change a component's identity.
 | `atoms/button.hbs` | `atoms/button` | `atoms-button` |
 | `molecules/search-field/search-field.hbs` | `molecules/search-field` | `molecules-search-field` |
 | `molecules/search-field/input/input.hbs` | `molecules/search-field/input` | `molecules-input` |
-| `00-atoms/badge/badge.hbs` | `00-atoms/badge` | `00-atoms-badge` |
+| `00-atoms/badge/badge.hbs` | `00-atoms/badge` | `atoms-badge` |
 
 - The **id** is the path without the file extension. A file named like its folder (`button/button.hbs`)
-  takes the folder's id. A numbered folder (`00-atoms`) keeps its number in the id and the handle.
+  takes the folder's id. A numbered folder or file (`00-atoms`) keeps its number in the id and the
+  route, but not in the handle, as in PatternLab.
 - The **handle** is the first folder plus the component name. It is how templates include each other.
 - Two components with the same handle **collide**: the first by sorted path keeps the handle, the other
   is left out of the tree and shows a `HANDLE_COLLISION` diagnostic naming both files. Rename or move one.

@@ -40,10 +40,14 @@ export function collapseComponentId(relNoExt: string): string {
  * preserved for variants). The ONE implementation — `buildDiscoveryMap` builds `handleMap` with this,
  * and export's include-rewrite keys its map on it, so the two cannot drift. `molecules/quick-links/
  * ql-list-button` → `molecules-ql-list-button`.
+ *
+ * Numeric ordering prefixes are dropped from both parts, as PatternLab's partial names drop them:
+ * `00-atoms/01-global/00-colors` → `atoms-colors`. They order the tree; the id and route keep them.
  */
 export function deriveHandle(id: string): string {
   const parts = id.split("/");
-  return `${parts[0]}-${parts[parts.length - 1]}`;
+  const unnumbered = (seg: string) => seg.replace(/^\d+[-_]/, "");
+  return `${unnumbered(parts[0])}-${unnumbered(parts[parts.length - 1])}`;
 }
 
 /**
