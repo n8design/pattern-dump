@@ -66,8 +66,8 @@ export function connectHmr(): void {
     // Corpus audit freshness — ANY component's template/render change invalidates the corpus rollup,
     // so refetch when the facet is open, regardless of which component is selected (deliberately
     // OUTSIDE the `componentId === current?.id` gates below). CSS edits do NOT re-audit the graph
-    // (server-side CSS-invariance — an .scss change emits css-link-swap, never
-    // content-swap), so only the template/render signals trigger a refetch. No polling.
+    // (server-side CSS-invariance), but a theme or base-layer .scss edit reloads the preview with a
+    // content-swap, so it refetches too: harmless, the rollup comes back unchanged. No polling.
     if ((msg.type === "content-swap" || msg.type === "error") && store.local.panelTab === "audit") {
       refreshAudit();
     }

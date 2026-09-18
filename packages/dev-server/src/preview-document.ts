@@ -56,7 +56,10 @@ export function buildPreviewDocument(
   linkBase = false,
   // themeSwitch: 'stylesheet' links only the active theme (bare-:root sets don't collide);
   // 'attribute' (default) links all and toggles via [data-theme].
-  themeSwitch: ThemeSwitch = "attribute"
+  themeSwitch: ThemeSwitch = "attribute",
+  // baseCssVersion: stamped as ?v= once the base layer has changed since boot, so a preview reloaded
+  // after a base edit fetches the new sheet. 0 (never changed) keeps the bare URL.
+  baseCssVersion = 0
 ): string {
   const bodyAttr   = defaultTheme ? ` data-theme="${escapeAttr(defaultTheme)}"` : "";
   const layoutClass = layout === "full" ? "layout-full" : "layout-centered";
@@ -87,7 +90,8 @@ export function buildPreviewDocument(
   // family-level classes with no single owning component). Linked FIRST so the component closure
   // (Layer 3) overrides it. Opt-in via config.documentBase (M5-CSS-EXTERNAL §2.2: closure + base +
   // active theme). The shell injects nothing — this link is part of the server-built document.
-  const baseLink = linkBase ? `<link rel="stylesheet" href="${PD_ROUTES.baseCss}">` : "";
+  const baseHrefV = baseCssVersion > 0 ? `${PD_ROUTES.baseCss}?v=${baseCssVersion}` : PD_ROUTES.baseCss;
+  const baseLink = linkBase ? `<link rel="stylesheet" href="${baseHrefV}">` : "";
 
   // Layer 1a: project asset CSS (htwoo.min.css, htwoo-themes.css, etc.) — linked before component CSS.
   const assetCssLinks = (assetsCss ?? [])

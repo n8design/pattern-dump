@@ -26,13 +26,13 @@ import { compileSassFile } from "@pattern-dump/build";
 import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
-import type { ServerState } from "./server-state.js";
+import { applyStyleData, type ServerState } from "./server-state.js";
 import { baseComponentIds, resolveComponentForFile } from "./discovery-index.js";
 import { buildCompositionRegistry } from "./composition.js";
 import {
   computeCssClosure, linkableClosure, recomputeComponentCss, withRenderedClassOwners,
 } from "./css-closure.js";
-import { patchClassOwnerIndex, resolveScssToComponent } from "./style-index.js";
+import { buildAllStyleData, patchClassOwnerIndex, resolveScssToComponent } from "./style-index.js";
 import { auditComponent } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
@@ -51,7 +51,7 @@ export interface WatchContext {
 export function startWatching(ctx: WatchContext): FSWatcher {
   const { cfg, state, render, tracker, hotreloader } = ctx;
   // Destructured so the body below reads exactly as it did inside startDevServer.
-  const { patternsDir, stylesDir, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
+  const { patternsDir, stylesDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
   // Only the PROJECT's own files are watched. Pattern packages live in node_modules: read-only
   // library code that changes by reinstalling, not by editing — so their themes and scripts are
   // not watched either.
@@ -100,6 +100,14 @@ async function handleComponentScss(filePath: string): Promise<void> {
   // treat the changed file itself as the entry point so "add" events work.
   const effectiveFiles = recompiledFiles.length > 0 ? recompiledFiles : [resolve(filePath)];
 
+  // A recompiled file that maps to no component (a `styles.entry` bundle, or the file importing an
+  // edited base partial) can change any component's CSS and the base layer, which the per-component
+  // recompute below cannot see. Rebuild all style data instead and broadcast what changed.
+  if (effectiveFiles.some(f => !resolveScssToComponent(resolve(f), stylesDir, allIds))) {
+    await restyleAll(allIds, timestamp, effectiveFiles, compileErrors.length > 0);
+    return;
+  }
+
   const pending: Array<{ type: "css-link-swap"; componentId: string; href: string }> = [];
   for (const recompiledFile of effectiveFiles) {
     const compId = resolveScssToComponent(resolve(recompiledFile), stylesDir, allIds);
@@ -134,22 +142,53 @@ async function handleComponentScss(filePath: string): Promise<void> {
     if (verboseTiming) console.timeEnd("[dev-server:timing] classOwnerIndex patch");
   }
 
-  // Compute orderedHrefs after all cache updates so a newly-populated entry is included.
-  // Filter to non-empty CSS only — the preview head never links zero-CSS components.
-  let orderedHrefs: string[] | undefined;
-  if (state.lastComponentId && state.discoveryResult && state.compositionRegistry) {
-    // Must match the render path, rendered-class owners included — this list REPLACES the preview's
-    // links, so anything the render path added and this one lacked would be stripped on every save.
-    const staticClosure = await computeCssClosure(
-      state.lastComponentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), state.discoveryResult.discoveryMap
-    );
-    const renderedHtml = await render({ component: state.lastComponentId }).then(r => r.html, () => "");
-    const closureIds = withRenderedClassOwners(staticClosure, renderedHtml, state.classOwnerIndex ?? new Map());
-    orderedHrefs = linkableClosure(closureIds, state.perComponentCss)
-      .map(id => componentCssUrl(id, timestamp));
-  }
+  const orderedHrefs = await closureHrefs(timestamp);
   for (const m of pending) hotreloader.push({ ...m, orderedHrefs });
   console.log(`[dev-server] CSS updated (recompiled: ${effectiveFiles.map(f => basename(f)).join(", ")})`);
+}
+
+// The full-restyle path: the same buildAllStyleData pass as boot and the routes' lazy rebuild, then
+// a css-link-swap per component whose CSS changed. A changed base layer has no per-component link to
+// bump, so the preview document is reloaded instead (content-swap, as theme edits do); it comes back
+// with the base link at its new ?v= (state.baseCssVersion).
+async function restyleAll(
+  allIds: Set<string>, timestamp: number, files: string[], hadCompileErrors: boolean,
+): Promise<void> {
+  const names = files.map(f => basename(f)).join(", ");
+  // A file that failed to compile is skipped by buildAllStyleData, which with one entry bundle would
+  // empty every component's CSS. Keep the last good CSS on screen; the error is already on the Console.
+  if (hadCompileErrors) {
+    console.warn(`[dev-server] CSS not updated — compile errors (recompiled: ${names})`);
+    return;
+  }
+  const changes = applyStyleData(state, await buildAllStyleData(styleRoots, allIds));
+  const orderedHrefs = await closureHrefs(timestamp);
+  for (const componentId of changes.changedComponents) {
+    hotreloader.push({ type: "css-link-swap", componentId, href: componentCssUrl(componentId, timestamp), orderedHrefs });
+  }
+  if (changes.baseChanged && state.lastComponentId) {
+    hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
+  }
+  const what = [
+    `${changes.changedComponents.length} component(s)`,
+    ...(changes.baseChanged ? ["base layer"] : []),
+  ].join(" + ");
+  console.log(`[dev-server] CSS updated: ${what} (recompiled: ${names})`);
+}
+
+// The ordered link set for the component on screen, computed after all cache updates so a
+// newly-populated entry is included. Filtered to non-empty CSS: the preview head never links
+// zero-CSS components.
+async function closureHrefs(timestamp: number): Promise<string[] | undefined> {
+  if (!state.lastComponentId || !state.discoveryResult || !state.compositionRegistry) return undefined;
+  // Must match the render path, rendered-class owners included — this list REPLACES the preview's
+  // links, so anything the render path added and this one lacked would be stripped on every save.
+  const staticClosure = await computeCssClosure(
+    state.lastComponentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), state.discoveryResult.discoveryMap
+  );
+  const renderedHtml = await render({ component: state.lastComponentId }).then(r => r.html, () => "");
+  const closureIds = withRenderedClassOwners(staticClosure, renderedHtml, state.classOwnerIndex ?? new Map());
+  return linkableClosure(closureIds, state.perComponentCss).map(id => componentCssUrl(id, timestamp));
 }
 
 // Markdown: component docs and folder index.md. Nothing caches them server-side — the tree, detail

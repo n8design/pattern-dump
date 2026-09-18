@@ -23,8 +23,9 @@
 //
 //  3. `perComponentCss` is REASSIGNED (not merely mutated) by the initial index build — it takes
 //     the map that `buildAllStyleData` returns. Anything that captured the pre-build reference
-//     would hold the wrong map forever. Only the initial build reassigns it today; a future
-//     re-index would need the same care.
+//     would hold the wrong map forever. Every full re-index (boot, the lazy rebuild in the
+//     component route, the watcher's full restyle) goes through `applyStyleData`, so nothing
+//     else may hold on to the map.
 //
 // `themeCss`, `themeTokens` and `scriptCache` are `readonly` because they are only ever mutated,
 // never replaced — the type records that difference rather than leaving it to convention.
@@ -33,7 +34,7 @@ import type { DiscoveryResult } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "./composition.js";
 import type { ComponentAudit } from "./diagnostics.js";
 import type {
-  ScssModuleGraph, ClassOwnerIndex, BaseProvenanceIndex,
+  AllStyleData, ScssModuleGraph, ClassOwnerIndex, BaseProvenanceIndex,
 } from "./style-index.js";
 
 export interface ServerState {
@@ -53,6 +54,9 @@ export interface ServerState {
   perComponentCss: Map<string, string>;
   /** Base-origin CSS: reset + font-face rules, no component rules. */
   baseCss: string;
+  /** Bumped each time `baseCss` changes after the first index build. Stamped on the preview's base
+   *  `<link>` as `?v=`, so a reloaded preview never reuses a stale base sheet. 0 = never changed. */
+  baseCssVersion: number;
 
   /** Rebuilt on HBS/JSON changes. */
   compositionRegistry: CompositionRegistry | null;
@@ -88,6 +92,7 @@ export function createServerState(): ServerState {
     scssGraphDirty: true,
     perComponentCss: new Map<string, string>(),
     baseCss: "",
+    baseCssVersion: 0,
     compositionRegistry: null,
     discoveryResult: null,
     auditSlices: null,
@@ -96,4 +101,35 @@ export function createServerState(): ServerState {
     themeTokens: new Map<string, Record<string, string | null>>(),
     scriptCache: new Map<string, string>(),
   };
+}
+
+/** What a full re-index changed, for the HMR path to broadcast. */
+export interface StyleDataChanges {
+  /** Components whose own-origin CSS differs from before (added, changed or emptied). */
+  changedComponents: string[];
+  /** True when the base layer's CSS differs from before. */
+  baseChanged: boolean;
+}
+
+/** Install a full style build into the state and report what changed. The single place that
+ *  reassigns `perComponentCss` (hazard 3). The first build is not a change: nothing is on screen yet. */
+export function applyStyleData(state: ServerState, data: AllStyleData): StyleDataChanges {
+  const firstBuild = state.classOwnerIndex === null;
+  const before = state.perComponentCss;
+  const changedComponents: string[] = [];
+  if (!firstBuild) {
+    for (const id of new Set([...before.keys(), ...data.componentCssMap.keys()])) {
+      if ((before.get(id) ?? "") !== (data.componentCssMap.get(id) ?? "")) changedComponents.push(id);
+    }
+  }
+  const baseChanged = !firstBuild && state.baseCss !== data.baseCss;
+  if (baseChanged) state.baseCssVersion += 1;
+
+  state.scssModuleGraph = data.scssModuleGraph;
+  state.classOwnerIndex = data.classOwnerIndex;
+  state.baseProvenance = data.baseProvenance;
+  state.perComponentCss = data.componentCssMap;
+  state.baseCss = data.baseCss;
+  state.scssGraphDirty = false;
+  return { changedComponents: changedComponents.sort(), baseChanged };
 }

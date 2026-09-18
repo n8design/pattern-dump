@@ -28,7 +28,7 @@ import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import type { ResolvedConfig } from "./server-config.js";
-import type { ServerState } from "./server-state.js";
+import { applyStyleData, type ServerState } from "./server-state.js";
 import { buildShellHtml, json, mimeType, serveFile } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
 import { buildCompositionRegistry } from "./composition.js";
@@ -242,12 +242,7 @@ export async function handleRequest(
         if (state.scssGraphDirty) {
           const ids = baseComponentIds(state.discoveryResult);
           const styleData = await buildAllStyleData(styleRoots, ids);
-          state.scssModuleGraph = styleData.scssModuleGraph;
-          state.classOwnerIndex = styleData.classOwnerIndex;
-          state.baseProvenance = styleData.baseProvenance;
-          state.perComponentCss = styleData.componentCssMap;
-          state.baseCss = styleData.baseCss;
-          state.scssGraphDirty = false;
+          applyStyleData(state, styleData);
         }
         if (!state.compositionRegistry) {
           state.compositionRegistry = await buildCompositionRegistry(patternDirs, handleMap, state.discoveryResult.discoveryMap);
@@ -279,7 +274,7 @@ export async function handleRequest(
         const previewDoc = buildPreviewDocument(
           normalizeAssetRefs(previewHtml, assetRootNames), linkableClosure(closureIds, state.perComponentCss), detail.layout, themeNames, defaultTheme,
           previewScripts, svgContents, assetsCss, componentId, undefined, scriptVersions,
-          documentBaseEnabled, themeSwitch
+          documentBaseEnabled, themeSwitch, state.baseCssVersion
         );
         json(res, 200, { ...detail, document: previewDoc, diagnostics } satisfies ComponentDetailResponse);
       } catch (e) {
@@ -370,7 +365,7 @@ export async function handleRequest(
         const doc = buildPreviewDocument(
           normalizeAssetRefs(html, assetRootNames), linkableClosure(closureIds, state.perComponentCss), layout, themeNames, effectiveTheme,
           previewScripts, svgContents, assetsCss, componentId, undefined, scriptVersions,
-          documentBaseEnabled, themeSwitch
+          documentBaseEnabled, themeSwitch, state.baseCssVersion
         );
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(doc);

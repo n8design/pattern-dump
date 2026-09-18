@@ -65,7 +65,7 @@ export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // Shared timing gate — one flag, so the startup-build and per-save halves cannot drift apart.
 // All mutable server state in one typed object — the seam that lets routes and the watcher
 // stop sharing lexical scope. Its header documents the three hazards.
-import { createServerState } from "./server-state.js";
+import { applyStyleData, createServerState } from "./server-state.js";
 // Resolved paths + flags, derived once from PatternDumpConfig against the ONE resolution base.
 import { resolveServerConfig } from "./server-config.js";
 // HTTP route handling — takes an explicit RouteContext instead of closing over this scope.
@@ -209,12 +209,7 @@ export async function startDevServer(
     await surfaceFlattening(dr.discoveryMap, state.compositionRegistry, cwd);
     const allComponentIds = baseComponentIds(dr);
     const styleData = await buildAllStyleData(styleRoots, allComponentIds);
-    state.scssModuleGraph = styleData.scssModuleGraph;
-    state.classOwnerIndex = styleData.classOwnerIndex;
-    state.baseProvenance = styleData.baseProvenance;
-    state.perComponentCss = styleData.componentCssMap;
-    state.baseCss = styleData.baseCss;
-    state.scssGraphDirty = false;
+    applyStyleData(state, styleData);
   }
 
   // ---- HTTP server ----
