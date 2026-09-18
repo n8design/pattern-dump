@@ -21,6 +21,8 @@ export interface StyleRoot {
   readonly entries: string[] | undefined;
   /** Package name; absent for the project. */
   readonly source?: string;
+  /** documentBase: paths (relative to `dir`) whose rules always go into the base layer. */
+  readonly base?: readonly string[];
 }
 
 export interface ResolvedConfig {
@@ -111,11 +113,11 @@ export function resolveServerConfig(
     })),
   ];
   const styleRoots: StyleRoot[] = [
-    { dir: stylesDir, entries: stylesEntries },
+    { dir: stylesDir, entries: stylesEntries, base: config.documentBase },
     ...packages.filter(p => p.manifest.styles).map(p => {
       const dir = inPackage(p, p.manifest.styles!.dir);
       const entries = asList(p.manifest.styles!.entry).map(e => resolve(dir, e));
-      return { dir, entries: entries.length ? entries : undefined, source: p.name };
+      return { dir, entries: entries.length ? entries : undefined, source: p.name, base: p.manifest.styles!.documentBase };
     }),
   ];
 

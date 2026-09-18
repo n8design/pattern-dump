@@ -112,3 +112,51 @@ describe("file watcher — full restyle for an entry bundle and the base layer",
     await write("src/styles/atoms/_tag.scss", `.tag { color: gray; }\n`);
   }, 60_000);
 });
+
+// A documentBase entry can list a file that belongs to a component. Its rules are base-layer CSS, so a
+// save must refresh the base layer, and the per-component recompute must not pull them back.
+describe("file watcher — a component file listed in documentBase", () => {
+  const WS = 47_313;
+  let dir = "";
+  let server: { port: number; close: () => Promise<void> };
+  let ws: WebSocket;
+  const received: HmrMessage[] = [];
+  const get = async (p: string) => (await fetch(`http://127.0.0.1:${server.port}${p}`)).text();
+  const write = (rel: string, text: string) => writeFile(join(dir, rel), text, "utf-8");
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "pd-restyle-listed-"));
+    for (const d of ["src/patterns/atoms", "src/styles/atoms", "assets"]) await mkdir(join(dir, d), { recursive: true });
+    await write("src/patterns/atoms/btn.hbs", `<button class="btn">Hi</button>\n`);
+    await write("src/styles/atoms/btn.scss", `.btn { color: red; }\n`);
+    server = await startDevServer(defineConfig({
+      sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
+      styles: { dir: "./src/styles" }, assets: { dir: "./assets" }, documentBase: ["atoms/btn"],
+    }), dir, { port: 0, wsPort: WS });
+    ws = new WebSocket(`ws://127.0.0.1:${WS}`);
+    ws.on("message", raw => { try { received.push(JSON.parse(String(raw)) as HmrMessage); } catch { /* not ours */ } });
+    await new Promise<void>((res, rej) => { ws.once("open", () => res()); ws.once("error", rej); });
+    await get("/api/component/atoms/btn");
+  }, 60_000);
+
+  afterAll(async () => {
+    ws?.close();
+    await server?.close();
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  it("serves the listed file's rules in the base layer, not the component", async () => {
+    expect(await get("/_pd/base.css")).toContain("color: red");
+    expect(await get("/_pd/components/atoms/btn.css")).toBe("");
+  });
+
+  it("a save refreshes the base layer and keeps the component empty", async () => {
+    received.length = 0;
+    await write("src/styles/atoms/btn.scss", `.btn { color: green; }\n`);
+    const deadline = Date.now() + 45_000;
+    while (!received.some(m => m.type === "content-swap") && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
+    expect(received.some(m => m.type === "content-swap")).toBe(true);
+    expect(await get("/_pd/base.css")).toContain("color: green");
+    expect(await get("/_pd/components/atoms/btn.css")).toBe("");
+  }, 60_000);
+});

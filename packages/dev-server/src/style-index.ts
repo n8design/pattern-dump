@@ -12,7 +12,8 @@
 // index it is GIVEN (the caller owns the map), which is what lets the HMR path patch ownership
 // incrementally per save instead of rebuilding the whole index.
 
-import { dirname, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import postcss from "postcss";
 import { SourceMapConsumer } from "source-map";
@@ -131,6 +132,49 @@ export interface AllStyleData {
   baseProvenance: BaseProvenanceIndex;
   componentCssMap: Map<string, string>;
   baseCss: string;
+  /** Base-layer rules from files that no component owns and that a root's `documentBase` does not
+   *  list: absolute path → rule count. Only for roots that declare a `documentBase`. */
+  baseOutsideList: Map<string, number>;
+}
+
+// ---- documentBase: paths whose rules always form the base layer ----
+
+/** A documentBase entry as a path relative to the styles folder, without `./`, a trailing `/` or
+ *  `.scss`, and without the leading `_` of a partial's name. `""` stands for the whole tree. */
+function normalizeBaseEntry(entry: string): string {
+  const parts = entry.replace(/\\/g, "/").replace(/\.scss$/, "").split("/")
+    .filter(seg => seg !== "" && seg !== ".");
+  if (parts.length > 0) parts[parts.length - 1] = parts[parts.length - 1].replace(/^_/, "");
+  return parts.join("/");
+}
+
+/**
+ * Whether a stylesheet is listed in `documentBase`: the file itself, a folder containing it, or `.`
+ * for the whole styles tree. Listed files form the base layer, linked beneath every preview, even
+ * when the file would otherwise belong to a component.
+ */
+export function documentBaseMatcher(stylesDir: string, base: readonly string[] | undefined): (absPath: string) => boolean {
+  const entries = (base ?? []).map(normalizeBaseEntry);
+  if (entries.length === 0) return () => false;
+  return absPath => {
+    const rel = relative(stylesDir, absPath);
+    if (rel.startsWith("..")) return false;
+    const parts = rel.replace(/\\/g, "/").replace(/\.scss$/, "").split("/");
+    parts[parts.length - 1] = parts[parts.length - 1].replace(/^_/, "");
+    const file = parts.join("/");
+    return entries.some(e => e === "" || file === e || file.startsWith(`${e}/`));
+  };
+}
+
+/** The documentBase entries that name nothing on disk under the styles folder. */
+export function missingDocumentBase(stylesDir: string, base: readonly string[] | undefined): string[] {
+  return (base ?? []).filter(entry => {
+    const e = normalizeBaseEntry(entry);
+    if (e === "") return false;
+    const dir = dirname(join(stylesDir, e));
+    const name = e.split("/").pop()!;
+    return ![join(stylesDir, e), join(dir, `${name}.scss`), join(dir, `_${name}.scss`)].some(existsSync);
+  });
 }
 
 /** Single compile pass producing the SCSS module graph, class→owner index, per-component
@@ -259,10 +303,12 @@ export async function patchClassOwnerIndex(
   return true;
 }
 
-/** One SCSS tree for buildAllStyleData: its folder, and optionally the only entries to compile. */
+/** One SCSS tree for buildAllStyleData: its folder, optionally the only entries to compile, and its
+ *  documentBase (paths whose rules always go into the base layer). */
 export interface StyleDataRoot {
   dir: string;
   entries?: string[];
+  base?: readonly string[];
 }
 
 /**
@@ -284,6 +330,8 @@ export async function buildAllStyleData(
   const baseProvenance: BaseProvenanceIndex = new Map();
   const componentCssBuckets = new Map<string, Set<string>>();
   const baseCssByRoot: string[][] = [];
+  // Distinct rule texts per unlisted, unowned file (a shared partial compiles into several entries).
+  const outsideRules = new Map<string, Set<string>>();
 
   for (const id of componentIds) styleUsesModules.set(id, []);
 
@@ -293,6 +341,8 @@ export async function buildAllStyleData(
 
   for (const styleRoot of rootList) {
   const stylesDir = styleRoot.dir;
+  const inBase = documentBaseMatcher(stylesDir, styleRoot.base);
+  const reportOutside = (styleRoot.base?.length ?? 0) > 0;
   const baseCssBucket = new Set<string>();
   baseCssByRoot.push([]);
 
@@ -346,7 +396,8 @@ export async function buildAllStyleData(
     const consumer = new SourceMapConsumer(rawMap as any);
     const root = postcss.parse(compiled.css);
 
-    function originOwnerFor(node: postcss.Node): string | null {
+    /** Absolute origin file of a top-level node, from the source map. */
+    function originPathFor(node: postcss.Node): string | null {
       const pos = node.source?.start;
       if (!pos) return null;
       const original = consumer.originalPositionFor({
@@ -354,20 +405,27 @@ export async function buildAllStyleData(
         column: pos.column - 1,
       });
       if (!original.source) return null;
-      const originPath = original.source.startsWith("file://")
+      return original.source.startsWith("file://")
         ? fileURLToPath(original.source)
         : resolve(dirname(entryFile), original.source);
-      const originComp = resolveScssToComponent(originPath, stylesDir, componentIds);
-      return originComp ?? "__base__";
     }
 
     // CSS bucketing: walk top-level nodes (rules + at-rules: @font-face, @keyframes, etc.)
     root.each(node => {
-      const owner = originOwnerFor(node);
-      if (owner === null) return;
+      const originPath = originPathFor(node);
+      if (originPath === null) return;
       const nodeText = cssNodeText(node);
+      // A file listed in documentBase is base-layer CSS, whichever component it would belong to.
+      const owner = inBase(originPath)
+        ? "__base__"
+        : resolveScssToComponent(originPath, stylesDir, componentIds) ?? "__base__";
       if (owner === "__base__") {
         baseCssBucket.add(nodeText);
+        if (reportOutside && !inBase(originPath)) {
+          const seen = outsideRules.get(originPath) ?? new Set<string>();
+          seen.add(nodeText);
+          outsideRules.set(originPath, seen);
+        }
       } else {
         const bucket = componentCssBuckets.get(owner) ?? new Set<string>();
         bucket.add(nodeText);
@@ -405,6 +463,7 @@ export async function buildAllStyleData(
     componentCssMap,
     // Packages' base rules first (later roots), the project's last — its own base wins the cascade.
     baseCss: joinCssChunks([...baseCssByRoot].reverse().flat()),
+    baseOutsideList: new Map([...outsideRules].map(([path, rules]) => [path, rules.size])),
   };
 }
 

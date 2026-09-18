@@ -32,7 +32,7 @@ import { buildCompositionRegistry } from "./composition.js";
 import {
   computeCssClosure, linkableClosure, recomputeComponentCss, withRenderedClassOwners,
 } from "./css-closure.js";
-import { buildAllStyleData, patchClassOwnerIndex, resolveScssToComponent } from "./style-index.js";
+import { buildAllStyleData, documentBaseMatcher, patchClassOwnerIndex, resolveScssToComponent } from "./style-index.js";
 import { auditComponent } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
@@ -57,6 +57,8 @@ export function startWatching(ctx: WatchContext): FSWatcher {
   // not watched either.
   const themesDir = cfg.config.themes ? cfg.themesDir : null;
   const scriptsDir = cfg.config.scriptsDir ? cfg.scriptsDirs[0] ?? null : null;
+  // The project's documentBase: a listed file's rules live in the base layer (see buildAllStyleData).
+  const inProjectBase = documentBaseMatcher(stylesDir, cfg.config.documentBase);
 
 const watchDirs = [patternsDir, stylesDir, ...(themesDir ? [themesDir] : []), ...(scriptsDir ? [scriptsDir] : [])];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
@@ -102,8 +104,10 @@ async function handleComponentScss(filePath: string): Promise<void> {
 
   // A recompiled file that maps to no component (a `styles.entry` bundle, or the file importing an
   // edited base partial) can change any component's CSS and the base layer, which the per-component
-  // recompute below cannot see. Rebuild all style data instead and broadcast what changed.
-  if (effectiveFiles.some(f => !resolveScssToComponent(resolve(f), stylesDir, allIds))) {
+  // recompute below cannot see. So can an edit to a file documentBase lists, whose rules are base-layer
+  // CSS even when it belongs to a component. Rebuild all style data instead and broadcast what changed.
+  if (inProjectBase(resolve(filePath)) ||
+      effectiveFiles.some(f => inProjectBase(resolve(f)) || !resolveScssToComponent(resolve(f), stylesDir, allIds))) {
     await restyleAll(allIds, timestamp, effectiveFiles, compileErrors.length > 0);
     return;
   }
@@ -113,7 +117,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
     const compId = resolveScssToComponent(resolve(recompiledFile), stylesDir, allIds);
     if (compId) {
       // Recompile with source map to get updated per-origin CSS for this component.
-      const newCss = await recomputeComponentCss(recompiledFile, compId, stylesDir, allIds);
+      const newCss = await recomputeComponentCss(recompiledFile, compId, stylesDir, allIds, inProjectBase);
       if (newCss !== null) {
         state.perComponentCss.set(compId, newCss);
         pending.push({

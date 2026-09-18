@@ -213,7 +213,9 @@ components by name alone, such as `atoms/_badge.scss` next to both `00-atoms/bad
 - **Which component owns a class** is worked out from the compiled CSS, through source maps. Each
   preview links only the CSS of the component and the components it uses.
 - **Shared rules** with no single owner (resets, document defaults, `@font-face`) go in the base layer,
-  named by `documentBase` in the config. It is linked beneath every preview.
+  turned on by `documentBase` in the config and linked beneath every preview. A file or folder listed
+  there always goes into it, even one that belongs to a component; `"."` makes every stylesheet
+  global ([configuration.md](configuration.md#documentbase)).
 - **Share code between components** through `@use` modules (tokens, mixins), not by importing another
   component's stylesheet.
 - A template that uses a class owned by another component shows up in **Relationships** as a borrowed

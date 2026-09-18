@@ -111,15 +111,18 @@ export interface PatternDumpConfig {
   helpers?: string;
   /**
    * The always-injected document-base layer (M5-CSS-EXTERNAL §2.2: a preview links
-   * closure + base + active theme). Names the base-origin path(s) — e.g.
-   * ['base/reset', 'base/root', 'base/font.base'] — relative to `styles.dir`.
+   * closure + base + active theme). Names file or folder paths — e.g.
+   * ['base/reset', 'base/root', 'base/font.base'] — relative to `styles.dir`; `"."` is the whole tree.
    *
-   * When present and non-empty, PD links the compiled base layer (`/_pd/base.css`, the
-   * origin-unattributed shared rules — resets, `:root`, `@font-face`, and family-level classes
-   * with no single owning component) into every preview, BENEATH the component closure so it
-   * never overrides it. Absent → not linked (current behaviour; a project whose classes all
-   * attribute to components needs no shared layer). The `__base__` layer must still carry no
-   * MIS-attributed rules — anything with a genuine owner attributes to that owner.
+   * When present and non-empty, PD links the compiled base layer (`/_pd/base.css`) into every
+   * preview, BENEATH the component closure so it never overrides it. The layer holds:
+   *  - every rule from a LISTED path, even one whose file belongs to a component (a component's
+   *    `body` rule needed on every page, or a whole PatternLab stylesheet with `"."`);
+   *  - the origin-unattributed rules — `:root`, `@font-face`, family-level classes with no single
+   *    owning component — listed or not, so shared partials stay available.
+   * Entries that match no file are reported at startup. Absent → not linked (a project whose classes
+   * all attribute to components needs no shared layer). Class ownership is unchanged by listing: a
+   * class still belongs to the component whose file authored it.
    */
   documentBase?: string[];
   /**

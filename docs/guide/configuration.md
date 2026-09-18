@@ -68,9 +68,22 @@ export default defineConfig({
 
 ### documentBase
 
-`string[]`, relative to `styles.dir`. The shared base layer: files or folders with rules no single
-component owns (resets, `:root` defaults, `@font-face`). The compiled layer is linked into every preview,
-beneath the component styles. Without it, no base layer is linked.
+`string[]`, relative to `styles.dir`. Turns on the shared base layer, which is linked into every
+preview beneath the component styles. Without it, no base layer is linked.
+
+- **Listed files and folders always go into the base layer**, even a file that would otherwise belong
+  to a component. List `00-base` for resets and `:root` defaults, a component's file when its rules
+  are needed on every page (a `body` rule in a hero, say), or `"."` to make the whole styles tree
+  global, as PatternLab's single stylesheet was.
+- **Rules no component owns join it too**, listed or not: shared partials whose rules no single
+  component owns stay available on every preview.
+- **`pd dev` checks the list at startup.** An entry that matches no file is a warning, usually a typo.
+  One line reports the rules that are in the base layer without being listed, so you can see what
+  is global.
+
+```ts
+documentBase: ["00-base", "03-organisms/hero"],
+```
 
 ### themes
 

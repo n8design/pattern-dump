@@ -28,12 +28,14 @@ import {
 
 /** Recompile a single SCSS entry file with source map and return the updated own-origin CSS
  *  for the given component id. Used by the HMR watcher to update perComponentCssCache.
- *  Returns null if compilation fails. */
+ *  `inBase` marks files listed in documentBase: their rules belong to the base layer, never to the
+ *  component, exactly as in buildAllStyleData. Returns null if compilation fails. */
 export async function recomputeComponentCss(
   entryFile: string,
   compId: string,
   stylesDir: string,
-  componentIds: Set<string>
+  componentIds: Set<string>,
+  inBase: (absPath: string) => boolean = () => false,
 ): Promise<string | null> {
   try {
     const compiled = sass.compile(entryFile, { sourceMap: true });
@@ -51,6 +53,7 @@ export async function recomputeComponentCss(
       const originPath = original.source.startsWith("file://")
         ? fileURLToPath(original.source)
         : resolve(dirname(entryFile), original.source);
+      if (inBase(originPath)) return;
       const originComp = resolveScssToComponent(originPath, stylesDir, componentIds);
       if (originComp === compId) bucket.add(cssNodeText(node));
     });

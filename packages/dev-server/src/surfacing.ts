@@ -10,14 +10,19 @@
 // One asymmetry to preserve: `surfaceCollisions` takes the hotreloader because a collision is
 // actionable live in the workbench (it becomes an HMR CollisionMessage on the Console); flattening
 // is console-plus-artifact only.
+//
+// `surfaceDocumentBase` is lighter still: a startup check of the configured documentBase paths, on
+// the console only, with no artifact.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import type { CollisionEntry, CollisionMessage, DiscoveryMap } from "@pattern-dump/contracts";
 import type { HotReloader } from "@pattern-dump/hotreloader";
 import { detectFlattening, renderFlatteningReport, type FlatteningInput } from "./flattening.js";
 import type { CompositionRegistry } from "./composition.js";
 import { pdScratchDir } from "./scratch.js";
+import type { StyleRoot } from "./server-config.js";
+import { missingDocumentBase } from "./style-index.js";
 
 /** Emit CollisionMessage events to the hotreloader and write CONFLICTS.generated.md.
  *  Called after every buildDiscoveryMap pass (startup + every tree-changed rebuild).
@@ -111,4 +116,23 @@ export async function surfaceFlattening(
   } catch (e) {
     console.warn("[dev-server] Could not write FLATTENED.generated.md to scratch dir:", e);
   }
+}
+
+/**
+ * Check each styles root's documentBase at startup. A listed path that names no file is a warning:
+ * it is almost always a typo, and it would otherwise leave those rules out of the base layer
+ * silently. Rules that no component owns and no documentBase lists still form the base layer; they
+ * are summarised in one line so the author can see what is global without being listed.
+ */
+export function surfaceDocumentBase(roots: readonly StyleRoot[], outsideList: ReadonlyMap<string, number>, cwd: string): void {
+  for (const root of roots) {
+    for (const entry of missingDocumentBase(root.dir, root.base)) {
+      console.warn(`[dev-server] documentBase "${entry}" matches no stylesheet in ${relative(cwd, root.dir) || "."}${root.source ? ` (${root.source})` : ""}`);
+    }
+  }
+  if (outsideList.size === 0) return;
+  const files = [...outsideList].sort((a, b) => b[1] - a[1]);
+  const rules = files.reduce((n, [, count]) => n + count, 0);
+  const examples = files.slice(0, 3).map(([path]) => relative(cwd, path)).join(", ");
+  console.log(`[dev-server] base layer: ${rules} rule(s) from ${files.length} file(s) that no component owns and documentBase does not list, e.g. ${examples}`);
 }
