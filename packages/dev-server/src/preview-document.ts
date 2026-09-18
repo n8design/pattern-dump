@@ -91,11 +91,11 @@ export function buildPreviewDocument(
   // (Layer 3) overrides it. Opt-in via config.documentBase (M5-CSS-EXTERNAL §2.2: closure + base +
   // active theme). The shell injects nothing — this link is part of the server-built document.
   const baseHrefV = baseCssVersion > 0 ? `${PD_ROUTES.baseCss}?v=${baseCssVersion}` : PD_ROUTES.baseCss;
-  const baseLink = linkBase ? `<link rel="stylesheet" href="${baseHrefV}">` : "";
+  const baseLink = linkBase ? `<link rel="stylesheet" href="${escapeAttr(baseHrefV)}">` : "";
 
   // Layer 1a: project asset CSS (htwoo.min.css, htwoo-themes.css, etc.) — linked before component CSS.
   const assetCssLinks = (assetsCss ?? [])
-    .map(p => `<link rel="stylesheet" href="/assets/${p}">`)
+    .map(p => `<link rel="stylesheet" href="${escapeAttr(`/assets/${p}`)}">`)
     .join("\n");
 
   // Layer 2: theme sets.
@@ -104,17 +104,17 @@ export function buildPreviewDocument(
   //    on change. Correct for bare-`:root` theme sets (hTWOo) that would collide if all were linked.
   const themeLinks = themeSwitch === "stylesheet"
     ? (defaultTheme
-        ? `<link rel="stylesheet" href="${themeCssUrl(defaultTheme)}" data-pd-theme="${escapeAttr(defaultTheme)}">`
+        ? `<link rel="stylesheet" href="${escapeAttr(themeCssUrl(defaultTheme))}" data-pd-theme="${escapeAttr(defaultTheme)}">`
         : "")
     : themeNames
-        .map(n => `<link rel="stylesheet" href="${themeCssUrl(n)}">`)
+        .map(n => `<link rel="stylesheet" href="${escapeAttr(themeCssUrl(n))}">`)
         .join("\n");
 
   // Layer 3: per-component own-origin CSS, in dependency order (deps before dependents).
   // data-pd-comp attribute is the HMR anchor — css-link-swap targets by this value.
   // Component ids use "/" as separators — do not encodeURIComponent (that would encode "/" to %2F).
   const closureLinks = closureIds
-    .map(id => `<link rel="stylesheet" href="${componentCssUrl(id)}" data-pd-comp="${escapeAttr(id)}">`)
+    .map(id => `<link rel="stylesheet" href="${escapeAttr(componentCssUrl(id))}" data-pd-comp="${escapeAttr(id)}">`)
     .join("\n");
 
   // SVG symbol sets inlined hidden at top of body.
@@ -124,9 +124,9 @@ export function buildPreviewDocument(
   // Local ids are stamped with ?v=<mtime> so the browser fetches fresh JS after a file change.
   const scriptTags = (requireScripts ?? [])
     .map(src => {
-      if (src.includes("://")) return `<script type="module" src="${src}"></script>`;
+      if (src.includes("://")) return `<script type="module" src="${escapeAttr(src)}"></script>`;
       const v = scriptVersions?.get(src);
-      return `<script type="module" src="${scriptUrl(src, v ?? undefined)}"></script>`;
+      return `<script type="module" src="${escapeAttr(scriptUrl(src, v ?? undefined))}"></script>`;
     })
     .join("\n");
 
