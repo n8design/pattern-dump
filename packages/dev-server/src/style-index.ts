@@ -21,6 +21,30 @@ import { collectScssFiles } from "@pattern-dump/build";
 import { collapseComponentId } from "@pattern-dump/discovery";
 import { verboseTiming } from "./timing.js";
 
+// ---- Serialising top-level CSS nodes into buckets ----
+
+/** One top-level node as standalone CSS text. `node.toString()` leaves off the `;` of a blockless
+ *  at-rule (`@import`, `@charset`, `@layer a, b`, `@namespace`) because PostCSS writes it from the
+ *  parent; without it the next chunk is parsed into the at-rule's prelude and both are dropped. */
+export function cssNodeText(node: postcss.ChildNode): string {
+  const text = node.toString();
+  return node.type === "atrule" && !node.nodes ? `${text};` : text;
+}
+
+/** Join serialised top-level chunks into one stylesheet. `@charset` and `@import` are honoured only
+ *  at the top of a stylesheet, so they are hoisted ahead of every other chunk (relative order kept). */
+export function joinCssChunks(chunks: Iterable<string>): string {
+  const charset: string[] = [];
+  const imports: string[] = [];
+  const rest: string[] = [];
+  for (const chunk of chunks) {
+    if (/^@charset\b/i.test(chunk)) charset.push(chunk);
+    else if (/^@import\b/i.test(chunk)) imports.push(chunk);
+    else rest.push(chunk);
+  }
+  return [...charset.slice(0, 1), ...imports, ...rest].join("\n");
+}
+
 // ---- SCSS module graph (styleUsesModules only — component↔component @use is a convention
 // violation that degrades to a plain non-navigable module path entry) ----
 
@@ -316,7 +340,7 @@ export async function buildAllStyleData(
     root.each(node => {
       const owner = originOwnerFor(node);
       if (owner === null) return;
-      const nodeText = node.toString();
+      const nodeText = cssNodeText(node);
       if (owner === "__base__") {
         baseCssBucket.add(nodeText);
       } else {
@@ -345,7 +369,7 @@ export async function buildAllStyleData(
 
   const componentCssMap = new Map<string, string>();
   for (const [id, bucket] of componentCssBuckets) {
-    componentCssMap.set(id, [...bucket].join("\n"));
+    componentCssMap.set(id, joinCssChunks(bucket));
   }
 
   if (verboseTiming) console.timeEnd("[dev-server:timing] full classOwnerIndex build");
@@ -355,7 +379,7 @@ export async function buildAllStyleData(
     baseProvenance,
     componentCssMap,
     // Packages' base rules first (later roots), the project's last — its own base wins the cascade.
-    baseCss: [...baseCssByRoot].reverse().flat().join("\n"),
+    baseCss: joinCssChunks([...baseCssByRoot].reverse().flat()),
   };
 }
 
