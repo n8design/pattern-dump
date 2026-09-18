@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 630" width="800" height="630" role="img" aria-labelledby="title desc">
   <title id="title">What a preview document contains</title>
-  <desc id="desc">In the head: 1 the base layer from documentBase, 2 asset stylesheets from assets.css, 3 theme stylesheets, 4 the component CSS closure. In the body, which carries data-theme: 5 inlined SVG symbol sets from requireAssets, 6 the rendered markup inside main, 7 module scripts, globalScripts first, then requireScript.</desc>
+  <desc id="desc">In the head: 1 the base layer from documentBase, 2 asset stylesheets from assets.css, 3 theme stylesheets, 4 the component CSS closure. In the body, which carries data-theme: 5 inlined SVG symbol sets from requireAssets, 6 the rendered markup, directly in the body, 7 module scripts, globalScripts first, then requireScript.</desc>
   <style>
     .bg { fill: #ffffff; }
     .box { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.5; }
@@ -81,7 +81,7 @@
   <circle class="num" cx="72" cy="469" r="13"/>
   <text class="num-t" x="72" y="474" text-anchor="middle">6</text>
   <text class="t" x="98" y="465" text-anchor="start">Rendered markup</text>
-  <text class="s" x="98" y="484" text-anchor="start">the component, inside &lt;main&gt;</text>
+  <text class="s" x="98" y="484" text-anchor="start">the component, directly in the body</text>
   <text class="m" x="740" y="475" text-anchor="end">.hbs + data</text>
   <rect class="box" x="44" y="502" width="712" height="50" rx="8"/>
   <circle class="num" cx="72" cy="527" r="13"/>

@@ -22,12 +22,13 @@ export type Category = string; // "atoms" | "molecules" | … — derived, not e
 export type ComponentStatus = "draft" | "stable" | "deprecated";
 
 /**
- * Preview layout mode (M4.2). How the component sits in the stage:
- *  - "centered": inner <main> hugs content, height-fits, stage centers it (atoms/molecules/organisms)
- *  - "full":     inner <main> fills the stage width AND height, top-aligned (pages/templates)
+ * Preview layout mode (M4.2). How the component sits in the stage. The preview document is the same
+ * in both — the markup directly in <body>, no wrapper — only the frame around it differs:
+ *  - "centered": the frame is sized to what the content needs (pd-width, measured at the full width
+ *                available) and to its height (pd-height), and the stage centres it (atoms/molecules/organisms)
+ *  - "full":     the frame fills the stage width AND height, top-aligned (pages/templates)
  * This is the RESOLVED mode (category default ← category index.md frontmatter ← component override),
- * so the shell renders directly without re-deriving precedence. Width is pure CSS; height is measured
- * for centered mode only (full mode fills).
+ * so the shell renders directly without re-deriving precedence.
  */
 export type LayoutMode = "centered" | "full";
 

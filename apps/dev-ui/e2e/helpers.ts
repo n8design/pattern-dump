@@ -36,7 +36,7 @@ export async function gotoComponentReady(page: Page, id: string, search = ""): P
   await page.goto(`/${id}${search}`);
   await page.waitForFunction((componentId: string) => {
     const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
-    return !!f?.contentDocument?.querySelector(`main[data-component-id='${componentId}']`);
+    return !!f?.contentDocument?.querySelector(`body[data-component-id='${componentId}']`);
   }, id);
 }
 

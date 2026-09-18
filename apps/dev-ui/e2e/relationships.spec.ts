@@ -47,7 +47,7 @@ test.describe("relationships facet", () => {
     await page.waitForURL(/atoms\/input/);
     await expect(page.locator(".preview-caption")).toHaveText("atoms/input");
     await page.waitForFunction(
-      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("main[data-component-id='atoms/input']"),
+      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("body[data-component-id='atoms/input']"),
       undefined,
       { timeout: 10000 }
     );
@@ -60,7 +60,7 @@ test.describe("relationships facet", () => {
     await expect(page.locator(".preview-caption")).toHaveText(/^molecules\/field$/, { timeout: 10000 });
     await expect(page).toHaveURL(/\/molecules\/field/);
     await page.waitForFunction(
-      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("main[data-component-id='molecules/field']"),
+      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("body[data-component-id='molecules/field']"),
       undefined,
       { timeout: 10000 }
     );

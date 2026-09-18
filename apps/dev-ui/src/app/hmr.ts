@@ -33,6 +33,7 @@ import { renderPanel } from "../inspector/panel.js";
 import { extractFolderPaths } from "../rail/tree-util.js";
 import { filterTree, mountSidebar, restoreNavOpenState, setActiveTreeItem, syncPackageControl } from "../rail/tree.js";
 import { navigateOverview } from "./navigation.js";
+import { remeasureAll } from "../stage/content-width.js";
 
 export function connectHmr(): void {
   // A static build has no server to reload from (see core/runtime.ts).
@@ -169,6 +170,10 @@ export function connectHmr(): void {
         });
       }
 
+      // The content's width may have changed with its CSS: fit the frames to it again, once the swapped
+      // stylesheets have loaded (measuring earlier would size the frames to the old CSS).
+      void pdLinksLoaded().then(remeasureAll);
+
       // Refresh relationships panel if the swapped file affects the currently-shown component.
       if (store.local.panelTab === "relationships" && session.current) {
         void fetch(componentUrl(session.current.id))
@@ -271,4 +276,16 @@ export function connectHmr(): void {
       void unhandled;
     }
   });
+}
+
+/** Resolves when the component stylesheets just swapped into the preview frames have loaded (or
+ *  failed), or after a second at most. Only pd-links change on a css-link-swap, so only they are awaited. */
+function pdLinksLoaded(): Promise<void> {
+  const links = [...document.querySelectorAll<HTMLIFrameElement>("iframe")]
+    .flatMap(f => [...(f.contentDocument?.querySelectorAll<HTMLLinkElement>("link[data-pd-comp]") ?? [])]);
+  return Promise.all(links.map(link => new Promise<void>(resolve => {
+    link.addEventListener("load", () => resolve(), { once: true });
+    link.addEventListener("error", () => resolve(), { once: true });
+    setTimeout(resolve, 1000);
+  }))).then(() => undefined);
 }

@@ -12,7 +12,7 @@ async function gotoComponent(page: Page, id: string) {
   await page.goto(`/${id}`);
   await page.waitForFunction((componentId: string) => {
     const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
-    return !!f?.contentDocument?.querySelector(`main[data-component-id='${componentId}']`);
+    return !!f?.contentDocument?.querySelector(`body[data-component-id='${componentId}']`);
   }, id);
   // Poll until every linked stylesheet in the iframe has its cssRules accessible.
   // External CSS files are fetched asynchronously after srcdoc is parsed.
@@ -207,7 +207,7 @@ test.describe("CSS externalisation — HMR link-swap: variants overview", () => 
     await page.waitForFunction(() => {
       const tiles = Array.from(document.querySelectorAll<HTMLIFrameElement>(".gallery-item iframe"));
       return tiles.length >= 1 && tiles.every(f => {
-        if (!f.contentDocument?.querySelector("main[data-component-id='atoms/button']")) return false;
+        if (!f.contentDocument?.querySelector("body[data-component-id='atoms/button']")) return false;
         const link = f.contentDocument.querySelector<HTMLLinkElement>("link[data-pd-comp='atoms/button']");
         return link?.sheet !== null;
       });
@@ -324,7 +324,7 @@ test("requireScript: toggle script still loads and aria-pressed flips", async ({
   await page.goto("/atoms/toggle-demo");
   await page.waitForFunction(() => {
     const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
-    return !!f?.contentDocument?.querySelector("main");
+    return !!f?.contentDocument?.querySelector("body[data-component-id='atoms/toggle-demo']");
   }, undefined, { timeout: 10_000 });
 
   const previewFrame = page.frameLocator("#preview-frame");

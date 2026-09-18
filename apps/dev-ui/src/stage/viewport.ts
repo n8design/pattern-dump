@@ -15,6 +15,7 @@ import { session } from "../core/session.js";
 import { store } from "../core/store.js";
 import { setupRadiogroupKeyboard } from "../core/radiogroup.js";
 import { svgIcon } from "../icons/index.js";
+import { measureContentWidth, stopMeasuring } from "./content-width.js";
 
 const PRESETS = {
   mobile:  { w: 375,  h: 667  },
@@ -62,9 +63,10 @@ export function syncMarks(): void {
   if (fr.width < 1 || fr.height < 1) { dom.markOverlay.hidden = true; return; }
   const sr = dom.stageView.getBoundingClientRect();
   const EPSILON = 2; // sub-pixel / border rounding tolerance
-  // Show only when the frame is smaller than the stage on BOTH axes.
+  // Show only when the frame is smaller than the stage on BOTH axes, and never in fit mode: a
+  // content-fitted frame there is the component's own size, not a simulated viewport.
   // Hides for fit, fullscreen, and any preset that clamps to stage width/height.
-  if (fr.width >= sr.width - EPSILON || fr.height >= sr.height - EPSILON) {
+  if (dom.iframe.classList.contains("vp-fit") || fr.width >= sr.width - EPSILON || fr.height >= sr.height - EPSILON) {
     dom.markOverlay.hidden = true;
     return;
   }
@@ -102,23 +104,15 @@ export function applyViewport(): void {
     dom.iframe.classList.remove("vp-sized");
     dom.iframe.classList.remove("vp-content");
     dom.iframe.classList.add("vp-fit");
+    // A centered component's frame is sized to its content and centred (content-width.ts).
+    measureContentWidth(dom.iframe);
   } else if (vp === "content") {
-    const layout = dom.stageView.getAttribute("data-layout") ?? "centered";
-    if (session.lastPdWidth !== null) {
-      dom.iframe.style.setProperty("--vp-w", `${session.lastPdWidth}px`);
-    } else if (layout === "full") {
-      // Full-layout fixtures are width-inert: pd-width is not injected, so 100% fallback fills
-      // the stage (same as fit mode). Don't apply the max-content seed.
-      dom.iframe.style.removeProperty("--vp-w");
-    } else {
-      // Centered layout: seed to max-content so the frame starts at its natural width before
-      // pd-width fires, preventing a wide→narrow pop.
-      dom.iframe.style.setProperty("--vp-w", "max-content");
-    }
     dom.iframe.classList.remove("vp-sized");
     dom.iframe.classList.remove("vp-fit");
     dom.iframe.classList.add("vp-content");
+    measureContentWidth(dom.iframe);
   } else {
+    stopMeasuring(dom.iframe);
     const p = PRESETS[vp as PresetName];
     dom.iframe.style.setProperty("--vp-w", `${p.w}px`);
     dom.iframe.classList.add("vp-sized");
@@ -173,6 +167,7 @@ export function startDisco(): void {
   if (vpDisco) return;
   // No need to save vpModeBeforeDisco — store.url.viewport persists through disco unchanged.
   vpDisco = true;
+  stopMeasuring(dom.iframe);
   dom.viewportToolbar.setAttribute("data-disco-active", ""); // suppress the active-mode accent → disco owns the one red
   dom.vpDiscoBtn.setAttribute("aria-pressed", "true");
   dom.vpDiscoBtn.innerHTML = svgIcon("vp-disco-fill");
@@ -266,7 +261,7 @@ export function initViewport(onFullscreen: () => void): void {
   const iframeObserver = new ResizeObserver(() => requestAnimationFrame(updateReadout));
   iframeObserver.observe(dom.iframe);
   iframeObserver.observe(dom.stageView);
-  dom.iframe.addEventListener("load", () => { updateReadout(); syncFrameFocusListeners(); });
+  dom.iframe.addEventListener("load", () => { measureContentWidth(dom.iframe); updateReadout(); syncFrameFocusListeners(); });
 
   // Leave path: any shell element gaining focus means the iframe lost it.
   // focusin doesn't cross iframe boundaries so this only fires for parent-doc focus.

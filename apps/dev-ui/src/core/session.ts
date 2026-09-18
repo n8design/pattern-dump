@@ -82,11 +82,6 @@ export interface Session {
   scanPending: boolean;
 
   // ---- Preview measurement ----
-  /** Last width reported by the preview's pd-width message. Written by the window message handler
-   *  and reset by applyComponent; read by the viewport readout ~2,000 lines away in the original
-   *  file. Genuinely cross-region, which is why it belongs here and not behind a viewport accessor —
-   *  that would force a back-import from navigation into viewport. */
-  lastPdWidth: number | null;
 }
 
 /** The single shell session. One page, one object. */
@@ -108,5 +103,4 @@ export const session: Session = {
   dataRaw: null,
   renderedA11y: [],
   scanPending: false,
-  lastPdWidth: null,
 };

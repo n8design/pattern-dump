@@ -101,14 +101,14 @@ test.describe("HMR smoke", () => {
 
       // HMR content-swap sets iframe.srcdoc — assert the new text appears in the iframe.
       await expect(
-        page.frameLocator("#preview-frame").locator("main")
+        page.frameLocator("#preview-frame").locator("body")
       ).toContainText("HMR_SMOKE", { timeout: 10_000 });
     } finally {
       await writeFile(jsonPath, original);
       // The restore re-renders; wait for the marker to disappear so the next spec does not load
       // atoms/button while this component is mid-swap.
       await settleAfterRestore(page, async () => {
-        const text = await page.frameLocator("#preview-frame").locator("main")
+        const text = await page.frameLocator("#preview-frame").locator("body")
           .textContent().catch(() => null);
         return text !== null && !text.includes("HMR_SMOKE");
       });

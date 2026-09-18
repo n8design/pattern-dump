@@ -33,6 +33,7 @@ import { listenForPreviewMessages } from "../stage/preview-messages.js";
 import { navigateVariants, swapVariant } from "./navigation.js";
 import { routeFromCurrentLocation } from "./router.js";
 import { renderShellHtml } from "./shell.js";
+import { initContentWidth } from "../stage/content-width.js";
 
 
 export function applyRightPanelDom(open: boolean): void {
@@ -61,6 +62,7 @@ export function mount(): void {
   initDom(app);
 
   listenForPreviewMessages();
+  initContentWidth();
 
   // Nav open-state persistence is wired by mountSidebar() — click listeners on each
   // <summary> element. Click fires only for user interaction; programmatic det.open = true

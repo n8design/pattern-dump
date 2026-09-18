@@ -62,17 +62,17 @@ test.describe("layout & regions", () => {
   }) => {
     await gotoComponent(page, "atoms/button");
 
-    const stageBox = await page.locator(".stage").boundingBox();
-    const iframeBox = await page.locator("#preview-frame").boundingBox();
-
-    expect(stageBox).not.toBeNull();
-    expect(iframeBox).not.toBeNull();
-
-    // For centered layout (atoms), the iframe width equals the stage width (100%).
-    // place-self: safe center centers it vertically when content is short.
-    // Horizontal: iframe fills full width, so x aligns with stage x.
-    expect(Math.abs(iframeBox!.x - stageBox!.x)).toBeLessThan(5);
-    expect(Math.abs(iframeBox!.width - stageBox!.width)).toBeLessThan(5);
+    // For centered layout (atoms) the frame is sized to its content (pd-width, stage/content-width.ts)
+    // and centred by margin-inline: auto: narrower than the stage, with its centre on the stage's.
+    // Poll: the width lands once the document has measured itself at full width.
+    await expect.poll(async () => {
+      const stageBox = await page.locator(".stage").boundingBox();
+      const iframeBox = await page.locator("#preview-frame").boundingBox();
+      if (!stageBox || !iframeBox) return false;
+      const narrower = iframeBox.width < stageBox.width / 2;
+      const centred = Math.abs((iframeBox.x + iframeBox.width / 2) - (stageBox.x + stageBox.width / 2)) < 5;
+      return narrower && centred;
+    }, { timeout: 10_000 }).toBe(true);
   });
 
   test("full-mode page: stage-view has data-layout=full; iframe fills the figure", async ({
@@ -101,7 +101,7 @@ test.describe("layout & regions", () => {
     expect(Math.abs(iframeBox!.height - (figureBox!.height - captionHeight))).toBeLessThan(5);
   });
 
-  test("full-mode iframe has no max-width constraint in preview document", async ({
+  test("a page's own <main> is the only one: the preview adds no wrapper", async ({
     page,
   }) => {
     await gotoComponent(page, "pages/homepage");
@@ -109,21 +109,20 @@ test.describe("layout & regions", () => {
     // Wait for the correct component document — avoids catching "about:blank" transitional state.
     await page.waitForFunction(() => {
       const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
-      return !!f?.contentDocument?.querySelector("main[data-component-id='pages/homepage']");
+      return !!f?.contentDocument?.querySelector("body[data-component-id='pages/homepage']");
     });
 
-    // Evaluate max-width of the <main> inside the preview document.
-    // Use page.evaluate with direct contentDocument access (same-origin srcdoc).
-    const maxWidth = await page.evaluate(() => {
-      const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
-      const main = f?.contentDocument?.querySelector("main");
-      if (!main) return null;
-      const win = main.ownerDocument?.defaultView ?? window;
-      return win.getComputedStyle(main).maxWidth;
+    // homepage.hbs authors <div class="page-homepage"> … <main class="page-body">. A wrapper <main>
+    // around it would nest landmarks (invalid HTML) and break `body > …` selectors: the page's root
+    // must be a direct body child and its main the only one.
+    const mains = await page.evaluate(() => {
+      const doc = (document.getElementById("preview-frame") as HTMLIFrameElement | null)?.contentDocument;
+      return {
+        count: doc?.querySelectorAll("main").length ?? -1,
+        rootIsBodyChild: !!doc?.querySelector("body > .page-homepage > main.page-body"),
+      };
     });
-
-    // layout-full must not apply a max-width (should be "none").
-    expect(maxWidth).toBe("none");
+    expect(mains).toEqual({ count: 1, rootIsBodyChild: true });
   });
 
   test("caption sits above the dock", async ({ page }) => {

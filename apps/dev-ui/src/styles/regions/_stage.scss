@@ -129,6 +129,12 @@ figure.preview {
   height: var(--vp-h, auto);
   margin-inline: auto;
   transition: width 2s ease;
+
+  // While measuring a centered component's content width, and while landing on it, no animation:
+  // the frame goes to full width and then to the content's width (stage/content-width.ts).
+  &.vp-measuring {
+    transition: none;
+  }
 }
 
 // The preview document is intentionally transparent (zero shell-authored style in the srcdoc).
@@ -231,7 +237,10 @@ figure.preview {
   padding-top: 0.5rem;
 
   iframe {
-    width: 100%;
+    // A centered component's tile fits its content's width and is centred (stage/content-width.ts).
+    width: var(--vp-w, 100%);
+    max-width: 100%;
+    margin-inline: auto;
     height: var(--vp-h, auto); /* pd-height sets --vp-h; auto = UA 150px until first fire */
     border: none;
     display: block;

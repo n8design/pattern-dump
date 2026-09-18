@@ -126,16 +126,12 @@ test.describe("preview-bleed: no shell-chrome injection", () => {
   });
 
   test("body margin equals UA baseline (no margin:0 override)", async ({ page }) => {
-    // Build a UA-baseline control iframe that mirrors the shell's main-wrapper structure
-    // so margin-collapse behaviour matches — an empty <body> would differ from
-    // <body><main style="max-width:..."></main></body>.
+    // A UA-baseline control: a plain document. The preview adds nothing around the markup, so its
+    // body must compute the same margin (computed style is not affected by margin collapse).
     const uaMargin = await page.evaluate((): Promise<number> =>
       new Promise(resolve => {
         const f = document.createElement("iframe");
-        f.srcdoc =
-          "<!DOCTYPE html><html><head></head><body>" +
-          '<main style="max-width:max-content;margin-inline:auto"></main>' +
-          "</body></html>";
+        f.srcdoc = "<!DOCTYPE html><html><head></head><body></body></html>";
         document.body.appendChild(f);
         f.addEventListener("load", () => {
           const m = parseFloat(
@@ -202,14 +198,15 @@ test.describe("preview-bleed: no shell-chrome injection", () => {
     expect(fontLoaded, "PDTestFont resolves in font-demo preview").toBe(true);
   });
 
-  test("layout main has inline style with max-width (not cascade-injected)", async ({ page }) => {
+  test("the preview adds no wrapper and no inline style around the markup", async ({ page }) => {
     await gotoComponent(page, "atoms/button");
-    const mainStyle = await page
-      .frameLocator("#preview-frame")
-      .locator("main")
-      .getAttribute("style");
-    expect(mainStyle).toBeTruthy();
-    expect(mainStyle).toContain("max-width");
+    const doc = await page.frameLocator("#preview-frame").locator("body").evaluate(body => ({
+      bodyStyle: body.getAttribute("style"),
+      wrapper: !!body.querySelector("main"),
+      // The component's own root is a direct child of <body>.
+      buttonIsBodyChild: !!body.querySelector(":scope > button, :scope > .df-button"),
+    }));
+    expect(doc).toEqual({ bodyStyle: null, wrapper: false, buttonIsBodyChild: true });
   });
 });
 

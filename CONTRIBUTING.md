@@ -97,10 +97,14 @@ Publish pre-releases with `--tag alpha`. Without a tag npm moves `latest`, and a
 
 ### The preview is an honest page
 
-- The shell injects **nothing** into a preview document: no stylesheet links, no inline styles, no reset.
-  The shell styles only its own furniture (`#preview-frame` and the Stage), never the preview.
+- The shell injects **nothing** into a preview document: no wrapper element, no stylesheet links, no
+  inline styles, no reset. The markup is the body's content; the body carries only `data-theme` and
+  `data-component-id`. The shell styles only its own furniture (`#preview-frame` and the Stage), never
+  the preview.
 - Iframe height comes only from the `pd-height` message, and width from `pd-width`. Iframes are replaced
-  elements, so `height: auto` or `fit-content` cannot size them from their content.
+  elements, so `height: auto` or `fit-content` cannot size them from their content. The document's
+  measurement script only reads the page; `pd-width` is trusted only when it was measured at the full
+  width available, so a fitted frame cannot narrow itself step by step.
 - The preview stays same-origin so the workbench can read the rendered source. Server-side validation
   and escaping are the only injection defence.
 - Don't patch the preview document from the shell to simplify something; it breaks this contract.

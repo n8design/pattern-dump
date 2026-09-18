@@ -57,7 +57,8 @@ export async function runRenderedA11yScan(): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const axeWindow = dom.iframe.contentWindow as any;
     if (!axeWindow.axe) await injectAxe();
-    const root = dom.iframe.contentDocument.querySelector("main") ?? dom.iframe.contentDocument.body;
+    // The whole page: the component's markup is the body's content (there is no wrapper to scope to).
+    const root = dom.iframe.contentDocument.body;
     const results = await axeWindow.axe.run(root, { runOnly: session.needsRenderingRules }) as {
       violations?: unknown[]; incomplete?: unknown[];
     };

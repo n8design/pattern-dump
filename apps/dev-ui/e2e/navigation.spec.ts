@@ -150,7 +150,7 @@ test.describe("SPA navigation — URL as source of truth", () => {
 
     // Preview iframe re-pointed — not left stale (direct contentDocument access; frameLocator lags CDP after srcdoc change).
     await page.waitForFunction(
-      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("main[data-component-id='atoms/input']"),
+      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("body[data-component-id='atoms/input']"),
       undefined,
       { timeout: 10000 }
     );
@@ -186,7 +186,7 @@ test.describe("SPA navigation — URL as source of truth", () => {
     await expect(page).toHaveURL(/\/molecules\/field/);
     // Preview iframe must be re-pointed to molecules/field, not left stale.
     await page.waitForFunction(
-      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("main[data-component-id='molecules/field']"),
+      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("body[data-component-id='molecules/field']"),
       undefined,
       { timeout: 10000 }
     );
@@ -240,7 +240,7 @@ test.describe("SPA navigation — URL as source of truth", () => {
     await expect(page.locator(".preview-caption")).toHaveText("atoms/button");
     // Preview iframe re-pointed — not left stale.
     await page.waitForFunction(
-      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("main[data-component-id='atoms/button']"),
+      () => !!document.getElementById("preview-frame")?.contentDocument?.querySelector("body[data-component-id='atoms/button']"),
       undefined,
       { timeout: 10000 }
     );

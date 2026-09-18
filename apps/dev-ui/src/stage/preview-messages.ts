@@ -4,7 +4,8 @@
 // so height:auto and fit-content do not content-size them (CONTRIBUTING.md, "The preview is an honest page"). Instead each preview
 // document posts its measurements, and this listener applies them:
 //   pd-height  -> --vp-h on the sending iframe      (skipped for full-page layouts; see below)
-//   pd-width   -> --vp-w, only in "content" viewport mode, and refreshes the width readout
+//   pd-width   -> --vp-w on a frame that fits its content (see content-width.ts), and refreshes the
+//                 width readout
 //   pd-fp      -> full-page dialog: "exit" closes it, "active" reveals its chrome
 //
 // In stage/ rather than app/: every effect lands on the Stage and every dependency is stage or core.
@@ -13,9 +14,8 @@
 // Registered exactly once, from mount(), at the same point in the sequence it always was.
 
 import { dom } from "../core/dom.js";
-import { session } from "../core/session.js";
-import { store } from "../core/store.js";
 import { showFullpageChrome } from "./fullpage.js";
+import { acceptContentWidth } from "./content-width.js";
 import { setVpProp } from "./preview-sizing.js";
 import { updateReadout } from "./viewport.js";
 
@@ -28,7 +28,7 @@ export function listenForPreviewMessages(): void {
   // Bounds for content mode are enforced by CSS max-width/max-height on .vp-content
   // (see _stage.scss) — the CSS clamp is live on every paint so it handles stage resizes.
   window.addEventListener("message", (e: MessageEvent<unknown>) => {
-    const data = e.data as { type?: string; height?: number; width?: number; action?: string } | null;
+    const data = e.data as { type?: string; height?: number; width?: number; at?: number; scroll?: number; action?: string } | null;
     if (!data) return;
     if (data.type === "pd-height" && typeof data.height === "number") {
       const height = data.height;
@@ -49,17 +49,16 @@ export function listenForPreviewMessages(): void {
           setVpProp(el, "--vp-h", height);
         }
       });
-    } else if (data.type === "pd-width" && typeof data.width === "number") {
-      session.lastPdWidth = data.width;
-      if (store.url.viewport === "content") {
-        const width = data.width;
-        document.querySelectorAll("iframe").forEach((f) => {
-          if ((f as HTMLIFrameElement).contentWindow === e.source) {
-            setVpProp(f as HTMLIFrameElement, "--vp-w", width);
-          }
-        });
-        requestAnimationFrame(updateReadout);
-      }
+    } else if (data.type === "pd-width" && typeof data.width === "number" && typeof data.at === "number") {
+      const { width, at } = data;
+      const scroll = typeof data.scroll === "number" ? data.scroll : at;
+      document.querySelectorAll("iframe").forEach((f) => {
+        const frame = f as HTMLIFrameElement;
+        if (frame.contentWindow !== e.source) return;
+        if (acceptContentWidth(frame, width, at, scroll) && frame === dom.iframe) {
+          requestAnimationFrame(updateReadout);
+        }
+      });
     } else if (data.type === "pd-fp") {
       if (data.action === "exit")   dom.fullpageDialog.close();
       else if (data.action === "active") showFullpageChrome();

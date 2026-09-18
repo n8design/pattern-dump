@@ -88,7 +88,7 @@ test.describe("theme CSS serving", () => {
     await page.waitForFunction(() => {
       const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
       const doc = f?.contentDocument;
-      if (!doc?.querySelector("main[data-component-id='atoms/button']")) return false;
+      if (!doc?.querySelector("body[data-component-id='atoms/button']")) return false;
       // Wait for component CSS link to be loaded (sheet non-null).
       const link = doc.querySelector("link[data-pd-comp='atoms/button']") as HTMLLinkElement | null;
       return link?.sheet !== null;
@@ -269,7 +269,7 @@ test.describe("HMR sanity — css-link-swap compatibility", () => {
     await page.waitForFunction(() => {
       const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
       const doc = f?.contentDocument;
-      return !!doc?.querySelector("main[data-component-id='atoms/button']")
+      return !!doc?.querySelector("body[data-component-id='atoms/button']")
         && !!doc?.querySelector("link[data-pd-comp='atoms/button']");
     });
   });

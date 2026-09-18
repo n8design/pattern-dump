@@ -37,6 +37,55 @@ export async function buildScriptVersions(
   return map;
 }
 
+/**
+ * How wide a `centered` preview's content needs the viewport to be, measured without touching the
+ * page. Plain JS, inlined into the preview's measurement script as `pdContentWidth()`.
+ *
+ * Walks the body. Text counts by its line boxes; a box narrower than its container (an inline-block,
+ * a flex item, anything with a set width, a replaced element) counts by its own right edge. A box
+ * that fills its container says nothing about the content's width, so it counts as what its content
+ * needs plus its own right padding, border and margin — except a grid or table, whose columns are laid
+ * out from the container's width, so it keeps its full width. The result is the rightmost of these
+ * plus the body's right margin, in viewport pixels. A component the page lays out full-width (a
+ * width:100% input, a progress bar) measures full-width: that is how it renders.
+ */
+const CONTENT_WIDTH_SCRIPT = `
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+`;
+
 export function buildPreviewDocument(
   html: string,
   closureIds: string[],   // component ids whose CSS files to link, in dependency order
@@ -61,27 +110,21 @@ export function buildPreviewDocument(
   // after a base edit fetches the new sheet. 0 (never changed) keeps the bare URL.
   baseCssVersion = 0
 ): string {
-  const bodyAttr   = defaultTheme ? ` data-theme="${escapeAttr(defaultTheme)}"` : "";
-  const layoutClass = layout === "full" ? "layout-full" : "layout-centered";
-  // Drop src:location.pathname — pathname is meaningless under srcdoc.
-  // The parent identifies which iframe sent the message via e.source.
-  // pd-width: centered layout only (full-layout fixtures are width-inert).
-  // pd-height: both layouts use document.documentElement.scrollHeight — the only measurement
-  //   that captures glyph ink overflow beyond the CSS line-box. main.scrollHeight only sees
-  //   the line-box; decorative/cursive fonts with tall ascenders or descenders report a lower
-  //   value, causing the frame to be set too short and the content to be clipped.
-  //   documentElement.scrollHeight also handles CSS margin-collapse correctly: when a child's
-  //   margin-top is larger than the body's (e.g. a <p> at 2rem → 32 px collapses with body's
-  //   8 px), the collapsed margin is already baked in — no manual margin arithmetic needed.
-  //   For normal fonts both values are numerically identical (zero regression).
-  // pd-width still uses main.scrollWidth + body horizontal margins: glyph overflow is vertical
-  //   only, and document.documentElement.scrollWidth can be unreliable for centered layouts.
+  const componentAttr = componentId ? ` data-component-id="${escapeAttr(componentId)}"` : "";
+  const bodyAttr = `${defaultTheme ? ` data-theme="${escapeAttr(defaultTheme)}"` : ""}${componentAttr}`;
+  // The measurement script — the one thing PD adds to the body besides the markup, and it only READS
+  // the page. The parent identifies which iframe sent a message via e.source.
+  //  - pd-height (both layouts): document.documentElement.scrollHeight, the only measurement that
+  //    captures glyph ink overflow beyond the line box and has margin collapse already applied.
+  //  - pd-width (centered only): how wide the content needs the viewport to be, so the Stage can size
+  //    the iframe to it and centre it. Nothing in the document is restyled to find out; see
+  //    CONTENT_WIDTH_SCRIPT. `at` is the width it was measured at: the Stage trusts only a measurement
+  //    taken at the full available width, which keeps wrapped text from narrowing the frame step by step.
   const widthPost = layout === "centered"
-    ? `window.parent.postMessage({type:'pd-width',width:(function(){var m=document.querySelector('main')||document.body,cs=getComputedStyle(document.body);return Math.ceil(m.scrollWidth+(parseFloat(cs.marginLeft)||0)+(parseFloat(cs.marginRight)||0));}())},'*');`
+    ? `window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');`
     : "";
-  const heightMeasure = `document.documentElement.scrollHeight`;
   const resizeScript = layout === "centered" || layout === "full"
-    ? `<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:${heightMeasure}},'*');${widthPost}},50);}).observe(document.body);})();</script>`
+    ? `<script>(function(){${layout === "centered" ? CONTENT_WIDTH_SCRIPT : ""}var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');${widthPost}},50);}).observe(document.body);})();</script>`
     : "";
 
   const baseTag = baseHref ? `<base href="${escapeAttr(baseHref)}">` : "";
@@ -132,11 +175,6 @@ export function buildPreviewDocument(
     })
     .join("\n");
 
-  const componentAttr = componentId ? ` data-component-id="${escapeAttr(componentId)}"` : "";
-  const layoutStyle = layout === "full"
-    ? ' style="width:100%;max-width:none"'
-    : ' style="max-width:max-content;margin-inline:auto"';
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -149,7 +187,7 @@ ${closureLinks}
 </head>
 <body${bodyAttr}>
 ${symbolSets}
-<main class="${layoutClass}"${layoutStyle}${componentAttr}>${html}</main>
+${html}
 ${resizeScript}
 ${scriptTags}
 </body>

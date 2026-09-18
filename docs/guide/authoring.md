@@ -191,7 +191,9 @@ its page off, or `overviews: false` in the config to turn them all off.
 
 ### Preview layout
 
-- **`centered`**: the component sits centred and as wide as its content.
+- **`centered`**: the preview frame is as wide as the component's content and centred in the Stage.
+  The page itself is not changed to get there, so a component that fills its container (a full-width
+  input, a progress bar) shows at full width, as it would on a page.
 - **`full`**: the component fills the Stage, for pages and layouts.
 
 Components in `pages/` and `templates/` default to `full`, everything else to `centered`. A top-level
@@ -229,7 +231,8 @@ Every preview is a complete HTML document built by the server, in this order:
 
 ![A preview document: in the head the base layer, asset stylesheets, theme stylesheets and component CSS; in the body inlined SVG symbol sets, the rendered markup and module scripts](preview-composition.svg)
 
-The workbench never adds anything to it, so what you see in the Stage is what your markup and CSS produce.
+The markup sits directly in `<body>`, with no wrapper around it. The workbench never adds anything to
+the document, so what you see in the Stage is what your markup and CSS produce.
 
 ## Behaviour scripts
 

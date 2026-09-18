@@ -94,8 +94,6 @@ export async function applyComponent(detail: ComponentDetail, variant?: string):
 
   // Reset content-fit height so pd-height can set it fresh for the new component.
   dom.iframe.style.removeProperty("--vp-h");
-  // Content mode: clear cached width so the new component sizes itself fresh.
-  session.lastPdWidth = null;
 
   // Re-apply the current viewport to the new srcdoc without resetting the mode.
   if (isDiscoRunning()) stopDisco();
