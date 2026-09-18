@@ -11,7 +11,7 @@
 
 import { readFile } from "node:fs/promises";
 import type { ServerResponse } from "node:http";
-import { PD_ROUTES, type ShellRuntime } from "@pattern-dump/contracts";
+import { PD_ROUTE_PREFIX, PD_ROUTES, type ShellRuntime } from "@pattern-dump/contracts";
 
 /** Content-Type for a file extension; unknown extensions fall back to a download-safe default. */
 export function mimeType(ext: string): string {
@@ -70,8 +70,24 @@ export async function serveFile(res: ServerResponse, filePath: string, contentTy
   }
 }
 
+/** Prefixes owned by the server's own routes. An unmatched path under one is never a workbench route. */
+const RESERVED_PREFIXES = ["/_pd/", "/api/", PD_ROUTE_PREFIX.preview, PD_ROUTE_PREFIX.source, PD_ROUTE_PREFIX.assets];
+
 /**
- * The SPA shell document. Served for every unmatched path so client-side routing owns the URL space.
+ * Whether an unmatched path gets the SPA shell (a workbench route) or a 404. The shell is for page
+ * loads: a path outside the reserved prefixes whose last segment has no file extension, or any such
+ * path a browser navigates to (`Accept: text/html`, which also covers a component id with a dot in
+ * it). A missing image, font, stylesheet or script is a 404, not a 200 carrying the workbench.
+ */
+export function servesShell(pathname: string, accept: string | undefined): boolean {
+  if (RESERVED_PREFIXES.some(p => pathname.startsWith(p))) return false;
+  const last = pathname.slice(pathname.lastIndexOf("/") + 1);
+  return !/\.[a-z0-9]+$/i.test(last) || (accept ?? "").includes("text/html");
+}
+
+/**
+ * The SPA shell document. Served for unmatched workbench routes (see `servesShell`) so client-side
+ * routing owns the URL space.
  * `window.__pd` (ShellRuntime) is the only value the shell needs inline — how it was served: live,
  * with the live-reload port, or from a static build. Everything else it fetches.
  */

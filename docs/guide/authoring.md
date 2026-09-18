@@ -273,6 +273,9 @@ Files in the assets folder are served at `/assets/`, with the path mirroring the
 `assets/images/logo.svg` is `/assets/images/logo.svg`. Use that path in templates and CSS. With several
 asset folders, each is served under its folder name (`/assets/images/…`, `/assets/fonts/…`).
 
+A path to a file that doesn't exist returns 404, so a broken image, font or `url()` shows up as a failed
+request in the browser's network panel.
+
 `assets.css` in the config lists stylesheets (relative to the assets folder) to link into every preview,
 before the component styles.
 

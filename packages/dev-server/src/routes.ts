@@ -29,7 +29,7 @@ import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/render
 
 import type { ResolvedConfig } from "./server-config.js";
 import { applyStyleData, type ServerState } from "./server-state.js";
-import { buildShellHtml, json, mimeType, serveFile } from "./http-utils.js";
+import { buildShellHtml, json, mimeType, serveFile, servesShell } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
 import { buildCompositionRegistry } from "./composition.js";
 import { buildComponentTree } from "./component-tree.js";
@@ -412,7 +412,12 @@ export async function handleRequest(
       return;
     }
 
-    // --- SPA shell (all other paths) ---
+    // --- SPA shell (workbench routes), 404 for everything else ---
+    if (!servesShell(pathname, req.headers.accept)) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end(`Not found: ${pathname}`);
+      return;
+    }
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(buildShellHtml({ mode: "live", wsPort }));
 
