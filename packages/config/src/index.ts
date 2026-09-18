@@ -2,6 +2,7 @@
 // Load and validate pattern-dump.config (.ts/.json, TS wins). Shared config types.
 import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/contracts";
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
+export { ConfigError, configProblems, validateConfig } from "./validate.js";
 
 export interface AssetsConfig {
   /** 'central' (default) serves the central assets dir; 'component-relative' resolves from component folder. */

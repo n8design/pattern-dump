@@ -6,6 +6,14 @@ is no TypeScript file. `--config <path>` uses a file elsewhere.
 **Every path in the config resolves against the project root**: the folder `pd` runs in, or `--root`.
 Not against the config file's location, even when `--config` points outside the root.
 
+The config is checked when it is loaded. A missing required option, an unknown option or a value of the
+wrong type stops `pd` with a list of every problem, and a likely typo gets a suggestion:
+
+```
+[pd] Error: pattern-dump.config.json: invalid config
+  - missing required "styles" (found "style" — did you mean "styles"?)
+```
+
 ```ts
 import { defineConfig } from "pattern-dump";
 
@@ -54,7 +62,7 @@ export default defineConfig({
 
 | Option | Type | Description |
 |---|---|---|
-| `styles.strategy` | `"parallel"` | Styles live in a separate tree mirroring the patterns |
+| `styles.strategy` | `"parallel"` | Styles live in a separate tree mirroring the patterns, the only layout supported so far |
 | `styles.dir` | string | The SCSS tree |
 | `styles.entry` | string or string[] | Compile only these files (relative to `styles.dir`). Without it, every `.scss` not starting with `_` is compiled. Name one design-system bundle here rather than several overlapping ones |
 
@@ -77,7 +85,7 @@ beneath the component styles. Without it, no base layer is linked.
 
 | Option | Type | Description |
 |---|---|---|
-| `assets.strategy` | `"central"` | Assets live in their own folder |
+| `assets.strategy` | `"central"` | Optional. Assets live in their own folder, the only layout supported so far |
 | `assets.dir` | string or string[] | Served at `/assets/`. With several folders, each is served under its folder name (`/assets/images/…`). References that start with a folder's name, relative (`../../images/x.svg`) or root-absolute (`/images/x.svg`), are rewritten to `/assets/images/x.svg` in markup and in `url()` in your compiled CSS |
 | `assets.css` | string[] | Stylesheets (relative to the assets folder) linked into every preview before the component styles |
 

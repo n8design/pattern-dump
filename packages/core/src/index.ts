@@ -9,7 +9,7 @@ import { join, dirname, resolve, relative, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
-import type { PatternDumpConfig } from "@pattern-dump/config";
+import { ConfigError, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
 
 export async function runDev(
   root: string,
@@ -186,32 +186,35 @@ export async function runExport(root: string, configPath?: string, outDir?: stri
  *
  * Either way, the config's *internal* directory paths (patternsDir, styles.dir, …) resolve
  * against `root`, never against the config file's location — the single resolution base.
+ *
+ * The loaded value is validated (unknown keys, missing required keys, wrong types) before anything
+ * reads it, so a typo is reported by name instead of failing later in whichever reader hits it.
  */
 export async function loadConfig(root: string, configPath?: string): Promise<PatternDumpConfig> {
   if (configPath) {
     if (!existsSync(configPath)) {
-      throw new Error(`--config file not found: ${configPath}`);
+      throw new ConfigError(`--config file not found: ${configPath}`);
     }
-    return configPath.endsWith(".json")
-      ? (JSON.parse(await readFile(configPath, "utf-8")) as PatternDumpConfig)
-      : loadTsConfig(configPath);
+    return validateConfig(await readConfigFile(configPath), configPath);
   }
 
-  const tsPath = join(root, "pattern-dump.config.ts");
-  const jsonPath = join(root, "pattern-dump.config.json");
-
-  if (existsSync(tsPath)) return loadTsConfig(tsPath);
-  if (existsSync(jsonPath)) {
-    return JSON.parse(await readFile(jsonPath, "utf-8")) as PatternDumpConfig;
+  for (const name of ["pattern-dump.config.ts", "pattern-dump.config.json"]) {
+    const path = join(root, name);
+    if (existsSync(path)) return validateConfig(await readConfigFile(path), name);
   }
 
-  throw new Error(
+  throw new ConfigError(
     `No pattern-dump.config.ts or pattern-dump.config.json found in ${root} (and no --config given)`
   );
 }
 
+/** The config file's value, not yet validated: parsed JSON, or a TS config's default export. */
+async function readConfigFile(path: string): Promise<unknown> {
+  return path.endsWith(".json") ? JSON.parse(await readFile(path, "utf-8")) : loadTsConfig(path);
+}
+
 /** Transpile a TS config to a temp ESM file and import its default export. */
-async function loadTsConfig(tsPath: string): Promise<PatternDumpConfig> {
+async function loadTsConfig(tsPath: string): Promise<unknown> {
   const tmp = join(tmpdir(), `pd-config-${Date.now()}.mjs`);
   try {
     await esbuild({
@@ -223,7 +226,7 @@ async function loadTsConfig(tsPath: string): Promise<PatternDumpConfig> {
       outfile: tmp,
     });
     const { default: cfg } = await import(pathToFileURL(tmp).href);
-    return cfg as PatternDumpConfig;
+    return cfg as unknown;
   } finally {
     await unlink(tmp).catch(() => {/* best-effort cleanup */});
   }

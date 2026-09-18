@@ -11,6 +11,13 @@ import { PD_PACKAGE_NAME, PD_VERSION } from "./distribution.js";
 
 const command = parseCommand(process.argv.slice(2), process.cwd());
 
+/** What to print for a failed command. A config problem is written for the person editing the
+ *  config, so it gets its message alone; anything else keeps its stack trace. Matched by name, not
+ *  class, so the CLI needs no import beyond core. */
+function describeError(e: unknown): unknown {
+  return e instanceof Error && e.name === "ConfigError" ? e.message : e;
+}
+
 switch (command.kind) {
   case "init": {
     const rl = process.stdin.isTTY ? createInterface({ input: process.stdin, output: process.stdout }) : null;
@@ -50,7 +57,7 @@ switch (command.kind) {
       if (typeof e === "object" && e !== null && (e as { code?: unknown }).code === "EADDRINUSE" && e instanceof Error) {
         console.error(`[pd] ${e.message}`);
       } else {
-        console.error("[pd] Error:", e);
+        console.error("[pd] Error:", describeError(e));
       }
       process.exit(1);
     });
@@ -63,7 +70,7 @@ switch (command.kind) {
     // after every write queued before it.
     runAudit(command.root, command.configPath, command.format)
       .then(() => process.stdout.write("", () => process.exit(0)))
-      .catch((e) => { console.error("[pd] Error:", e); process.exit(1); });
+      .catch((e) => { console.error("[pd] Error:", describeError(e)); process.exit(1); });
     break;
 
   case "build":
@@ -84,7 +91,7 @@ switch (command.kind) {
     // so Node exits cleanly once the report has drained.
     runExport(command.root, command.configPath, command.out)
       .then(() => { process.exitCode = 0; })
-      .catch((e) => { console.error("[pd] Error:", e); process.exitCode = 1; });
+      .catch((e) => { console.error("[pd] Error:", describeError(e)); process.exitCode = 1; });
     break;
 
   case "help":
