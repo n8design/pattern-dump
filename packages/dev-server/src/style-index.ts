@@ -66,19 +66,44 @@ export type ClassOwnerIndex = Map<string, string>;
 // classes whose classOwnerIndex owner is "__base__".
 export type BaseProvenanceIndex = Map<string, string>;
 
+// Numeric ordering prefixes (`00-atoms`, `01_molecules`) order a PatternLab tree; they are not part
+// of what a file is about. Discovery keeps them in ids, and a styles tree may or may not use them.
+const stripOrderPrefixes = (path: string): string =>
+  path.split("/").map(seg => seg.replace(/^\d+[-_]/, "")).join("/");
+
+/** Component ids keyed by their prefix-stripped form; null marks two ids that strip alike. Cached per
+ *  Set: callers build a fresh id set per discovery pass (baseComponentIds) and never mutate it. */
+const strippedIdCache = new WeakMap<Set<string>, Map<string, string | null>>();
+function strippedIds(componentIds: Set<string>): Map<string, string | null> {
+  let map = strippedIdCache.get(componentIds);
+  if (!map) {
+    map = new Map();
+    for (const id of componentIds) {
+      const key = stripOrderPrefixes(id);
+      map.set(key, map.has(key) ? null : id);
+    }
+    strippedIdCache.set(componentIds, map);
+  }
+  return map;
+}
+
 export function resolveScssToComponent(absPath: string, stylesDir: string, componentIds: Set<string>): string | null {
   const rel = relative(stylesDir, absPath);
   let normalized = rel
     .replace(/\.scss$/, "")
     .split("/")
-    .map(seg => seg.replace(/^\d+[-_]/, "").replace(/^_/, ""))
+    .map(seg => seg.replace(/^_/, ""))
     .join("/");
   // _index.scss files resolve to their parent component dir (e.g. atoms/button/_index → atoms/button).
   if (normalized.endsWith("/index")) normalized = normalized.slice(0, -6);
   // Ask discovery for the id — apply the SAME collapse rule discovery used (<dir>/<dir> → <dir>),
   // rather than re-deriving here and diverging (e.g. atoms/avatar/avatar → atoms/avatar).
   const id = collapseComponentId(normalized);
-  return componentIds.has(id) ? id : null;
+  if (componentIds.has(id)) return id;
+  // Otherwise match with ordering prefixes ignored on both sides, so `00-atoms/_badge.scss`,
+  // `atoms/_badge.scss` and `01-atoms/_badge.scss` all find `00-atoms/badge` or `atoms/badge`.
+  // Two components that differ only by prefix are ambiguous: attributed to neither.
+  return strippedIds(componentIds).get(collapseComponentId(stripOrderPrefixes(normalized))) ?? null;
 }
 
 // Maps an absolute SCSS path that belongs to NO component to a human-readable StyleModuleId

@@ -15,9 +15,10 @@ components; they never change a component's identity.
 | `atoms/button.hbs` | `atoms/button` | `atoms-button` |
 | `molecules/search-field/search-field.hbs` | `molecules/search-field` | `molecules-search-field` |
 | `molecules/search-field/input/input.hbs` | `molecules/search-field/input` | `molecules-input` |
+| `00-atoms/badge/badge.hbs` | `00-atoms/badge` | `00-atoms-badge` |
 
 - The **id** is the path without the file extension. A file named like its folder (`button/button.hbs`)
-  takes the folder's id.
+  takes the folder's id. A numbered folder (`00-atoms`) keeps its number in the id and the handle.
 - The **handle** is the first folder plus the component name. It is how templates include each other.
 - Two components with the same handle **collide**: the first by sorted path keeps the handle, the other
   is left out of the tree and shows a `HANDLE_COLLISION` diagnostic naming both files. Rename or move one.
@@ -201,6 +202,12 @@ both.
 Styles live in a separate SCSS tree that mirrors the patterns: `src/styles/atoms/button.scss` holds the
 styles for `atoms/button`. Every `.scss` file not starting with `_` is compiled, unless the config names
 specific entry files.
+
+Folder numbers (`00-atoms`, `01-molecules`) don't have to match between the two trees:
+`styles/00-atoms/_badge.scss`, `styles/atoms/_badge.scss` and `styles/01-atoms/_badge.scss` all style the
+component `00-atoms/badge` or `atoms/badge`. An exact path match wins. A file that matches two
+components by name alone, such as `atoms/_badge.scss` next to both `00-atoms/badge` and
+`01-atoms/badge`, belongs to neither: its rules go into the base layer.
 
 - **Which component owns a class** is worked out from the compiled CSS, through source maps. Each
   preview links only the CSS of the component and the components it uses.
