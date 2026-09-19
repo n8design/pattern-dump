@@ -137,6 +137,31 @@ describe("detectFlattening — the discriminator triple", () => {
     ];
     expect(detectFlattening(inputs)).toHaveLength(0);
   });
+
+  it("does not cluster a bare one-element wrapper around includes", () => {
+    // Page templates that are one <main class> around includes: identical, but the skeleton
+    // (one element, one attribute) says nothing about copied markup.
+    const page = (inc: string) => `<main class="page">{{> ${inc} }}{{> organisms-footer }}</main>`;
+    const inputs: FlatteningInput[] = [
+      { id: "pages/a", hbs: page("organisms-hero") },
+      { id: "pages/b", hbs: page("organisms-team") },
+      { id: "pages/c", hbs: page("molecules-aside") },
+    ];
+    expect(detectFlattening(inputs)).toHaveLength(0);
+    // Opting down restores the old behaviour.
+    expect(detectFlattening(inputs, { minSkeletonSize: 1 })).toHaveLength(1);
+  });
+
+  it("still clusters single-element copies that carry real shape (hTWOo's input types)", () => {
+    const input = (type: string) =>
+      `<input class="hoo-input-text" type="${type}" id="{{id}}" name="{{name}}" placeholder="{{ph}}" aria-describedby="{{d}}">`;
+    const inputs: FlatteningInput[] = [
+      { id: "atoms/input-password", hbs: input("password") },
+      { id: "atoms/input-phone", hbs: input("tel") },
+      { id: "atoms/input-url", hbs: input("url") },
+    ];
+    expect(detectFlattening(inputs).map(c => c.members)).toEqual([["atoms/input-password", "atoms/input-phone", "atoms/input-url"]]);
+  });
 });
 
 describe("renderFlatteningReport", () => {

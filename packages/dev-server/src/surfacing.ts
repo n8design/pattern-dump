@@ -43,6 +43,7 @@ export async function surfaceCollisions(
     hotreloader.push(messages[i]);
     console.warn(`[dev-server] HANDLE_COLLISION: "${col.handle}" — incumbent: ${col.incumbentPath} — quarantined: ${col.quarantinedPath}`);
   }
+  if (collisions.length > 0) console.warn(`[dev-server] collisions listed in ${join(pdScratchDir(cwd), "CONFLICTS.generated.md")}`);
   const md = collisions.length === 0
     ? "# Conflicts\n\nNo handle collisions detected.\n"
     : [
@@ -104,7 +105,7 @@ export async function surfaceFlattening(
 
   if (clusters.length) {
     const members = clusters.reduce((n, c) => n + c.members.length, 0);
-    console.warn(`[dev-server] FLATTENED: ${clusters.length} cluster(s) across ${members} components — see FLATTENED.generated.md`);
+    console.warn(`[dev-server] FLATTENED: ${clusters.length} cluster(s) across ${members} components — see ${join(pdScratchDir(cwd), "FLATTENED.generated.md")}`);
   }
 
   // Never write into the (possibly read-only) project root — emit to the PD-owned scratch dir. A

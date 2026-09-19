@@ -70,6 +70,11 @@ function toSkelNode(el: HTMLElement): SkelNode {
   return { tag: el.tagName ? el.tagName.toLowerCase() : "", attrs, children };
 }
 
+/** Elements plus attribute names: how much shape a skeleton carries. */
+function skeletonSize(nodes: SkelNode[]): number {
+  return nodes.reduce((n, node) => n + 1 + node.attrs.length + skeletonSize(node.children), 0);
+}
+
 function toPreorder(nodes: SkelNode[], depth: number, out: string[]): void {
   for (const n of nodes) {
     out.push(`${depth}<${n.tag}${n.attrs.length ? " " + n.attrs.join(",") : ""}>`);
@@ -190,6 +195,11 @@ export interface FlatteningOpts {
   prefilterCutoff?: number;
   shingleK?: number;
   minClusterSize?: number;
+  /** Smallest skeleton compared at all, counted as elements plus attribute names. Default 3: a bare
+   *  `<main class>` or `<div class>` around includes (size 2) is shared by unrelated templates and
+   *  says nothing about copied markup, while a single `<input>` with a dozen attributes is a real
+   *  shape to copy. */
+  minSkeletonSize?: number;
   rootMatch?: "exact" | "prefix";
   metric?: SimilarityMetric;
   /** Composition-edge predicate (supplied by dev-server from the composition registry). */
@@ -215,6 +225,7 @@ const DEFAULTS: Required<Omit<FlatteningOpts, "metric" | "hasEdge">> = {
   prefilterCutoff: 0.6,
   shingleK: 2,
   minClusterSize: 2,
+  minSkeletonSize: 3,
   rootMatch: "exact",    // full root-class match — emphasis families (hoo-button vs -primary) stay distinct
 };
 
@@ -262,6 +273,7 @@ export function detectFlattening(
   for (const { id } of sorted) {
     const s = skel.get(id)!;
     if (!s.root) continue;
+    if (skeletonSize(s.tree) < o.minSkeletonSize) continue;
     const key = rootKey(s.root, o.rootMatch);
     (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(id);
   }
