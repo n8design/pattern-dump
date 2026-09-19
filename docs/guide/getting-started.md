@@ -12,7 +12,12 @@ static build.
 Pattern Dump installs into each project as a development dependency. `pd init` writes a starter
 project and installs it.
 
-The package is not on npm yet. Until it is, build it from this repository and install from the file:
+```bash
+npx pattern-dump@alpha init my-design-system
+```
+
+Pattern Dump is published as an alpha, so name the `alpha` tag. To try changes that are not released yet,
+build the package from a clone of this repository and create the project from the file:
 
 ```bash
 # in a clone of the Pattern Dump repository
@@ -22,8 +27,6 @@ npm run pack:pd          # → .pd-pack/pattern-dump-<version>.tgz
 # anywhere else
 npx --package=/path/to/pattern-dump-<version>.tgz pd init my-design-system --pd-source /path/to/pattern-dump-<version>.tgz
 ```
-
-Once the package is published, this becomes `npx pattern-dump@alpha init my-design-system`.
 
 `pd init` asks for:
 

@@ -30,21 +30,26 @@ Node.js 20.10 or later, and npm.
 
 ## Quick start
 
-Pattern Dump is not published to npm yet. Build the package from this repository, then create a project
-with it:
+Pattern Dump is on npm as an alpha. Create a project with it:
+
+```bash
+npx pattern-dump@alpha init my-design-system
+cd my-design-system
+npm run dev              # → http://localhost:4000
+```
+
+To try changes that are not released yet, build the package from this repository and create the project
+from the file:
 
 ```bash
 git clone <this repository> pattern-dump
 cd pattern-dump
 npm install
 npm run pack:pd          # → .pd-pack/pattern-dump-<version>.tgz
-ls .pd-pack              # the exact file name, e.g. pattern-dump-0.1.0-alpha.0.tgz
 
 cd ..
 TGZ="$PWD/pattern-dump/.pd-pack/pattern-dump-<version>.tgz"
 npx --package="$TGZ" pd init my-design-system --pd-source "$TGZ"
-cd my-design-system
-npm run dev              # → http://localhost:4000
 ```
 
 Day to day:
