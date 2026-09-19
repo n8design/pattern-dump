@@ -8,13 +8,13 @@
 // Depends on ./navigation.js and not the reverse — navigation renders what it is told and never
 // consults the URL itself.
 
-import { routeFromPathname } from "../core/runtime.js";
+import { routeFromPathname, routeHref } from "../core/runtime.js";
 import type { TreeNode } from "@pattern-dump/contracts";
 import { session } from "../core/session.js";
 import { store, parseUrlState } from "../core/store.js";
 import { applyCvd } from "../rail/a11y-control.js";
 import { applyViewport } from "../stage/viewport.js";
-import { navigate, navigateOverview, navigateVariants, swapVariant } from "./navigation.js";
+import { navigate, navigateOverview, navigateUnknown, navigateVariants, swapVariant } from "./navigation.js";
 
 
 function resolvePathKind(path: string): "component" | "group" | null {
@@ -50,6 +50,12 @@ export async function routeFromCurrentLocation(): Promise<void> {
   }
 
   const path = routeFromPathname(window.location.pathname).slice(1);
+  // A PatternLab-style link names the route in the hash (/#/pages/home). Move it into the path, which
+  // is where routes live here; a variant hash (#ghost) never starts with a slash.
+  if (!path && window.location.hash.startsWith("#/")) {
+    history.replaceState(history.state, "", routeHref(window.location.hash.slice(1)) + window.location.search);
+    return routeFromCurrentLocation();
+  }
   // Variant is now in the URL hash (#ghost), not ?v= query param.
   const variant = window.location.hash.slice(1) || undefined;
   if (!path) return;
@@ -71,7 +77,9 @@ export async function routeFromCurrentLocation(): Promise<void> {
     } else {
       await navigate(path, variant);
     }
-  } else {
+  } else if (kind === "group") {
     await navigateOverview(path);
+  } else {
+    await navigateUnknown(path, variant);
   }
 }

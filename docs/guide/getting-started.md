@@ -85,7 +85,9 @@ The workbench has four regions:
 | **Inspector** (right) | **Docs** (the component's `.md`), **Relationships** (what it uses and what uses it, including borrowed CSS classes), **Audit** (defects across all components) |
 | **Console** (bottom) | **Source** (template, data, schema), **HTML** (the rendered markup), **Diagnostics** (render, schema, HTML validation and accessibility findings), **Console** (messages from the server) |
 
-Every view has its own address, so links, reloads and the browser's Back button work.
+Every view has its own address, so links, reloads and the browser's Back button work. PatternLab-style
+links (`/#/atoms/button`) open the same view, and an address that names nothing says so and links the
+closest match.
 
 ## 4. Add a component
 

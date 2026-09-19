@@ -12,10 +12,11 @@
 // one helper: applyComponent resets the render pair and then SEEDS dataCache/dataRaw from the payload,
 // while swapVariant and navigateOverview null all four. init-order.spec.ts pins the consequence.
 
-import type { ComponentDetail, FolderOverview } from "@pattern-dump/contracts";
+import type { ComponentDetail, FolderOverview, TreeNode } from "@pattern-dump/contracts";
 import { componentUrl, overviewUrl, previewUrl } from "@pattern-dump/contracts";
 import { dom } from "../core/dom.js";
 import { extractHighlightedPre } from "../core/html-util.js";
+import { routeHref } from "../core/runtime.js";
 import { session } from "../core/session.js";
 import { store } from "../core/store.js";
 import { runRenderedA11yScan } from "../dock/a11y-scan.js";
@@ -182,7 +183,109 @@ export async function navigate(componentId: string, variant?: string): Promise<v
     await applyComponent(detail, variant);
   } catch (e) {
     console.error("[pd] Navigate error:", e);
+    showStageMessage(`Could not load “${componentId}”: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+// ---- Navigate: a path the tree does not know ----
+
+/**
+ * A route that names no component or folder in the tree. A component quarantined by a handle
+ * collision is left out of the tree but still has a detail route, so ask the server first; only
+ * when it has nothing either is the route unknown.
+ */
+export async function navigateUnknown(path: string, variant?: string): Promise<void> {
+  const res = await fetch(componentUrl(path, variant)).catch(() => null);
+  if (res?.ok) {
+    await applyComponent(await res.json() as ComponentDetail, variant);
+    return;
+  }
+  showStageMessage(`No component or folder “${path}”.`, closestPaths(path));
+}
+
+/** Up to three tree paths that `path` probably meant: the same name elsewhere first, then small typos. */
+function closestPaths(path: string): string[] {
+  const all: string[] = [];
+  const walk = (nodes: TreeNode[]) => { for (const n of nodes) { all.push(n.path); if (n.children) walk(n.children); } };
+  walk(session.tree.roots);
+  const name = path.split("/").pop() ?? path;
+  const sameName = all.filter(p => p.split("/").pop() === name);
+  const near = all
+    .map(p => ({ p, d: editDistance(p, path) }))
+    .filter(({ p, d }) => d <= Math.max(2, Math.floor(path.length / 5)) && !sameName.includes(p))
+    .sort((a, b) => a.d - b.d)
+    .map(({ p }) => p);
+  return [...sameName, ...near].slice(0, 3);
+}
+
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+  }
+  return row[b.length];
+}
+
+// ---- The Stage without a component: folder pages and messages ----
+
+/** Leave the component view: no current component, the folder area shown, source tabs hidden. */
+function showFolderArea(activePath: string): void {
+  session.current = null;
+  session.currentVariant = null;
+  session.renderedHtmlCache = null;
+  session.rawRenderedHtml = null;
+  session.dataCache = null;
+  session.dataRaw = null;
+
+  session.stageMode = "single";
+  dom.variantBar.hidden = true;
+  dom.panel.hidden = true;
+  dom.singlePreview.hidden = true;
+  dom.categoryOverview.hidden = false;
+  dom.variantsGalleryEl.hidden = true;
+  dom.stageView.removeAttribute("data-layout");
+
+  // Overview: hide source tabs, switch to console.
+  dom.dockEl.dataset.mode = "overview";
+  switchDockTab("console");
+
+  setActiveTreeItem(activePath);
+}
+
+/**
+ * Say something in the Stage instead of showing a preview: an unknown route, or a view that failed
+ * to load. Suggestions are component or folder paths, offered as links.
+ */
+export function showStageMessage(message: string, suggestions: string[] = []): void {
+  showFolderArea("");
+  dom.categoryOverview.innerHTML = "";
+  const box = document.createElement("div");
+  box.className = "stage-message";
+  box.setAttribute("role", "status");
+  const p = document.createElement("p");
+  p.textContent = message;
+  box.appendChild(p);
+  if (suggestions.length > 0) {
+    const intro = document.createElement("p");
+    intro.textContent = "Did you mean:";
+    const list = document.createElement("ul");
+    for (const s of suggestions) {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = routeHref(`/${s}`);
+      a.textContent = s;
+      li.appendChild(a);
+      list.appendChild(li);
+    }
+    box.append(intro, list);
+  }
+  dom.categoryOverview.appendChild(box);
 }
 
 // ---- Navigate: folder overview ----
@@ -192,30 +295,12 @@ export async function navigateOverview(folderPath: string): Promise<void> {
     const res = await fetch(overviewUrl(folderPath));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const overview = await res.json() as FolderOverview;
-    session.current = null;
-    session.currentVariant = null;
-    session.renderedHtmlCache = null;
-    session.rawRenderedHtml = null;
-    session.dataCache = null;
-    session.dataRaw = null;
-
-    session.stageMode = "single";
-    dom.variantBar.hidden = true;
-    dom.panel.hidden = true;
-    dom.singlePreview.hidden = true;
-    dom.categoryOverview.hidden = false;
-    dom.variantsGalleryEl.hidden = true;
-    dom.stageView.removeAttribute("data-layout");
-
-    // Overview: hide source tabs, switch to console.
-    dom.dockEl.dataset.mode = "overview";
-    switchDockTab("console");
-
-    setActiveTreeItem(folderPath);
+    showFolderArea(folderPath);
     renderOverview(overview);
     await renderPanel();
   } catch (e) {
     console.error("[pd] Overview error:", e);
+    showStageMessage(`Could not load “${folderPath}”: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 

@@ -62,4 +62,13 @@ describe("unmatched paths", () => {
     // Component ids come from file names, so `card.small.hbs` is the route /molecules/card.small.
     expect(await isShell(await get("/molecules/card.small", NAVIGATE))).toBe(true);
   });
+
+  it("the component detail route is a 404 for an id nothing defines", async () => {
+    expect((await get("/api/component/atoms/buton")).status).toBe(404);
+    expect((await get("/api/component/atoms/button")).status).toBe(200);
+    // A base synthesized from variants alone, and a component quarantined by a handle collision
+    // (left out of the tree, still inspectable), both have a detail.
+    expect((await get("/api/component/atoms/badge")).status).toBe(200);
+    expect((await get("/api/component/atoms/baseless/baseless-2")).status).toBe(200);
+  });
 });
