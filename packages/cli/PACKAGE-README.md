@@ -92,6 +92,7 @@ export default defineConfig({
 - [Pattern packages]({{repo}}/blob/main/docs/guide/pattern-packages.md)
 - [Static build]({{repo}}/blob/main/docs/guide/static-build.md)
 - [Command line]({{repo}}/blob/main/docs/guide/cli.md)
+- [Changelog]({{repo}}/blob/main/CHANGELOG.md): what changed in each release
 
 ## Support
 
