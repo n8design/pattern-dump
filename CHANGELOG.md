@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-alpha.1
+## 0.1.0-alpha.2
 
 Fixes found while moving a PatternLab styleguide to Pattern Dump, and the changes they needed.
 
@@ -39,6 +39,11 @@ These can change how an existing project loads or renders:
 
 ### Fixed
 
+- A `centered` preview whose height comes from the viewport (`height: 200vh` in the base layer, a
+  percentage chain) no longer grows without bound. Content-fitting such a height is circular — the
+  frame's height feeds the content's — and the frame used to double every tick to the browser's
+  layout ceiling, showing a size like `785 × 33554428`. The run of growth is now detected, the frame
+  keeps its last steady height and the content scrolls inside it, and the Console says why.
 - SCSS edits reach the preview live when `styles.entry` is set, and edits to base-layer styles
   update live too.
 - `@import`, `@charset`, `@layer a, b` and `@namespace` kept their `;`: the next rule was being
