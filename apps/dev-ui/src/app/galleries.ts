@@ -19,6 +19,7 @@ import { resourceUrl, routeHref } from "../core/runtime.js";
 import { store } from "../core/store.js";
 import { applyThemeToIframe } from "../rail/theme.js";
 import { currentVpParam } from "../stage/viewport.js";
+import { resetContentHeight } from "../stage/content-height.js";
 import { measureContentWidth } from "../stage/content-width.js";
 
 export async function buildVariantsGallery(): Promise<void> {
@@ -70,6 +71,7 @@ export async function buildVariantsGallery(): Promise<void> {
     f.addEventListener("load", () => {
       if (store.local.theme) applyThemeToIframe(f, store.local.theme);
       const h = f.contentDocument?.documentElement?.scrollHeight;
+      resetContentHeight(f);
       if (typeof h === "number" && h > 0) f.style.setProperty("--vp-h", `${h}px`);
       measureContentWidth(f);
     });
@@ -116,6 +118,7 @@ export function renderOverview(overview: FolderOverview): void {
     f.addEventListener("load", () => {
       if (store.local.theme) applyThemeToIframe(f, store.local.theme);
       const h = f.contentDocument?.documentElement?.scrollHeight;
+      resetContentHeight(f);
       if (typeof h === "number" && h > 0) f.style.setProperty("--vp-h", `${h}px`);
       measureContentWidth(f);
     });

@@ -22,7 +22,7 @@ import { routeHref } from "../core/runtime.js";
 import { store } from "../core/store.js";
 import { runRenderedA11yScan } from "../dock/a11y-scan.js";
 import { refreshDiagnostics } from "../dock/diagnostics.js";
-import { copyDockSource, switchDockTab, switchSourceFacet } from "../dock/tabs.js";
+import { copyDockSource, renderConsole, switchDockTab, switchSourceFacet } from "../dock/tabs.js";
 import { svgIcon } from "../icons/index.js";
 import { clearAuditError } from "../inspector/audit.js";
 import { renderPanel } from "../inspector/panel.js";
@@ -33,6 +33,7 @@ import { listenForPreviewMessages } from "../stage/preview-messages.js";
 import { navigateVariants, swapVariant } from "./navigation.js";
 import { routeFromCurrentLocation } from "./router.js";
 import { renderShellHtml } from "./shell.js";
+import { initContentHeight } from "../stage/content-height.js";
 import { initContentWidth } from "../stage/content-width.js";
 
 
@@ -63,6 +64,13 @@ export function mount(): void {
 
   listenForPreviewMessages();
   initContentWidth();
+  // A preview whose own height depends on the frame's is parked at its last steady height; say so,
+  // because the frame then looks short and scrolls rather than fitting its content.
+  initContentHeight(frame => {
+    const id = frame.contentDocument?.body?.dataset.componentId ?? session.current?.id ?? "preview";
+    renderConsole(`${id}: height depends on the preview's own height (a viewport-relative rule such as `
+      + `height: 100vh), so the frame keeps its last steady height and the content scrolls inside it.`);
+  });
 
   // Nav open-state persistence is wired by mountSidebar() — click listeners on each
   // <summary> element. Click fires only for user interaction; programmatic det.open = true

@@ -191,9 +191,12 @@ its page off, or `overviews: false` in the config to turn them all off.
 
 ### Preview layout
 
-- **`centered`**: the preview frame is as wide as the component's content and centred in the Stage.
-  The page itself is not changed to get there, so a component that fills its container (a full-width
-  input, a progress bar) shows at full width, as it would on a page.
+- **`centered`**: the preview frame is as wide as the component's content and centred in the Stage,
+  and as tall as the content. The page itself is not changed to get there, so a component that fills
+  its container (a full-width input, a progress bar) shows at full width, as it would on a page. A
+  component whose height comes from the viewport (`height: 100vh`, a percentage chain) cannot be
+  fitted — its height would follow the frame's — so the frame keeps its last steady height and the
+  content scrolls inside it; the Console says when that happens.
 - **`full`**: the component fills the Stage, for pages and layouts.
 
 Components in `pages/` and `templates/` default to `full`, everything else to `centered`. A top-level

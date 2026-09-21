@@ -15,8 +15,8 @@
 
 import { dom } from "../core/dom.js";
 import { showFullpageChrome } from "./fullpage.js";
+import { acceptContentHeight } from "./content-height.js";
 import { acceptContentWidth } from "./content-width.js";
-import { setVpProp } from "./preview-sizing.js";
 import { updateReadout } from "./viewport.js";
 
 export function listenForPreviewMessages(): void {
@@ -32,22 +32,14 @@ export function listenForPreviewMessages(): void {
     if (!data) return;
     if (data.type === "pd-height" && typeof data.height === "number") {
       const height = data.height;
+      // Which frames content-fit their height, and what stops a centered preview whose own height
+      // depends on the frame's from ballooning, is content-height.ts. Full-page layout is
+      // viewport-inert in height: the iframe fills the stage and a taller page scrolls INSIDE it.
+      // documentElement.scrollHeight stays the measurement (glyph-ink + margin-collapse correct).
       document.querySelectorAll("iframe").forEach((f) => {
-        if ((f as HTMLIFrameElement).contentWindow === e.source) {
-          const el = f as HTMLIFrameElement;
-          // Full-page layout is viewport-inert in HEIGHT — exactly as it already is in width. The
-          // iframe fills the stage and a taller page scrolls INSIDE it; it must not grow the
-          // viewport. Content-fitting height there is circular by construction with viewport-relative
-          // content (height:100vh / min-height:100% / a flex column) — the content derives its
-          // height FROM the iframe we would derive from the content — so the iframe balloons
-          // unbounded. Only centered/fit layouts content-fit height (a 20px atom must not sit in a
-          // 900px frame). documentElement.scrollHeight stays the measurement (glyph-ink + margin-
-          // collapse correct); the body's UA margin only ever compounded because height fed back.
-          if (el.closest('[data-layout="full"]')) return;
-          // Guarded write: a no-op --vp-h write still forces a recalc that re-triggers the srcdoc
-          // ResizeObserver → feedback loop. The width path shares setVpProp so the two cannot drift.
-          setVpProp(el, "--vp-h", height);
-        }
+        const frame = f as HTMLIFrameElement;
+        if (frame.contentWindow !== e.source) return;
+        acceptContentHeight(frame, height);
       });
     } else if (data.type === "pd-width" && typeof data.width === "number" && typeof data.at === "number") {
       const { width, at } = data;

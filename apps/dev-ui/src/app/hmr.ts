@@ -33,6 +33,7 @@ import { renderPanel } from "../inspector/panel.js";
 import { extractFolderPaths } from "../rail/tree-util.js";
 import { filterTree, mountSidebar, restoreNavOpenState, setActiveTreeItem, syncPackageControl } from "../rail/tree.js";
 import { navigateOverview } from "./navigation.js";
+import { resetContentHeight } from "../stage/content-height.js";
 import { remeasureAll } from "../stage/content-width.js";
 
 export function connectHmr(): void {
@@ -172,7 +173,11 @@ export function connectHmr(): void {
 
       // The content's width may have changed with its CSS: fit the frames to it again, once the swapped
       // stylesheets have loaded (measuring earlier would size the frames to the old CSS).
-      void pdLinksLoaded().then(remeasureAll);
+      void pdLinksLoaded().then(() => {
+        // New CSS, new height: a preview clamped as circular gets another chance.
+        document.querySelectorAll<HTMLIFrameElement>("#preview-frame, .gallery-item iframe").forEach(resetContentHeight);
+        remeasureAll();
+      });
 
       // Refresh relationships panel if the swapped file affects the currently-shown component.
       if (store.local.panelTab === "relationships" && session.current) {

@@ -15,6 +15,7 @@ import { session } from "../core/session.js";
 import { store } from "../core/store.js";
 import { setupRadiogroupKeyboard } from "../core/radiogroup.js";
 import { svgIcon } from "../icons/index.js";
+import { resetContentHeight } from "./content-height.js";
 import { measureContentWidth, stopMeasuring } from "./content-width.js";
 
 const PRESETS = {
@@ -261,7 +262,12 @@ export function initViewport(onFullscreen: () => void): void {
   const iframeObserver = new ResizeObserver(() => requestAnimationFrame(updateReadout));
   iframeObserver.observe(dom.iframe);
   iframeObserver.observe(dom.stageView);
-  dom.iframe.addEventListener("load", () => { measureContentWidth(dom.iframe); updateReadout(); syncFrameFocusListeners(); });
+  dom.iframe.addEventListener("load", () => {
+    resetContentHeight(dom.iframe);
+    measureContentWidth(dom.iframe);
+    updateReadout();
+    syncFrameFocusListeners();
+  });
 
   // Leave path: any shell element gaining focus means the iframe lost it.
   // focusin doesn't cross iframe boundaries so this only fires for parent-doc focus.

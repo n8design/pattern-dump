@@ -105,6 +105,10 @@ Publish pre-releases with `--tag alpha`. Without a tag npm moves `latest`, and a
   elements, so `height: auto` or `fit-content` cannot size them from their content. The document's
   measurement script only reads the page; `pd-width` is trusted only when it was measured at the full
   width available, so a fitted frame cannot narrow itself step by step.
+- A preview whose own height depends on the frame's (`height: 200vh`, a `%` chain, `cqb`) makes
+  content-fitting circular: each measurement grows the frame, which grows the content. That run of
+  growth is detected and the frame parked at its last steady height (`stage/content-height.ts`); full
+  previews never content-fit height at all.
 - The preview stays same-origin so the workbench can read the rendered source. Server-side validation
   and escaping are the only injection defence.
 - Don't patch the preview document from the shell to simplify something; it breaks this contract.
