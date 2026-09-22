@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.0-alpha.3
+
+Fixes found while moving a second PatternLab styleguide (n8d) to Pattern Dump.
+
+### Fixed
+
+- A numbered `templates` or `pages` folder now gets the `full` preview layout its category promises.
+  The category was matched with its ordering prefix still attached, so a PatternLab tree
+  (`04-templates`, `05-pages`) could never hit the documented default — only a per-folder
+  `preview: full` could. Folder *labels* still keep the number: `2-col` is a name and `04-templates`
+  a prefix, and nothing in the string tells them apart, so a numbered folder sets `title:` for a
+  clean label.
+- A `requireScript` or `globalScripts` id with no matching `<scriptsDir>/<id>.ts` is reported instead
+  of failing inside the preview. `pd dev` names every unresolvable id at startup — with the component
+  for a `requireScript` — and the script's URL answers 404 saying which file it expected and where,
+  rather than embedding a raw `ENOENT`. Scripts are TypeScript, so a `.js` file of the same name does
+  not satisfy an id; that is the common case this hid.
+
 ## 0.1.0-alpha.2
 
 Fixes found while moving a PatternLab styleguide to Pattern Dump, and the changes they needed.
