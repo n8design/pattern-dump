@@ -15,7 +15,7 @@
 // a cache, and it is why two concurrent clients interfere with each other.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { basename, extname, join } from "node:path";
+import { basename, extname, join, relative } from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
@@ -155,8 +155,15 @@ export async function handleRequest(
       try {
         if (!state.scriptCache.has(scriptId)) {
           // The project's scripts first, then each package's — a project script replaces a package's.
-          const entryPoint = scriptsDirs.map(d => join(d, `${scriptId}.ts`)).find(f => existsSync(f))
-            ?? join(scriptsDirs[0], `${scriptId}.ts`);
+          const entryPoint = scriptsDirs.map(d => join(d, `${scriptId}.ts`)).find(f => existsSync(f));
+          if (entryPoint === undefined) {
+            // Say what is missing. Compiling a path we know is absent would report it as an ENOENT
+            // compile error inside the preview, naming neither the id nor where it was looked for.
+            res.writeHead(404, { "Content-Type": "text/plain" });
+            res.end(`No script "${scriptId}": scripts are TypeScript, so ${scriptId}.ts is expected in `
+              + scriptsDirs.map(d => relative(cwd, d) || d).join(" or "));
+            return;
+          }
           const js = await compileScriptFile(entryPoint);
           state.scriptCache.set(scriptId, js);
         }

@@ -12,7 +12,8 @@
 
 import type { PatternDirs } from "./pattern-dirs.js";
 import { readFile } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, join, relative } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { parsePartialsFromHbs } from "./hbs-partials.js";
 
@@ -109,4 +110,40 @@ export async function loadSvgAssets(ids: string[], assetsDir: string): Promise<s
 export function hideSvg(svg: string): string {
   // Inject display:none + aria-hidden on the root <svg> element.
   return svg.replace(/<svg(\s|>)/, '<svg$1style="display:none;position:absolute" aria-hidden="true" ');
+}
+
+/**
+ * Report `requireScript` / `globalScripts` ids that can never resolve, once, at startup — the way
+ * project-loaders reports an unreadable helper or a bad _data file. Without this a typo is silent
+ * until someone opens the component, where it used to surface as a raw ENOENT inside the preview.
+ *
+ * Scripts are TypeScript by contract, so an id resolves only as `<scriptsDir>/<id>.ts`. A full URL in
+ * globalScripts is loaded by the browser, not compiled, so it is not checked here.
+ */
+export async function reportUnresolvableScripts(
+  discoveryMap: DiscoveryMap,
+  scriptsDirs: string[],
+  globalScripts: string[],
+  cwd: string,
+): Promise<void> {
+  const resolves = (id: string) => scriptsDirs.some(d => existsSync(join(d, `${id}.ts`)));
+  const where = scriptsDirs.length
+    ? scriptsDirs.map(d => relative(cwd, d) || d).join(" or ")
+    : "no scriptsDir configured";
+
+  for (const id of globalScripts) {
+    if (id.includes("://") || resolves(normalizeScriptId(id))) continue;
+    console.warn(`[dev-server] globalScripts "${id}": no ${normalizeScriptId(id)}.ts in ${where}`);
+  }
+
+  for (const [componentId, entry] of discoveryMap) {
+    if (!entry.mdPath) continue;
+    let md: string;
+    try { md = await readFile(entry.mdPath, "utf-8"); } catch { continue; }
+    for (const raw of parseFrontmatterList(md, "requireScript")) {
+      const id = normalizeScriptId(raw);
+      if (resolves(id)) continue;
+      console.warn(`[dev-server] requireScript "${raw}" on ${componentId}: no ${id}.ts in ${where}`);
+    }
+  }
 }

@@ -260,6 +260,9 @@ they load in that order.
   build step while you work.
 - To load a script into every preview, list it in the config: `globalScripts: ["<id>"]`. A full URL
   there loads an external script.
+- Scripts are TypeScript: an id resolves as `<scriptsDir>/<id>.ts` and nothing else, so a `.js` file
+  of the same name does not satisfy it. `pd dev` names every id that cannot resolve at startup, and
+  the script's URL answers 404 saying which file it expected and where.
 
 The starter's `tsconfig.json` covers `src/scripts` for your editor and two scripts:
 

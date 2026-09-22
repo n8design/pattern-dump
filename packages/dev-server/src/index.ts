@@ -65,6 +65,7 @@ export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // Shared timing gate — one flag, so the startup-build and per-save halves cannot drift apart.
 // All mutable server state in one typed object — the seam that lets routes and the watcher
 // stop sharing lexical scope. Its header documents the three hazards.
+import { reportUnresolvableScripts } from "./requires.js";
 import { applyStyleData, createServerState } from "./server-state.js";
 // Resolved paths + flags, derived once from PatternDumpConfig against the ONE resolution base.
 import { resolveServerConfig } from "./server-config.js";
@@ -211,6 +212,7 @@ export async function startDevServer(
     const styleData = await buildAllStyleData(styleRoots, allComponentIds);
     applyStyleData(state, styleData);
     surfaceDocumentBase(styleRoots, styleData.baseOutsideList, cwd);
+    await reportUnresolvableScripts(dr.discoveryMap, cfg.scriptsDirs, cfg.globalScripts, cwd);
   }
 
   // ---- HTTP server ----
