@@ -11,6 +11,7 @@ import { readFolderFile, type PatternDirs } from "./pattern-dirs.js";
 import type {
   DiscoveryMap, FolderOverview, FolderOverviewItem, LayoutMode, TreeNode,
 } from "@pattern-dump/contracts";
+import { stripOrderPrefixes } from "@pattern-dump/discovery";
 import { FULL_CATEGORIES } from "./layout-mode.js";
 import { buildSubtree } from "./component-tree.js";
 import { renderDoc } from "./markdown.js";
@@ -23,7 +24,7 @@ export async function buildFolderOverview(
 ): Promise<FolderOverview> {
   const category  = folderPath.split("/")[0];
 
-  let folderLayout: LayoutMode = FULL_CATEGORIES.has(category) ? "full" : "centered";
+  let folderLayout: LayoutMode = FULL_CATEGORIES.has(stripOrderPrefixes(category)) ? "full" : "centered";
   let doc: string | undefined;
 
   try {

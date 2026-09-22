@@ -8,10 +8,12 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { readFolderFile, type PatternDirs } from "./pattern-dirs.js";
 import type { DiscoveryMap, LayoutMode } from "@pattern-dump/contracts";
+import { stripOrderPrefixes } from "@pattern-dump/discovery";
 
 /**
  * Categories that default to `full` preview layout. A page or template is a whole document, so it
  * fills the stage; everything else is centered content. Overridable per-category and per-component.
+ * Matched without ordering prefixes, so a PatternLab tree's `05-pages` counts (see stripOrderPrefixes).
  */
 export const FULL_CATEGORIES = new Set(["pages", "templates"]);
 
@@ -29,8 +31,9 @@ export async function resolveLayoutMode(
   const parts    = componentId.split("/");
   const category = parts[0];
 
-  let layout: LayoutMode = FULL_CATEGORIES.has(category) ? "full" : "centered";
+  let layout: LayoutMode = FULL_CATEGORIES.has(stripOrderPrefixes(category)) ? "full" : "centered";
 
+  // The raw category here: it is a folder on disk, prefix and all.
   const categoryIndex = await readFolderFile(patternsDir, join(category, "index.md"));
   if (categoryIndex !== null) {
     const m = categoryIndex.match(/^preview:\s*(centered|full)$/m);

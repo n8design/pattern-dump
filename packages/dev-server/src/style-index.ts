@@ -19,7 +19,7 @@ import postcss from "postcss";
 import { SourceMapConsumer } from "source-map";
 import * as sass from "sass";
 import { collectScssFiles } from "@pattern-dump/build";
-import { collapseComponentId } from "@pattern-dump/discovery";
+import { collapseComponentId, stripOrderPrefixes } from "@pattern-dump/discovery";
 import { verboseTiming } from "./timing.js";
 
 // ---- Serialising top-level CSS nodes into buckets ----
@@ -66,11 +66,6 @@ export type ClassOwnerIndex = Map<string, string>;
 // module authored the class, so the styleModules relationship can report it. Only ever read for
 // classes whose classOwnerIndex owner is "__base__".
 export type BaseProvenanceIndex = Map<string, string>;
-
-// Numeric ordering prefixes (`00-atoms`, `01_molecules`) order a PatternLab tree; they are not part
-// of what a file is about. Discovery keeps them in ids, and a styles tree may or may not use them.
-const stripOrderPrefixes = (path: string): string =>
-  path.split("/").map(seg => seg.replace(/^\d+[-_]/, "")).join("/");
 
 /** Component ids keyed by their prefix-stripped form; null marks two ids that strip alike. Cached per
  *  Set: callers build a fresh id set per discovery pass (baseComponentIds) and never mutate it. */

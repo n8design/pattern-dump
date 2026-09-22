@@ -199,9 +199,9 @@ its page off, or `overviews: false` in the config to turn them all off.
   content scrolls inside it; the Console says when that happens.
 - **`full`**: the component fills the Stage, for pages and layouts.
 
-Components in `pages/` and `templates/` default to `full`, everything else to `centered`. A top-level
-folder's `index.md` overrides the default for every component in it; a component's own `.md` overrides
-both.
+Components in `pages/` and `templates/` default to `full`, everything else to `centered`. The folder's
+number does not matter, so `05-pages` counts as `pages`. A top-level folder's `index.md` overrides the
+default for every component in it; a component's own `.md` overrides both.
 
 ## Styles
 

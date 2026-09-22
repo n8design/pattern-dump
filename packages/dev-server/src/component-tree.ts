@@ -31,7 +31,10 @@ function directChildPaths(parentPath: string, allIds: string[]): string[] {
 
 /** Display title for a folder with no `title:` of its own: "organisms" → "Organisms",
  *  "quick-links" → "Quick links". Components keep their raw name — it is their handle's tail and
- *  what authors search for; a folder is only a label. */
+ *  what authors search for; a folder is only a label.
+ *  An ordering prefix is NOT stripped here: "2-col" is a name, "04-templates" is a prefix, and
+ *  nothing in the string tells them apart — tree-order.spec pins "2-col" → "2 col". A numbered
+ *  folder that wants a clean label sets `title:` in its index.md. */
 export function folderTitle(segment: string): string {
   const words = segment.split(/[-_\s]+/).filter(Boolean);
   if (words.length === 0) return segment;

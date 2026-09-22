@@ -36,6 +36,16 @@ export function collapseComponentId(relNoExt: string): string {
 }
 
 /**
+ * A path or segment without its numeric ordering prefixes: `00-atoms/01-global` → `atoms/global`.
+ * The prefixes order a PatternLab tree; they are not part of what a thing IS, so ids and routes keep
+ * them while everything that asks "what is this" — handles, the stylesheet a component owns, the
+ * category a layout default is keyed on — compares without them.
+ */
+export function stripOrderPrefixes(path: string): string {
+  return path.split("/").map(seg => seg.replace(/^\d+[-_]/, "")).join("/");
+}
+
+/**
  * The dash handle for a slash id: `<category>-<last-id-segment>` (intermediate folders dropped; `~`
  * preserved for variants). The ONE implementation — `buildDiscoveryMap` builds `handleMap` with this,
  * and export's include-rewrite keys its map on it, so the two cannot drift. `molecules/quick-links/
@@ -45,9 +55,8 @@ export function collapseComponentId(relNoExt: string): string {
  * `00-atoms/01-global/00-colors` → `atoms-colors`. They order the tree; the id and route keep them.
  */
 export function deriveHandle(id: string): string {
-  const parts = id.split("/");
-  const unnumbered = (seg: string) => seg.replace(/^\d+[-_]/, "");
-  return `${unnumbered(parts[0])}-${unnumbered(parts[parts.length - 1])}`;
+  const parts = stripOrderPrefixes(id).split("/");
+  return `${parts[0]}-${parts[parts.length - 1]}`;
 }
 
 /**
