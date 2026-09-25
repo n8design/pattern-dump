@@ -223,6 +223,9 @@ components by name alone, such as `atoms/_badge.scss` next to both `00-atoms/bad
   global ([configuration.md](configuration.md#documentbase)).
 - **Share code between components** through `@use` modules (tokens, mixins), not by importing another
   component's stylesheet.
+- **Load an installed package by name:** `@use '@scope/pkg/sass/tokens'` is found in the `node_modules`
+  folders from the stylesheet upward, as in Node, and `@use 'pkg:@scope/pkg'` uses the package's own
+  Sass entry. No `SASS_PATH` or load-path setting is needed.
 - A template that uses a class owned by another component shows up in **Relationships** as a borrowed
   class.
 

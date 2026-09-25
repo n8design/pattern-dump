@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import postcss from "postcss";
 import * as sass from "sass";
 import { SourceMapConsumer } from "source-map";
+import { sassPackageOptions } from "@pattern-dump/build";
 import { parse as parseHtml } from "node-html-parser";
 import type { DiscoveryMap, RelationshipsAvailable } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "./composition.js";
@@ -38,7 +39,7 @@ export async function recomputeComponentCss(
   inBase: (absPath: string) => boolean = () => false,
 ): Promise<string | null> {
   try {
-    const compiled = sass.compile(entryFile, { sourceMap: true });
+    const compiled = sass.compile(entryFile, { sourceMap: true, ...sassPackageOptions(entryFile) });
     const rawMap = compiled.sourceMap;
     if (!rawMap) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

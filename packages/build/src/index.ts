@@ -5,12 +5,38 @@ import * as sass from "sass";
 import postcss from "postcss";
 import autoprefixer from "autoprefixer";
 import { build as esbuildBuild } from "esbuild";
+import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { join, extname, resolve } from "node:path";
+import { dirname, join, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Dirent } from "node:fs";
 
 // ---- SCSS compilation utilities ----
+
+const packageOptionsCache = new Map<string, Pick<sass.Options<"sync">, "loadPaths" | "importers">>();
+
+/**
+ * Sass options that resolve a package by its bare name, as Node does: `@use '@scope/pkg/path'`
+ * through every `node_modules` from the entry's folder upward, and `@use 'pkg:@scope/pkg'` through
+ * Sass's Node package importer. Relative loads still resolve first, so existing stylesheets are
+ * unaffected. Walking up from the entry means a package's own entry (inside `node_modules`) finds
+ * the project's installed packages too.
+ */
+export function sassPackageOptions(entryFile: string): Pick<sass.Options<"sync">, "loadPaths" | "importers"> {
+  const start = dirname(resolve(entryFile));
+  let options = packageOptionsCache.get(start);
+  if (!options) {
+    const loadPaths: string[] = [];
+    for (let dir = start; ; dir = dirname(dir)) {
+      const modules = join(dir, "node_modules");
+      if (existsSync(modules)) loadPaths.push(modules);
+      if (dirname(dir) === dir) break;
+    }
+    options = { loadPaths, importers: [new sass.NodePackageImporter(start)] };
+    packageOptionsCache.set(start, options);
+  }
+  return options;
+}
 
 /** Recursively collect non-partial SCSS files under `dir`. */
 export async function collectScssFiles(dir: string): Promise<string[]> {
@@ -37,7 +63,7 @@ export async function collectScssFiles(dir: string): Promise<string[]> {
 async function compileSassFileWithDeps(
   filePath: string
 ): Promise<{ css: string; deps: string[] }> {
-  const result = sass.compile(filePath);
+  const result = sass.compile(filePath, sassPackageOptions(filePath));
   const processed = await postcss([autoprefixer]).process(result.css, { from: undefined });
   const deps = result.loadedUrls
     .filter((u) => u.protocol === "file:")

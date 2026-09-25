@@ -19,7 +19,7 @@ import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
 import { SourceMapConsumer } from "source-map";
 import * as sass from "sass";
-import { collectScssFiles } from "@pattern-dump/build";
+import { collectScssFiles, sassPackageOptions } from "@pattern-dump/build";
 import { collapseComponentId, stripOrderPrefixes } from "@pattern-dump/discovery";
 import { verboseTiming } from "./timing.js";
 
@@ -305,7 +305,7 @@ export async function attributeClassesFromFile(
   componentIds: Set<string>
 ): Promise<{ classMap: Map<string, string>; ranks: Map<string, number> } | null> {
   try {
-    const compiled = sass.compile(entryFile, { sourceMap: true });
+    const compiled = sass.compile(entryFile, { sourceMap: true, ...sassPackageOptions(entryFile) });
     if (!compiled.sourceMap) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const consumer = new SourceMapConsumer(compiled.sourceMap as any);
@@ -429,7 +429,7 @@ export async function buildAllStyleData(
     const compOwner = resolveScssToComponent(entryFile, stylesDir, componentIds);
 
     let compiled: sass.CompileResult;
-    try { compiled = sass.compile(entryFile, { sourceMap: true }); }
+    try { compiled = sass.compile(entryFile, { sourceMap: true, ...sassPackageOptions(entryFile) }); }
     catch { continue; }
 
     // ---- Module graph (from loadedUrls, same as old buildScssModuleGraph) ----

@@ -40,7 +40,8 @@ Components use the properties, ideally with a fallback so a preview stays readab
 **Every theme must use the same property names, and they must be the names your component CSS reads.**
 A theme with differently named properties changes nothing.
 
-Theme files are compiled like any other SCSS, so they can `@use` shared modules by relative path.
+Theme files are compiled like any other SCSS, so they can `@use` shared modules by relative path, or
+an installed package by its name.
 
 ## Configuration
 
