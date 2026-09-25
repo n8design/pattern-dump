@@ -107,7 +107,8 @@ export type DiagnosticKind =
   | "CASCADE_WARNING"    // array merge / null-clearing (producer = later milestone)
   | "A11Y"               // axe-core node-mode finding (producer = later milestone)
   | "HIGHLIGHT_FALLBACK" // M4.1 fence/Shiki degradation note
-  | "HANDLE_COLLISION";  // M6: component quarantined — handle held by incumbent; rename to resolve
+  | "HANDLE_COLLISION"   // M6: component quarantined — handle held by incumbent; rename to resolve
+  | "DATA_INVALID";      // a component or variant .json that does not parse; its data was not used
 
 /** Fields every diagnostic carries, whichever engine produced it. */
 interface DiagnosticBase {
@@ -119,7 +120,7 @@ interface DiagnosticBase {
   ruleId?: string;
   /** JSON Schema / data pointer, e.g. "#/properties/label" — schema kinds only. */
   path?: string;
-  /** Source-file position — RENDER_ERROR, best-effort. */
+  /** Source-file position — RENDER_ERROR and DATA_INVALID, best-effort. */
   location?: { file?: string; line?: number; column?: number };
 }
 
