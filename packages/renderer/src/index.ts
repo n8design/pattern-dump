@@ -164,17 +164,28 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
       handleMap    ??= maps.handleMap;
     }
 
+    // A variant addressed by its own id (`atoms/chip~danger`, as in /preview/atoms/chip~danger) is
+    // the base component rendered with that variant — the same as `?variant=danger`, so the base's
+    // data, template and schema apply beneath the variant's.
+    let componentId = input.component;
+    let variant = input.variant;
+    const tilde = componentId.indexOf("~");
+    if (tilde > 0 && !variant && discoveryMap.has(componentId.slice(0, tilde))) {
+      variant = componentId.slice(tilde + 1);
+      componentId = componentId.slice(0, tilde);
+    }
+
     // Resolve the requested component's entry.
-    const entry = discoveryMap.get(input.component);
-    if (!entry) throw new Error(`[renderer] Component not found: "${input.component}"`);
+    const entry = discoveryMap.get(componentId);
+    if (!entry) throw new Error(`[renderer] Component not found: "${componentId}"`);
 
     // For own-markup variants (separate .hbs), use that template; otherwise use the base .hbs.
     // Data-overlay variants (json only, no .hbs) always use the base template.
     let templateHbsPath = entry.hbsPath;
     let variantJsonPath: string | undefined;
-    if (input.variant) {
-      const variantEntry = discoveryMap.get(`${input.component}~${input.variant}`);
-      if (!variantEntry) throw new Error(`[renderer] Variant not found: "${input.component}~${input.variant}"`);
+    if (variant) {
+      const variantEntry = discoveryMap.get(`${componentId}~${variant}`);
+      if (!variantEntry) throw new Error(`[renderer] Variant not found: "${componentId}~${variant}"`);
       if (variantEntry.ownMarkup && variantEntry.hbsPath) {
         templateHbsPath = variantEntry.hbsPath;
       }
@@ -221,7 +232,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     //
     // Supplied base: a parent may pass base="<value>" as a partial hash arg to seed the child's
     // entire id cluster, making every {{id 'name'}} in the subtree externally predictable.
-    const componentSlug = safePart(input.component.replace(/[\\/]/g, "-"));
+    const componentSlug = safePart(componentId.replace(/[\\/]/g, "-"));
     let currentBase = `pd-${componentSlug}`;
 
     // idCache: base:name → id string. One cache per render; memoises deterministic derivations.
@@ -254,8 +265,13 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         // Every discovered component is registered, but only one this render includes reports its
         // invalid data: the diagnostic is added when the partial runs, below.
         const childData = compEntry.jsonPath ? await readDataFile(compEntry.jsonPath) : {};
-        const childDefaults: Record<string, unknown> = childData.data ?? {};
         const childDataPath = compEntry.jsonPath;
+        // A variant included by its handle (`{{> "atoms-chip~danger"}}`) gets its base's data beneath
+        // its own, exactly as the variant renders on its own page.
+        const variantTilde = compId.indexOf("~");
+        const baseJsonPath = variantTilde > 0 ? discoveryMap.get(compId.slice(0, variantTilde))?.jsonPath : undefined;
+        const baseData = baseJsonPath ? await readDataFile(baseJsonPath) : {};
+        const childDefaults: Record<string, unknown> = deepMerge(structuredClone(baseData.data ?? {}), childData.data);
 
         const childTemplate = env.compile(partialSrc);
         const capturedDefaults = childDefaults;
@@ -287,6 +303,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
             }
 
             if (childData.diagnostic && childDataPath) dataDiagnostics.set(childDataPath, childData.diagnostic);
+            if (baseData.diagnostic && baseJsonPath) dataDiagnostics.set(baseJsonPath, baseData.diagnostic);
 
             // Swap base, execute, restore — synchronous so no interleaving.
             const savedBase = currentBase;
@@ -392,7 +409,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     } catch { /* no schema file — skip */ }
 
     const meta: RenderMeta | undefined = diagnostics.length > 0
-      ? { componentId: input.component, variant: input.variant, diagnostics }
+      ? { componentId, variant, diagnostics }
       : undefined;
 
     return { html, document: buildDocument(html, options), ...(meta ? { meta } : {}) };
