@@ -12,6 +12,7 @@ import type {
 import { HtmlValidate } from "html-validate";
 import Handlebars from "handlebars";
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 
 // Fragment-scoped HTML content-model validator (M4.9 finalise).
@@ -45,6 +46,38 @@ export function deepMerge(
 }
 
 const safePart = (n: string) => n.replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase();
+
+/** Line and column of a JSON parse error, from the parser's message (best-effort). */
+function jsonErrorPosition(reason: string, text: string): { line?: number; column?: number } {
+  const lineColumn = /line (\d+) column (\d+)/.exec(reason);
+  if (lineColumn) return { line: Number(lineColumn[1]), column: Number(lineColumn[2]) };
+  const position = /position (\d+)/.exec(reason);
+  if (!position) return {};
+  const lines = text.slice(0, Number(position[1])).split("\n");
+  return { line: lines.length, column: lines[lines.length - 1].length + 1 };
+}
+
+/**
+ * Read a component or variant data file. A file that cannot be read is no data. A file that does
+ * not parse is no data plus a DATA_INVALID diagnostic, so the dropped data shows up on the Console
+ * instead of the component silently rendering without it.
+ */
+async function readDataFile(path: string): Promise<{ data?: Record<string, unknown>; diagnostic?: Diagnostic }> {
+  let text: string;
+  try { text = await readFile(path, "utf-8"); } catch { return {}; }
+  try {
+    return { data: JSON.parse(text) as Record<string, unknown> };
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    return {
+      diagnostic: {
+        kind: "DATA_INVALID", source: "render", severity: "error",
+        message: `${basename(path)} is not valid JSON (${reason}); its data was not used`,
+        location: { file: path, ...jsonErrorPosition(reason, text) },
+      },
+    };
+  }
+}
 
 /** Register core + legacy + project helpers on a Handlebars env.
  *  mintId and getLastId are closures owned by the render call so they see the live currentBase. */
@@ -153,17 +186,17 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // M6 "render-on-select"; this guard is independent of when that lands).
     const templateSrc = templateHbsPath ? await readFile(templateHbsPath, "utf-8") : "";
 
-    let defaultData: Record<string, unknown> = {};
-    if (entry.jsonPath) {
-      try {
-        defaultData = JSON.parse(await readFile(entry.jsonPath, "utf-8")) as Record<string, unknown>;
-      } catch { /* no defaults file */ }
-    }
+    // Data files that do not parse, reported once each (DATA_INVALID) — the component's own, the
+    // variant's, and those of partials this render actually includes.
+    const dataDiagnostics = new Map<string, Diagnostic>();
+    const readData = async (path: string): Promise<Record<string, unknown> | undefined> => {
+      const { data, diagnostic } = await readDataFile(path);
+      if (diagnostic) dataDiagnostics.set(path, diagnostic);
+      return data;
+    };
 
-    let variantData: Record<string, unknown> | undefined;
-    if (variantJsonPath) {
-      variantData = JSON.parse(await readFile(variantJsonPath, "utf-8")) as Record<string, unknown>;
-    }
+    const defaultData: Record<string, unknown> = (entry.jsonPath ? await readData(entry.jsonPath) : undefined) ?? {};
+    const variantData = variantJsonPath ? await readData(variantJsonPath) : undefined;
 
     // Cascade (lowest → highest): project global data → component defaults → variant → live.
     // globalData is the base (cloned so the shared, once-loaded object is never mutated); component
@@ -218,12 +251,11 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
       try {
         const partialSrc = await readFile(compEntry.hbsPath, "utf-8");
 
-        let childDefaults: Record<string, unknown> = {};
-        if (compEntry.jsonPath) {
-          try {
-            childDefaults = JSON.parse(await readFile(compEntry.jsonPath, "utf-8")) as Record<string, unknown>;
-          } catch { /* no defaults */ }
-        }
+        // Every discovered component is registered, but only one this render includes reports its
+        // invalid data: the diagnostic is added when the partial runs, below.
+        const childData = compEntry.jsonPath ? await readDataFile(compEntry.jsonPath) : {};
+        const childDefaults: Record<string, unknown> = childData.data ?? {};
+        const childDataPath = compEntry.jsonPath;
 
         const childTemplate = env.compile(partialSrc);
         const capturedDefaults = childDefaults;
@@ -253,6 +285,8 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
               invocationCounters.set(counterKey, n + 1);
               thisBase = n === 0 ? currentBase : `pd-${partialSlug}-${n}`;
             }
+
+            if (childData.diagnostic && childDataPath) dataDiagnostics.set(childDataPath, childData.diagnostic);
 
             // Swap base, execute, restore — synchronous so no interleaving.
             const savedBase = currentBase;
@@ -299,7 +333,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     });
 
     // ---- Diagnostics (M4.9 / M4.9-finalise) ----
-    const diagnostics: Diagnostic[] = [];
+    const diagnostics: Diagnostic[] = [...dataDiagnostics.values()];
 
     // HTML content-model validation (fragment-scoped — no doctype/shell noise).
     const htmlReport = htmlValidator.validateStringSync(html);

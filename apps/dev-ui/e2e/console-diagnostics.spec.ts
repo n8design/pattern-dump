@@ -54,6 +54,17 @@ test.describe("Diagnostics tab — per-render diagnostics panel (M4.9 finalise)"
     ).toHaveAttribute("data-severity", "error");
   });
 
+  test("a component .json that does not parse shows DATA_INVALID, and the component still renders", async ({ page }) => {
+    await gotoComponent(page, "atoms/data-invalid");
+    await openDiagnosticsTab(page);
+
+    const item = page.locator(diag(" li[data-kind='DATA_INVALID']"));
+    await expect(item).toBeAttached();
+    await expect(item).toHaveAttribute("data-severity", "error");
+    await expect(item).toContainText("data-invalid.json");
+    await expect(page.frameLocator("#preview-frame").locator(".tb-data-invalid")).toHaveText("label: []");
+  });
+
   test("clean component reads 'No issues found' — the explicit all-clear", async ({ page }) => {
     // atoms/button default render: schema present, all required fields filled by default data.
     await gotoComponent(page, "atoms/button");
