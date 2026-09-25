@@ -1,4 +1,4 @@
-// A repeated rule keeps its LAST position: the later copy is the one that wins the cascade, so
+// Cascade order survives bucketing. A repeated rule keeps its LAST position: the later copy is the one that wins the cascade, so
 // dropping it (and keeping the earlier one) silently changes what the browser paints.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -48,5 +48,16 @@ describe("repeated rules keep their last position", () => {
   it("per-save recompute matches the full build", async () => {
     const css = await recomputeComponentCss(join(styles, "comp.scss"), "atoms/fieldset", styles, ids);
     expect(paddings(css ?? "", ".fieldset")).toEqual(["0", "16px"]);
+  });
+});
+
+describe("a configured entry list is the cascade order", () => {
+  it("entries compile in the order given, not sorted", async () => {
+    await writeFile(join(styles, "z-first.scss"), `.order { color: red; }\n`);
+    await writeFile(join(styles, "a-second.scss"), `.order { color: blue; }\n`);
+    const d = await buildAllStyleData(
+      [{ dir: styles, entries: [join(styles, "z-first.scss"), join(styles, "a-second.scss")] }], ids);
+    const colors = [...d.baseCss.matchAll(/\.order\s*\{\s*color:\s*([^;]+);/g)].map(m => m[1]);
+    expect(colors).toEqual(["red", "blue"]);
   });
 });

@@ -229,9 +229,9 @@ export function missingDocumentBase(stylesDir: string, base: readonly string[] |
 }
 
 /** Single compile pass producing the SCSS module graph, class→owner index, per-component
- *  origin-bucketed CSS, and base CSS. One `sass.compile` call per entry file (sorted for
- *  determinism); `loadedUrls` feeds the module graph; the source map feeds class attribution
- *  and CSS bucketing. Claim precedence decides the class index. */
+ *  origin-bucketed CSS, and base CSS. One `sass.compile` call per entry file (in configured
+ *  order, or sorted when discovered); `loadedUrls` feeds the module graph; the source map feeds
+ *  class attribution and CSS bucketing. Claim precedence decides the class index. */
 /**
  * Core class-attribution logic: given a compiled CSS root and its source-map consumer,
  * extract { className → owning component id } mappings for every rule in the output.
@@ -417,12 +417,13 @@ export async function buildAllStyleData(
 
   let entryFiles: string[] = [];
   if (styleRoot.entries && styleRoot.entries.length > 0) {
-    // Configured styles.entry: compile ONLY these (resolved absolute by the caller).
+    // Configured styles.entry: compile ONLY these (resolved absolute by the caller), in the order
+    // given. A configured list is the cascade order, so it is never re-sorted.
     entryFiles = [...styleRoot.entries];
   } else {
-    try { entryFiles = await collectScssFiles(stylesDir); } catch { entryFiles = []; }
+    // Discovered entries have no inherent order: sort them for determinism.
+    try { entryFiles = (await collectScssFiles(stylesDir)).sort(); } catch { entryFiles = []; }
   }
-  entryFiles.sort();
 
   for (const entryFile of entryFiles) {
     const compOwner = resolveScssToComponent(entryFile, stylesDir, componentIds);
