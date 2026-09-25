@@ -233,7 +233,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
           flatName,
           function(
             context: Record<string, unknown>,
-            opts: { hash?: Record<string, unknown>; fn?: (...args: unknown[]) => unknown }
+            opts: { hash?: Record<string, unknown>; fn?: (...args: unknown[]) => unknown; data?: Record<string, unknown> }
           ) {
             // Determine this instance's base.
             const suppliedBase = opts?.hash?.base != null
@@ -272,9 +272,14 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
             // runtime it is a Handlebars template delegate returning the rendered block string. Cast it
             // to the partial value type Handlebars' RuntimeOptions expects (Template = TemplateDelegate |
             // string) so the whole project typechecks — the runtime contract is unchanged.
-            const runtime: Handlebars.RuntimeOptions | undefined = opts?.fn
-              ? { partials: { ...env.partials, "@partial-block": opts.fn as unknown as Handlebars.TemplateDelegate } }
-              : undefined;
+            //
+            // The caller's data frame (opts.data) is passed on as in stock Handlebars, so `@root` stays
+            // the page's data and `@index` etc. stay visible inside the partial. For a block call the
+            // body is also the `@partial-block` data variable, which `{{#if @partial-block}}` reads.
+            const data = { ...opts?.data, ...(opts?.fn ? { "partial-block": opts.fn } : {}) };
+            const runtime: Handlebars.RuntimeOptions = opts?.fn
+              ? { data, partials: { ...env.partials, "@partial-block": opts.fn as unknown as Handlebars.TemplateDelegate } }
+              : { data };
             const result = childTemplate(merged, runtime);
 
             currentBase = savedBase;
