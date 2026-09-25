@@ -120,8 +120,10 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
   }
   if (rule === "packages") {
     const ok = Array.isArray(value) && value.every(p =>
-      typeof p === "string" || (isObject(p) && typeof p.name === "string" && (p.exclude === undefined || isStrings(p.exclude))));
-    if (!ok) fail(`a list of package names or { name, exclude } objects`);
+      typeof p === "string" || (isObject(p) && typeof p.name === "string"
+        && (p.exclude === undefined || isStrings(p.exclude))
+        && (p.styles === undefined || typeof p.styles === "boolean")));
+    if (!ok) fail(`a list of package names or { name, exclude, styles } objects`);
     return;
   }
   if (rule === "logo") {

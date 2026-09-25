@@ -17,7 +17,13 @@ npm install --save-dev @acme/design-system
 packages: ["@acme/design-system"],
 // or hide some of its templates:
 // packages: [{ name: "@acme/design-system", exclude: ["pages/**"] }],
+// or leave out its stylesheets, e.g. when your own SCSS compiles them:
+// packages: ["@acme/design-system", { name: "@acme/core", styles: false }],
 ```
+
+`styles: false` drops only the package's stylesheets; its templates, data, themes, scripts and assets
+are still used. It works for a package that another package brings in as a peer, too: name the peer
+with the option.
 
 Restart `pd dev` after installing, updating or adding a package.
 

@@ -32,8 +32,8 @@ describe("loadPatternPackages", () => {
     await pkg(root, "left-pad", {}); // a peer without a manifest contributes nothing
 
     expect(loadPatternPackages([{ name: "@acme/patterns", exclude: ["drafts/**"] }], root)).toEqual([
-      { name: "@acme/patterns", version: "1.2.3", dir: patterns, manifest: { patterns: "_patterns", exclude: ["legacy/**"] }, exclude: ["legacy/**", "drafts/**"], direct: true },
-      { name: "@acme/core", version: "1.2.3", dir: core, manifest: { styles: { dir: "sass" } }, exclude: [], direct: false },
+      { name: "@acme/patterns", version: "1.2.3", dir: patterns, manifest: { patterns: "_patterns", exclude: ["legacy/**"] }, exclude: ["legacy/**", "drafts/**"], direct: true, styles: true },
+      { name: "@acme/core", version: "1.2.3", dir: core, manifest: { styles: { dir: "sass" } }, exclude: [], direct: false, styles: true },
     ]);
   });
 
@@ -42,6 +42,17 @@ describe("loadPatternPackages", () => {
     await pkg(root, "a", { patternDump: {}, peerDependencies: { b: "*" } });
     await pkg(root, "b", { patternDump: {} });
     expect(loadPatternPackages(["b", "a"], root).map(p => [p.name, p.direct])).toEqual([["b", true], ["a", true]]);
+  });
+
+  it("applies a named package's options even when it is first reached as a peer", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-packages-"));
+    await pkg(root, "@acme/patterns", { patternDump: {}, peerDependencies: { "@acme/core": "*" } });
+    await pkg(root, "@acme/core", { patternDump: { styles: { dir: "sass" } } });
+    const loaded = loadPatternPackages(["@acme/patterns", { name: "@acme/core", styles: false, exclude: ["x/**"] }], root);
+    expect(loaded.map(p => [p.name, p.styles, p.exclude])).toEqual([
+      ["@acme/patterns", true, []],
+      ["@acme/core", false, ["x/**"]],
+    ]);
   });
 
   it("names the install command for a package that is not installed", async () => {

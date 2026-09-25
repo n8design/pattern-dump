@@ -23,6 +23,8 @@ export interface ResolvedPackage {
   exclude: string[];
   /** Named in the config (false = reached as a peer). */
   direct: boolean;
+  /** Whether the package's stylesheets are used (`styles: false` in the config leaves them out). */
+  styles: boolean;
 }
 
 /** The folder of an installed package, looking in node_modules from `root` upward. */
@@ -48,7 +50,7 @@ export function loadPatternPackages(references: PackageReference[] | undefined, 
   const out: ResolvedPackage[] = [];
   const seen = new Set<string>();
 
-  const visit = (name: string, extraExclude: string[], direct: boolean, from: string): void => {
+  const visit = (name: string, direct: boolean, from: string): void => {
     if (seen.has(name)) return;
     const dir = findPackageDir(name, from);
     if (!dir) {
@@ -69,15 +71,20 @@ export function loadPatternPackages(references: PackageReference[] | undefined, 
       version: pkg.version ?? "0.0.0",
       dir,
       manifest: pkg.patternDump,
-      exclude: [...(pkg.patternDump.exclude ?? []), ...extraExclude],
+      exclude: [...(pkg.patternDump.exclude ?? []), ...(options.get(name)?.exclude ?? [])],
       direct,
+      styles: options.get(name)?.styles ?? true,
     });
-    for (const peer of Object.keys(pkg.peerDependencies ?? {})) visit(peer, [], false, dir);
+    for (const peer of Object.keys(pkg.peerDependencies ?? {})) visit(peer, false, dir);
   };
 
+  // Options by package name, applied however the package is reached — a package named in the config
+  // may also be another one's peer and be visited first as that.
+  const options = new Map<string, { exclude?: string[]; styles?: boolean }>();
+  for (const ref of references ?? []) if (typeof ref !== "string") options.set(ref.name, ref);
+
   for (const ref of references ?? []) {
-    const { name, exclude } = typeof ref === "string" ? { name: ref, exclude: [] } : { name: ref.name, exclude: ref.exclude ?? [] };
-    visit(name, exclude, true, root);
+    visit(typeof ref === "string" ? ref : ref.name, true, root);
   }
   return out;
 }

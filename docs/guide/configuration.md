@@ -130,7 +130,7 @@ documentBase: ["00-base", "03-organisms/hero"],
 
 | Option | Type | Description |
 |---|---|---|
-| `packages` | array | Pattern packages from `node_modules` used next to your own patterns: a package name, or `{ name, exclude }` to hide some of its templates (globs relative to its patterns folder). See [pattern-packages.md](pattern-packages.md) |
+| `packages` | array | Pattern packages from `node_modules` used next to your own patterns: a package name, or `{ name, exclude, styles }`: `exclude` hides some of its templates (globs relative to its patterns folder), `styles: false` leaves out its stylesheets. See [pattern-packages.md](pattern-packages.md) |
 | `exclude` | string[] | Globs, relative to `patternsDir`, of your own templates to leave out |
 
 ### build

@@ -130,7 +130,7 @@ export function resolveServerConfig(
   ];
   const styleRoots: StyleRoot[] = [
     { dir: stylesDir, entries: stylesEntries, base: config.documentBase },
-    ...packages.filter(p => p.manifest.styles).map(p => {
+    ...packages.filter(p => p.manifest.styles && p.styles).map(p => {
       const dir = inPackage(p, p.manifest.styles!.dir);
       const entries = asList(p.manifest.styles!.entry).map(e => resolve(dir, e));
       return { dir, entries: entries.length ? entries : undefined, source: p.name, base: p.manifest.styles!.documentBase };
@@ -163,7 +163,7 @@ export function resolveServerConfig(
     ...packages.filter(p => p.manifest.scripts).map(p => inPackage(p, p.manifest.scripts!)),
   ];
   const documentBaseEnabled = (Array.isArray(config.documentBase) && config.documentBase.length > 0)
-    || packages.some(p => (p.manifest.styles?.documentBase?.length ?? 0) > 0);
+    || packages.some(p => p.styles && (p.manifest.styles?.documentBase?.length ?? 0) > 0);
 
   return {
     port, wsPort, cwd, config,

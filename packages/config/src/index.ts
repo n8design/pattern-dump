@@ -73,8 +73,14 @@ export interface ShellConfig {
  * invoking `cwd`. This holds even when the file is supplied via `--config` from outside the
  * root — which is what lets PD open a read-only project it does not own.
  */
-/** A pattern package named in the config: the npm name, or the name plus extra excludes. */
-export type PackageReference = string | { name: string; exclude?: string[] };
+/**
+ * A pattern package named in the config: the npm name, or the name plus options.
+ * - `exclude`: extra globs of the package's templates to hide.
+ * - `styles: false`: leave the package's stylesheets out (its templates, data, themes, scripts and
+ *   assets are still used), e.g. when the project compiles that CSS itself. A package reached only
+ *   as another package's peer can be named here just to carry this option.
+ */
+export type PackageReference = string | { name: string; exclude?: string[]; styles?: boolean };
 
 export interface PatternDumpConfig {
   sourceDir: string;

@@ -10,7 +10,7 @@ const valid = {
   scriptsDir: "./src/scripts", globalScripts: ["nav", "https://cdn.example/x.js"],
   dataDir: "./src/data", helpers: "./src/helpers", documentBase: ["base"], overviews: false,
   shell: { brand: { title: "T", logo: { light: "/a.svg", dark: "/b.svg" }, logoAlt: "T", href: "/" } },
-  packages: ["pkg-a", { name: "pkg-b", exclude: ["x/**"] }], exclude: ["drafts/**"],
+  packages: ["pkg-a", { name: "pkg-b", exclude: ["x/**"] }, { name: "pkg-c", styles: false }], exclude: ["drafts/**"],
   build: { outDir: "./site", basePath: "/docs/", audit: false },
 };
 
@@ -48,6 +48,12 @@ describe("configProblems", () => {
       `missing required "themes.default"`,
       `"assets.dir" must be a string or a list of strings`,
       `"overviews" must be true or false`,
+    ]);
+  });
+
+  it("rejects a package option of the wrong type", () => {
+    expect(configProblems({ ...valid, packages: [{ name: "pkg-a", styles: "no" }] })).toEqual([
+      `"packages" must be a list of package names or { name, exclude, styles } objects`,
     ]);
   });
 
