@@ -124,6 +124,12 @@ describe("/preview documentBase — shared base layer injection", () => {
     expect(base).toContain("outline-color");            // .tb-dual's SHARED rule → in base
   });
 
+  it("a repeated base rule keeps its LAST position (A, B, A ends with A, as the browser applies it)", async () => {
+    const base = await (await fetch(`http://127.0.0.1:${on.port}/_pd/base.css`)).text();
+    const paddings = [...base.matchAll(/\.tb-repeat\s*\{\s*padding:\s*([^;]+);/g)].map(m => m[1]);
+    expect(paddings).toEqual(["0", "16px"]);
+  });
+
   it("(1) no dumping ground — dual's OWN rule attributes to its component, not base", async () => {
     const base = await (await fetch(`http://127.0.0.1:${on.port}/_pd/base.css`)).text();
     const comp = await (await fetch(`http://127.0.0.1:${on.port}/_pd/components/atoms/dual.css`)).text();

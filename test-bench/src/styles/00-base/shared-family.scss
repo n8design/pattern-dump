@@ -18,3 +18,18 @@
   outline-style: solid;
   outline-color: rgb(40, 50, 60);
 }
+
+// .tb-repeat — a rule repeated after a different one (A, B, A), the shape a project gets when it
+// forwards a package's modules after its own overrides. The browser applies the LAST copy, so the
+// base layer must keep A's final position: dropping the later duplicate would let B win.
+.tb-repeat {
+  padding: 16px;
+}
+
+.tb-repeat {
+  padding: 0;
+}
+
+.tb-repeat {
+  padding: 16px;
+}

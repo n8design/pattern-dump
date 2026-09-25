@@ -22,7 +22,7 @@ import { parse as parseHtml } from "node-html-parser";
 import type { DiscoveryMap, RelationshipsAvailable } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "./composition.js";
 import {
-  resolveScssToComponent, cssNodeText, joinCssChunks,
+  resolveScssToComponent, cssNodeText, joinCssChunks, addLastOccurrence,
   type ClassOwnerIndex, type BaseProvenanceIndex,
 } from "./style-index.js";
 
@@ -55,7 +55,7 @@ export async function recomputeComponentCss(
         : resolve(dirname(entryFile), original.source);
       if (inBase(originPath)) return;
       const originComp = resolveScssToComponent(originPath, stylesDir, componentIds);
-      if (originComp === compId) bucket.add(cssNodeText(node));
+      if (originComp === compId) addLastOccurrence(bucket, cssNodeText(node));
     });
     return joinCssChunks(bucket);
   } catch {

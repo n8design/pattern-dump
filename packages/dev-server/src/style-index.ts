@@ -32,6 +32,14 @@ export function cssNodeText(node: postcss.ChildNode): string {
   return node.type === "atrule" && !node.nodes ? `${text};` : text;
 }
 
+/** Add a chunk to a bucket, keeping only its LAST position. When a stylesheet repeats a rule, the
+ *  later copy is the one that wins the cascade; dropping the earlier copy is always safe, dropping
+ *  the later one is not (`.a {} .b {} .a {}` must still end with `.a`). */
+export function addLastOccurrence(bucket: Set<string>, chunk: string): void {
+  bucket.delete(chunk);
+  bucket.add(chunk);
+}
+
 /** Join serialised top-level chunks into one stylesheet. `@charset` and `@import` are honoured only
  *  at the top of a stylesheet, so they are hoisted ahead of every other chunk (relative order kept). */
 export function joinCssChunks(chunks: Iterable<string>): string {
@@ -415,7 +423,7 @@ export async function buildAllStyleData(
         ? "__base__"
         : resolveScssToComponent(originPath, stylesDir, componentIds) ?? "__base__";
       if (owner === "__base__") {
-        baseCssBucket.add(nodeText);
+        addLastOccurrence(baseCssBucket, nodeText);
         if (reportOutside && !inBase(originPath)) {
           const seen = outsideRules.get(originPath) ?? new Set<string>();
           seen.add(nodeText);
@@ -423,7 +431,7 @@ export async function buildAllStyleData(
         }
       } else {
         const bucket = componentCssBuckets.get(owner) ?? new Set<string>();
-        bucket.add(nodeText);
+        addLastOccurrence(bucket, nodeText);
         componentCssBuckets.set(owner, bucket);
       }
     });
