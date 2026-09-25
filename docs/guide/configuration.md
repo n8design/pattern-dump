@@ -89,8 +89,8 @@ documentBase: ["00-base", "03-organisms/hero"],
 
 | Option | Type | Description |
 |---|---|---|
-| `themes.dir` | string | Folder of `<name>.theme.scss` files |
-| `themes.default` | string | The theme previews start with |
+| `themes.dir` | string | Optional. Folder of your own `<name>.theme.scss` files. Leave it out to use only the themes your pattern packages provide |
+| `themes.default` | string | The theme previews start with: one of yours or a package's. `pd dev` warns when it matches no theme |
 | `themes.switch` | `"attribute"` (default) or `"stylesheet"` | How themes switch; see [themes.md](themes.md#switching) |
 | `themes.swatch.slots` | string[] | Custom properties shown as colour swatches in the theme picker. Default: `["--bodyBackground", "--themePrimary", "--accent"]` |
 

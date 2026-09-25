@@ -51,6 +51,10 @@ describe("configProblems", () => {
     ]);
   });
 
+  it("accepts themes with only a default, for a theme a package provides", () => {
+    expect(configProblems({ ...valid, themes: { default: "blue" } })).toEqual([]);
+  });
+
   it("rejects a package option of the wrong type", () => {
     expect(configProblems({ ...valid, packages: [{ name: "pkg-a", styles: "no" }] })).toEqual([
       `"packages" must be a list of package names or { name, exclude, styles } objects`,

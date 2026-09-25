@@ -145,3 +145,11 @@ export function surfaceAssetRoots(assetRoots: readonly string[], cwd: string): v
     console.warn(`[dev-server] assets: ${relative(cwd, root)} is hidden by ${relative(cwd, by) || "."}, which has the same folder name; its files are not served`);
   }
 }
+
+/** Warn when the configured default theme is none of the themes found in the project's or the
+ *  packages' theme folders: previews would otherwise carry a data-theme nothing styles. */
+export function surfaceDefaultTheme(defaultTheme: string | undefined, themeNames: readonly string[]): void {
+  if (!defaultTheme || themeNames.includes(defaultTheme)) return;
+  const available = themeNames.length ? `available: ${[...themeNames].sort().join(", ")}` : "no theme folder is configured or provided by a package";
+  console.warn(`[dev-server] themes.default "${defaultTheme}" matches no theme; ${available}`);
+}

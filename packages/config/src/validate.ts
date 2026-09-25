@@ -32,7 +32,7 @@ const SHAPE: Shape = {
       switch: { values: ["attribute", "stylesheet"] },
       swatch: { keys: { slots: "strings" }, required: ["slots"] },
     },
-    required: ["dir", "default"],
+    required: ["default"],
   },
   assets: {
     keys: {

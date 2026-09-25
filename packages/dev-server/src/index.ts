@@ -55,7 +55,7 @@ import { baseComponentIds } from "./discovery-index.js";
 // Project helper/data loaders — one bad file is isolated and logged, never fatal.
 import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 // Set-level findings surfaced as generated side artifacts (collisions, flattening).
-import { surfaceAssetRoots, surfaceCollisions, surfaceDocumentBase, surfaceFlattening } from "./surfacing.js";
+import { surfaceAssetRoots, surfaceCollisions, surfaceDefaultTheme, surfaceDocumentBase, surfaceFlattening } from "./surfacing.js";
 // Headless `pd audit`. Re-exported: packages/core imports it.
 export { runDiagnosticsAudit } from "./audit.js";
 export { buildStaticSite, withBasePath } from "./static-build.js";
@@ -186,7 +186,7 @@ export async function startDevServer(
       try {
         const css = await compileSassFile(join(dir, `${name}.theme.scss`));
         state.themeCss.set(name, css);
-        const slots = config.themes && dir === cfg.themeDirs[0] ? swatchSlots : cfg.packageSwatchSlots;
+        const slots = config.themes?.dir && dir === cfg.themeDirs[0] ? swatchSlots : cfg.packageSwatchSlots;
         state.themeTokens.set(name, await extractThemeTokens(name, css, slots, dir));
       } catch (e) {
         console.warn(`[dev-server] Theme compile error (${name}):`, e);
@@ -195,6 +195,7 @@ export async function startDevServer(
       }
     }
   }
+  surfaceDefaultTheme(cfg.defaultTheme, [...state.themeCss.keys()]);
 
 
 

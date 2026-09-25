@@ -42,9 +42,10 @@ export interface StylesConfig {
 }
 
 export interface ThemesConfig {
-  /** Directory of theme files (custom-property value-sets). */
-  dir: string;
-  /** Default theme name applied via data-theme on the preview body. */
+  /** Directory of the project's own theme files (custom-property value-sets). Leave it out to use
+   *  only the themes pattern packages provide, with `default` naming one of them. */
+  dir?: string;
+  /** Default theme name applied via data-theme on the preview body: a project theme or a package's. */
   default: string;
   /** Switch wiring: attribute toggle (default) or per-theme stylesheet swap. */
   switch?: ThemeSwitch;

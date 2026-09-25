@@ -55,7 +55,7 @@ export function startWatching(ctx: WatchContext): FSWatcher {
   // Only the PROJECT's own files are watched. Pattern packages live in node_modules: read-only
   // library code that changes by reinstalling, not by editing — so their themes and scripts are
   // not watched either.
-  const themesDir = cfg.config.themes ? cfg.themesDir : null;
+  const themesDir = cfg.config.themes?.dir ? cfg.themesDir : null;
   const scriptsDir = cfg.config.scriptsDir ? cfg.scriptsDirs[0] ?? null : null;
   // The project's documentBase: a listed file's rules live in the base layer (see buildAllStyleData).
   const inProjectBase = documentBaseMatcher(stylesDir, cfg.config.documentBase);

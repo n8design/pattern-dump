@@ -141,7 +141,7 @@ export function resolveServerConfig(
   // built on a package need that package's themes even when the project adds its own.
   const themePackages = packages.filter(p => p.manifest.themes);
   const themeDirs = [
-    ...(config.themes ? [resolve(cwd, config.themes.dir)] : []),
+    ...(config.themes?.dir ? [resolve(cwd, config.themes.dir)] : []),
     ...themePackages.map(p => inPackage(p, p.manifest.themes!.dir)),
   ];
   // 'stylesheet' as soon as any source needs it: its bare `:root` sets collide when all are linked,
