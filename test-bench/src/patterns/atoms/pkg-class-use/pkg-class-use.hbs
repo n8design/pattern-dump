@@ -1,0 +1,7 @@
+<!--
+  Guard fixture for class ownership across roots. This project component writes the package class
+  .fixture-chip (defined by pd-fixture-ui's atoms/fixture-chip) directly, and a project base rule
+  restyles it in context (.tb-chip-host .fixture-chip in 00-base/shared-family). That contextual
+  rule must not take the class over: the preview still links the package component's CSS.
+-->
+<span class="fixture-chip">Package class in a project template</span>

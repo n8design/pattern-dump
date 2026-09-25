@@ -25,6 +25,7 @@
     "markdown-it": "^14",
     "node-html-parser": "^7.1.0",
     "postcss": "^8.0.0",
+    "postcss-selector-parser": "^7.1.1",
     "sass": "^1.77.0",
     "source-map": "^0.6.1"
   },

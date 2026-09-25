@@ -16,6 +16,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import postcss from "postcss";
+import selectorParser from "postcss-selector-parser";
 import { SourceMapConsumer } from "source-map";
 import * as sass from "sass";
 import { collectScssFiles } from "@pattern-dump/build";
@@ -74,6 +75,53 @@ export type ClassOwnerIndex = Map<string, string>;
 // module authored the class, so the styleModules relationship can report it. Only ever read for
 // classes whose classOwnerIndex owner is "__base__".
 export type BaseProvenanceIndex = Map<string, string>;
+
+// ---- Which rule claims a class ----
+// A rule DEFINES a class when one of its selectors is that class's own compound, with no ancestor or
+// sibling context (`.card`, `.card:hover`, `.card.is-active`). Every other appearance is a MENTION:
+// contextual overrides (`.tile .card`, `.card:checked + label`) and pseudo-class arguments
+// (`:not(.card)`). When several rules claim one class, a defining claim beats a mention, then a
+// component beats `__base__`, then the first writer wins. Without this, a project base rule that
+// restyles a package class in context (`.tile .hoo-radio`) owned the class, and the package
+// component that defines it was never linked.
+
+interface SelectorClasses { defines: string[]; mentions: string[] }
+const selectorClassCache = new Map<string, SelectorClasses>();
+
+/** The classes a selector list defines (context-free compounds) and the ones it only mentions. */
+export function selectorClasses(selector: string): SelectorClasses {
+  const cached = selectorClassCache.get(selector);
+  if (cached) return cached;
+  const defines = new Set<string>();
+  const mentions = new Set<string>();
+  try {
+    selectorParser(list => {
+      list.each(complex => {
+        const contextFree = !complex.some(node => node.type === "combinator");
+        complex.walkClasses(cls => {
+          (contextFree && cls.parent === complex ? defines : mentions).add(cls.value);
+        });
+      });
+    }).processSync(selector);
+  } catch {
+    // Unparseable selector: fall back to treating every class-looking token as defined.
+    for (const m of selector.matchAll(/\.([\w-]+)/g)) defines.add(m[1]);
+  }
+  for (const name of defines) mentions.delete(name);
+  const result = { defines: [...defines], mentions: [...mentions] };
+  selectorClassCache.set(selector, result);
+  return result;
+}
+
+/** Precedence of a class claim: defining over mentioning, then a component over `__base__`. */
+function claimRank(owner: string, defines: boolean): number {
+  return (defines ? 2 : 0) + (owner === "__base__" ? 0 : 1);
+}
+
+/** The claim rank behind each class of an index built by buildAllStyleData, so the per-save patch
+ *  applies the same precedence. Kept beside the index, not in it: the index stays a plain
+ *  class → owner map for every reader. */
+const indexRanks = new WeakMap<ClassOwnerIndex, Map<string, number>>();
 
 /** Component ids keyed by their prefix-stripped form; null marks two ids that strip alike. Cached per
  *  Set: callers build a fresh id set per discovery pass (baseComponentIds) and never mutate it. */
@@ -183,13 +231,14 @@ export function missingDocumentBase(stylesDir: string, base: readonly string[] |
 /** Single compile pass producing the SCSS module graph, class→owner index, per-component
  *  origin-bucketed CSS, and base CSS. One `sass.compile` call per entry file (sorted for
  *  determinism); `loadedUrls` feeds the module graph; the source map feeds class attribution
- *  and CSS bucketing. First-writer wins for the class index. */
+ *  and CSS bucketing. Claim precedence decides the class index. */
 /**
  * Core class-attribution logic: given a compiled CSS root and its source-map consumer,
  * extract { className → owning component id } mappings for every rule in the output.
  * Tracing is via the source map (needed for Sass-expanded nesting like `& .foo`).
- * First-writer wins when the same class appears across multiple source files compiled
- * by the same entry point.
+ * When the same class is claimed by several rules, the claim precedence above decides
+ * (`selectorClasses`, `claimRank`); `ranks` carries the winning claim's rank so callers
+ * merging several files apply the same precedence.
  *
  * This is the SINGLE implementation shared by both buildAllStyleData (full rebuild on
  * navigation) and attributeClassesFromFile → patchClassOwnerIndex (incremental per-save
@@ -202,12 +251,13 @@ export function extractClassesFromCompiled(
   entryFile: string,
   stylesDir: string,
   componentIds: Set<string>
-): { classMap: Map<string, string>; baseModules: BaseProvenanceIndex } {
+): { classMap: Map<string, string>; baseModules: BaseProvenanceIndex; ranks: Map<string, number> } {
   const classMap = new Map<string, string>();
   const baseModules: BaseProvenanceIndex = new Map();
+  const ranks = new Map<string, number>();
   root.walkRules(rule => {
-    const classMatches = rule.selector.match(/\.([\w-]+)/g);
-    if (!classMatches) return;
+    const { defines, mentions } = selectorClasses(rule.selector);
+    if (defines.length === 0 && mentions.length === 0) return;
     const pos = rule.source?.start;
     if (!pos) return;
     const original = consumer.originalPositionFor({ line: pos.line, column: pos.column - 1 });
@@ -220,17 +270,23 @@ export function extractClassesFromCompiled(
     // Base-class provenance: keep the authoring partial (barrel-retaining) when the origin
     // resolves to no component. Discarded here before; retained now for styleModules.
     const modulePath = resolved === null ? resolveSharedModulePath(originPath, stylesDir, true) : null;
-    for (const cls of classMatches) {
-      const name = cls.slice(1);
-      if (!classMap.has(name)) classMap.set(name, owner); // first-writer wins
-      // Record base provenance only when the WINNING owner is base (guards against a component
-      // first-writer being shadowed by a later base rule for the same class name).
-      if (modulePath && classMap.get(name) === "__base__" && !baseModules.has(name)) {
+    const claim = (name: string, rank: number): void => {
+      const prev = ranks.get(name);
+      if (prev === undefined || rank > prev) {
+        classMap.set(name, owner);
+        ranks.set(name, rank);
+        // Base provenance belongs to the WINNING claim only, so a component that takes a class
+        // over from a base rule leaves no stale module behind.
+        if (modulePath && owner === "__base__") baseModules.set(name, modulePath);
+        else baseModules.delete(name);
+      } else if (modulePath && owner === "__base__" && classMap.get(name) === "__base__" && !baseModules.has(name)) {
         baseModules.set(name, modulePath);
       }
-    }
+    };
+    for (const name of defines) claim(name, claimRank(owner, true));
+    for (const name of mentions) claim(name, claimRank(owner, false));
   });
-  return { classMap, baseModules };
+  return { classMap, baseModules, ranks };
 }
 
 /**
@@ -247,7 +303,7 @@ export async function attributeClassesFromFile(
   entryFile: string,
   stylesDir: string,
   componentIds: Set<string>
-): Promise<Map<string, string> | null> {
+): Promise<{ classMap: Map<string, string>; ranks: Map<string, number> } | null> {
   try {
     const compiled = sass.compile(entryFile, { sourceMap: true });
     if (!compiled.sourceMap) return null;
@@ -256,8 +312,8 @@ export async function attributeClassesFromFile(
     const root = postcss.parse(compiled.css);
     // Incremental patch path uses class ownership only; base provenance is rebuilt on the next
     // full buildAllStyleData (navigation-lag MVP), same as the @use module graph.
-    const { classMap } = extractClassesFromCompiled(consumer, root, entryFile, stylesDir, componentIds);
-    return classMap;
+    const { classMap, ranks } = extractClassesFromCompiled(consumer, root, entryFile, stylesDir, componentIds);
+    return { classMap, ranks };
   } catch {
     return null;
   }
@@ -271,8 +327,9 @@ export async function attributeClassesFromFile(
  *     deleted class disappears from the index, not just unchanged).
  *  2. Re-derive this entry's class attributions via attributeClassesFromFile (shared core
  *     — same algorithm as the navigation-time full build).
- *  3. Re-insert entries attributed to changedCompId, honoring first-writer-wins against
- *     other components' existing claims.
+ *  3. Re-insert entries attributed to changedCompId where its claim outranks the surviving
+ *     one (claim precedence, when the index came from buildAllStyleData), otherwise only
+ *     where no claim survives.
  *
  * Mutates `index` in place. Returns true on a successful patch, false on compilation
  * failure (in which case step 1's removals are still applied — leaves the index slightly
@@ -292,16 +349,23 @@ export async function patchClassOwnerIndex(
   componentIds: Set<string>,
   index: ClassOwnerIndex
 ): Promise<boolean> {
+  const ranks = indexRanks.get(index);
   // Step 1: clear stale claims by changedCompId so removed classes drop out.
   for (const [cls, owner] of index) {
-    if (owner === changedCompId) index.delete(cls);
+    if (owner === changedCompId) { index.delete(cls); ranks?.delete(cls); }
   }
   // Step 2: re-derive from the recompiled file using the shared attribution core.
   const fresh = await attributeClassesFromFile(entryFile, stylesDir, componentIds);
   if (!fresh) return false;
-  // Step 3: re-insert this component's classes, first-writer-wins against survivors.
-  for (const [name, owner] of fresh) {
-    if (owner === changedCompId && !index.has(name)) index.set(name, owner);
+  // Step 3: re-insert this component's classes where they win against the survivors.
+  for (const [name, owner] of fresh.classMap) {
+    if (owner !== changedCompId) continue;
+    const rank = fresh.ranks.get(name) ?? 0;
+    const prev = ranks?.get(name);
+    if (!index.has(name) || (prev !== undefined && rank > prev)) {
+      index.set(name, owner);
+      ranks?.set(name, rank);
+    }
   }
   return true;
 }
@@ -317,8 +381,8 @@ export interface StyleDataRoot {
 /**
  * Build all style data over one SCSS tree, or several (the project's first, then pattern packages').
  * Each rule is attributed against the tree it was authored in, so a package's `01-atoms/button.scss`
- * owns `atoms/button` exactly as the project's would. First writer wins across trees for the class
- * index (the project first); the shared base layer is emitted packages first, so the project's own
+ * owns `atoms/button` exactly as the project's would. The class index follows the claim precedence
+ * across trees, ties going to the first writer (the project first); the shared base layer is emitted packages first, so the project's own
  * base rules come later in the cascade and win.
  */
 export async function buildAllStyleData(
@@ -330,6 +394,8 @@ export async function buildAllStyleData(
 
   const styleUsesModules = new Map<string, string[]>();
   const classIndex: ClassOwnerIndex = new Map();
+  const classRanks = new Map<string, number>();
+  indexRanks.set(classIndex, classRanks);
   const baseProvenance: BaseProvenanceIndex = new Map();
   const componentCssBuckets = new Map<string, Set<string>>();
   const baseCssByRoot: string[][] = [];
@@ -438,13 +504,21 @@ export async function buildAllStyleData(
 
     // Class owner index: delegate to the shared attribution core so the per-save patch
     // (patchClassOwnerIndex via attributeClassesFromFile) and this full build cannot drift.
-    const { classMap: perFileClasses, baseModules: perFileBaseModules } =
+    const { classMap: perFileClasses, baseModules: perFileBaseModules, ranks: perFileRanks } =
       extractClassesFromCompiled(consumer, root, entryFile, stylesDir, componentIds);
     for (const [name, owner] of perFileClasses) {
-      if (!classIndex.has(name)) classIndex.set(name, owner); // first-writer wins
-    }
-    for (const [name, mod] of perFileBaseModules) {
-      if (!baseProvenance.has(name)) baseProvenance.set(name, mod); // first-writer wins
+      const rank = perFileRanks.get(name) ?? 0;
+      const prev = classRanks.get(name);
+      const mod = perFileBaseModules.get(name);
+      if (prev === undefined || rank > prev) {
+        // Claim precedence across files and roots; ties keep the first writer (the project first).
+        classIndex.set(name, owner);
+        classRanks.set(name, rank);
+        if (mod) baseProvenance.set(name, mod);
+        else baseProvenance.delete(name);
+      } else if (mod && classIndex.get(name) === "__base__" && !baseProvenance.has(name)) {
+        baseProvenance.set(name, mod);
+      }
     }
   }
 

@@ -33,3 +33,10 @@
 .tb-repeat {
   padding: 16px;
 }
+
+// .tb-chip-host .fixture-chip — a project base rule that restyles a PACKAGE class in context (the
+// package pd-fixture-ui defines .fixture-chip). It mentions the class; it must not own it, or a
+// project template writing class="fixture-chip" never gets the package component's CSS linked.
+.tb-chip-host .fixture-chip {
+  font-style: italic;
+}
