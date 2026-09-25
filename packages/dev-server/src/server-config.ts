@@ -85,6 +85,22 @@ export interface ResolvedConfig {
   readonly packageSwatchSlots: string[];
 }
 
+/**
+ * Asset roots hidden by an earlier root with the same folder name. `/assets/<name>/…` is served from
+ * the FIRST root called `<name>` (the project's come first), so a later one is never reachable, not
+ * even for files only it has. `pd dev` warns about these, and `pd build` leaves them out.
+ */
+export function shadowedAssetRoots(assetRoots: readonly string[]): { root: string; by: string }[] {
+  const first = new Map<string, string>();
+  const shadowed: { root: string; by: string }[] = [];
+  for (const root of assetRoots) {
+    const by = first.get(basename(root));
+    if (by === undefined) first.set(basename(root), root);
+    else if (by !== root) shadowed.push({ root, by });
+  }
+  return shadowed;
+}
+
 const DEFAULT_SWATCH_SLOTS = ["--bodyBackground", "--themePrimary", "--accent"];
 
 export function resolveServerConfig(

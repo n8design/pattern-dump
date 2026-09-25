@@ -21,7 +21,7 @@ import {
 import { startDevServer } from "./index.js";
 import { buildShellHtml } from "./http-utils.js";
 import { loadPatternPackages } from "./packages.js";
-import { resolveServerConfig } from "./server-config.js";
+import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 
 export interface StaticBuildOptions {
   /** Absolute output directory. Emptied first. */
@@ -211,8 +211,16 @@ export async function buildStaticSite(
       log("… corpus audit left out (build.audit: false / --no-audit)");
     }
 
-    // ---- 5. Assets, copied as served: /assets/<root name>/…, and the single-root mirror ----
+    // ---- 5. Assets, copied as served: /assets/<root name>/…, and the single-root mirror. A root
+    // hidden by an earlier one of the same name is never served by `pd dev`, so it is left out here
+    // too rather than copied over (or under) the root that wins. ----
+    const shadowed = new Map(shadowedAssetRoots(cfg.assetRoots).map(s => [s.root, s.by]));
     for (const [i, rootDir] of cfg.assetRoots.entries()) {
+      const by = shadowed.get(rootDir);
+      if (by !== undefined) {
+        report.warnings.push(`assets: ${relative(root, rootDir)} is hidden by ${relative(root, by) || "."}, which has the same folder name; left out`);
+        continue;
+      }
       const exists = await stat(rootDir).then(s => s.isDirectory(), () => false);
       if (!exists) continue;
       await cp(rootDir, join(outDir, "assets", cfg.assetRootNames[i]), { recursive: true });

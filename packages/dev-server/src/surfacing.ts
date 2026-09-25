@@ -21,7 +21,7 @@ import type { HotReloader } from "@pattern-dump/hotreloader";
 import { detectFlattening, renderFlatteningReport, type FlatteningInput } from "./flattening.js";
 import type { CompositionRegistry } from "./composition.js";
 import { pdScratchDir } from "./scratch.js";
-import type { StyleRoot } from "./server-config.js";
+import { shadowedAssetRoots, type StyleRoot } from "./server-config.js";
 import { missingDocumentBase } from "./style-index.js";
 
 /** Emit CollisionMessage events to the hotreloader and write CONFLICTS.generated.md.
@@ -136,4 +136,12 @@ export function surfaceDocumentBase(roots: readonly StyleRoot[], outsideList: Re
   const rules = files.reduce((n, [, count]) => n + count, 0);
   const examples = files.slice(0, 3).map(([path]) => relative(cwd, path)).join(", ");
   console.log(`[dev-server] base layer: ${rules} rule(s) from ${files.length} file(s) that no component owns and documentBase does not list, e.g. ${examples}`);
+}
+
+/** Warn about asset roots that an earlier root with the same folder name hides (see
+ *  shadowedAssetRoots): their files are never served, which otherwise goes unnoticed. */
+export function surfaceAssetRoots(assetRoots: readonly string[], cwd: string): void {
+  for (const { root, by } of shadowedAssetRoots(assetRoots)) {
+    console.warn(`[dev-server] assets: ${relative(cwd, root)} is hidden by ${relative(cwd, by) || "."}, which has the same folder name; its files are not served`);
+  }
 }
