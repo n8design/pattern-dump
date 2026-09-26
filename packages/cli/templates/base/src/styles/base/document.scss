@@ -2,6 +2,10 @@
 
 // The document defaults every preview sits on — the base layer named by `documentBase` in the config.
 // Fallbacks keep a preview readable before a theme is chosen.
+//
+// `:where(body)` has no specificity, so these are defaults only: a pattern package's own document
+// rules (hTWOo's body background and text colour, which follow its themes) override them even
+// though the project's base rules come later in the cascade.
 
 *,
 *::before,
@@ -9,7 +13,7 @@
   box-sizing: border-box;
 }
 
-body {
+:where(body) {
   margin: 0;
   font-family: tokens.$font-family;
   line-height: 1.5;
