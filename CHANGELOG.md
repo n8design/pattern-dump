@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.1.0-alpha.4
+
+Fixes found while moving a third PatternLab styleguide (CTS) to Pattern Dump with hTWOo consumed only as
+pattern packages: its templates, data, scripts and CSS all come from `@n8d/htwoo-patterns` and
+`@n8d/htwoo-core`, and the project compiles only its own SCSS.
+
+### Added
+
+- `styles: false` on a package reference leaves that package's stylesheets out, for a project that
+  compiles them itself; its templates, data, themes, scripts and assets are still used. It also works
+  for a package that another brings in as a peer: name the peer with the option.
+- `themes.dir` is optional: `themes: { default: "<name>" }` alone makes one of your packages' themes the
+  one previews start with. `pd dev` warns when the default matches no theme.
+- A component or variant `.json` that does not parse is reported as a `DATA_INVALID` diagnostic, with
+  the file and, where the parser gives one, the line and column, instead of being dropped silently. An
+  invalid variant file no longer fails the whole render.
+
+### Fixed
+
+- A class belongs to the rule that defines it (the class on its own, such as `.card` or `.card:hover`),
+  not to every rule that mentions it. A project rule that restyles a package class in context
+  (`.tile .hoo-radio`) took the class over, so the package component's CSS was never linked where the
+  class was used.
+- A rule repeated after a different one (A, B, A) keeps its last position in the base layer and in
+  component CSS, as the browser applies it. The first copy was kept, so B won.
+- Included partials keep the caller's data frame, as in stock Handlebars: `@root` is the page's data,
+  and `{{#if @partial-block}}` sees the block of a block call.
+- A configured `styles.entry` list compiles in the order given. It was sorted, which could change the
+  cascade.
+- SCSS can load an installed package by its bare name (`@use '@scope/pkg/…'`) or a `pkg:` URL, without
+  `SASS_PATH`.
+- A data variant reached by its own id (`/preview/atoms/chip~danger`) or included by its handle
+  (`{{> "atoms-chip~danger"}}`) renders on top of its base component's data, as `?variant=` already did.
+- `pd build` copies assets as `pd dev` serves them: where two asset folders share a name, the first one
+  (the project's) wins and the other is left out and reported. A package's `images/` used to overwrite
+  the project's in the snapshot. `pd dev` warns about such folders at startup.
+
 ## 0.1.0-alpha.3
 
 Fixes found while moving a second PatternLab styleguide (n8d) to Pattern Dump.
