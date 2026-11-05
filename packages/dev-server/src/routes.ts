@@ -61,6 +61,8 @@ export interface RouteContext {
   /** Build identity captured at BOOT — see /api/version. Must be the value from startup, not a
    *  fresh stat, or it could never detect that the running process is behind its own bundle. */
   readonly boot: BootStamp;
+  /** The clock for response time stamps (the audit's `generatedAt`). See DevServerOptions.now. */
+  readonly now: () => Date;
 }
 
 /** What the running process knows about itself, frozen at startup. The wire shape adds `protocol`. */
@@ -231,7 +233,7 @@ export async function handleRequest(
         }
         // _liveReaudits: total surgical HMR re-audits since startup — the incremental-proof instrument
         // (rises by exactly 1 per .hbs edit, 0 per .scss edit). Debug envelope field, not the graph.
-        json(res, 200, { ...graph, generatedAt: new Date().toISOString(), _liveReaudits: state.liveReauditCount } satisfies AuditResponse);
+        json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount } satisfies AuditResponse);
       } catch (e) {
         json(res, 500, { error: e instanceof Error ? e.message : String(e) } satisfies ApiError);
       }

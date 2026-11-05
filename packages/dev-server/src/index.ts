@@ -115,6 +115,10 @@ export interface DevServerOptions {
   /** false = headless: no live-reload socket and no file watcher. Used by `pd build`, which only
    *  reads the routes once. Default true. */
   live?: boolean;
+  /** The clock behind the server's time stamps: the boot `startedAt` (/api/version) and the audit's
+   *  `generatedAt`. Default: real time. `pd build` passes a fixed one when asked for a reproducible
+   *  snapshot. */
+  now?: () => Date;
 }
 export interface DevServer {
   port: number;
@@ -229,14 +233,15 @@ export async function startDevServer(
   // Node has already cached the old module, so nothing short of a restart can fix that.
   //
   // Degrades to null rather than failing startup — a missing stamp must never stop the server.
+  const now = opts.now ?? (() => new Date());
   const boot: BootStamp = {
-    startedAt: new Date().toISOString(),
+    startedAt: now().toISOString(),
     serverBundleMtime: await stat(fileURLToPath(import.meta.url))
       .then(st => st.mtimeMs)
       .catch(() => null),
   };
 
-  const routeCtx: RouteContext = { cfg, state, render, tracker, globalData, devUiDist, boot };
+  const routeCtx: RouteContext = { cfg, state, render, tracker, globalData, devUiDist, boot, now };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 
   await new Promise<void>((resolve, reject) => {

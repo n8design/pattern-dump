@@ -32,6 +32,10 @@ export interface StaticBuildOptions {
   pdVersion: string;
   /** Include the corpus audit (default: config.build.audit, then true). When false it is not run. */
   audit?: boolean;
+  /** A fixed build time. Every time stamp in the snapshot — the shell's `builtAt`, the audit's
+   *  `generatedAt`, the server's `startedAt` — then comes from it, so two builds of an unchanged
+   *  project are byte-identical. Default: real time. */
+  now?: Date;
   log?: (line: string) => void;
 }
 
@@ -92,7 +96,9 @@ export async function buildStaticSite(
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
 
-  const server = await startDevServer(config, root, { port: 0, live: false });
+  const fixed = opts.now;
+  const now = fixed ? (): Date => new Date(fixed.getTime()) : (): Date => new Date();
+  const server = await startDevServer(config, root, { port: 0, live: false, now });
   log("… server ready");
   const origin = `http://127.0.0.1:${server.port}`;
   const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], ms: 0 };
@@ -229,7 +235,7 @@ export async function buildStaticSite(
 
     // ---- 6. One shell page per route ----
     const runtime: ShellRuntime = {
-      mode: "static", basePath, builtAt: new Date().toISOString(), pdVersion: opts.pdVersion,
+      mode: "static", basePath, builtAt: now().toISOString(), pdVersion: opts.pdVersion,
       ...(includeAudit ? {} : { audit: false }),
     };
     const shell = withBasePath(buildShellHtml(runtime), basePath);
