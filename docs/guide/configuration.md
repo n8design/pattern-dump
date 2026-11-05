@@ -79,7 +79,8 @@ preview beneath the component styles. Without it, no base layer is linked.
   component owns stay available on every preview.
 - **`pd dev` checks the list at startup.** An entry that matches no file is a warning, usually a typo.
   One line reports the rules that are in the base layer without being listed, so you can see what
-  is global.
+  is global, and `BASE-LAYER.generated.md` in Pattern Dump's scratch folder (the path is in that
+  line) lists every such file with its rule count.
 
 ```ts
 documentBase: ["00-base", "03-organisms/hero"],

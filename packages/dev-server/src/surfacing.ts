@@ -11,8 +11,8 @@
 // actionable live in the workbench (it becomes an HMR CollisionMessage on the Console); flattening
 // is console-plus-artifact only.
 //
-// `surfaceDocumentBase` is lighter still: a startup check of the configured documentBase paths, on
-// the console only, with no artifact.
+// `surfaceDocumentBase` is lighter still: a startup check of the configured documentBase paths on the
+// console, plus BASE-LAYER.generated.md listing every unlisted, unowned base-layer file.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -119,23 +119,48 @@ export async function surfaceFlattening(
   }
 }
 
+/** The unlisted, unowned base-layer rules as a report: every file with its rule count, most first. */
+export function renderBaseLayerReport(outsideList: ReadonlyMap<string, number>, cwd: string): string {
+  const files = [...outsideList].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const rules = files.reduce((n, [, count]) => n + count, 0);
+  const lines = [
+    "# Base layer: rules outside documentBase",
+    "",
+    "Rules that no component owns and that no `documentBase` entry lists. They are still linked beneath",
+    "every preview. List a file in `documentBase` if it is meant to be global, or move its rules into the",
+    "component they style. Derived on every start: never edit this file.",
+    "",
+  ];
+  if (files.length === 0) return [...lines, "None.", ""].join("\n");
+  lines.push(`${rules} rule(s) in ${files.length} file(s).`, "", "| Rules | File |", "|---:|---|");
+  for (const [path, count] of files) lines.push(`| ${count} | \`${relative(cwd, path)}\` |`);
+  return [...lines, ""].join("\n");
+}
+
 /**
  * Check each styles root's documentBase at startup. A listed path that names no file is a warning:
  * it is almost always a typo, and it would otherwise leave those rules out of the base layer
  * silently. Rules that no component owns and no documentBase lists still form the base layer; they
- * are summarised in one line so the author can see what is global without being listed.
+ * are summarised in one line, and listed file by file in BASE-LAYER.generated.md in the scratch dir.
  */
-export function surfaceDocumentBase(roots: readonly StyleRoot[], outsideList: ReadonlyMap<string, number>, cwd: string): void {
+export async function surfaceDocumentBase(roots: readonly StyleRoot[], outsideList: ReadonlyMap<string, number>, cwd: string): Promise<void> {
   for (const root of roots) {
     for (const entry of missingDocumentBase(root.dir, root.base)) {
       console.warn(`[dev-server] documentBase "${entry}" matches no stylesheet in ${relative(cwd, root.dir) || "."}${root.source ? ` (${root.source})` : ""}`);
     }
   }
+  const report = join(pdScratchDir(cwd), "BASE-LAYER.generated.md");
+  try {
+    await mkdir(pdScratchDir(cwd), { recursive: true });
+    await writeFile(report, renderBaseLayerReport(outsideList, cwd), "utf-8");
+  } catch (e) {
+    console.warn("[dev-server] Could not write BASE-LAYER.generated.md to scratch dir:", e);
+  }
   if (outsideList.size === 0) return;
   const files = [...outsideList].sort((a, b) => b[1] - a[1]);
   const rules = files.reduce((n, [, count]) => n + count, 0);
   const examples = files.slice(0, 3).map(([path]) => relative(cwd, path)).join(", ");
-  console.log(`[dev-server] base layer: ${rules} rule(s) from ${files.length} file(s) that no component owns and documentBase does not list, e.g. ${examples}`);
+  console.log(`[dev-server] base layer: ${rules} rule(s) from ${files.length} file(s) that no component owns and documentBase does not list, e.g. ${examples} — all listed in ${report}`);
 }
 
 /** Warn about asset roots that an earlier root with the same folder name hides (see
