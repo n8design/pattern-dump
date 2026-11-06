@@ -27,6 +27,16 @@ test.describe("the skin", () => {
     expect(fonts.text).toMatch(/^"Source Serif 4",/);
   });
 
+  test("declares both colour schemes on the page and inside its live example, so light-dark() can follow the reader", async ({ page }) => {
+    // Without color-scheme: light dark, light-dark() always picks the light value, whatever the reader's
+    // setting: emulating a dark scheme alone would not catch that.
+    await page.goto("/");
+    await settle(page);
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light dark");
+    expect(await page.locator("figure.doc-example iframe").evaluate((f: HTMLIFrameElement) =>
+      f.contentWindow!.getComputedStyle(f.contentDocument!.documentElement).colorScheme)).toBe("light dark");
+  });
+
   for (const [scheme, paper] of [["light", "oklch(0.985 0.006 85)"], ["dark", "oklch(0.18 0.015 260)"]] as const) {
     test(`follows the ${scheme} colour scheme, on the page and inside its live example`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme });
