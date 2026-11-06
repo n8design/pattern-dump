@@ -11,17 +11,18 @@
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
 import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
-  staticPathFor, themeCssUrl,
+  themeCssUrl,
   type ComponentDetailResponse, type ComponentTree, type ShellRuntime, type ThemeSummary, type TreeNode,
 } from "@pattern-dump/contracts";
 import { startDevServer } from "./index.js";
 import { buildShellHtml } from "./http-utils.js";
 import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
+import { createSnapshotWriter } from "./snapshot-writer.js";
 
 export interface StaticBuildOptions {
   /** Absolute output directory. Emptied first. */
@@ -49,23 +50,6 @@ export interface StaticBuildReport {
    *  written, and do not fail the build. */
   warnings: string[];
   ms: number;
-}
-
-/** Root-relative PD URL prefixes that must move under the base path. */
-const PD_PREFIXES = /(^|["'(\s,=])\/(_pd|api|preview|source|assets)\//g;
-
-/** Prefix every root-relative PD URL in a text response with the base path. "/" leaves it untouched. */
-export function withBasePath(text: string, basePath: string): string {
-  if (basePath === "/") return text;
-  return text.replace(PD_PREFIXES, (_m, lead: string, head: string) => `${lead}${basePath}${head}/`);
-}
-
-const isText = (contentType: string): boolean =>
-  /\b(text\/html|text\/css|application\/json)\b/.test(contentType);
-
-/** The on-disk path for a snapshot URL path: segments decoded, as a static host will look them up. */
-function diskPath(outDir: string, urlPath: string): string {
-  return join(outDir, ...urlPath.split("/").map(seg => decodeURIComponent(seg)));
 }
 
 export async function buildStaticSite(
@@ -102,54 +86,7 @@ export async function buildStaticSite(
   log("… server ready");
   const origin = `http://127.0.0.1:${server.port}`;
   const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], ms: 0 };
-  const done = new Set<string>();
-
-  /** Fetch a live URL and write it to its snapshot file. Returns the (unrewritten) body, or null. */
-  async function capture(liveUrl: string, { optional = false } = {}): Promise<string | null> {
-    const file = staticPathFor(liveUrl);
-    if (done.has(file)) return null;
-    done.add(file);
-    const res = await fetch(`${origin}${liveUrl}`);
-    if (res.status !== 200) {
-      // A component that fails to render is a finding about the design system, not a reason to abort
-      // the build: the static shell reports the missing file exactly as the live one reports the error.
-      // 404s of optional views (a component without a data file) are expected and not listed.
-      if (res.status >= 500 || !optional) {
-        const reason = res.status >= 500 ? `: ${((await res.text()).split("\n")[0] ?? "").slice(0, 160)}` : "";
-        report.warnings.push(`${res.status} ${liveUrl}${reason}`);
-      }
-      return null;
-    }
-    const type = res.headers.get("content-type") ?? "";
-    const target = diskPath(outDir, file);
-    await mkdir(dirname(target), { recursive: true });
-    if (isText(type)) {
-      const body = await res.text();
-      const out = withBasePath(body, basePath);
-      await writeFile(target, out);
-      report.bytes += Buffer.byteLength(out);
-      report.files++;
-      return body;
-    }
-    const buffer = Buffer.from(await res.arrayBuffer());
-    await writeFile(target, buffer);
-    report.bytes += buffer.length;
-    report.files++;
-    return /javascript/.test(type) ? buffer.toString("utf8") : null;
-  }
-
-  /** Write a text body under the snapshot path of a live URL (for responses already in hand). */
-  async function store(liveUrl: string, body: string): Promise<void> {
-    const file = staticPathFor(liveUrl);
-    if (done.has(file)) return;
-    done.add(file);
-    const target = diskPath(outDir, file);
-    await mkdir(dirname(target), { recursive: true });
-    const out = withBasePath(body, basePath);
-    await writeFile(target, out);
-    report.bytes += Buffer.byteLength(out);
-    report.files++;
-  }
+  const { capture, store } = createSnapshotWriter({ outDir, basePath, origin, report });
 
   /** Every /_pd/ stylesheet and script a document references. */
   const referenced = (html: string): string[] =>
@@ -238,14 +175,10 @@ export async function buildStaticSite(
       mode: "static", basePath, builtAt: now().toISOString(), pdVersion: opts.pdVersion,
       ...(includeAudit ? {} : { audit: false }),
     };
-    const shell = withBasePath(buildShellHtml(runtime), basePath);
-    for (const route of routes) {
-      const target = diskPath(outDir, staticPathFor(route));
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, shell);
-      report.files++;
-      report.bytes += Buffer.byteLength(shell);
-    }
+    // Through the writer like every other file: the base path is applied there, once, and a route whose
+    // file is already written (by a capture) is not written over.
+    const shell = buildShellHtml(runtime);
+    for (const route of routes) await store(route, shell);
     // GitHub Pages runs Jekyll unless told otherwise, and Jekyll drops every folder starting with "_"
     // — which would silently remove _pd/ (the shell, its CSS, every theme and component stylesheet).
     await writeFile(join(outDir, ".nojekyll"), "");

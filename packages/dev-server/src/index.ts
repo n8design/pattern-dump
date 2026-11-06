@@ -58,7 +58,8 @@ import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 import { surfaceAssetRoots, surfaceCollisions, surfaceDefaultTheme, surfaceDocumentBase, surfaceFlattening } from "./surfacing.js";
 // Headless `pd audit`. Re-exported: packages/core imports it.
 export { runDiagnosticsAudit } from "./audit.js";
-export { buildStaticSite, withBasePath } from "./static-build.js";
+export { buildStaticSite } from "./static-build.js";
+export { withBasePath } from "./snapshot-writer.js";
 export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // Folder overview gallery — public leaves under a group node.
 // Component detail. Widest fan-out in the package — nothing may import it back.
