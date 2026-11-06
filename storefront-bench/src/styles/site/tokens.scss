@@ -1,30 +1,31 @@
-// The skin's design tokens, all prefixed --sk-. Colours are OKLCH and follow the reader's colour
-// scheme through light-dark().
-// --sk-accent is the one brand colour. Every accent tint the skin uses is mixed from it, so a site
-// rebrands by setting that token alone: one colour, or a light-dark() pair.
+// The skin's design tokens, all prefixed --sk-. The reader's colour scheme picks the ground through
+// light-dark(): ink with bone text in the dark, bone with ink text in the light; the same accent in both.
+// --sk-accent is the one brand colour. Everything accented is the accent or derived from it, so a site
+// rebrands by setting that token alone.
 :root {
   color-scheme: light dark;
 
-  --sk-accent: light-dark(oklch(55% 0.19 30deg), oklch(72% 0.15 35deg));
-  --sk-paper: light-dark(oklch(98.5% 0.006 85deg), oklch(18% 0.015 260deg));
-  --sk-ink: light-dark(oklch(22% 0.02 260deg), oklch(94% 0.01 85deg));
-  --sk-muted: light-dark(oklch(48% 0.02 260deg), oklch(72% 0.02 260deg));
-  --sk-rule: light-dark(oklch(88% 0.01 85deg), oklch(32% 0.015 260deg));
+  --sk-accent: #ff4a2b;
+  --sk-bone: #ede8df;
+  --sk-coal: #0b0b0c;
+  --sk-paper: light-dark(var(--sk-bone), var(--sk-coal));
+  --sk-ink: light-dark(var(--sk-coal), var(--sk-bone));
 
-  // The illustration's palette as colour fields, the same in both schemes, each with the text that
-  // reads on it. The accent's field is the accent itself; the text on it follows the accent's
-  // lightness (dark on a light accent, light on a dark one), so a rebrand keeps it readable.
-  --sk-ochre: oklch(79.1% 0.134 79deg);
-  --sk-slate: oklch(41% 0.05 265deg);
-  --sk-deep: oklch(26.1% 0.03 265deg);
-  --sk-on-light: oklch(22% 0.02 260deg);
-  --sk-on-dark: oklch(95.9% 0.014 85deg);
-  --sk-on-accent: oklch(from var(--sk-accent) clamp(0.2, (0.66 - l) * 1000, 0.97) 0.012 h);
+  // Muted text: #8a857c on ink; on bone that is too faint for small text, so the light scheme darkens it.
+  --sk-muted: light-dark(#5f5a52, #8a857c);
+  --sk-rule: light-dark(#cbc4b8, #2b2a28);
 
-  // The accent's washes keep its hue (relative colour syntax): pale on paper, deep on the dark
-  // paper. Mixing the accent into the dark paper would cross the hue circle through purple.
-  --sk-accent-wash: light-dark(oklch(from var(--sk-accent) 95% 0.03 h), oklch(from var(--sk-accent) 27% 0.04 h));
-  --sk-accent-wash-strong: light-dark(oklch(from var(--sk-accent) 89% 0.06 h), oklch(from var(--sk-accent) 33% 0.07 h));
+  // The accent as text keeps its hue, darkened on bone where the accent itself is too light to read.
+  --sk-accent-text: light-dark(oklch(from var(--sk-accent) calc(l - 0.16) c h), var(--sk-accent));
+
+  // Text on the accent follows the accent's lightness: dark on a light accent, light on a dark one,
+  // so a rebrand keeps it readable.
+  --sk-on-accent: oklch(from var(--sk-accent) clamp(0.16, (0.6 - l) * 1000, 0.95) 0.01 h);
+
+  // The accent's washes keep its hue (relative colour syntax): pale on bone, deep on ink. Mixing the
+  // accent into the ink would cross the hue circle.
+  --sk-accent-wash: light-dark(oklch(from var(--sk-accent) 93% 0.04 h), oklch(from var(--sk-accent) 24% 0.06 h));
+  --sk-accent-wash-strong: light-dark(oklch(from var(--sk-accent) 87% 0.08 h), oklch(from var(--sk-accent) 30% 0.09 h));
 
   --sk-font-display: "Montserrat", "Helvetica Neue", arial, sans-serif;
   --sk-font-body: "Source Serif 4", georgia, serif;

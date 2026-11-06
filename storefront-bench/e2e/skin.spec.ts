@@ -104,7 +104,7 @@ test.describe("the skin", () => {
     });
   }
 
-  for (const [scheme, paper] of [["light", "oklch(0.985 0.006 85)"], ["dark", "oklch(0.18 0.015 260)"]] as const) {
+  for (const [scheme, paper] of [["light", "rgb(237, 232, 223)"], ["dark", "rgb(11, 11, 12)"]] as const) {
     test(`follows the ${scheme} colour scheme, on the page and inside its live example`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme });
       await page.goto("/");
@@ -136,7 +136,7 @@ test.describe("the skin", () => {
     });
   }
 
-  test("puts each section on a field of the illustration's palette, edge to edge, and each card on a field of its own", async ({ page }) => {
+  test("puts each section on a field of the palette, edge to edge, and each card on a field of its own", async ({ page }) => {
     /** Each element's background next to the token it should be, both resolved on the page; and whether it spans the viewport. */
     const field = (selector: string, token: string) => page.locator(selector).first().evaluate((el, t) => {
       const probe = document.createElement("i");
@@ -154,29 +154,29 @@ test.describe("the skin", () => {
     };
     await page.goto("/");
     await expectField(".home-cover", "--sk-accent");
-    await expectField(".site-footer", "--sk-deep");
+    await expectField(".site-footer", "--sk-ink");
     await expectField(".card:nth-child(1)", "--sk-accent", false);
-    await expectField(".card:nth-child(2)", "--sk-ochre", false);
+    await expectField(".card:nth-child(2)", "--sk-bone", false);
     await page.goto("/about/");
-    await expectField(".page-header", "--sk-ochre");
+    await expectField(".page-header", "--sk-accent");
     await page.goto("/guides/setup/");
-    await expectField(".article-header", "--sk-slate");
+    await expectField(".article-header", "--sk-ink");
   });
 
   for (const route of ["/", "/guides/setup/"]) {
-    test(`${route}: shows its live example as a specimen plate: the frame on a slate mat, the caption plate with the workbench link inside it`, async ({ page }) => {
+    test(`${route}: shows its live example as a specimen plate: the frame on a bone mat, the caption plate with the workbench link inside it`, async ({ page }) => {
       await page.goto(route);
       await settle(page);
       const plate = await page.locator("figure.doc-example").evaluate(fig => {
         const probe = document.createElement("i");
-        probe.style.backgroundColor = "var(--sk-slate)";
+        probe.style.backgroundColor = "var(--sk-bone)";
         document.body.append(probe);
-        const slate = getComputedStyle(probe).backgroundColor;
+        const bone = getComputedStyle(probe).backgroundColor;
         probe.remove();
         const f = fig.getBoundingClientRect(), frame = fig.querySelector("iframe")!.getBoundingClientRect();
         const caption = fig.querySelector("figcaption")!, c = caption.getBoundingClientRect(), link = caption.querySelector("a");
         return {
-          mat: getComputedStyle(fig).backgroundColor === slate,
+          mat: getComputedStyle(fig).backgroundColor === bone,
           matAround: Math.min(frame.left - f.left, f.right - frame.right, frame.top - f.top, f.bottom - c.bottom) >= 12,
           captionInPlate: c.top >= frame.bottom && c.left >= f.left && c.right <= f.right && c.bottom <= f.bottom,
           link: link?.getAttribute("href") ?? null,
@@ -189,6 +189,19 @@ test.describe("the skin", () => {
       expect(plate.linkNames).toContain(plate.title);
     });
   }
+
+  test("lays a film grain over the page that takes no clicks, and none on paper", async ({ page }) => {
+    await page.goto("/");
+    const grain = () => page.evaluate(() => {
+      const cs = getComputedStyle(document.body, "::after");
+      return { display: cs.display, position: cs.position, inset: [cs.top, cs.right, cs.bottom, cs.left].join(" "),
+        opacity: cs.opacity, pointerEvents: cs.pointerEvents, image: cs.backgroundImage.includes("/assets/images/grain.svg") };
+    });
+    expect(await grain()).toEqual({ display: "block", position: "fixed", inset: "0px 0px 0px 0px", opacity: "0.07", pointerEvents: "none", image: true });
+    await page.emulateMedia({ media: "print" });
+    expect((await grain()).display).toBe("none");
+    expect((await page.request.get("/assets/images/grain.svg")).status()).toBe(200);
+  });
 
   test("takes its brand colour from --sk-accent alone", async ({ page }) => {
     await page.goto("/");
@@ -278,7 +291,7 @@ test.describe("motion and print", () => {
         href: link.href,
       };
     });
-    expect(printed.paper).toBe("oklch(0.985 0.006 85)");
+    expect(printed.paper).toBe("rgb(237, 232, 223)");
     expect(printed.nav).toBe("none");
     expect(printed.cards).toBe("none");
     expect(printed.after).toBe(`" (${printed.href})"`);

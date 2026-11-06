@@ -21,15 +21,15 @@
   border-end-start-radius: var(--sk-corner);
 }
 
-// Each card on a field of its own, in turn: the accent, ochre, slate.
+// Each card on a field of its own, in turn: the accent, bone, ink.
 .card:nth-child(3n + 2) {
-  background: var(--sk-ochre);
-  color: var(--sk-on-light);
+  background: var(--sk-bone);
+  color: var(--sk-coal);
 }
 
 .card:nth-child(3n) {
-  background: var(--sk-slate);
-  color: var(--sk-on-dark);
+  background: var(--sk-ink);
+  color: var(--sk-paper);
 }
 
 // On a coloured field the accent can't mark a link or focus: the field's own text colour does.

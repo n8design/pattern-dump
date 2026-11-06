@@ -76,17 +76,19 @@ describe("pd build — the storefront root", () => {
       "about/index.html",
       "assets/fonts/ibm-plex-mono-medium.woff2",
       "assets/fonts/ibm-plex-mono-regular.woff2",
+      "assets/fonts/montserrat-italic-variable.woff2",
       "assets/fonts/montserrat-variable.woff2",
       "assets/fonts/source-serif-4-italic.woff2",
       "assets/fonts/source-serif-4-roman.woff2",
       "assets/images/bench-blocks.svg",
+      "assets/images/grain.svg",
       "guides/index.html",
       "guides/setup/index.html",
       "index.html",
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 23, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 25, bytes: expect.any(Number) });
   });
 
   it("resolves every reference inside it to a file it holds", () => {
