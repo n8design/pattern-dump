@@ -17,6 +17,7 @@
 .site-nav-list {
   gap: var(--sk-space-2) var(--sk-space-5);
   padding-block: var(--sk-space-3);
+  counter-reset: sk-nav;
 }
 
 .site-nav-list > li {
@@ -24,6 +25,18 @@
   flex-wrap: wrap;
   gap: var(--sk-space-3);
   align-items: baseline;
+  counter-increment: sk-nav;
+}
+
+// The site's name in the header is the way home, so the nav leaves the home page out. Its route is
+// always /. A hidden entry does not count, so the others are numbered from 01.
+.site-nav-list > li:has(> a[href="/"]) {
+  display: none;
+}
+
+// Each section's number before its name; the number is decoration, so it has no spoken text.
+.site-nav-list > li > a::before {
+  content: counter(sk-nav, decimal-leading-zero) " " / "";
 }
 
 .site-nav a {

@@ -26,6 +26,16 @@ test.describe("storefront pages", () => {
     await expect(page.locator(".site-nav-sub a")).toHaveText(["Setup"]);
   });
 
+  test("shows the sections numbered from 01, and leaves out the home page: the site's name is the way home", async ({ page }) => {
+    await page.goto("/about/");
+    await expect(page.locator(".site-nav-list > li").filter({ has: page.locator('> a[href="/"]') })).toBeHidden();
+    const shown = await page.locator(".site-nav-list > li > a").evaluateAll(as => as
+      .filter(a => a.checkVisibility())
+      .map(a => [a.textContent, getComputedStyle(a, "::before").content]));
+    expect(shown).toEqual([["Guides", `counter(sk-nav, decimal-leading-zero) " " / ""`], ["About", `counter(sk-nav, decimal-leading-zero) " " / ""`]]);
+    await expect(page.locator(".site-title")).toHaveAttribute("href", "/");
+  });
+
   test("loads no workbench shell stylesheet", async ({ page }) => {
     await page.goto("/");
     const hrefs = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")));
