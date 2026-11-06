@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "node ../packages/cli/dist/index.js dev",
     "e2e": "playwright test --config e2e/playwright.config.ts",
-    "lint": "eslint e2e"
+    "lint": "eslint e2e",
+    "lint:css": "stylelint 'src/styles/**/*.scss'"
   }
 }
