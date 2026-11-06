@@ -1,0 +1,10 @@
+{{#> partials-base }}
+<article class="home">
+  <header class="home-cover">
+    <h1 class="home-title">{{title}}</h1>
+    {{#if description}}<p class="home-description">{{description}}</p>{{/if}}
+  </header>
+  <div class="page-body">{{{body}}}</div>
+  {{> partials-cards sections=true }}
+</article>
+{{/partials-base}}

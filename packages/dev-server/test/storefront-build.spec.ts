@@ -66,8 +66,10 @@ describe("pd build — the storefront root", () => {
       "_pd/base.css",
       "_pd/components/components/callout.css",
       "_pd/components/layouts/article.css",
+      "_pd/components/layouts/home.css",
       "_pd/components/layouts/page.css",
       "_pd/components/partials/base.css",
+      "_pd/components/partials/cards.css",
       "_pd/components/partials/footer.css",
       "_pd/components/partials/header.css",
       "_pd/components/partials/nav.css",
@@ -82,7 +84,7 @@ describe("pd build — the storefront root", () => {
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 19, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 21, bytes: expect.any(Number) });
   });
 
   it("resolves every reference inside it to a file it holds", () => {
@@ -155,7 +157,7 @@ describe("pd build — a storefront with problems writes nothing", () => {
     const out = join(root, "..", "wb-fail");
     await expect(build(root, out)).rejects.toThrow(
       "pd build: the storefront has problems, so nothing was written:\n"
-      + `  - /: index.md:3: "bogus" is not declared by layout "page"\n`
+      + `  - /: index.md:4: "bogus" is not declared by layout "home"\n`
       + "  - /about/: about.md: pattern components/nope: there is no such component",
     );
     expect(await exists(out)).toBe(false);

@@ -52,7 +52,7 @@ describe("readPages — the storefront bench", () => {
     const model = await readPages(bench);
     expect(model.problems).toEqual([]);
     expect(model.pages).toEqual([
-      { route: "/", title: "Storefront bench", layout: "page" },
+      { route: "/", title: "Storefront bench", layout: "home" },
       { route: "/guides/", title: "Guides", layout: "page" },
       { route: "/guides/setup/", title: "Setup", layout: "article" },
       { route: "/about/", title: "About", layout: "page" },

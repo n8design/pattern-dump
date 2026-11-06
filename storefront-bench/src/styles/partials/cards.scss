@@ -1,0 +1,67 @@
+// Cards for a part of the site. Each card is a size container: a wide card sets its pages beside its
+// title, a narrow one beneath it.
+.site-cards {
+  grid-column: wide;
+  margin-block-start: var(--sk-space-6);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+  gap: var(--sk-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  container-type: inline-size;
+  border: 1px solid var(--sk-rule);
+  border-end-start-radius: var(--sk-corner);
+}
+
+.card:has(a:hover) {
+  border-color: var(--sk-accent);
+}
+
+.card-body {
+  display: grid;
+  gap: var(--sk-space-3);
+  align-content: space-between;
+  min-block-size: 9rem;
+  padding: var(--sk-space-5);
+}
+
+.card-title {
+  font-family: var(--sk-font-display);
+  font-size: var(--sk-step-1);
+  font-weight: 800;
+  line-height: 1.15;
+  text-decoration: none;
+}
+
+.card-title::after {
+  content: " →";
+  color: var(--sk-accent);
+}
+
+.card-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sk-space-1) var(--sk-space-4);
+  margin: 0;
+  padding: 0;
+  font-size: var(--sk-step-n1);
+  list-style: none;
+}
+
+@container (width > 26rem) {
+  .card-body {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+
+  .card-pages {
+    justify-content: end;
+  }
+}

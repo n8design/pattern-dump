@@ -19,7 +19,8 @@ async function sources(): Promise<Map<string, string>> {
   return out;
 }
 
-const COLOUR_LITERAL = /#[0-9a-f]{3,8}\b|\b(?:oklch|oklab|lch|lab|rgba?|hsla?|hwb|color)\(/gi;
+// A colour written out, or one mixed from others: both belong in the tokens file.
+const COLOUR_LITERAL = /#[0-9a-f]{3,8}\b|\b(?:oklch|oklab|lch|lab|rgba?|hsla?|hwb|color|color-mix|light-dark)\(/gi;
 
 describe("the skin's colours", () => {
   it("are written only in the tokens file", async () => {

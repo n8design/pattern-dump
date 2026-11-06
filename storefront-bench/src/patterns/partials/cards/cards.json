@@ -1,0 +1,27 @@
+{
+  "nav": [
+    {
+      "route": "/",
+      "title": "Home"
+    },
+    {
+      "route": "/guides/",
+      "title": "Guides",
+      "current": true,
+      "children": [
+        {
+          "route": "/guides/setup/",
+          "title": "Setup"
+        },
+        {
+          "route": "/guides/writing/",
+          "title": "Writing pages"
+        }
+      ]
+    },
+    {
+      "route": "/about/",
+      "title": "About"
+    }
+  ]
+}

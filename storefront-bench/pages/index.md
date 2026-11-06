@@ -1,4 +1,5 @@
 ---
+layout: home
 title: Storefront bench
 description: A small website rendered from markdown, with the bench's own skin.
 order: 0

@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "node-html-parser";
 import { createHeightFitter, type DiscoveryMap, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
@@ -60,16 +61,29 @@ describe("assemblePage — the bench's pages", () => {
     const html = page.html;
     expect(html).toContain("<title>Storefront bench</title>");
     expect(html).toContain(`<meta name="description" content="A small website rendered from markdown, with the bench's own skin.">`);
-    expect(html).toContain(`<link rel="stylesheet" href="/_pd/head-for/layouts/page">`);
-    expect(html).toContain(`<h1 class="page-title">Storefront bench</h1>`);
+    expect(html).toContain(`<link rel="stylesheet" href="/_pd/head-for/layouts/home">`);
+    expect(html).toContain(`<h1 class="home-title">Storefront bench</h1>`);
     expect(html).toContain(`<a href="/" aria-current="page">Storefront bench</a>`);
     expect(html).toContain(`<a href="/guides/">Guides</a>`);
     expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>`);
     expect(html).toContain(`<a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a>`);
     expect(html).toContain("<p>Built with Pattern Dump from the storefront bench.</p>");
+    // A card for every other part of the site, none for the home page itself; a folder's card lists its pages.
+    const cards = parse(html).querySelectorAll(`nav.site-cards[aria-label="Sections"] .card`);
+    expect(cards.map(c => c.querySelector(".card-title")?.getAttribute("href"))).toEqual(["/guides/", "/about/"]);
+    expect(cards[0].querySelectorAll(".card-pages a").map(a => [a.getAttribute("href"), a.text])).toEqual([["/guides/setup/", "Setup"]]);
     // The layout's sample body never shows.
     expect(html).not.toContain("This is the body of a page");
     expect(html).not.toContain("data-pd-live");
+  });
+
+  it("shows a folder's pages as cards on the folder's own page, and no cards on a page without pages", async () => {
+    const guides = parse((await build("/guides/", join(bench, "pages"))).html);
+    expect(guides.querySelectorAll(`nav.site-cards[aria-label="In this section"] .card-title`).map(a => [a.getAttribute("href"), a.text]))
+      .toEqual([["/guides/setup/", "Setup"]]);
+    for (const route of ["/about/", "/guides/setup/"]) {
+      expect(parse((await build(route, join(bench, "pages"))).html).querySelectorAll(".site-cards"), route).toHaveLength(0);
+    }
   });
 
   it("renders an article with its lede, and marks it current in the nav", async () => {
@@ -128,7 +142,7 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
     const md = "---\ntitle: T\nlayout: <img src=x onerror=alert(1)>\n---\n";
     const page = await build("/", await pagesOf({ "index.md": md }));
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`index.md:3: layout "<img src=x onerror=alert(1)>" is not a layout — the layouts are "article", "page"`]);
+    expect(page.problems).toEqual([`index.md:3: layout "<img src=x onerror=alert(1)>" is not a layout — the layouts are "article", "home", "page"`]);
     expect(page.html).not.toContain("<img src=x");
     expect(page.html).toContain(`<li>index.md:3: layout &quot;&lt;img src=x onerror=alert(1)&gt;&quot; is not a layout`.replace(/&quot;/g, `"`));
   });
@@ -180,7 +194,7 @@ describe("the skin's templates", () => {
     };
     await walk(join(patterns, "layouts"));
     await walk(join(patterns, "partials"));
-    expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}"]);
+    expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}"]);
   });
 });
 

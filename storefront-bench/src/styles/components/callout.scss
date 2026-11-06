@@ -1,5 +1,27 @@
-// Wireframe only: the design pass replaces this.
+// A short note set apart from the text around it: the accent's wash, a rule in the accent, and the
+// skin's corner. The warning tone strengthens both.
 .callout {
-  border-inline-start: 0.25rem solid;
-  padding: 0.5rem 1rem;
+  display: grid;
+  gap: var(--sk-space-1);
+  padding: var(--sk-space-4) var(--sk-space-5);
+  background: var(--sk-accent-wash);
+  border-inline-start: 0.25rem solid var(--sk-accent);
+  border-end-start-radius: var(--sk-corner);
+}
+
+.callout-title {
+  margin: 0;
+  font-family: var(--sk-font-display);
+  font-size: var(--sk-step-n1);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.callout-text {
+  margin: 0;
+}
+
+.callout-warning {
+  background: var(--sk-accent-wash-strong);
 }
