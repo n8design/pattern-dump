@@ -12,7 +12,10 @@ const valid = {
   shell: { brand: { title: "T", logo: { light: "/a.svg", dark: "/b.svg" }, logoAlt: "T", href: "/" } },
   packages: ["pkg-a", { name: "pkg-b", exclude: ["x/**"] }, { name: "pkg-c", styles: false }], exclude: ["drafts/**"],
   build: { outDir: "./site", basePath: "/docs/", audit: false },
-  storefront: { pagesDir: "./pages", outDir: "./site-www", host: "docs.localhost", workbenchUrl: "https://workbench.example.com/" },
+  storefront: {
+    pagesDir: "./pages", outDir: "./site-www", host: "docs.localhost", workbenchUrl: "https://workbench.example.com/",
+    site: { title: "Docs", footer: "Made here", social: { links: ["a"] } },
+  },
 };
 
 const storefront = (sf: Record<string, unknown>) => configProblems({ ...valid, storefront: sf });
@@ -168,6 +171,17 @@ describe("configProblems — storefront", () => {
       ["./pages-src", "./pages-out"], ["../site/pages", "../site/www"],
     ];
     for (const [pagesDir, outDir] of ok) expect(storefront({ pagesDir, outDir }), `${pagesDir} | ${outDir}`).toEqual([]);
+  });
+
+  it("takes the site's values as an object, of any keys: they are checked against the layouts, not here", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    for (const ok of [{}, { title: "A" }, { title: "A", nested: { x: [1, 2] }, flag: true }]) {
+      expect(storefront({ ...base, site: ok }), JSON.stringify(ok)).toEqual([]);
+    }
+    const message = `"storefront.site" must be an object of the site's values, such as { title: "My site" }`;
+    for (const bad of [[], ["title"], "My site", 3, null, true]) {
+      expect(storefront({ ...base, site: bad }), JSON.stringify(bad)).toEqual([message]);
+    }
   });
 
   it("takes a bare host name for the storefront host, and nothing else", () => {

@@ -10,7 +10,7 @@ type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo" | "http-url" | "host";
+  | "packages" | "logo" | "http-url" | "host" | "plain-object";
 type Shape = Readonly<Record<string, Rule>>;
 
 const SHAPE: Shape = {
@@ -55,7 +55,7 @@ const SHAPE: Shape = {
   exclude: "strings",
   build: { keys: { outDir: "string", basePath: "string", audit: "boolean" } },
   storefront: {
-    keys: { pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "http-url" },
+    keys: { pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "http-url", site: "plain-object" },
     required: ["pagesDir", "outDir"],
   },
 };
@@ -150,6 +150,11 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
       } catch { ok = false; }
     }
     if (!ok) fail(`an absolute http(s) URL with no query or fragment, such as "https://workbench.example.com/"`);
+    return;
+  }
+  if (rule === "plain-object") {
+    // Its keys are checked where the patterns are known: against what the site's layouts declare.
+    if (!isObject(value)) fail(`an object of the site's values, such as { title: "My site" }`);
     return;
   }
   if (rule === "host") {

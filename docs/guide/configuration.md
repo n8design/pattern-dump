@@ -158,6 +158,7 @@ none of them is another, and none is inside another.
 | `storefront.outDir` | string | required | Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench snapshot |
 | `storefront.host` | string | `live.localhost` | The host name `pd dev` serves the storefront on. A bare name, with no scheme, port or path |
 | `storefront.workbenchUrl` | string | — | Where the built workbench will be hosted, such as `https://workbench.example.com/` or `https://htwoo.io/workbench/`: an absolute http(s) URL with no query or fragment. A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
+| `storefront.site` | object | — | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it |
 
 ## When changes take effect
 

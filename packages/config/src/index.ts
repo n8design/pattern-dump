@@ -183,6 +183,12 @@ export interface StorefrontConfig {
    * `http://pd.localhost:<port>`, the workbench of the same process.
    */
   workbenchUrl?: string;
+  /**
+   * Values every page of the site shares, such as its title or the line in its footer. Every layout gets
+   * them as `site`; a page cannot set them. Which keys there are, and their types, is what the `site`
+   * property of `partials/base`'s schema declares: they are checked against it, not inferred.
+   */
+  site?: Record<string, unknown>;
 }
 
 export function defineConfig(config: PatternDumpConfig): PatternDumpConfig {
