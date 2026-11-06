@@ -11,6 +11,8 @@ export default defineConfig({
   // The skin's tokens, fonts and document defaults: linked into every page and every preview.
   documentBase: ["site"],
   assets: { dir: "./src/assets" },
+  // The skin's helpers: a page's chapters, sections, index and next page, derived from its body and the nav.
+  helpers: "./src/helpers/skin.ts",
   storefront: {
     pagesDir: "./pages",
     outDir: "./.out/storefront",
