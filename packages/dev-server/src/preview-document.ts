@@ -8,34 +8,13 @@
 // `escapeAttr` is applied at every attribute bake site — that is the sole injection defence, since
 // the preview is deliberately same-origin so PD can read the rendered source back for verification.
 //
-// Pure composition over explicit arguments: no server state, no I/O except stat-ing script mtimes.
+// Pure composition over explicit arguments: no server state, no I/O. The stylesheet layers and the
+// per-component assets (closure, scripts and their versions, SVG symbols) come from document-layers.ts.
 
-import { stat } from "node:fs/promises";
-import { join } from "node:path";
 import type { LayoutMode, ThemeSwitch } from "@pattern-dump/contracts";
-import { componentCssUrl, PD_ROUTES, scriptUrl, themeCssUrl } from "@pattern-dump/contracts";
+import { scriptUrl } from "@pattern-dump/contracts";
+import { stylesheetLayers } from "./document-layers.js";
 import { escapeAttr } from "./http-utils.js";
-
-// Stat each script's .ts source to get its current mtime (milliseconds since epoch).
-// Called just before buildPreviewDocument so the version is fresh on every render.
-// Unknown ids are silently skipped (no .ts file → no ?v= stamp, browser cache used).
-export async function buildScriptVersions(
-  ids: string[],
-  dirs: string | string[]
-): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
-  await Promise.all(ids.map(async id => {
-    // First folder that has the script, in the same order the script route resolves it.
-    for (const dir of Array.isArray(dirs) ? dirs : [dirs]) {
-      try {
-        const { mtimeMs } = await stat(join(dir, `${id}.ts`));
-        map.set(id, mtimeMs);
-        return;
-      } catch { /* not in this folder */ }
-    }
-  }));
-  return map;
-}
 
 /**
  * How wide a `centered` preview's content needs the viewport to be, measured without touching the
@@ -129,38 +108,10 @@ export function buildPreviewDocument(
 
   const baseTag = baseHref ? `<base href="${escapeAttr(baseHref)}">` : "";
 
-  // Layer 0: document-base — the shared, origin-unattributed layer (resets, :root, @font-face,
-  // family-level classes with no single owning component). Linked FIRST so the component closure
-  // (Layer 3) overrides it. Opt-in via config.documentBase (M5-CSS-EXTERNAL §2.2: closure + base +
-  // active theme). The shell injects nothing — this link is part of the server-built document.
-  const baseHrefV = baseCssVersion > 0 ? `${PD_ROUTES.baseCss}?v=${baseCssVersion}` : PD_ROUTES.baseCss;
-  const baseLink = linkBase ? `<link rel="stylesheet" href="${escapeAttr(baseHrefV)}">` : "";
-
-  // Layer 1a: project asset CSS (htwoo.min.css, htwoo-themes.css, etc.) — linked before component CSS.
-  // A full URL (a web-font stylesheet, a CDN) is linked as it is, the same rule as globalScripts;
-  // anything else is a path in the assets folder.
-  const assetCssLinks = (assetsCss ?? [])
-    .map(p => `<link rel="stylesheet" href="${escapeAttr(p.includes("://") ? p : `/assets/${p}`)}">`)
-    .join("\n");
-
-  // Layer 2: theme sets.
-  //  - 'attribute' (default): link ALL themes; the CSS uses [data-theme=] selectors, toggled on body.
-  //  - 'stylesheet': link ONLY the active theme, anchored by data-pd-theme; the client swaps its href
-  //    on change. Correct for bare-`:root` theme sets (hTWOo) that would collide if all were linked.
-  const themeLinks = themeSwitch === "stylesheet"
-    ? (defaultTheme
-        ? `<link rel="stylesheet" href="${escapeAttr(themeCssUrl(defaultTheme))}" data-pd-theme="${escapeAttr(defaultTheme)}">`
-        : "")
-    : themeNames
-        .map(n => `<link rel="stylesheet" href="${escapeAttr(themeCssUrl(n))}">`)
-        .join("\n");
-
-  // Layer 3: per-component own-origin CSS, in dependency order (deps before dependents).
-  // data-pd-comp attribute is the HMR anchor — css-link-swap targets by this value.
-  // Component ids use "/" as separators — do not encodeURIComponent (that would encode "/" to %2F).
-  const closureLinks = closureIds
-    .map(id => `<link rel="stylesheet" href="${escapeAttr(componentCssUrl(id))}" data-pd-comp="${escapeAttr(id)}">`)
-    .join("\n");
+  // Layers 0–3, shared with every document PD assembles (document-layers.ts).
+  const layers = stylesheetLayers({
+    closureIds, themeNames, defaultTheme, assetsCss, linkBase, themeSwitch, baseCssVersion,
+  });
 
   // SVG symbol sets inlined hidden at top of body.
   const symbolSets = (svgContents ?? []).join("\n");
@@ -180,10 +131,10 @@ export function buildPreviewDocument(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-${baseTag}${baseLink}
-${assetCssLinks}
-${themeLinks}
-${closureLinks}
+${baseTag}${layers.base}
+${layers.assets}
+${layers.themes}
+${layers.closure}
 </head>
 <body${bodyAttr}>
 ${symbolSets}

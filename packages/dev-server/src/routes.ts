@@ -35,10 +35,10 @@ import { buildCompositionRegistry } from "./composition.js";
 import { buildComponentTree } from "./component-tree.js";
 import { buildComponentDetail } from "./detail.js";
 import { buildFolderOverview } from "./overview.js";
-import { buildPreviewDocument, buildScriptVersions, normalizeAssetRefs } from "./preview-document.js";
+import { buildPreviewDocument, normalizeAssetRefs } from "./preview-document.js";
+import { resolveDocumentAssets } from "./document-layers.js";
 import { resolveLayoutMode } from "./layout-mode.js";
-import { computeCssClosure, linkableClosure, withRenderedClassOwners } from "./css-closure.js";
-import { aggregateRequires, loadSvgAssets, normalizeScriptId } from "./requires.js";
+import { aggregateRequires, normalizeScriptId } from "./requires.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
@@ -79,8 +79,8 @@ export async function handleRequest(
   const {
     patternRoots, patternDirs, styleRoots,
     themesDir, defaultTheme,
-    assetRoots, assetRootNames, assetsDir, assetsCss,
-    scriptsDirs, withGlobalScripts,
+    assetRoots, assetRootNames, assetsCss,
+    scriptsDirs,
     overviewsEnabled, documentBaseEnabled, themeSwitch, config, cwd, wsPort,
   } = cfg;
 
@@ -275,19 +275,13 @@ export async function handleRequest(
         const { previewHtml, diagnostics } = await checkComponent(componentId, variant, render, quarantineEntry);
 
         const themeNames = themesDir ? [...state.themeCss.keys()] : [];
-        const svgContents = detail.requireAssets && assetsDir
-          ? await loadSvgAssets(detail.requireAssets, assetsDir)
-          : [];
-        const closureIds = withRenderedClassOwners(await computeCssClosure(
-          componentId, compReg, patternDirs, state.classOwnerIndex ?? new Map(), state.discoveryResult!.discoveryMap
-        ), previewHtml, state.classOwnerIndex ?? new Map());
-        const previewScripts = withGlobalScripts(detail.requireScripts);
-        const scriptVersions = scriptsDirs.length && previewScripts.length
-          ? await buildScriptVersions(previewScripts, scriptsDirs)
-          : undefined;
+        const assets = await resolveDocumentAssets(cfg, state, {
+          componentId, html: previewHtml, requireScripts: detail.requireScripts, requireAssets: detail.requireAssets,
+          compositionRegistry: compReg, discoveryMap: state.discoveryResult.discoveryMap,
+        });
         const previewDoc = buildPreviewDocument(
-          normalizeAssetRefs(previewHtml, assetRootNames), linkableClosure(closureIds, state.perComponentCss), detail.layout, themeNames, defaultTheme,
-          previewScripts, svgContents, assetsCss, componentId, undefined, scriptVersions,
+          normalizeAssetRefs(previewHtml, assetRootNames), assets.closureIds, detail.layout, themeNames, defaultTheme,
+          assets.scripts, assets.svgContents, assetsCss, componentId, undefined, assets.scriptVersions,
           documentBaseEnabled, themeSwitch, state.baseCssVersion
         );
         json(res, 200, { ...detail, document: previewDoc, diagnostics } satisfies ComponentDetailResponse);
@@ -366,19 +360,13 @@ export async function handleRequest(
           state.compositionRegistry = await buildCompositionRegistry(patternDirs, previewHandleMap, previewDiscoveryMap);
         }
         const requires    = await aggregateRequires(componentId, patternDirs, previewHandleMap, previewDiscoveryMap);
-        const svgContents = assetsDir
-          ? await loadSvgAssets(requires.assets, assetsDir)
-          : [];
-        const closureIds = withRenderedClassOwners(await computeCssClosure(
-          componentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), previewDiscoveryMap
-        ), html, state.classOwnerIndex ?? new Map());
-        const previewScripts = withGlobalScripts(requires.scripts);
-        const scriptVersions = scriptsDirs.length && previewScripts.length
-          ? await buildScriptVersions(previewScripts, scriptsDirs)
-          : undefined;
+        const assets = await resolveDocumentAssets(cfg, state, {
+          componentId, html, requireScripts: requires.scripts, requireAssets: requires.assets,
+          compositionRegistry: state.compositionRegistry, discoveryMap: previewDiscoveryMap,
+        });
         const doc = buildPreviewDocument(
-          normalizeAssetRefs(html, assetRootNames), linkableClosure(closureIds, state.perComponentCss), layout, themeNames, effectiveTheme,
-          previewScripts, svgContents, assetsCss, componentId, undefined, scriptVersions,
+          normalizeAssetRefs(html, assetRootNames), assets.closureIds, layout, themeNames, effectiveTheme,
+          assets.scripts, assets.svgContents, assetsCss, componentId, undefined, assets.scriptVersions,
           documentBaseEnabled, themeSwitch, state.baseCssVersion
         );
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
