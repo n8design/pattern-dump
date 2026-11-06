@@ -120,27 +120,54 @@ describe("configProblems — storefront", () => {
     expect(storefront({ ...base, workbenchUrl: "https://htwoo.io/workbench" })).toEqual([]);
   });
 
-  it("rejects pagesDir when it is the patterns folder, however it is spelled", () => {
+  // storefront.pagesDir, patternsDir ("./src/patterns" in the fixture) and storefront.outDir must be
+  // pairwise disjoint: for each pair, the same folder or either one inside the other is a problem.
+  const same = (a: string, va: string, b: string, vb: string) =>
+    `"${a}" ("${va}") and "${b}" ("${vb}") are the same folder — each needs a folder of its own`;
+  const nested = (a: string, va: string, b: string, vb: string) =>
+    `"${a}" ("${va}") is inside "${b}" ("${vb}") — each needs a folder of its own, outside the other`;
+  const P = "storefront.pagesDir", T = "patternsDir", O = "storefront.outDir", PATTERNS = "./src/patterns";
+
+  const cases: Array<[label: string, pagesDir: string, outDir: string, problem: string]> = [
+    // pagesDir and patternsDir
+    ["pages = patterns",        "./src/patterns",       "./www",              same(P, "./src/patterns", T, PATTERNS)],
+    ["pages inside patterns",   "./src/patterns/pages", "./www",              nested(P, "./src/patterns/pages", T, PATTERNS)],
+    ["patterns inside pages",   "./src",                "./www",              nested(T, PATTERNS, P, "./src")],
+    // pagesDir and outDir
+    ["pages = out",             "./pages",              "./pages",            same(P, "./pages", O, "./pages")],
+    ["out inside pages",        "./pages",              "./pages/out",        nested(O, "./pages/out", P, "./pages")],
+    ["pages inside out",        "./www/pages",          "./www",              nested(P, "./www/pages", O, "./www")],
+    // patternsDir and outDir
+    ["out = patterns",          "./pages",              "./src/patterns",     same(T, PATTERNS, O, "./src/patterns")],
+    ["out inside patterns",     "./pages",              "./src/patterns/www", nested(O, "./src/patterns/www", T, PATTERNS)],
+    ["patterns inside out",     "./pages",              "./src",              nested(T, PATTERNS, O, "./src")],
+  ];
+  for (const [label, pagesDir, outDir, problem] of cases) {
+    it(`rejects ${label}, with the exact problem`, () => {
+      expect(storefront({ pagesDir, outDir })).toEqual([problem]);
+    });
+  }
+
+  it("compares folders as resolved paths, however they are spelled", () => {
     for (const pagesDir of ["./src/patterns", "src/patterns", "src/patterns/", "./src/./patterns"]) {
-      expect(storefront({ pagesDir, outDir: "./www" }), pagesDir).toEqual([
-        `"storefront.pagesDir" ("${pagesDir}") is the patterns folder — pages need a folder of their own, outside "patternsDir" ("./src/patterns")`,
-      ]);
+      expect(storefront({ pagesDir, outDir: "./www" }), pagesDir).toEqual([same(P, pagesDir, T, PATTERNS)]);
     }
   });
 
-  it("rejects pagesDir inside the patterns folder", () => {
-    expect(storefront({ pagesDir: "./src/patterns/pages", outDir: "./www" })).toEqual([
-      `"storefront.pagesDir" ("./src/patterns/pages") is inside "patternsDir" ("./src/patterns") — pages need a folder of their own, outside it`,
-    ]);
-    expect(storefront({ pagesDir: "src/patterns/site/pages", outDir: "./www" })).toEqual([
-      `"storefront.pagesDir" ("src/patterns/site/pages") is inside "patternsDir" ("./src/patterns") — pages need a folder of their own, outside it`,
+  it("reports every overlapping pair", () => {
+    expect(storefront({ pagesDir: "./src/patterns", outDir: "src/patterns/" })).toEqual([
+      same(P, "./src/patterns", T, PATTERNS),
+      same(P, "./src/patterns", O, "src/patterns/"),
+      same(T, PATTERNS, O, "src/patterns/"),
     ]);
   });
 
-  it("accepts pagesDir outside the patterns folder, including a sibling that shares its name's start", () => {
-    for (const pagesDir of ["./pages", "./src/pages", "./src/patterns-site", "../site/pages"]) {
-      expect(storefront({ pagesDir, outDir: "./www" }), pagesDir).toEqual([]);
-    }
+  it("accepts disjoint folders, including siblings whose names share a start", () => {
+    const ok: Array<[pagesDir: string, outDir: string]> = [
+      ["./pages", "./www"], ["./src/pages", "./src/www"], ["./src/patterns-site", "./src/patterns-www"],
+      ["./pages-src", "./pages-out"], ["../site/pages", "../site/www"],
+    ];
+    for (const [pagesDir, outDir] of ok) expect(storefront({ pagesDir, outDir }), `${pagesDir} | ${outDir}`).toEqual([]);
   });
 
   it("takes a bare host name for the storefront host, and nothing else", () => {

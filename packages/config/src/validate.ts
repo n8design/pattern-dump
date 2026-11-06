@@ -180,18 +180,32 @@ export class ConfigError extends Error {
 /** Checks across keys, run once every key has the right type. */
 function checkRelations(raw: Record<string, unknown>, problems: string[]): void {
   const sf = raw.storefront;
-  if (!isObject(sf) || typeof sf.pagesDir !== "string" || typeof raw.patternsDir !== "string") return;
-  // Both are relative to the project root, so compare them resolved against the same (any) root.
-  // Pages are markdown files that are not components: under patternsDir, a page would also be read as
-  // component docs, and the watcher could not tell which one an edit belongs to.
+  if (!isObject(sf)) return;
+  // Three folders that must not share files, so they are pairwise disjoint: not the same folder, and
+  // neither inside the other. Pages are markdown that is not component docs (under patternsDir the
+  // watcher could not tell which an edit belongs to, and the reverse puts component docs among the
+  // pages); the storefront output is emptied and written by `pd build`, so it must hold neither.
+  const folders: Array<[name: string, value: unknown]> = [
+    ["storefront.pagesDir", sf.pagesDir],
+    ["patternsDir", raw.patternsDir],
+    ["storefront.outDir", sf.outDir],
+  ];
+  // All are relative to the project root, so they are compared resolved against the same (any) root.
   const root = resolve(sep, "pd-root");
-  const pages = resolve(root, sf.pagesDir);
-  const patterns = resolve(root, raw.patternsDir);
-  const rel = relative(patterns, pages);
-  if (rel === "") {
-    problems.push(`"storefront.pagesDir" ("${sf.pagesDir}") is the patterns folder — pages need a folder of their own, outside "patternsDir" ("${raw.patternsDir}")`);
-  } else if (!rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-zA-Z]:/.test(rel)) {
-    problems.push(`"storefront.pagesDir" ("${sf.pagesDir}") is inside "patternsDir" ("${raw.patternsDir}") — pages need a folder of their own, outside it`);
+  const inside = (child: string, parent: string): boolean => {
+    const rel = relative(parent, child);
+    return rel !== "" && !rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-zA-Z]:/.test(rel);
+  };
+  for (let i = 0; i < folders.length; i++) {
+    for (let j = i + 1; j < folders.length; j++) {
+      const [a, va] = folders[i], [b, vb] = folders[j];
+      if (typeof va !== "string" || typeof vb !== "string") continue;
+      const pa = resolve(root, va), pb = resolve(root, vb);
+      const label = (name: string, value: string) => `"${name}" ("${value}")`;
+      if (pa === pb) problems.push(`${label(a, va)} and ${label(b, vb)} are the same folder — each needs a folder of its own`);
+      else if (inside(pa, pb)) problems.push(`${label(a, va)} is inside ${label(b, vb)} — each needs a folder of its own, outside the other`);
+      else if (inside(pb, pa)) problems.push(`${label(b, vb)} is inside ${label(a, va)} — each needs a folder of its own, outside the other`);
+    }
   }
 }
 

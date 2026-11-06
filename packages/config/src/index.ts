@@ -167,9 +167,11 @@ export interface PatternDumpConfig {
  */
 export interface StorefrontConfig {
   /** Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/`.
-   *  A folder of its own: not `patternsDir`, and not inside it. */
+   *  `pagesDir`, `patternsDir` and `outDir` are three separate folders: none is another, and none is inside
+   *  another. */
   pagesDir: string;
-  /** Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench snapshot. */
+  /** Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench
+   *  snapshot, and separate from `pagesDir` and `patternsDir` (see `pagesDir`). */
   outDir: string;
   /** The host name `pd dev` serves the storefront on. Default: `live.localhost`. */
   host?: string;

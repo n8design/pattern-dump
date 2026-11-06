@@ -149,11 +149,12 @@ Defaults for `pd build`; the command line overrides each. See [static-build.md](
 A website of real HTML pages, written from markdown, beside the workbench. `pd dev` serves it on its own
 host and the workbench on `pd.localhost`, both from `/`; `pd build` writes it to its own folder. A page
 renders with the layout `layouts/<name>` from your patterns (`layout:` in its frontmatter, `page` when
-it has none).
+it has none). `storefront.pagesDir`, `patternsDir` and `storefront.outDir` must be three separate folders:
+none of them is another, and none is inside another.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `storefront.pagesDir` | string | required | Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/`. A folder of its own: not `patternsDir`, and not inside it |
+| `storefront.pagesDir` | string | required | Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/` |
 | `storefront.outDir` | string | required | Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench snapshot |
 | `storefront.host` | string | `live.localhost` | The host name `pd dev` serves the storefront on. A bare name, with no scheme, port or path |
 | `storefront.workbenchUrl` | string | — | Where the built workbench will be hosted, such as `https://workbench.example.com/` or `https://htwoo.io/workbench/`: an absolute http(s) URL with no query or fragment. A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
