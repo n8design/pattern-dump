@@ -33,6 +33,10 @@ describe("renderDoc frame mode — pattern fences", () => {
     expect(html).toBe(
       `<figure class="doc-example">\n`
       + `<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>\n`
+      + `<ul class="doc-example-variants" aria-label="Variants of components/callout">\n`
+      + `<li><a href="/preview/components/callout" aria-current="true">default</a></li>\n`
+      + `<li><a href="/preview/components/callout~warning">warning</a></li>\n`
+      + `</ul>\n`
       + `<figcaption><a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a></figcaption>\n`
       + `</figure>\n`,
     );
@@ -65,6 +69,31 @@ describe("renderDoc frame mode — pattern fences", () => {
     const html = await renderDoc("```pattern " + evil + "\n```\n", renderComponent, evilMap, frame());
     expect(html).not.toContain("<script>");
     expect(html).toContain(`src="/preview/x/a&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"`);
+  });
+});
+
+describe("renderDoc frame mode — a component's variants", () => {
+  it("lists every variant from discovery, the base first, each a link to its own preview, the shown one current", async () => {
+    const html = await renderDoc("```pattern components/callout~warning\n```\n", renderComponent, map, frame());
+    expect(html).toContain(
+      `<ul class="doc-example-variants" aria-label="Variants of components/callout">\n`
+      + `<li><a href="/preview/components/callout">default</a></li>\n`
+      + `<li><a href="/preview/components/callout~warning" aria-current="true">warning</a></li>\n`
+      + `</ul>\n`);
+  });
+
+  it("lists nothing for a component without variants", async () => {
+    const noVariants: DiscoveryMap = new Map([...map].filter(([id]) => !id.includes("~")));
+    const html = await renderDoc("```pattern components/callout\n```\n", renderComponent, noVariants, frame());
+    expect(html).toBe(
+      `<figure class="doc-example">\n`
+      + `<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>\n`
+      + `<figcaption><a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a></figcaption>\n`
+      + `</figure>\n`);
+  });
+
+  it("leaves the workbench's own docs unchanged: inline mode has no variant list", async () => {
+    expect(await renderDoc("```pattern components/callout\n```\n", renderComponent, map)).not.toContain("doc-example-variants");
   });
 });
 

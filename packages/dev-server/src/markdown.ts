@@ -64,6 +64,24 @@ function _mdPlainPre(code: string): string {
 }
 
 
+/**
+ * A frame-mode example's variants, when its component has any: one link per variant, the base first
+ * (`default`), each to that variant's own preview, with `aria-current` on the one the fence shows. With
+ * scripting off a link opens that preview; a page's script may swap the frame's src in place instead.
+ * Read from discovery, so it lists what exists; nothing when the component has no variants.
+ */
+function _frameVariants(compId: string, shown: string | undefined, discoveryMap: DiscoveryMap): string {
+  const prefix = `${compId}~`;
+  const variants = [...discoveryMap.keys()].filter(id => id.startsWith(prefix)).map(id => id.slice(prefix.length)).sort();
+  if (variants.length === 0) return "";
+  const items = [undefined, ...variants].map(v => {
+    const id = v ? `${prefix}${v}` : compId;
+    const current = v === shown ? ` aria-current="true"` : "";
+    return `<li><a href="${escapeAttr(`/preview/${id}`)}"${current}>${escapeHtml(v ?? "default")}</a></li>\n`;
+  });
+  return `<ul class="doc-example-variants" aria-label="${escapeAttr(`Variants of ${compId}`)}">\n${items.join("")}</ul>\n`;
+}
+
 /** Shared parser for pattern specs used by both fence blocks and cross-links. */
 function _parsePatternSpec(spec: string): { compId: string; variant?: string } {
   const tildeIdx = spec.indexOf("~");
@@ -170,6 +188,7 @@ async function _resolveFence(
       const workbench = embed.workbenchUrl + compId + (variant ? `#${variant}` : "");
       out.set(idx, `<figure class="doc-example">\n`
         + `<iframe src="${escapeAttr(`/preview/${fullId}`)}" title="${escapeAttr(fullId)}" loading="lazy"></iframe>\n`
+        + _frameVariants(compId, variant, discoveryMap)
         + `<figcaption><a href="${escapeAttr(workbench)}">Open ${escapeHtml(fullId)} in the workbench</a></figcaption>\n`
         + `</figure>\n`);
       return;

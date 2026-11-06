@@ -17,6 +17,16 @@ test.describe("storefront pages with JavaScript off", () => {
     await expect(page.locator("figure.doc-example figcaption a")).toHaveAttribute("href", `${base}components/callout`);
   });
 
+  test("a live example lists its component's variants, each a link that opens that variant's preview", async ({ page }) => {
+    await page.goto("/");
+    const variants = page.locator("figure.doc-example .doc-example-variants a");
+    expect(await variants.evaluateAll(as => as.map(a => [a.textContent, a.getAttribute("href"), a.getAttribute("aria-current")])))
+      .toEqual([["default", "/preview/components/callout", "true"], ["warning", "/preview/components/callout~warning", null]]);
+    await variants.filter({ hasText: "warning" }).click();
+    await expect(page).toHaveURL(/\/preview\/components\/callout~warning(\/|\.html)?$/);
+    await expect(page.locator("body")).toContainText("Careful");
+  });
+
   test("an article reads, nav and all", async ({ page }) => {
     await page.goto("/guides/setup/");
     await expect(page.locator(".article-lede")).toHaveText("Three folders make a site — the pages, the layouts that dress them, and the components they show.");
