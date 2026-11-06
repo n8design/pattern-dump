@@ -225,6 +225,18 @@ test.describe("motion and print", () => {
     });
   }
 
+  test("prints its colour fields as ink on paper, since printers drop background colours", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark", media: "print" });
+    for (const [route, selector] of [["/", ".home-cover"], ["/about/", ".page-header"], ["/guides/setup/", ".article-header"], ["/", ".site-footer"]] as const) {
+      await page.goto(route);
+      const printed = await page.locator(selector).evaluate(el => {
+        const cs = getComputedStyle(el);
+        return { background: cs.backgroundColor, color: cs.color, body: getComputedStyle(document.body).color };
+      });
+      expect(printed, `${route} ${selector}`).toEqual({ background: "rgba(0, 0, 0, 0)", color: printed.body, body: printed.body });
+    }
+  });
+
   test("prints in the light scheme, without the site navigation or cards, with other sites' addresses written out", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark", media: "print" });
     await page.goto("/");
