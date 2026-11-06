@@ -2,11 +2,31 @@
   "title": "Storefront bench",
   "description": "A small website rendered from markdown, with the bench's own skin.",
   "body": "<p>This is the body of a page: its markdown, rendered. It can hold <a href=\"/about/\">links</a>, lists and live examples.</p><ul><li>One file per page</li><li>The folder is the navigation</li></ul>",
-  "site": { "title": "Storefront bench", "tagline": "A website written in markdown", "href": "/" },
+  "site": {
+    "title": "Storefront bench",
+    "tagline": "A website written in markdown",
+    "href": "/",
+    "footer": "Built with Pattern Dump from the storefront bench."
+  },
   "nav": [
-    { "route": "/", "title": "Home", "current": true },
-    { "route": "/guides/", "title": "Guides", "children": [{ "route": "/guides/setup/", "title": "Setup" }] },
-    { "route": "/about/", "title": "About" }
-  ],
-  "footer": { "text": "Built with Pattern Dump from the storefront bench." }
+    {
+      "route": "/",
+      "title": "Home",
+      "current": true
+    },
+    {
+      "route": "/guides/",
+      "title": "Guides",
+      "children": [
+        {
+          "route": "/guides/setup/",
+          "title": "Setup"
+        }
+      ]
+    },
+    {
+      "route": "/about/",
+      "title": "About"
+    }
+  ]
 }

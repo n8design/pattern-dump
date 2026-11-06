@@ -4,8 +4,9 @@
 // (where in the nav). Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
 // declares. Nothing is inferred: a key the schema does not declare is an error, and a layout with no
-// schema declares nothing. Two more keys are filled by the storefront itself (`body`, the rendered
-// markdown, and `nav`); a page cannot set them, and a layout requiring them is satisfied.
+// schema declares nothing. Three more keys are filled by the storefront itself (`body`, the rendered
+// markdown; `nav`; and `site`, from storefront.site); a page cannot set them, and a layout requiring them
+// is satisfied.
 //
 // Every problem is returned, each with the line it is on when it has one, and every problem is fatal to
 // the caller (D7). The frontmatter's own grammar errors (readFrontmatterStrict) come first.
@@ -19,7 +20,7 @@ import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
 export const RESERVED_KEYS = ["layout", "order"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
-export const ASSEMBLY_KEYS = ["body", "nav"] as const;
+export const ASSEMBLY_KEYS = ["body", "nav", "site"] as const;
 
 export interface PageProblem {
   /** The page file, relative to the pages folder. */

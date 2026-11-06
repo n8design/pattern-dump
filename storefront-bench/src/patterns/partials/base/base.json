@@ -1,9 +1,29 @@
 {
-  "site": { "title": "Storefront bench", "tagline": "A website written in markdown", "href": "/" },
+  "site": {
+    "title": "Storefront bench",
+    "tagline": "A website written in markdown",
+    "href": "/",
+    "footer": "Built with Pattern Dump from the storefront bench."
+  },
   "nav": [
-    { "route": "/", "title": "Home", "current": true },
-    { "route": "/guides/", "title": "Guides", "children": [{ "route": "/guides/setup/", "title": "Setup" }] },
-    { "route": "/about/", "title": "About" }
-  ],
-  "footer": { "text": "Built with Pattern Dump from the storefront bench." }
+    {
+      "route": "/",
+      "title": "Home",
+      "current": true
+    },
+    {
+      "route": "/guides/",
+      "title": "Guides",
+      "children": [
+        {
+          "route": "/guides/setup/",
+          "title": "Setup"
+        }
+      ]
+    },
+    {
+      "route": "/about/",
+      "title": "About"
+    }
+  ]
 }

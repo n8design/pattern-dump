@@ -129,9 +129,10 @@ describe("checkPageFrontmatter — keys", () => {
   });
 
   it("refuses the keys the storefront fills, and does not count them as missing", async () => {
-    expect((await check("---\ntitle: T\nbody: Mine\nnav: [a]\n---\n")).problems).toEqual([
+    expect((await check("---\ntitle: T\nbody: Mine\nnav: [a]\nsite: Mine\n---\n")).problems).toEqual([
       P(3, `"body" is filled by the storefront, not by a page`),
       P(4, `"nav" is filled by the storefront, not by a page`),
+      P(5, `"site" is filled by the storefront, not by a page`),
     ]);
     // layouts/typed requires body: the storefront fills it, so a page without it is fine.
     expect((await check("---\nlayout: typed\ntitle: T\n---\n")).problems).toEqual([]);

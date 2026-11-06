@@ -12,5 +12,11 @@ export default defineConfig({
     pagesDir: "./pages",
     outDir: "./.out/storefront",
     workbenchUrl: "https://workbench.example.test/",
+    site: {
+      title: "Storefront bench",
+      tagline: "A website written in markdown",
+      href: "/",
+      footer: "Built with Pattern Dump from the storefront bench.",
+    },
   },
 });
