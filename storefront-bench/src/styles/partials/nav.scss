@@ -1,5 +1,9 @@
 // The site navigation: one row between two rules, a section's pages after it.
+// Above what follows it: a poster title's glyphs reach above its own box, and must not cover (or take
+// the clicks of) the nav.
 .site-nav {
+  position: relative;
+  z-index: 1;
   border-block: 1px solid var(--sk-rule);
   font-family: var(--sk-font-display);
   font-size: var(--sk-step-n1);

@@ -11,11 +11,12 @@
   grid-column: wide;
   margin: 0;
   font-family: var(--sk-font-display);
-  font-size: var(--sk-step-5);
+  font-size: clamp(3rem, var(--sk-wide) / (var(--sk-chars) * var(--sk-letter)), 24rem);
   font-weight: 900;
-  line-height: 0.95;
-  letter-spacing: -0.03em;
+  line-height: var(--sk-title-leading);
+  letter-spacing: var(--sk-title-tracking);
   text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 .article-lede {

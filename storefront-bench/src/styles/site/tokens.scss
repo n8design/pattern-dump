@@ -33,6 +33,15 @@
   --sk-step-4: clamp(2.6rem, 1.5rem + 4.4vw, 5.2rem);
   --sk-step-5: clamp(3.2rem, 1.4rem + 7vw, 7.5rem);
 
+  // Poster titles: the home page's at up to 15vw, a page's sized to fill the wide column. A page title's
+  // layout sets --sk-chars (its length) on it; the size is the column's width over that many average
+  // Montserrat Black letters (0.66em each, the widest of the skin's titles rounded up).
+  --sk-step-poster: max(3rem, 15vw);
+  --sk-wide: min(var(--sk-page), 100vw - 2 * var(--sk-gutter));
+  --sk-letter: 0.66;
+  --sk-title-tracking: -0.04em;
+  --sk-title-leading: 0.85;
+
   --sk-space-1: 0.25rem;
   --sk-space-2: 0.5rem;
   --sk-space-3: 0.75rem;

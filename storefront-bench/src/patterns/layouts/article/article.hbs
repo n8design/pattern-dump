@@ -1,7 +1,7 @@
 {{#> partials-base }}
 <article class="article">
   <header class="article-header">
-    <h1 class="article-title">{{title}}</h1>
+    <h1 class="article-title" style="--sk-chars: {{title.length}}">{{title}}</h1>
     {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
   </header>
   <div class="article-body">{{{body}}}</div>

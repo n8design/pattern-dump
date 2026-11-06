@@ -58,6 +58,49 @@ test.describe("the skin", () => {
     })).toEqual(mono);
   });
 
+  for (const width of [1440, 390]) {
+    test(`sets titles at poster scale at ${width}px: the home title at 15vw, a page title filling its column`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      const title = () => page.locator("h1").evaluate(h => {
+        const range = document.createRange();
+        range.selectNodeContents(h);
+        const text = range.getBoundingClientRect(), cs = getComputedStyle(h), size = parseFloat(cs.fontSize);
+        return { size, fill: text.width / h.getBoundingClientRect().width, overflow: h.scrollWidth > h.clientWidth + 1,
+          lines: Math.round(text.height / parseFloat(cs.lineHeight)),
+          tracking: parseFloat(cs.letterSpacing) / size, leading: parseFloat(cs.lineHeight) / size };
+      });
+      await page.goto("/");
+      await page.evaluate(() => document.fonts.ready);
+      const home = await title();
+      expect(home.size).toBeCloseTo(width * 0.15, 0);
+      expect(home.overflow).toBe(false);
+      for (const route of ["/about/", "/guides/", "/guides/setup/"]) {
+        await page.goto(route);
+        await page.evaluate(() => document.fonts.ready);
+        const t = await title();
+        expect(t, route).toMatchObject({ overflow: false, lines: 1 });
+        expect(t.fill, route).toBeGreaterThan(0.85);
+        expect(t.tracking, route).toBeLessThanOrEqual(-0.03);
+        expect(t.leading, route).toBeLessThanOrEqual(0.9);
+      }
+    });
+  }
+
+  for (const width of [1440, 390]) {
+    test(`keeps every nav link clickable above a poster title at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      for (const route of ["/", "/about/", "/guides/", "/guides/setup/"]) {
+        await page.goto(route);
+        await page.evaluate(() => document.fonts.ready);
+        const covered = await page.locator(".site-nav a").evaluateAll(as => as.filter(a => a.checkVisibility()).flatMap(a => {
+          const r = a.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return hit === a || a.contains(hit) ? [] : [`${a.textContent} → ${hit?.tagName}.${hit?.className}`];
+        }));
+        expect(covered, route).toEqual([]);
+      }
+    });
+  }
+
   for (const [scheme, paper] of [["light", "oklch(0.985 0.006 85)"], ["dark", "oklch(0.18 0.015 260)"]] as const) {
     test(`follows the ${scheme} colour scheme, on the page and inside its live example`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme });

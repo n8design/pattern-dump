@@ -1,6 +1,6 @@
 {{#> partials-base }}
 <article class="page">
-  <h1 class="page-title">{{title}}</h1>
+  <h1 class="page-title" style="--sk-chars: {{title.length}}">{{title}}</h1>
   {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
   <div class="page-body">{{{body}}}</div>
   {{> partials-cards }}

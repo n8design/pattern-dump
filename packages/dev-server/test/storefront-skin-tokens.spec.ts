@@ -20,6 +20,15 @@ async function sources(): Promise<Map<string, string>> {
 }
 
 // A colour written out, or one mixed from others: both belong in the tokens file.
+const patterns = fileURLToPath(new URL("../../../storefront-bench/src/patterns/", import.meta.url));
+async function templates(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const entry of await readdir(patterns, { recursive: true, withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".hbs")) out.set(entry.name, await readFile(join(entry.parentPath, entry.name), "utf8"));
+  }
+  return out;
+}
+
 const COLOUR_LITERAL = /#[0-9a-f]{3,8}\b|\b(?:oklch|oklab|lch|lab|rgba?|hsla?|hwb|color|color-mix|light-dark)\(/gi;
 
 describe("the skin's colours", () => {
@@ -35,6 +44,10 @@ describe("the skin's colours", () => {
   it("use only tokens the tokens file defines", async () => {
     const all = await sources();
     const defined = new Set([...all.get(TOKENS)!.matchAll(/(--sk-[a-z0-9-]+)\s*:/g)].map(m => m[1]));
+    // A value a skin template sets on an element, in its style attribute (a title's length), is defined there.
+    for (const text of (await templates()).values()) {
+      for (const style of text.matchAll(/style="([^"]*)"/g)) for (const m of style[1].matchAll(/(--sk-[a-z0-9-]+)\s*:/g)) defined.add(m[1]);
+    }
     const undefinedUses: string[] = [];
     for (const [file, text] of all) {
       for (const m of text.matchAll(/var\(\s*(--sk-[a-z0-9-]+)/g)) if (!defined.has(m[1])) undefinedUses.push(`${file}: ${m[1]}`);
