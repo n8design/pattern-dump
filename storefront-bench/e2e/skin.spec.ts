@@ -65,7 +65,9 @@ test.describe("the skin", () => {
         const range = document.createRange();
         range.selectNodeContents(h);
         const text = range.getBoundingClientRect(), cs = getComputedStyle(h), size = parseFloat(cs.fontSize);
+        const next = h.nextElementSibling?.getBoundingClientRect();
         return { size, fill: text.width / h.getBoundingClientRect().width, overflow: h.scrollWidth > h.clientWidth + 1,
+          clearsNext: !next || text.bottom <= next.top + 1,
           lines: Math.round(text.height / parseFloat(cs.lineHeight)),
           tracking: parseFloat(cs.letterSpacing) / size, leading: parseFloat(cs.lineHeight) / size };
       });
@@ -78,7 +80,8 @@ test.describe("the skin", () => {
         await page.goto(route);
         await page.evaluate(() => document.fonts.ready);
         const t = await title();
-        expect(t, route).toMatchObject({ overflow: false, lines: 1 });
+        // Solid leading, but the descenders still clear what follows the title.
+        expect(t, route).toMatchObject({ overflow: false, lines: 1, clearsNext: true });
         expect(t.fill, route).toBeGreaterThan(0.85);
         expect(t.tracking, route).toBeLessThanOrEqual(-0.03);
         expect(t.leading, route).toBeLessThanOrEqual(0.9);
