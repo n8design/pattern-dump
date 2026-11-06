@@ -605,6 +605,8 @@ export const PD_ROUTES = {
   version: "/api/version",
   /** GET → ShellClientConfig */
   config: "/api/config",
+  /** GET → StorefrontPagesResponse, on the storefront host. What `pd build` crawls for storefront pages. */
+  pages: "/api/pages",
   /** The shell bundle, stylesheet and vendored assets. */
   mainJs: "/_pd/main.js",
   mainCss: "/_pd/main.css",
@@ -614,6 +616,16 @@ export const PD_ROUTES = {
   shikiCss: "/_pd/shiki.css",
   /** Document-base layer (reset + font-face). */
   baseCss: "/_pd/base.css",
+} as const;
+
+/**
+ * The two front ends of one `pd dev` process, told apart by the request's Host header. Both serve
+ * from `/`. Any other host — plain `localhost`, `127.0.0.1` — gets the workbench, as before.
+ * `storefront.host` in the config replaces the storefront default.
+ */
+export const PD_HOSTS = {
+  storefront: "live.localhost",
+  workbench: "pd.localhost",
 } as const;
 
 /** Prefixes of the parameterised routes. routes.ts matches with these; the builders emit them. */
@@ -665,6 +677,29 @@ export interface ShellClientConfig {
   themeSwitch: ThemeSwitch;
   /** The configured default theme — what an un-themed preview actually shows. "" when none. */
   defaultTheme: string;
+}
+
+/** One storefront page: a markdown file in `storefront.pagesDir`, at the route its path defines. */
+export interface StorefrontPage {
+  /** Root-relative and slash-wrapped: "/" for pages/index.md, "/guides/setup/" for pages/guides/setup.md. */
+  route: string;
+  /** The page's `title`, or its route when it has none. */
+  title: string;
+  /** The layout it renders with: the component `layouts/<layout>`. */
+  layout: string;
+}
+
+/** A nav entry. Top-level pages and folders; a folder's pages are its children (one level only). */
+export interface StorefrontNavItem {
+  route: string;
+  title: string;
+  children?: StorefrontNavItem[];
+}
+
+/** GET /api/pages — every storefront page and the nav, in nav order. */
+export interface StorefrontPagesResponse {
+  pages: StorefrontPage[];
+  nav: StorefrontNavItem[];
 }
 
 /** The body of every JSON error response. */

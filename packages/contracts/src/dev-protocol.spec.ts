@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import {
   previewUrl, renderedSourceUrl, dataSourceUrl, overviewUrl,
-  componentUrl, componentCssUrl, themeCssUrl, scriptUrl, PD_ROUTES, PD_ROUTE_PREFIX,
+  componentUrl, componentCssUrl, themeCssUrl, scriptUrl, PD_ROUTES, PD_ROUTE_PREFIX, PD_HOSTS,
   staticPathFor, normalizeBasePath,
   buildAuditRollup, AUDIT_SCOPE, PD_PROTOCOL_VERSION,
   type DiagnosticsGraph, type HmrMessage,
@@ -119,6 +119,11 @@ describe("route table — builders round-trip through the server's parse", () =>
     const all = [...Object.values(PD_ROUTES), ...Object.values(PD_ROUTE_PREFIX)];
     for (const r of all) expect(r.startsWith("/")).toBe(true);
     expect(new Set(all).size).toBe(all.length);
+  });
+
+  it("names two distinct front-end hosts, both bare host names", () => {
+    expect(PD_HOSTS.storefront).not.toBe(PD_HOSTS.workbench);
+    for (const h of Object.values(PD_HOSTS)) expect(h).toMatch(/^[a-z0-9.-]+$/);
   });
 });
 
@@ -327,9 +332,18 @@ describe("HmrMessage wire shapes", () => {
 
 describe("staticPathFor — every builder's URL maps to one file", () => {
   it("maps the fixed API routes to .json files", () => {
-    for (const r of ["tree", "themes", "config", "version", "audit"] as const) {
+    for (const r of ["tree", "themes", "config", "version", "audit", "pages"] as const) {
       expect(staticPathFor(PD_ROUTES[r])).toBe(`api/${r}.json`);
     }
+  });
+
+  // The storefront writes through the same mapping, unchanged: a page route is a folder index, and an
+  // embedded preview is addressed by its variant id, so the query a static host cannot serve never
+  // appears in a storefront page.
+  it("maps storefront page routes and variant-id previews without a change to the mapping", () => {
+    expect(staticPathFor("/guides/setup/")).toBe("guides/setup/index.html");
+    expect(staticPathFor("/about/")).toBe("about/index.html");
+    expect(staticPathFor("/preview/atoms/button~secondary")).toBe("preview/atoms/button~secondary/index.html");
   });
 
   it("maps component detail by id and variant, keeping / and ~ in the id", () => {
@@ -368,6 +382,7 @@ describe("staticPathFor — every builder's URL maps to one file", () => {
       componentUrl("atoms/button"), componentUrl("atoms/button", "a"), previewUrl("atoms/button"),
       previewUrl("atoms/button", "a"), renderedSourceUrl("atoms/button"), renderedSourceUrl("atoms/button", "a"),
       dataSourceUrl("atoms/button"), overviewUrl("atoms"), "/atoms/button", PD_ROUTES.tree,
+      PD_ROUTES.pages, "/preview/atoms/button~a",
     ];
     const files = urls.map(staticPathFor);
     expect(new Set(files).size).toBe(files.length);
