@@ -17,11 +17,13 @@
 // What cannot be a sound site is reported in `problems`, not guessed around, and every problem is fatal
 // to the caller (D7): a folder of pages with no `index.md` (its nav entry would have no page to link to);
 // two files that claim the same route; a file or folder whose name is not lowercase letters, digits and
-// hyphens (the name is the URL); and a file that is not a page. Dotfiles and dot-folders are ignored.
+// hyphens (the name is the URL); a file that is not a page; a pages folder that does not exist; and a
+// folder with no `index.md` at its top, so no home page (an empty folder included). Dotfiles and
+// dot-folders are ignored.
 // Images and other files for pages belong in the project's assets, not here. Pages are read with the strict
 // frontmatter reader; its errors are left to the caller, which validates every page.
 
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import type { StorefrontNavItem, StorefrontPage, StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
@@ -84,6 +86,9 @@ const scalar = (v: string | string[] | undefined): string | undefined => typeof 
 export async function readPages(pagesDir: string): Promise<PageModel> {
   const problems: string[] = [];
   const files = new Map<string, PageFile>();
+  if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
+    return { pages: [], nav: [], files, problems: [`the pages folder ${pagesDir} does not exist`] };
+  }
   for (const path of (await markdownFiles(pagesDir, pagesDir, problems)).sort()) {
     const route = routeFor(path);
     const other = files.get(route);
@@ -112,6 +117,7 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
     const parts = f.path.split("/").slice(0, -1);
     for (let i = 1; i <= parts.length; i++) folders.add(`/${parts.slice(0, i).join("/")}/`);
   }
+  if (!files.has("/")) problems.push("there is no home page: the pages folder needs an index.md at its top, the page at /");
   for (const folder of [...folders].sort()) {
     if (!files.has(folder)) problems.push(`the folder ${folder.slice(1)} holds pages but has no index.md — it needs one, as the folder's own page`);
   }

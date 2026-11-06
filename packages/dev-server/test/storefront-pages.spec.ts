@@ -1,11 +1,13 @@
 // The storefront's page model: routes from file paths, the nav from folders and `order` (the component
 // tree's rules, inherited), and every problem that keeps a pages folder from being a sound site.
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { readPages, routeFor } from "../src/storefront/pages.js";
+import { checkPageFrontmatter } from "../src/storefront/frontmatter-contract.js";
 
 const roots: string[] = [];
 afterAll(async () => { await Promise.all(roots.map(r => rm(r, { recursive: true, force: true }))); });
@@ -21,6 +23,15 @@ async function pages(files: Record<string, string>): Promise<string> {
   }
   return root;
 }
+// A layout schema requiring a title, for the end-to-end check below.
+let schemaFile = "";
+beforeAll(async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pd-pages-schema-"));
+  roots.push(dir);
+  schemaFile = join(dir, "page.schema.json");
+  await writeFile(schemaFile, JSON.stringify({ required: ["title"], properties: { title: { type: "string" }, description: { type: "string" } } }));
+});
+
 const page = (title: string, extra = ""): string => `---\ntitle: ${title}\n${extra}---\n\nBody of ${title}.\n`;
 const navRoutes = (nav: Awaited<ReturnType<typeof readPages>>["nav"]) =>
   nav.map(n => n.children ? `${n.route} [${n.children.map(c => c.route).join(" ")}]` : n.route);
@@ -145,6 +156,15 @@ describe("readPages — what the nav shows", () => {
     expect(model.nav.find(n => n.route === "/untitled/")?.title).toBe("/untitled/");
   });
 
+  it("a page without a title reaches the frontmatter check without one, so a required title is reported missing", async () => {
+    const root = await pages({ "index.md": "---\ndescription: No title\n---\n" });
+    const model = await readPages(root);
+    const map = new Map([["layouts/page", { hbsPath: "/x/page.hbs", schemaPath: schemaFile, ownMarkup: true }]]) as DiscoveryMap;
+    const checked = await checkPageFrontmatter(model.files.get("/")!, map);
+    expect(checked.problems).toEqual([{ file: "index.md", message: `"title" is required by layout "page"` }]);
+    expect(model.nav[0].title).toBe("/");
+  });
+
   it("titles a page by its route when it has no title, and gives it the page layout when it names none", async () => {
     const model = await readPages(await pages({ "index.md": "No frontmatter.\n", "x.md": "---\nlayout: article\n---\n" }));
     expect(model.pages).toEqual([{ route: "/", title: "/", layout: "page" }, { route: "/x/", title: "/x/", layout: "article" }]);
@@ -193,8 +213,27 @@ describe("readPages — problems (each one fatal to the caller)", () => {
     expect(model.pages.map(p => p.route)).toEqual(["/g/", "/"]);
   });
 
-  it("an empty pages folder is a site with no pages, and no problem", async () => {
+  it("an empty pages folder has no home page", async () => {
     const model = await readPages(await pages({}));
-    expect(model).toEqual({ pages: [], nav: [], files: new Map(), problems: [] });
+    expect(model).toEqual({
+      pages: [], nav: [], files: new Map(),
+      problems: ["there is no home page: the pages folder needs an index.md at its top, the page at /"],
+    });
+  });
+
+  it("pages without an index.md at the top have no home page", async () => {
+    const model = await readPages(await pages({ "about.md": page("About") }));
+    expect(model.problems).toEqual(["there is no home page: the pages folder needs an index.md at its top, the page at /"]);
+    expect(model.pages.map(p => p.route)).toEqual(["/about/"]);
+  });
+
+  it("a pages folder that does not exist", async () => {
+    const missing = join(await pages({}), "no-such-folder");
+    expect(await readPages(missing)).toEqual({ pages: [], nav: [], files: new Map(), problems: [`the pages folder ${missing} does not exist`] });
+  });
+
+  it("a pages path that is a file, not a folder", async () => {
+    const file = join(await pages({ "index.md": page("Home") }), "index.md");
+    expect((await readPages(file)).problems).toEqual([`the pages folder ${file} does not exist`]);
   });
 });
