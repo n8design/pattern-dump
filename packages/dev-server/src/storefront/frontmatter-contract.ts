@@ -11,10 +11,9 @@
 // Every problem is returned, each with the line it is on when it has one, and every problem is fatal to
 // the caller (D7). The frontmatter's own grammar errors (readFrontmatterStrict) come first.
 
-import { readFile } from "node:fs/promises";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { suggest } from "@pattern-dump/config";
-import { checkDeclared, type PropertySchema } from "./declared-values.js";
+import { checkDeclared, readSchema, type PropertySchema } from "./declared-values.js";
 import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
@@ -73,17 +72,13 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   }
 
   // ---- the layout's schema: what a page may set ----
-  let schema: LayoutSchema = {};
-  let hasSchema = false;
-  if (entry.schemaPath) {
-    try {
-      schema = JSON.parse(await readFile(entry.schemaPath, "utf8")) as LayoutSchema;
-      hasSchema = true;
-    } catch (e) {
-      problems.push({ file: page.path, message: `the schema of layout "${layout}" cannot be read: ${e instanceof Error ? e.message : String(e)}` });
-      return { layoutId, values: {}, problems };
-    }
+  const read = await readSchema(entry.schemaPath);
+  if (read.error !== undefined) {
+    problems.push({ file: page.path, message: `the schema of layout "${layout}" cannot be read: ${read.error}` });
+    return { layoutId, values: {}, problems };
   }
+  const schema: LayoutSchema = read.schema ?? {};
+  const hasSchema = read.schema !== undefined;
   const declared = schema.properties ?? {};
 
   // ---- every key the page sets ----

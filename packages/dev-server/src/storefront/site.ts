@@ -6,10 +6,9 @@
 // checked against it with the same checker as page frontmatter, with coercion off: config values are
 // already typed. Every problem is fatal to the caller (D7).
 
-import { readFile } from "node:fs/promises";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { suggest } from "@pattern-dump/config";
-import { checkDeclared, type PropertySchema } from "./declared-values.js";
+import { checkDeclared, readSchema } from "./declared-values.js";
 
 /** The component whose schema declares `site`. */
 export const SITE_SCHEMA_OWNER = "partials/base";
@@ -28,14 +27,9 @@ export async function checkSite(site: Record<string, unknown> | undefined, disco
     return { values: {}, problems };
   }
 
-  let schema: { required?: string[]; properties?: Record<string, PropertySchema> } = {};
-  if (entry.schemaPath) {
-    try {
-      schema = JSON.parse(await readFile(entry.schemaPath, "utf8")) as typeof schema;
-    } catch (e) {
-      return { values: {}, problems: [`the schema of ${SITE_SCHEMA_OWNER} cannot be read: ${e instanceof Error ? e.message : String(e)}`] };
-    }
-  }
+  const read = await readSchema(entry.schemaPath);
+  if (read.error !== undefined) return { values: {}, problems: [`the schema of ${SITE_SCHEMA_OWNER} cannot be read: ${read.error}`] };
+  const schema = read.schema ?? {};
   const declared = schema.properties?.site;
   if (!declared) {
     if (site !== undefined) problems.push(`storefront.site is set, but ${SITE_SCHEMA_OWNER} declares no site, so no layout can use it`);

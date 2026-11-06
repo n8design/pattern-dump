@@ -45,19 +45,27 @@ const unterminatedQuote = (s: string): boolean => {
   return (t[0] === '"' || t[0] === "'") && (t.length < 2 || t.at(-1) !== t[0]);
 };
 
+/** The file without its byte-order mark, split into lines; and the index of the closing `---` when the
+ *  file opens a block (-1 when it is never closed), or null when there is no block. */
+function block(md: string): { text: string; lines: string[]; end: number | null } {
+  const text = md.startsWith(BOM) ? md.slice(1) : md;
+  const lines = text.split(/\r?\n/);
+  if (lines[0]?.trim() !== "---") return { text, lines, end: null };
+  return { text, lines, end: lines.findIndex((l, i) => i > 0 && l.trim() === "---") };
+}
+
 function scan(md: string): FrontmatterReading {
   const errors: FrontmatterError[] = [];
   const err = (line: number, message: string): void => { errors.push({ line, message }); };
-  const text = md.startsWith(BOM) ? md.slice(1) : md;
-  const lines = text.split(/\r?\n/);
+  const { text, lines, end: blockEnd } = block(md);
 
-  if (lines[0]?.trim() !== "---") {
+  if (blockEnd === null) {
     // No block, which is valid — unless it is one written with bare-CR line endings, which leave the
     // whole file on one line and so never read as a block.
     if (/^---\r(?!\n)/.test(text)) err(1, "lines end in a bare CR — use LF or CRLF line endings");
     return { values: {}, errors, lines: {} };
   }
-  const end = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
+  const end = blockEnd;
   if (end < 0) {
     err(1, "the frontmatter block opened here is never closed — end it with a line holding only ---");
     return { values: {}, errors, lines: {} };
@@ -125,4 +133,13 @@ export function readFrontmatter(md: string): Record<string, FrontmatterValue> {
  *  the line each key is set on. A file with no block is valid: no values, no errors, no lines. */
 export function readFrontmatterStrict(md: string): FrontmatterReading {
   return scan(md);
+}
+
+/** The markdown after the leading `---` block, found by the same rule as the readings above: the whole
+ *  file (without a byte-order mark) when it has no block, nothing when its block is never closed. */
+export function frontmatterBody(md: string): string {
+  const { text, lines, end } = block(md);
+  if (end === null) return text;
+  if (end < 0) return "";
+  return lines.slice(end + 1).join("\n");
 }

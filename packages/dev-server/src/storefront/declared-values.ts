@@ -7,6 +7,7 @@
 //
 // Only what the property declares is checked; nothing is inferred, and other schema keywords are ignored.
 
+import { readFile } from "node:fs/promises";
 import type { FrontmatterValue } from "../frontmatter.js";
 
 export type JsonType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
@@ -73,4 +74,18 @@ export function checkDeclared(prop: PropertySchema, value: unknown, mode: Declar
     return { ok: false, message: `must be one of ${prop.enum.map(e => JSON.stringify(e)).join(", ")} (got ${describe(value, mode)})` };
   }
   return result;
+}
+
+/** What a component schema file declares at its top. */
+export interface ObjectSchema { required?: string[]; properties?: Record<string, PropertySchema> }
+
+/** A component's schema file, parsed: `schema` is absent when there is no file; `error` says why one
+ *  cannot be read. The one place a storefront check reads a schema. */
+export async function readSchema(schemaPath: string | undefined): Promise<{ schema?: ObjectSchema; error?: string }> {
+  if (!schemaPath) return {};
+  try {
+    return { schema: JSON.parse(await readFile(schemaPath, "utf8")) as ObjectSchema };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
