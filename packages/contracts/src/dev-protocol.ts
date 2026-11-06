@@ -812,7 +812,9 @@ export function staticPathFor(liveUrl: string): string {
  * Protocol version of this file's wire shapes — HTTP responses AND socket messages.
  *
  * Bump it whenever a shape changes incompatibly (a field removed, renamed or retyped; an HMR arm
- * removed). Adding an optional field does not need a bump. The server announces it three ways —
+ * removed). Adding an optional field does not need a bump, and neither does adding an HMR arm: a shell
+ * bundled before the arm existed receives it, matches none of its handlers and does nothing. The
+ * server announces it three ways —
  * the `hello` socket message, the `X-PD-Protocol` response header, and `VersionInfo.protocol` —
  * and the shell compares it against the value it was bundled with, so a stale shell talking to a
  * newer server says so instead of misbehaving silently. Same idea as GRAPH_ARTIFACT_VERSION.
@@ -830,6 +832,8 @@ export const PD_PROTOCOL_HEADER = "X-PD-Protocol";
  *  - error         : a render or build failure, surfaced on the Console.
  *  - tree-changed  : a component was added or removed → re-fetch the tree.
  *  - collision     : a handle collision quarantined a component → surfaced on the Console.
+ *  - page-changed  : a storefront page (or the nav) changed → storefront pages reload. The
+ *                    workbench shell receives it too and ignores it.
  *
  * NOTE: A11yResult / meta.a11y were removed in M4.11. Rendered a11y findings are produced
  * client-side (axe in the live iframe) and do not flow through the HMR channel.
@@ -870,7 +874,14 @@ export interface CollisionMessage {
   quarantinedPath: string;
 }
 
-export type HmrMessage = HelloMessage | ContentSwapMessage | ErrorMessage | CssLinkSwapMessage | TreeChangedMessage | CollisionMessage;
+/** A storefront page changed. `route` names the page ("/guides/setup/"); null means a page was added
+ *  or removed, so the nav — and with it every page — changed. */
+export interface PageChangedMessage {
+  type: "page-changed";
+  route: string | null;
+}
+
+export type HmrMessage = HelloMessage | ContentSwapMessage | ErrorMessage | CssLinkSwapMessage | TreeChangedMessage | CollisionMessage | PageChangedMessage;
 
 /** First frame on every connection. Lets the shell detect a protocol mismatch with the server. */
 export interface HelloMessage {

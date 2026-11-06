@@ -304,6 +304,8 @@ describe("HmrMessage wire shapes", () => {
       { type: "css-link-swap", componentId: "a", href: "/x.css", orderedHrefs: ["/x.css"] },
       { type: "tree-changed" },
       { type: "collision", handle: "atoms-b", incumbentPath: "/a.hbs", quarantinedPath: "/b.hbs" },
+      { type: "page-changed", route: "/guides/setup/" },
+      { type: "page-changed", route: null },
     ];
 
     // Exhaustiveness: the default arm is unreachable only while every `type` is handled. Adding an
@@ -316,13 +318,14 @@ describe("HmrMessage wire shapes", () => {
         case "css-link-swap": return m.href;
         case "tree-changed":  return "tree";
         case "collision":     return m.handle;
+        case "page-changed":  return m.route ?? "*";
         default: {
           const never: never = m;
           return never;
         }
       }
     });
-    expect(seen).toHaveLength(8);
+    expect(seen).toHaveLength(10);
   });
 });
 
