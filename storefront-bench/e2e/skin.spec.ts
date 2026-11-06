@@ -59,16 +59,18 @@ test.describe("the skin", () => {
   });
 
   for (const width of [1440, 390]) {
-    test(`sets titles at poster scale at ${width}px: the home title at 15vw, a page title filling its column`, async ({ page }) => {
+    test(`sets titles at poster scale at ${width}px: the home title at 15vw, a page's hero title filling its column up to 25vw`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       const title = () => page.locator("h1").evaluate(h => {
         const range = document.createRange();
         range.selectNodeContents(h);
         const text = range.getBoundingClientRect(), cs = getComputedStyle(h), size = parseFloat(cs.fontSize);
-        const next = h.nextElementSibling?.getBoundingClientRect();
+        // What follows the title: in a hero, the meta row after it; elsewhere the next element.
+        const next = (h.closest(".hero")?.nextElementSibling ?? h.nextElementSibling)?.getBoundingClientRect();
         return { size, fill: text.width / h.getBoundingClientRect().width, overflow: h.scrollWidth > h.clientWidth + 1,
           clearsNext: !next || text.bottom <= next.top + 1,
-          lines: Math.round(text.height / parseFloat(cs.lineHeight)),
+          // Lines by the text's line boxes: at solid leading its content area is taller than a line height.
+          lines: new Set([...range.getClientRects()].map(r => Math.round(r.top))).size,
           tracking: parseFloat(cs.letterSpacing) / size, leading: parseFloat(cs.lineHeight) / size };
       });
       await page.goto("/");
@@ -82,9 +84,11 @@ test.describe("the skin", () => {
         const t = await title();
         // Solid leading, but the descenders still clear what follows the title.
         expect(t, route).toMatchObject({ overflow: false, lines: 1, clearsNext: true });
-        expect(t.fill, route).toBeGreaterThan(0.85);
-        expect(t.tracking, route).toBeLessThanOrEqual(-0.03);
-        expect(t.leading, route).toBeLessThanOrEqual(0.9);
+        // Up to 25vw: a title at the cap is as large as the hero allows; any other fills its column.
+        expect(t.size, route).toBeLessThanOrEqual(width * 0.25 + 0.5);
+        if (Math.abs(t.size - width * 0.25) > 0.5) expect(t.fill, route).toBeGreaterThan(0.85);
+        expect(t.tracking, route).toBeCloseTo(-0.06, 3);
+        expect(t.leading, route).toBeCloseTo(0.78, 2);
       }
     });
   }
@@ -157,10 +161,6 @@ test.describe("the skin", () => {
     await expectField(".site-footer", "--sk-ink");
     await expectField(".card:nth-child(1)", "--sk-accent", false);
     await expectField(".card:nth-child(2)", "--sk-bone", false);
-    await page.goto("/about/");
-    await expectField(".page-header", "--sk-accent");
-    await page.goto("/guides/setup/");
-    await expectField(".article-header", "--sk-ink");
   });
 
   for (const route of ["/", "/guides/setup/"]) {
@@ -202,6 +202,43 @@ test.describe("the skin", () => {
     expect((await grain()).display).toBe("none");
     expect((await page.request.get("/assets/images/grain.svg")).status()).toBe(200);
   });
+
+  for (const route of ["/about/", "/guides/", "/guides/setup/"]) {
+    test(`${route}: cuts its hero title through an accent block with the skin's corner, blended by difference`, async ({ page }) => {
+      await page.goto(route);
+      await page.evaluate(() => document.fonts.ready);
+      const hero = await page.locator(".hero").evaluate(h => {
+        const block = getComputedStyle(h, "::before"), title = h.querySelector(".hero-title")!, t = getComputedStyle(title);
+        const probe = document.createElement("i");
+        probe.style.cssText = "color: var(--sk-accent); background: var(--sk-paper)";
+        document.body.append(probe);
+        const accent = getComputedStyle(probe).color, paper = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        // The block's box, from its insets within the hero; the title's text box.
+        const hr = h.getBoundingClientRect(), range = document.createRange();
+        range.selectNodeContents(title);
+        const tr = range.getBoundingClientRect();
+        const left = hr.left + parseFloat(block.left), top = hr.top + parseFloat(block.top);
+        return {
+          block: block.backgroundColor === accent,
+          corners: [block.borderStartStartRadius, block.borderStartEndRadius, block.borderEndEndRadius].every(r => r === "0px") && parseFloat(block.borderEndStartRadius) > 40,
+          blend: t.mixBlendMode, isolated: getComputedStyle(h).isolation, ground: getComputedStyle(h).backgroundColor === paper,
+          crosses: tr.right > left && tr.bottom > top,
+        };
+      });
+      expect(hero).toEqual({ block: true, corners: true, blend: "difference", isolated: "isolate", ground: true, crosses: true });
+    });
+  }
+
+  for (const [route, index, layout, sections] of [["/about/", "02", "page", "0"], ["/guides/", "01", "page", "0"], ["/guides/setup/", "01.1", "article", "2"]] as const) {
+    test(`${route}: shows its derived meta row under the hero: index ${index}, layout ${layout}, ${sections} sections`, async ({ page }) => {
+      await page.goto(route);
+      const meta = await page.locator(".hero-meta").evaluate(dl => [...dl.querySelectorAll("div")].map(d => [d.querySelector("dt")!.textContent, d.querySelector("dd")!.textContent]));
+      expect(meta).toEqual([["Index", index], ["Layout", layout], ["Sections", sections]]);
+      const label = await page.locator(".hero-meta").evaluate(el => [getComputedStyle(el).fontFamily.split(",")[0], getComputedStyle(el).textTransform]);
+      expect(label).toEqual(['"IBM Plex Mono"', "uppercase"]);
+    });
+  }
 
   test("takes its brand colour from --sk-accent alone", async ({ page }) => {
     await page.goto("/");
@@ -274,7 +311,7 @@ test.describe("motion and print", () => {
 
   test("prints its colour fields as ink on paper, since printers drop background colours", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark", media: "print" });
-    for (const [route, selector] of [["/", ".home-cover"], ["/about/", ".page-header"], ["/guides/setup/", ".article-header"], ["/", ".site-footer"], ["/", "figure.doc-example"]] as const) {
+    for (const [route, selector] of [["/", ".home-cover"], ["/about/", ".hero"], ["/guides/setup/", ".hero"], ["/", ".site-footer"], ["/", "figure.doc-example"]] as const) {
       await page.goto(route);
       const printed = await page.locator(selector).evaluate(el => {
         const cs = getComputedStyle(el);
@@ -282,6 +319,12 @@ test.describe("motion and print", () => {
       });
       expect(printed, `${route} ${selector}`).toEqual({ background: "rgba(0, 0, 0, 0)", color: printed.body, body: printed.body });
     }
+    // The hero's title prints as plain ink, unblended, without the accent block it would blend against.
+    await page.goto("/guides/setup/");
+    expect(await page.locator(".hero").evaluate(h => {
+      const t = getComputedStyle(h.querySelector(".hero-title")!);
+      return [t.color === getComputedStyle(document.body).color, t.mixBlendMode, getComputedStyle(h, "::before").display];
+    })).toEqual([true, "normal", "none"]);
   });
 
   test("prints in the light scheme, without the site navigation or cards, with other sites' addresses written out", async ({ page }) => {

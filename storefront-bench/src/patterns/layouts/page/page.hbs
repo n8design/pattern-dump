@@ -1,9 +1,14 @@
 {{#> partials-base }}
 <article class="page">
-  <header class="page-header">
-    <h1 class="page-title" style="--sk-chars: {{title.length}}">{{title}}</h1>
-    {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
+  <header class="hero">
+    <h1 class="hero-title page-title" style="--sk-chars: {{skinLongestWord title}}">{{title}}</h1>
   </header>
+  <dl class="hero-meta">
+    <div><dt>Index</dt><dd>{{skinIndex nav}}</dd></div>
+    <div><dt>Layout</dt><dd>page</dd></div>
+    <div><dt>Sections</dt><dd>{{#with (skinChapters body)}}{{count}}{{/with}}</dd></div>
+  </dl>
+  {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
   <div class="page-body">{{{body}}}</div>
   {{> partials-cards }}
 </article>

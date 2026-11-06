@@ -49,9 +49,11 @@
   // Montserrat Black letters (0.66em each, the widest of the skin's titles rounded up).
   --sk-step-poster: max(3rem, 15vw);
   --sk-wide: min(var(--sk-page), 100vw - 2 * var(--sk-gutter));
-  --sk-letter: 0.66;
-  --sk-title-tracking: -0.04em;
-  --sk-title-leading: 0.85;
+  --sk-letter: 0.62;
+  --sk-title-tracking: -0.06em;
+  --sk-title-leading: 0.78;
+  --sk-hero-max: 25vw;
+  --sk-hero-corner: clamp(3rem, 14vw, 14rem);
 
   --sk-space-1: 0.25rem;
   --sk-space-2: 0.5rem;

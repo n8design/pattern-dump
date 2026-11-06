@@ -1,7 +1,7 @@
 // The storefront bench skin's helpers: what a page shows about its own structure, derived from its
 // rendered body and the nav.
 import { describe, expect, it } from "vitest";
-import { skinChapters, skinIndex, skinNext, skinSections } from "../../../storefront-bench/src/helpers/skin.js";
+import { skinChapters, skinIndex, skinLongestWord, skinNext, skinSections } from "../../../storefront-bench/src/helpers/skin.js";
 
 /** The bench's nav as the storefront gives it to a page, with `current` on the given route. */
 const nav = (current: string) => [
@@ -60,5 +60,14 @@ describe("skinNext", () => {
     expect(["/", "/guides/", "/guides/setup/", "/about/"].map(r => skinNext(nav(r))?.route)).toEqual(["/guides/", "/guides/setup/", "/about/", "/"]);
     expect(skinNext(nav("/about/"))).toEqual({ route: "/", title: "Storefront bench" });
     expect(skinNext(nav("/nowhere/"))).toBeNull();
+  });
+});
+
+describe("skinLongestWord", () => {
+  it("is the length of a title's longest word, in characters, and at least 1", () => {
+    expect(skinLongestWord("Storefront bench")).toBe(10);
+    expect(skinLongestWord("  A  bé  ")).toBe(2);
+    expect(skinLongestWord("")).toBe(1);
+    expect(skinLongestWord(undefined)).toBe(1);
   });
 });

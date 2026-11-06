@@ -1,30 +1,7 @@
-// The default layout: a display title and its description on an ochre field, edge to edge, then the body.
-.page-header {
-  display: grid;
-  grid-column: full;
-  grid-template-columns: subgrid;
-  padding-block: var(--sk-space-7) var(--sk-space-6);
-  background: var(--sk-accent);
-  color: var(--sk-on-accent);
-}
-
-.page-title {
-  grid-column: wide;
-
-  // Solid leading lets the descenders hang below the line: room for them, in proportion to the size.
-  margin: 0 0 0.2em;
-  font-family: var(--sk-font-display);
-  font-size: clamp(3rem, var(--sk-wide) / (var(--sk-chars) * var(--sk-letter)), 24rem);
-  font-weight: 900;
-  line-height: var(--sk-title-leading);
-  letter-spacing: var(--sk-title-tracking);
-  text-wrap: balance;
-  overflow-wrap: break-word;
-}
-
+// The default layout: the hero and its meta row (site/hero.scss), the description, then the body.
 .page-description {
   grid-column: content;
-  margin-block: var(--sk-space-5) 0;
+  margin-block: var(--sk-space-6) 0;
   font-size: var(--sk-step-1);
   font-style: italic;
   line-height: 1.4;

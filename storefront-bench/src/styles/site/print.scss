@@ -2,6 +2,17 @@
 // alone), and every link to another site with its address written out.
 // (The light scheme itself is set with the tokens, in tokens.scss.)
 @media print {
+  // The hero's title is blended against its ground and block; on paper there is neither, so it is
+  // plain ink, and the block is left out.
+  .site .hero-title {
+    color: var(--sk-ink);
+    mix-blend-mode: normal;
+  }
+
+  .hero::before {
+    display: none;
+  }
+
   .site-nav,
   .site-cards {
     display: none;
@@ -14,7 +25,7 @@
   // Printers drop background colours, so a colour field would leave its light text on white paper.
   // On paper the fields are plain ink on paper. (Scoped under .site to outrank each section's own rule,
   // which comes after the base layer.)
-  .site :is(.home-cover, .page-header, .article-header, .site-footer, .doc-example) {
+  .site :is(.home-cover, .hero, .site-footer, .doc-example) {
     background: none;
     color: var(--sk-ink);
   }

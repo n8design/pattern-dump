@@ -1,0 +1,68 @@
+// The hero of a page: its title at poster scale, cutting through an accent block with the skin's corner
+// (only the lower-left one rounded). The title is bone, blended by difference: on the ground it reads as
+// the ground's opposite (ink on bone, bone on ink), and where it crosses the block it shows the block's
+// opposite. The hero isolates the blend, so nothing outside it takes part.
+.hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-column: full;
+  grid-template-columns: subgrid;
+  padding-block: var(--sk-space-7) var(--sk-space-5);
+  overflow: clip;
+
+  // The ground inside the isolated group: without it the title would blend with nothing and stay bone.
+  background: var(--sk-paper);
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 22% 0 0 42%;
+  z-index: -1;
+  background: var(--sk-accent);
+  border-end-start-radius: var(--sk-hero-corner);
+}
+
+// The title fills the wide column with its longest word (the layout sets --sk-chars to that word's
+// length), and never passes 25vw.
+.hero-title {
+  grid-column: wide;
+
+  // Solid leading lets the descenders hang below the line: room for them, in proportion to the size.
+  margin: 0 0 0.2em;
+  color: var(--sk-bone);
+  font-family: var(--sk-font-display);
+  font-size: min(var(--sk-hero-max), var(--sk-wide) / (var(--sk-chars) * var(--sk-letter)));
+  font-weight: 900;
+  line-height: var(--sk-title-leading);
+  letter-spacing: var(--sk-title-tracking);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  mix-blend-mode: difference;
+}
+
+// What the page is, in mono labels under the hero, all derived: its place in the nav, its layout, and
+// how many sections its body has.
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: wide;
+  gap: var(--sk-space-2) var(--sk-space-6);
+  margin: 0;
+  padding-block: var(--sk-space-3);
+  border-block: 1px solid var(--sk-rule);
+}
+
+.hero-meta div {
+  display: flex;
+  gap: var(--sk-space-2);
+}
+
+.hero-meta dt {
+  color: var(--sk-muted);
+}
+
+.hero-meta dd {
+  margin: 0;
+}

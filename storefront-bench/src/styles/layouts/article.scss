@@ -1,30 +1,7 @@
-// A longer text: the title and lede on a slate field, edge to edge, then the body.
-.article-header {
-  display: grid;
-  grid-column: full;
-  grid-template-columns: subgrid;
-  padding-block: var(--sk-space-7) var(--sk-space-6);
-  background: var(--sk-ink);
-  color: var(--sk-paper);
-}
-
-.article-title {
-  grid-column: wide;
-
-  // Solid leading lets the descenders hang below the line: room for them, in proportion to the size.
-  margin: 0 0 0.2em;
-  font-family: var(--sk-font-display);
-  font-size: clamp(3rem, var(--sk-wide) / (var(--sk-chars) * var(--sk-letter)), 24rem);
-  font-weight: 900;
-  line-height: var(--sk-title-leading);
-  letter-spacing: var(--sk-title-tracking);
-  text-wrap: balance;
-  overflow-wrap: break-word;
-}
-
+// A longer text: the hero and its meta row (site/hero.scss), the lede, then the body.
 .article-lede {
   grid-column: content;
-  margin-block: var(--sk-space-5) 0;
+  margin-block: var(--sk-space-6) 0;
   font-size: var(--sk-step-2);
   line-height: 1.3;
   text-wrap: pretty;

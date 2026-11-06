@@ -50,6 +50,12 @@ export function skinSections(nav: unknown): Array<NavEntry & { number: string; i
   }));
 }
 
+/** The length of a title's longest word: a poster title is sized so that word fills its column. */
+export function skinLongestWord(title: unknown): number {
+  const words = (typeof title === "string" ? title : "").split(/\s+/).filter(Boolean);
+  return Math.max(1, ...words.map(w => [...w].length));
+}
+
 /** Whether the page is the home page. */
 export function skinAtHome(nav: unknown): boolean {
   return isNav(nav) && nav.some(e => e.route === "/" && !!e.current);
