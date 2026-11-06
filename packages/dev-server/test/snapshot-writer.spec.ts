@@ -80,11 +80,12 @@ describe("createSnapshotWriter", () => {
     const w = createSnapshotWriter({ outDir: root, basePath: "/", origin, report: counts });
     await w.capture("/preview/atoms/a");
     expect(await w.capture("/preview/atoms/a")).toBeNull();
-    // A body for the same file — as a shell route whose file a capture already wrote — is skipped.
-    await w.store("/preview/atoms/a", "<p>shell</p>");
+    // A body for the same file — as a shell route whose file a capture already wrote — is skipped, and
+    // store names the URL that holds the file.
+    expect(await w.store("/preview/atoms/a", "<p>shell</p>")).toBe("/preview/atoms/a");
     expect(await readFile(join(root, "preview", "atoms", "a", "index.html"), "utf8")).toBe(`<link href="/_pd/components/atoms/a.css">`);
-    await w.store("/atoms/a", "<p>shell</p>");
-    await w.store("/atoms/a", "<p>other</p>");
+    expect(await w.store("/atoms/a", "<p>shell</p>")).toBeNull();
+    expect(await w.store("/atoms/a/", "<p>other</p>")).toBe("/atoms/a");
     expect(await readFile(join(root, "atoms", "a", "index.html"), "utf8")).toBe("<p>shell</p>");
     expect(counts.files).toBe(2);
   });

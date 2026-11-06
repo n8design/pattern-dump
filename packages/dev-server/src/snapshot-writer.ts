@@ -2,8 +2,8 @@
 //
 // A writer belongs to one output root. It fetches a live URL from the headless server, or takes a body
 // already in hand, and writes it to the file `staticPathFor` names under that root — rewriting
-// root-relative PD URLs for the base path on the way. Its `done` set means each file is written once:
-// the first writer of a path wins and later ones are skipped.
+// root-relative PD URLs for the base path on the way. Its `done` record means each file is written once:
+// the first writer of a path wins and later ones are skipped; `store` says which URL holds the file.
 //
 // Fetch failures are reported, never thrown. By default they are warnings (a component that fails to
 // render is a finding about the design system, not a reason to stop the build); a `fatal` capture
@@ -57,20 +57,22 @@ export interface CaptureOptions {
 export interface SnapshotWriter {
   /** Fetch a live URL and write it to its snapshot file. Returns the (unrewritten) body, or null. */
   capture(liveUrl: string, options?: CaptureOptions): Promise<string | null>;
-  /** Write a text body under the snapshot path of a live URL (for responses already in hand). */
-  store(liveUrl: string, body: string): Promise<void>;
+  /** Write a text body under the snapshot path of a live URL (for responses already in hand). Returns null
+   *  when it wrote the file, or — when the file was already written — the live URL that wrote it. */
+  store(liveUrl: string, body: string): Promise<string | null>;
   /** Failures of fatal captures, one line each ("<status> <url>[: reason]"). */
   readonly failures: string[];
 }
 
 export function createSnapshotWriter({ outDir, basePath, origin, report }: SnapshotWriterOptions): SnapshotWriter {
-  const done = new Set<string>();
+  /** Snapshot file → the live URL that wrote it. */
+  const done = new Map<string, string>();
   const failures: string[] = [];
 
   async function capture(liveUrl: string, { optional = false, fatal = false }: CaptureOptions = {}): Promise<string | null> {
     const file = staticPathFor(liveUrl);
     if (done.has(file)) return null;
-    done.add(file);
+    done.set(file, liveUrl);
     const res = await fetch(`${origin}${liveUrl}`);
     if (res.status !== 200) {
       // A component that fails to render is a finding about the design system, not a reason to abort
@@ -100,16 +102,18 @@ export function createSnapshotWriter({ outDir, basePath, origin, report }: Snaps
     return /javascript/.test(type) ? buffer.toString("utf8") : null;
   }
 
-  async function store(liveUrl: string, body: string): Promise<void> {
+  async function store(liveUrl: string, body: string): Promise<string | null> {
     const file = staticPathFor(liveUrl);
-    if (done.has(file)) return;
-    done.add(file);
+    const holder = done.get(file);
+    if (holder !== undefined) return holder;
+    done.set(file, liveUrl);
     const target = diskPath(outDir, file);
     await mkdir(dirname(target), { recursive: true });
     const out = withBasePath(body, basePath);
     await writeFile(target, out);
     report.bytes += Buffer.byteLength(out);
     report.files++;
+    return null;
   }
 
   return { capture, store, failures };

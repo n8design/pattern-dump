@@ -15,7 +15,7 @@ import { join, relative, resolve, sep } from "node:path";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
-  themeCssUrl,
+  staticPathFor, themeCssUrl,
   type ComponentDetailResponse, type ComponentTree, type ShellRuntime, type ThemeSummary, type TreeNode,
 } from "@pattern-dump/contracts";
 import { startDevServer } from "./index.js";
@@ -176,9 +176,15 @@ export async function buildStaticSite(
       ...(includeAudit ? {} : { audit: false }),
     };
     // Through the writer like every other file: the base path is applied there, once, and a route whose
-    // file is already written (by a capture) is not written over.
+    // file is already written (by a capture) is not written over. That only happens when a pattern folder
+    // shares its name with one of PD's own URL prefixes; the route then has no page, so it is reported.
     const shell = buildShellHtml(runtime);
-    for (const route of routes) await store(route, shell);
+    for (const route of routes) {
+      const holder = await store(route, shell);
+      if (holder !== null) {
+        report.warnings.push(`shell page for route ${route} not written: ${staticPathFor(route)} already holds the server's response to ${holder}`);
+      }
+    }
     // GitHub Pages runs Jekyll unless told otherwise, and Jekyll drops every folder starting with "_"
     // — which would silently remove _pd/ (the shell, its CSS, every theme and component stylesheet).
     await writeFile(join(outDir, ".nojekyll"), "");
