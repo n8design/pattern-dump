@@ -68,7 +68,7 @@ export default tseslint.config(
   {
     // Playwright specs run in a browser context via page.evaluate, where DOM globals are typed
     // loosely at the boundary. Kept as a narrow allowance rather than weakening the rule globally.
-    files: ["apps/dev-ui/e2e/**/*.ts"],
+    files: ["apps/dev-ui/e2e/**/*.ts", "storefront-bench/e2e/**/*.ts"],
     rules: { "@typescript-eslint/no-explicit-any": "warn" },
   },
 
