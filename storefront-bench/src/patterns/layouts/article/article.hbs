@@ -8,6 +8,7 @@
     <div><dt>Layout</dt><dd>article</dd></div>
     <div><dt>Sections</dt><dd>{{#with (skinChapters body)}}{{count}}{{/with}}</dd></div>
   </dl>
+  {{> partials-marquee }}
   {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
   <div class="article-body">{{{body}}}</div>
 </article>

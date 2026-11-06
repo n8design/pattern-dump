@@ -56,6 +56,11 @@ export function skinLongestWord(title: unknown): number {
   return Math.max(1, ...words.map(w => [...w].length));
 }
 
+/** What a page's marquee scrolls: its sections' headings, or on the home page the site's sections. */
+export function skinMarquee(body: unknown, nav: unknown): string[] {
+  return skinAtHome(nav) ? skinSections(nav).map(s => s.title) : skinChapters(body).chapters.map(c => c.title);
+}
+
 /** Whether the page is the home page. */
 export function skinAtHome(nav: unknown): boolean {
   return isNav(nav) && nav.some(e => e.route === "/" && !!e.current);

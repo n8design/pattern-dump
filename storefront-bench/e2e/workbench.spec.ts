@@ -12,6 +12,7 @@ const SKIN: Array<[id: string, docs: string]> = [
   ["partials/header", "At the top of every page"],
   ["partials/nav", "Built from the pages folder"],
   ["partials/footer", "At the bottom of every page"],
+  ["partials/marquee", "Built from the page itself"],
 ];
 
 test.describe("the skin in the workbench", () => {
@@ -19,7 +20,7 @@ test.describe("the skin in the workbench", () => {
     await page.goto(`${WORKBENCH}/layouts/page`);
     await page.waitForSelector("#preview-frame[srcdoc]");
     const hrefs = await page.locator(".sidebar-tree a.tree-link").evaluateAll(as => as.map(a => a.getAttribute("href")));
-    expect(hrefs.sort()).toEqual(["/components/callout", "/layouts/article", "/layouts/home", "/layouts/page", "/partials/base", "/partials/cards", "/partials/footer", "/partials/header", "/partials/nav"]);
+    expect(hrefs.sort()).toEqual(["/components/callout", "/layouts/article", "/layouts/home", "/layouts/page", "/partials/base", "/partials/cards", "/partials/footer", "/partials/header", "/partials/marquee", "/partials/nav"]);
   });
 
   for (const [id, docs] of SKIN) {

@@ -49,6 +49,8 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
     ["Storefront bench", "©2026", "(01) Guides", "(02) About", "A website written in markdown"]],
   ["partials/nav", "Nav", "The site's sections, numbered from 01, with the current one marked by aria-current.", "centered",
     ["(01) Guides", "(02) About"]],
+  ["partials/marquee", "Marquee", "A band in the accent that scrolls a page's section headings, or the site's sections on the home page.", "centered",
+    ["Pages", "Layouts", "Components"]],
   ["partials/footer", "Footer", "The line at the bottom of every page.", "centered",
     ["Built with Pattern Dump from the storefront bench."]],
   ["components/callout", "Callout", "A short note set apart from the text around it.", "centered",

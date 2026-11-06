@@ -72,6 +72,7 @@ describe("pd build — the storefront root", () => {
       "_pd/components/partials/cards.css",
       "_pd/components/partials/footer.css",
       "_pd/components/partials/header.css",
+      "_pd/components/partials/marquee.css",
       "_pd/components/partials/nav.css",
       "about/index.html",
       "assets/fonts/ibm-plex-mono-medium.woff2",
@@ -88,7 +89,7 @@ describe("pd build — the storefront root", () => {
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 25, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 26, bytes: expect.any(Number) });
   });
 
   it("resolves every reference inside it to a file it holds", () => {

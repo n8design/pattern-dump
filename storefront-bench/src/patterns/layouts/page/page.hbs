@@ -8,6 +8,7 @@
     <div><dt>Layout</dt><dd>page</dd></div>
     <div><dt>Sections</dt><dd>{{#with (skinChapters body)}}{{count}}{{/with}}</dd></div>
   </dl>
+  {{> partials-marquee }}
   {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
   <div class="page-body">{{{body}}}</div>
   {{> partials-cards }}

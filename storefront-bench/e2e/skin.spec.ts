@@ -21,8 +21,8 @@ test.describe("the skin", () => {
       title: getComputedStyle(document.querySelector("h1")!).fontFamily,
       text: getComputedStyle(document.querySelector(".article-body p")!).fontFamily,
     }));
-    // Every face this page uses: the mono's two weights for its labels. Nothing on it is set in italic.
-    expect(fonts.loaded).toEqual(["IBM Plex Mono normal", "IBM Plex Mono normal", "Montserrat normal", "Source Serif 4 normal"]);
+    // Every face this page uses: the mono's two weights for its labels, Montserrat's italic for its marquee.
+    expect(fonts.loaded).toEqual(["IBM Plex Mono normal", "IBM Plex Mono normal", "Montserrat italic", "Montserrat normal", "Source Serif 4 normal"]);
     expect(fonts.title).toMatch(/^"?Montserrat"?,/);
     expect(fonts.text).toMatch(/^"Source Serif 4",/);
   });
@@ -293,6 +293,58 @@ test.describe("the skin", () => {
       expect(box.slack).toBeLessThan(1);
     });
   }
+});
+
+test.describe("the marquee", () => {
+  /** The marquee as a reader and a screen reader meet it. */
+  const marquee = (page: Page) => page.locator(".marquee").evaluate(m => {
+    const band = getComputedStyle(m.querySelector(".marquee-band")!), track = getComputedStyle(m.querySelector(".marquee-track")!);
+    const run = getComputedStyle(m.querySelector(".marquee-run")!);
+    const probe = document.createElement("i");
+    probe.style.color = "var(--sk-accent)";
+    document.body.append(probe);
+    const accent = getComputedStyle(probe).color;
+    probe.remove();
+    const exposed = [...m.querySelectorAll(".marquee-item")].filter(i => !i.closest("[aria-hidden='true']")).map(i => i.textContent);
+    return {
+      accent: track.backgroundColor === accent, rotate: band.rotate,
+      font: [run.fontFamily.split(",")[0], run.fontStyle, run.fontWeight],
+      animation: [track.animationName, track.animationIterationCount, track.animationPlayState],
+      exposed,
+      copiesHidden: [...m.querySelectorAll(".marquee-run")].slice(1).every(r => r.getAttribute("aria-hidden") === "true"),
+      separatorsHidden: [...m.querySelectorAll(".marquee-sep")].every(s => s.getAttribute("aria-hidden") === "true"),
+      shownRuns: [...m.querySelectorAll(".marquee-run")].filter(r => getComputedStyle(r).display !== "none").length,
+    };
+  });
+
+  test("scrolls a page's section headings on a tilted accent band, read out once", async ({ page }) => {
+    await page.goto("/guides/setup/");
+    expect(await marquee(page)).toEqual({
+      accent: true, rotate: "-2deg", font: ["Montserrat", "italic", "900"],
+      animation: ["sk-marquee", "infinite", "running"],
+      exposed: ["Pages", "Layouts"], copiesHidden: true, separatorsHidden: true, shownRuns: 4,
+    });
+  });
+
+  test("has no band on a page without sections", async ({ page }) => {
+    for (const route of ["/about/", "/guides/"]) {
+      await page.goto(route);
+      await expect(page.locator(".marquee"), route).toHaveCount(0);
+    }
+  });
+
+  test("stands still for a reader who prefers less motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/guides/setup/");
+    expect((await marquee(page)).animation[0]).toBe("none");
+  });
+
+  test("stands still on paper, its sections once", async ({ page }) => {
+    await page.emulateMedia({ media: "print" });
+    await page.goto("/guides/setup/");
+    const printed = await marquee(page);
+    expect([printed.animation[0], printed.shownRuns]).toEqual(["none", 1]);
+  });
 });
 
 test.describe("motion and print", () => {

@@ -1,7 +1,7 @@
 // The storefront bench skin's helpers: what a page shows about its own structure, derived from its
 // rendered body and the nav.
 import { describe, expect, it } from "vitest";
-import { skinChapters, skinIndex, skinLongestWord, skinNext, skinSections } from "../../../storefront-bench/src/helpers/skin.js";
+import { skinChapters, skinIndex, skinLongestWord, skinMarquee, skinNext, skinSections } from "../../../storefront-bench/src/helpers/skin.js";
 
 /** The bench's nav as the storefront gives it to a page, with `current` on the given route. */
 const nav = (current: string) => [
@@ -69,5 +69,14 @@ describe("skinLongestWord", () => {
     expect(skinLongestWord("  A  bé  ")).toBe(2);
     expect(skinLongestWord("")).toBe(1);
     expect(skinLongestWord(undefined)).toBe(1);
+  });
+});
+
+describe("skinMarquee", () => {
+  it("scrolls a page's section headings, and on the home page the site's sections", () => {
+    const body = "<p>x</p><h2>Pages</h2><p>a</p><h2>Layouts</h2><p>b</p>";
+    expect(skinMarquee(body, nav("/guides/setup/"))).toEqual(["Pages", "Layouts"]);
+    expect(skinMarquee(body, nav("/"))).toEqual(["Guides", "About"]);
+    expect(skinMarquee("<p>No sections.</p>", nav("/about/"))).toEqual([]);
   });
 });

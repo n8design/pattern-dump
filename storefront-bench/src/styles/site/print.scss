@@ -13,6 +13,16 @@
     display: none;
   }
 
+  // The marquee stands still and shows its sections once. (Under .site, to outrank the marquee's own
+  // rules, which come after the base layer.)
+  .site .marquee-track {
+    animation: none;
+  }
+
+  .site .marquee-run[aria-hidden] {
+    display: none;
+  }
+
   .site-nav,
   .site-cards {
     display: none;
