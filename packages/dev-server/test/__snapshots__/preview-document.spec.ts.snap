@@ -1,0 +1,1577 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`preview document head layering > switch=attribute default=- base=false baseV=0 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=false baseV=0 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=false baseV=0 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=false baseV=0 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=false baseV=3 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=false baseV=3 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=false baseV=3 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=false baseV=3 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=true baseV=0 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=true baseV=0 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=true baseV=0 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=true baseV=0 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=true baseV=3 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=true baseV=3 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=true baseV=3 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=- base=true baseV=3 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=false baseV=0 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=false baseV=0 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=false baseV=0 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=false baseV=0 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=false baseV=3 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=false baseV=3 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=false baseV=3 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=false baseV=3 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=true baseV=0 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=true baseV=0 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=true baseV=0 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=true baseV=0 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=true baseV=3 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=true baseV=3 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=true baseV=3 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=attribute default=light base=true baseV=3 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=false baseV=0 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=false baseV=0 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=false baseV=0 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=false baseV=0 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=false baseV=3 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=false baseV=3 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=false baseV=3 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=false baseV=3 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=true baseV=0 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+
+
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=true baseV=0 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+
+
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=true baseV=0 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=true baseV=0 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=true baseV=3 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+
+
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=true baseV=3 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+
+
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=true baseV=3 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=- base=true baseV=3 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=false baseV=0 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=false baseV=0 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=false baseV=0 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=false baseV=0 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=false baseV=3 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=false baseV=3 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=false baseV=3 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=false baseV=3 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=true baseV=0 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=true baseV=0 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=true baseV=0 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=true baseV=0 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=true baseV=3 assets=- closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=true baseV=3 assets=- closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=true baseV=3 assets=2 closure=0 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+
+</head>"
+`;
+
+exports[`preview document head layering > switch=stylesheet default=light base=true baseV=3 assets=2 closure=2 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css?v=3">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="https://fonts.example/f.css">
+<link rel="stylesheet" href="/_pd/themes/light.css" data-pd-theme="light">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>"
+`;
+
+exports[`preview document, whole > layout=centered scripts=false svg=false base=/pd/ 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/pd/"><link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+
+<button class="b">Go</button>
+<script>(function(){
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');},50);}).observe(document.body);})();</script>
+
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=centered scripts=false svg=false base=- 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+
+<button class="b">Go</button>
+<script>(function(){
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');},50);}).observe(document.body);})();</script>
+
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=centered scripts=false svg=true base=/pd/ 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/pd/"><link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+<svg hidden><symbol id="i-x"></symbol></svg>
+<button class="b">Go</button>
+<script>(function(){
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');},50);}).observe(document.body);})();</script>
+
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=centered scripts=false svg=true base=- 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+<svg hidden><symbol id="i-x"></symbol></svg>
+<button class="b">Go</button>
+<script>(function(){
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');},50);}).observe(document.body);})();</script>
+
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=centered scripts=true svg=false base=/pd/ 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/pd/"><link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+
+<button class="b">Go</button>
+<script>(function(){
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');},50);}).observe(document.body);})();</script>
+<script type="module" src="/_pd/scripts/toggle.js?v=1767319445000"></script>
+<script type="module" src="/_pd/scripts/nav.js"></script>
+<script type="module" src="https://cdn.example/x.js"></script>
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=centered scripts=true svg=false base=- 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+
+<button class="b">Go</button>
+<script>(function(){
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');},50);}).observe(document.body);})();</script>
+<script type="module" src="/_pd/scripts/toggle.js?v=1767319445000"></script>
+<script type="module" src="/_pd/scripts/nav.js"></script>
+<script type="module" src="https://cdn.example/x.js"></script>
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=centered scripts=true svg=true base=/pd/ 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/pd/"><link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+<svg hidden><symbol id="i-x"></symbol></svg>
+<button class="b">Go</button>
+<script>(function(){
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');},50);}).observe(document.body);})();</script>
+<script type="module" src="/_pd/scripts/toggle.js?v=1767319445000"></script>
+<script type="module" src="/_pd/scripts/nav.js"></script>
+<script type="module" src="https://cdn.example/x.js"></script>
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=centered scripts=true svg=true base=- 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+<svg hidden><symbol id="i-x"></symbol></svg>
+<button class="b">Go</button>
+<script>(function(){
+function pdContentWidth(){
+  function px(v){ return parseFloat(v) || 0; }
+  function need(el){
+    var right = 0, cr = el.getBoundingClientRect().right, es = getComputedStyle(el);
+    var contentRight = cr - px(es.paddingRight) - px(es.borderRightWidth);
+    for (var c = el.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        if (!/\\S/.test(c.data)) continue;
+        var rg = document.createRange(); rg.selectNodeContents(c);
+        var rs = rg.getClientRects();
+        for (var i = 0; i < rs.length; i++) right = Math.max(right, rs[i].right);
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      var tag = c.tagName.toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEMPLATE' || tag === 'NOSCRIPT') continue;
+      var cs = getComputedStyle(c);
+      if (cs.display === 'none') continue;
+      var r = c.getBoundingClientRect();
+      var box = /^(IMG|SVG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OBJECT|EMBED)$/.test(tag);
+      if (cs.display === 'contents' || (!box && cs.display === 'inline') || (r.width === 0 && r.height === 0)) {
+        right = Math.max(right, need(c));
+      } else if (!box && !/grid|table/.test(cs.display) && r.right + px(cs.marginRight) >= contentRight - 0.5) {
+        var inner = Math.max(need(c), r.left + px(cs.borderLeftWidth) + px(cs.paddingLeft));
+        right = Math.max(right, inner + px(cs.paddingRight) + px(cs.borderRightWidth) + px(cs.marginRight));
+      } else {
+        right = Math.max(right, r.right + px(cs.marginRight));
+      }
+    }
+    return right;
+  }
+  var b = document.body, bs = getComputedStyle(b);
+  return Math.ceil(need(b) + px(bs.paddingRight) + px(bs.borderRightWidth) + px(bs.marginRight));
+}
+var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');window.parent.postMessage({type:'pd-width',width:pdContentWidth(),at:window.innerWidth,scroll:document.documentElement.scrollWidth},'*');},50);}).observe(document.body);})();</script>
+<script type="module" src="/_pd/scripts/toggle.js?v=1767319445000"></script>
+<script type="module" src="/_pd/scripts/nav.js"></script>
+<script type="module" src="https://cdn.example/x.js"></script>
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=full scripts=false svg=false base=/pd/ 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/pd/"><link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+
+<button class="b">Go</button>
+<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');},50);}).observe(document.body);})();</script>
+
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=full scripts=false svg=false base=- 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+
+<button class="b">Go</button>
+<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');},50);}).observe(document.body);})();</script>
+
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=full scripts=false svg=true base=/pd/ 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/pd/"><link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+<svg hidden><symbol id="i-x"></symbol></svg>
+<button class="b">Go</button>
+<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');},50);}).observe(document.body);})();</script>
+
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=full scripts=false svg=true base=- 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+<svg hidden><symbol id="i-x"></symbol></svg>
+<button class="b">Go</button>
+<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');},50);}).observe(document.body);})();</script>
+
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=full scripts=true svg=false base=/pd/ 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/pd/"><link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+
+<button class="b">Go</button>
+<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');},50);}).observe(document.body);})();</script>
+<script type="module" src="/_pd/scripts/toggle.js?v=1767319445000"></script>
+<script type="module" src="/_pd/scripts/nav.js"></script>
+<script type="module" src="https://cdn.example/x.js"></script>
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=full scripts=true svg=false base=- 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+
+<button class="b">Go</button>
+<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');},50);}).observe(document.body);})();</script>
+<script type="module" src="/_pd/scripts/toggle.js?v=1767319445000"></script>
+<script type="module" src="/_pd/scripts/nav.js"></script>
+<script type="module" src="https://cdn.example/x.js"></script>
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=full scripts=true svg=true base=/pd/ 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/pd/"><link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+<svg hidden><symbol id="i-x"></symbol></svg>
+<button class="b">Go</button>
+<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');},50);}).observe(document.body);})();</script>
+<script type="module" src="/_pd/scripts/toggle.js?v=1767319445000"></script>
+<script type="module" src="/_pd/scripts/nav.js"></script>
+<script type="module" src="https://cdn.example/x.js"></script>
+</body>
+</html>"
+`;
+
+exports[`preview document, whole > layout=full scripts=true svg=true base=- 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/_pd/base.css">
+<link rel="stylesheet" href="/assets/css/fonts.css">
+<link rel="stylesheet" href="/_pd/themes/light.css">
+<link rel="stylesheet" href="/_pd/themes/dark.css">
+<link rel="stylesheet" href="/_pd/components/atoms/icon.css" data-pd-comp="atoms/icon">
+<link rel="stylesheet" href="/_pd/components/atoms/button.css" data-pd-comp="atoms/button">
+</head>
+<body data-theme="light" data-component-id="atoms/button">
+<svg hidden><symbol id="i-x"></symbol></svg>
+<button class="b">Go</button>
+<script>(function(){var _t;new ResizeObserver(function(){clearTimeout(_t);_t=setTimeout(function(){window.parent.postMessage({type:'pd-height',height:document.documentElement.scrollHeight},'*');},50);}).observe(document.body);})();</script>
+<script type="module" src="/_pd/scripts/toggle.js?v=1767319445000"></script>
+<script type="module" src="/_pd/scripts/nav.js"></script>
+<script type="module" src="https://cdn.example/x.js"></script>
+</body>
+</html>"
+`;
