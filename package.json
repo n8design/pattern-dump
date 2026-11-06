@@ -28,7 +28,8 @@
   "workspaces": [
     "packages/*",
     "apps/*",
-    "test-bench"
+    "test-bench",
+    "storefront-bench"
   ],
   "scripts": {
     "build": "nx run-many -t build",

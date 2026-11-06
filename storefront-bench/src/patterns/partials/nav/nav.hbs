@@ -1,0 +1,15 @@
+<nav class="site-nav" aria-label="Site">
+  <ul class="site-nav-list">
+    {{#each nav}}
+    <li><a href="{{route}}"{{#if current}} aria-current="page"{{/if}}>{{title}}</a>
+      {{#if children}}
+      <ul class="site-nav-sub">
+        {{#each children}}
+        <li><a href="{{route}}"{{#if current}} aria-current="page"{{/if}}>{{title}}</a></li>
+        {{/each}}
+      </ul>
+      {{/if}}
+    </li>
+    {{/each}}
+  </ul>
+</nav>

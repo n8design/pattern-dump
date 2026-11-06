@@ -1,0 +1,12 @@
+{
+  "name": "storefront-bench",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@pattern-dump/cli": "*"
+  },
+  "scripts": {
+    "dev": "node ../packages/cli/dist/index.js dev"
+  }
+}

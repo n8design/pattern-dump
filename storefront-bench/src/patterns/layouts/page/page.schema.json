@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Page layout",
+  "description": "The frontmatter a page using layout: page may set, besides layout and order.",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "title":       { "type": "string", "description": "The page's heading, and its title in the nav" },
+    "description": { "type": "string", "description": "One sentence under the heading, and the page's meta description" }
+  }
+}
