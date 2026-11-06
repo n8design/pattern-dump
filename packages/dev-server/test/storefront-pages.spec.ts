@@ -58,9 +58,10 @@ describe("readPages — the storefront bench", () => {
       { route: "/about/", title: "About", layout: "page" },
     ]);
     expect(model.nav).toEqual([
-      { route: "/", title: "Storefront bench" },
-      { route: "/guides/", title: "Guides", children: [{ route: "/guides/setup/", title: "Setup" }] },
-      { route: "/about/", title: "About" },
+      { route: "/", title: "Storefront bench", description: "A small website rendered from markdown, with the bench's own skin." },
+      { route: "/guides/", title: "Guides", description: "Longer texts about the bench.",
+        children: [{ route: "/guides/setup/", title: "Setup", description: "How the bench is put together." }] },
+      { route: "/about/", title: "About", description: "What the bench is for." },
     ]);
     expect([...model.files.keys()]).toEqual(["/", "/guides/", "/guides/setup/", "/about/"]);
     expect(model.files.get("/guides/setup/")?.path).toBe("guides/setup.md");
@@ -131,6 +132,20 @@ describe("readPages — what the nav shows", () => {
       before.nav[2],
       { route: "/contact/", title: "Contact" },
     ]);
+  });
+
+  it("carries each page's description, a top-level entry's and a folder page's, and none where a page has none", async () => {
+    const model = await readPages(await pages({
+      "index.md": page("Home", "description: The front page.\n"),
+      "g/index.md": page("G"),
+      "g/x.md": page("X", "description: A page in G.\n"),
+    }));
+    // Without an order, entries sort by name: g before the home page's index.
+    expect(model.nav).toEqual([
+      { route: "/g/", title: "G", children: [{ route: "/g/x/", title: "X", description: "A page in G." }] },
+      { route: "/", title: "Home", description: "The front page." },
+    ]);
+    expect("description" in model.nav[0]).toBe(false);
   });
 
   it("is one level deep: deeper pages exist at their routes, but not in the nav", async () => {

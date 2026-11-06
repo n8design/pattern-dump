@@ -693,6 +693,8 @@ export interface StorefrontPage {
 export interface StorefrontNavItem {
   route: string;
   title: string;
+  /** The page's `description` from its frontmatter; absent when it has none. */
+  description?: string;
   children?: StorefrontNavItem[];
 }
 

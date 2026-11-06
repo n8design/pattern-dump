@@ -102,6 +102,11 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
     title: scalar(f.frontmatter.values["title"]) ?? f.route,
     layout: scalar(f.frontmatter.values["layout"]) ?? DEFAULT_LAYOUT,
   });
+  /** A nav entry's page fields: its route and title, and its description when it has one. */
+  const entryOf = (f: PageFile): StorefrontNavItem => {
+    const description = scalar(f.frontmatter.values["description"]);
+    return { route: f.route, title: pageOf(f).title, ...(description !== undefined ? { description } : {}) };
+  };
   const weightOf = (f: PageFile | undefined): number | undefined => {
     const o = parseOrder(f?.frontmatter.values["order"]);
     return o && "weight" in o ? o.weight : undefined;
@@ -156,10 +161,10 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
     const children = folders.has(item.route) && item.route !== "/"
       ? ordered(item.route).flatMap(c => {
         const p = files.get(c.route);
-        return p ? [{ route: p.route, title: pageOf(p).title }] : [];
+        return p ? [entryOf(p)] : [];
       })
       : [];
-    nav.push({ route: page.route, title: pageOf(page).title, ...(children.length ? { children } : {}) });
+    nav.push({ ...entryOf(page), ...(children.length ? { children } : {}) });
   }
 
   // Every page: in nav order first, then the ones the nav does not reach, by path.
