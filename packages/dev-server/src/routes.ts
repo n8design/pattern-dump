@@ -68,6 +68,8 @@ export interface RouteContext {
   readonly now: () => Date;
   /** false when headless (`pd build`): there is no live-reload socket, so pages carry no client for it. */
   readonly live: boolean;
+  /** Set by `pd build`: storefront pages link into the workbench at this address. See DevServerOptions. */
+  readonly storefrontWorkbenchUrl?: string;
 }
 
 /** What the running process knows about itself, frozen at startup. The wire shape adds `protocol`. */
@@ -449,14 +451,15 @@ export async function handleRequest(
       // A page route is a folder path; /about is /about/, as a static host serves it.
       const route = /\.[a-z0-9]+$/i.test(pathname) ? null : pathname.endsWith("/") ? pathname : `${pathname}/`;
       if (route === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end(`Not found: ${pathname}`); return; }
-      // In pd dev a page links to the workbench of this same process, whatever the config's build-time URL.
+      // In pd dev a page links to the workbench of this same process, whatever the config's build-time
+      // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
       if (!state.compositionRegistry) {
         state.compositionRegistry = await buildCompositionRegistry(patternDirs, state.discoveryResult.handleMap, discoveryMap);
       }
       const page = await assemblePage(route, model, {
         discoveryMap, composition: state.compositionRegistry, render, site: cfg.storefront.site,
-        workbenchUrl: `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
+        workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html) => pageStylesheets(cfg, state, discoveryMap, layoutId, html),
         ...(ctx.live ? { live: { wsPort } } : {}),
       });

@@ -45,6 +45,8 @@ export interface SnapshotWriterOptions {
   /** The headless server, e.g. "http://127.0.0.1:61234". */
   origin: string;
   report: SnapshotCounts;
+  /** How a live URL is fetched. Default: fetch(origin + url). A writer for another host passes its own. */
+  fetch?: (liveUrl: string) => Promise<Response>;
 }
 
 export interface CaptureOptions {
@@ -64,7 +66,7 @@ export interface SnapshotWriter {
   readonly failures: string[];
 }
 
-export function createSnapshotWriter({ outDir, basePath, origin, report }: SnapshotWriterOptions): SnapshotWriter {
+export function createSnapshotWriter({ outDir, basePath, origin, report, fetch: get = (u: string) => fetch(`${origin}${u}`) }: SnapshotWriterOptions): SnapshotWriter {
   /** Snapshot file → the live URL that wrote it. */
   const done = new Map<string, string>();
   const failures: string[] = [];
@@ -73,7 +75,7 @@ export function createSnapshotWriter({ outDir, basePath, origin, report }: Snaps
     const file = staticPathFor(liveUrl);
     if (done.has(file)) return null;
     done.set(file, liveUrl);
-    const res = await fetch(`${origin}${liveUrl}`);
+    const res = await get(liveUrl);
     if (res.status !== 200) {
       // A component that fails to render is a finding about the design system, not a reason to abort
       // the build: the static shell reports the missing file exactly as the live one reports the error.

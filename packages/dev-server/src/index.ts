@@ -120,6 +120,9 @@ export interface DevServerOptions {
    *  `generatedAt`. Default: real time. `pd build` passes a fixed one when asked for a reproducible
    *  snapshot. */
   now?: () => Date;
+  /** `pd build` only: where storefront pages link into the workbench — the built workbench's address
+   *  (storefront.workbenchUrl). Without it, pages link to this process's own workbench on pd.localhost. */
+  storefrontWorkbenchUrl?: string;
 }
 export interface DevServer {
   port: number;
@@ -242,7 +245,10 @@ export async function startDevServer(
       .catch(() => null),
   };
 
-  const routeCtx: RouteContext = { cfg, state, render, tracker, globalData, devUiDist, boot, now, live };
+  const routeCtx: RouteContext = {
+    cfg, state, render, tracker, globalData, devUiDist, boot, now, live,
+    ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
+  };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 
   await new Promise<void>((resolve, reject) => {
