@@ -24,11 +24,10 @@
   border-color: var(--sk-accent);
 }
 
+// As tall as what it holds: a title, and a folder's pages.
 .card-body {
   display: grid;
   gap: var(--sk-space-3);
-  align-content: space-between;
-  min-block-size: 9rem;
   padding: var(--sk-space-5);
 }
 
@@ -56,9 +55,10 @@
 }
 
 @container (width > 26rem) {
+  // A folder's pages sit low beside its title, on the title's last line.
   .card-body {
     grid-template-columns: 1fr auto;
-    align-items: end;
+    align-items: last baseline;
   }
 
   .card-pages {

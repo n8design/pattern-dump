@@ -70,11 +70,22 @@ test.describe("the skin", () => {
       await page.goto("/");
       const card = page.locator(".card", { has: page.locator('.card-title[href="/guides/"]') });
       const box = await card.evaluate(c => {
+        const body = c.querySelector(".card-body")!, cs = getComputedStyle(body);
         const t = c.querySelector(".card-title")!.getBoundingClientRect(), p = c.querySelector(".card-pages")!.getBoundingClientRect();
-        return { titleRight: t.right, titleBottom: t.bottom, pagesLeft: p.left, pagesTop: p.top };
+        const content = Math.max(t.bottom, p.bottom) - Math.min(t.top, p.top);
+        return { titleTop: t.top, titleRight: t.right, titleBottom: t.bottom, pagesLeft: p.left, pagesTop: p.top, pagesBottom: p.bottom,
+          slack: body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - content };
       });
-      if (beside) expect(box.pagesLeft).toBeGreaterThan(box.titleRight);
-      else expect(box.pagesTop).toBeGreaterThanOrEqual(box.titleBottom);
+      if (beside) {
+        expect(box.pagesLeft).toBeGreaterThan(box.titleRight);
+        // Low beside the title: the list's middle in the title's lower half, not up at the card's top.
+        expect((box.pagesTop + box.pagesBottom) / 2).toBeGreaterThan((box.titleTop + box.titleBottom) / 2);
+        expect(box.pagesBottom).toBeLessThanOrEqual(box.titleBottom + 2);
+      } else {
+        expect(box.pagesTop).toBeGreaterThanOrEqual(box.titleBottom);
+      }
+      // No empty space: the card is as tall as what it holds.
+      expect(box.slack).toBeLessThan(1);
     });
   }
 });
