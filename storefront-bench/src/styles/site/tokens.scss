@@ -10,8 +10,11 @@
   --sk-ink: light-dark(oklch(22% 0.02 260deg), oklch(94% 0.01 85deg));
   --sk-muted: light-dark(oklch(48% 0.02 260deg), oklch(72% 0.02 260deg));
   --sk-rule: light-dark(oklch(88% 0.01 85deg), oklch(32% 0.015 260deg));
-  --sk-accent-wash: color-mix(in oklch, var(--sk-accent) 10%, var(--sk-paper));
-  --sk-accent-wash-strong: color-mix(in oklch, var(--sk-accent) 22%, var(--sk-paper));
+
+  // The accent's washes keep its hue (relative colour syntax): pale on paper, deep on the dark
+  // paper. Mixing the accent into the dark paper would cross the hue circle through purple.
+  --sk-accent-wash: light-dark(oklch(from var(--sk-accent) 95% 0.03 h), oklch(from var(--sk-accent) 27% 0.04 h));
+  --sk-accent-wash-strong: light-dark(oklch(from var(--sk-accent) 89% 0.06 h), oklch(from var(--sk-accent) 33% 0.07 h));
 
   --sk-font-display: "Montserrat", "Helvetica Neue", arial, sans-serif;
   --sk-font-body: "Source Serif 4", georgia, serif;

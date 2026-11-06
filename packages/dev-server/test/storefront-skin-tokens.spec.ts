@@ -45,9 +45,14 @@ describe("the skin's colours", () => {
   it("derive every accent tint from --sk-accent, which is defined once", async () => {
     const tokens = (await sources()).get(TOKENS)!;
     expect([...tokens.matchAll(/--sk-accent\s*:/g)]).toHaveLength(1);
-    // Every other token that mixes in a colour mixes in the accent token, not a second literal accent.
-    const mixes = [...tokens.matchAll(/(--sk-[a-z0-9-]+)\s*:\s*color-mix\(([^;]+);/g)];
-    for (const [, name, body] of mixes) expect(body, name).toContain("var(--sk-accent)");
+    // Every other token that mixes in a colour, or takes one with relative colour syntax (from …), takes
+    // the accent token, not a second literal accent.
+    const derived = [...tokens.matchAll(/(--sk-[a-z0-9-]+)\s*:([^;]*(?:color-mix\(|\bfrom\s)[^;]*);/g)];
+    expect(derived.length).toBeGreaterThan(0);
+    for (const [, name, body] of derived) {
+      expect(body, name).toContain("var(--sk-accent)");
+      for (const m of body.matchAll(/\bfrom\s+(var\([^)]*\)|[^\s]+)/g)) expect(m[1], name).toBe("var(--sk-accent)");
+    }
   });
 
   it("never use the workbench shell's --pd- properties", async () => {

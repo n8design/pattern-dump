@@ -48,6 +48,27 @@ test.describe("the skin", () => {
     });
   }
 
+  for (const [route, tone] of [["/", "callout"], ["/guides/setup/", "warning callout"]] as const) {
+    test(`keeps a ${tone}'s wash on the accent's hue in the dark scheme, not a purple-grey`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: "dark" });
+      await page.goto(route);
+      await settle(page);
+      const hues = await page.locator("figure.doc-example iframe").evaluate((f: HTMLIFrameElement) => {
+        const w = f.contentWindow!, d = f.contentDocument!;
+        const hue = (c: string) => { const m = /^oklch\(\S+ \S+ (\S+)\)$/.exec(c); return m ? parseFloat(m[1]) : NaN; };
+        const probe = d.createElement("i");
+        probe.style.color = "oklch(from var(--sk-accent) l c h)";
+        d.body.append(probe);
+        const accent = w.getComputedStyle(probe).color;
+        probe.remove();
+        const wash = w.getComputedStyle(d.querySelector(".callout")!).backgroundColor;
+        return { accent, wash, accentHue: hue(accent), washHue: hue(wash) };
+      });
+      expect(Number.isNaN(hues.washHue), JSON.stringify(hues)).toBe(false);
+      expect(Math.abs(hues.washHue - hues.accentHue), JSON.stringify(hues)).toBeLessThan(5);
+    });
+  }
+
   test("takes its brand colour from --sk-accent alone", async ({ page }) => {
     await page.goto("/");
     const read = () => page.evaluate(() => ({
