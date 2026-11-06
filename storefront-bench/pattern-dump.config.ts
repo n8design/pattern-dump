@@ -8,6 +8,9 @@ export default defineConfig({
   patternsDir: "./src/patterns",
   outDir: "./.out/workbench",
   styles: { strategy: "parallel", dir: "./src/styles" },
+  // The skin's tokens, fonts and document defaults: linked into every page and every preview.
+  documentBase: ["site"],
+  assets: { dir: "./src/assets" },
   storefront: {
     pagesDir: "./pages",
     outDir: "./.out/storefront",

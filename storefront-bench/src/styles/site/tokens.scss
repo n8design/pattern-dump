@@ -1,0 +1,39 @@
+// The skin's design tokens, all prefixed --sk-. Colours are OKLCH and follow the reader's colour
+// scheme through light-dark().
+// --sk-accent is the one brand colour. Every accent tint the skin uses is mixed from it, so a site
+// rebrands by setting that token alone: one colour, or a light-dark() pair.
+:root {
+  color-scheme: light dark;
+
+  --sk-accent: light-dark(oklch(55% 0.19 30deg), oklch(72% 0.15 35deg));
+  --sk-paper: light-dark(oklch(98.5% 0.006 85deg), oklch(18% 0.015 260deg));
+  --sk-ink: light-dark(oklch(22% 0.02 260deg), oklch(94% 0.01 85deg));
+  --sk-muted: light-dark(oklch(48% 0.02 260deg), oklch(72% 0.02 260deg));
+  --sk-rule: light-dark(oklch(88% 0.01 85deg), oklch(32% 0.015 260deg));
+  --sk-accent-wash: color-mix(in oklch, var(--sk-accent) 10%, var(--sk-paper));
+
+  --sk-font-display: "Montserrat", "Helvetica Neue", arial, sans-serif;
+  --sk-font-body: "Source Serif 4", georgia, serif;
+
+  // A fluid type scale: each step grows with the viewport between its two ends.
+  --sk-step-n1: clamp(0.83rem, 0.8rem + 0.15vw, 0.9rem);
+  --sk-step-0: clamp(1.06rem, 1rem + 0.3vw, 1.25rem);
+  --sk-step-1: clamp(1.3rem, 1.15rem + 0.6vw, 1.6rem);
+  --sk-step-2: clamp(1.6rem, 1.3rem + 1.2vw, 2.25rem);
+  --sk-step-3: clamp(2rem, 1.4rem + 2.4vw, 3.4rem);
+  --sk-step-4: clamp(2.6rem, 1.5rem + 4.4vw, 5.2rem);
+  --sk-step-5: clamp(3.2rem, 1.4rem + 7vw, 7.5rem);
+
+  --sk-space-1: 0.25rem;
+  --sk-space-2: 0.5rem;
+  --sk-space-3: 0.75rem;
+  --sk-space-4: 1rem;
+  --sk-space-5: 1.5rem;
+  --sk-space-6: 2.5rem;
+  --sk-space-7: 4rem;
+  --sk-space-8: 6rem;
+
+  --sk-measure: 38rem;
+  --sk-page: 76rem;
+  --sk-corner: 1.75rem;
+}

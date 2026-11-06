@@ -63,19 +63,23 @@ describe("pd build — the storefront root", () => {
   it("writes one HTML file per page at its route, the previews they embed, and what those reference", () => {
     expect([...files.keys()].sort()).toEqual([
       ".nojekyll",
+      "_pd/base.css",
       "_pd/components/components/callout.css",
       "_pd/components/partials/base.css",
       "_pd/components/partials/footer.css",
       "_pd/components/partials/header.css",
       "_pd/components/partials/nav.css",
       "about/index.html",
+      "assets/fonts/montserrat-variable.woff2",
+      "assets/fonts/source-serif-4-italic.woff2",
+      "assets/fonts/source-serif-4-roman.woff2",
       "guides/index.html",
       "guides/setup/index.html",
       "index.html",
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 12, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 16, bytes: expect.any(Number) });
   });
 
   it("resolves every reference inside it to a file it holds", () => {
