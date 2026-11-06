@@ -334,9 +334,17 @@ watcher.on("change", async (filePath) => {
 // from firing at startup. Theme additions are ignored here (rare; handled on next nav).
 // Helper: rebuild discovery, surface any collisions, then push tree-changed.
 async function rebuildAndSignalTree(label: string): Promise<void> {
+  const before = state.discoveryResult ? baseComponentIds(state.discoveryResult) : null;
   const dr = await buildDiscoveryMap(patternRoots);
   state.discoveryResult = dr;
   state.compositionRegistry = null;
+  // A component that arrived (or left) changes who owns which stylesheet: a stylesheet saved before its
+  // template was filed under the base layer, and now belongs to the component. Restyle against the new
+  // set, so its CSS moves without a restart.
+  const after = baseComponentIds(dr);
+  if (!before || before.size !== after.size || [...after].some(id => !before.has(id))) {
+    await restyleAll(after, Date.now(), [], false);
+  }
   // Structural change (component added / removed) → the corpus node set changed; drop the diagnostics
   // slice cache so the next /api/audit re-seeds (still a hash-delta vs disk — only genuinely-changed
   // components re-audit). Not surgical, but adds/removes are rare and reshape the graph.

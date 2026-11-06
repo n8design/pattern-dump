@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- A component added while `pd dev` runs gets its own stylesheet even when the stylesheet is saved before
+  the template. Until the template existed its rules counted as base-layer rules, and they stayed there
+  until a restart: linked on every preview and missing from the component's own CSS.
 - A variant reached by its own id (`/preview/atoms/toggle-demo~alt`) is now the same document as
   `?variant=alt`: it gets its base's behaviour scripts (`requireScript`), layout and CSS. It used to
   lose the base's scripts.
