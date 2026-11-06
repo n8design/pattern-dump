@@ -15,7 +15,7 @@
 
 import { dom } from "../core/dom.js";
 import { showFullpageChrome } from "./fullpage.js";
-import { acceptContentHeight } from "./content-height.js";
+import { acceptContentHeightMessage } from "./content-height.js";
 import { acceptContentWidth } from "./content-width.js";
 import { updateReadout } from "./viewport.js";
 
@@ -30,17 +30,13 @@ export function listenForPreviewMessages(): void {
   window.addEventListener("message", (e: MessageEvent<unknown>) => {
     const data = e.data as { type?: string; height?: number; width?: number; at?: number; scroll?: number; action?: string } | null;
     if (!data) return;
-    if (data.type === "pd-height" && typeof data.height === "number") {
-      const height = data.height;
-      // Which frames content-fit their height, and what stops a centered preview whose own height
-      // depends on the frame's from ballooning, is content-height.ts. Full-page layout is
-      // viewport-inert in height: the iframe fills the stage and a taller page scrolls INSIDE it.
-      // documentElement.scrollHeight stays the measurement (glyph-ink + margin-collapse correct).
-      document.querySelectorAll("iframe").forEach((f) => {
-        const frame = f as HTMLIFrameElement;
-        if (frame.contentWindow !== e.source) return;
-        acceptContentHeight(frame, height);
-      });
+    if (data.type === "pd-height") {
+      // Which frame sent it, which frames content-fit their height, and what stops a centered preview
+      // whose own height depends on the frame's from ballooning: the shared fitter (content-height.ts,
+      // over @pattern-dump/contracts). Full-page layout is viewport-inert in height: the iframe fills the
+      // stage and a taller page scrolls INSIDE it. documentElement.scrollHeight stays the measurement
+      // (glyph-ink + margin-collapse correct).
+      acceptContentHeightMessage(e, document.querySelectorAll("iframe"));
     } else if (data.type === "pd-width" && typeof data.width === "number" && typeof data.at === "number") {
       const { width, at } = data;
       const scroll = typeof data.scroll === "number" ? data.scroll : at;

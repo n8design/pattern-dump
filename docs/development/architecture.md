@@ -55,7 +55,7 @@ pattern-dump/
 
 | Package | Responsibility | Depends on |
 |---|---|---|
-| `contracts` | The seams: TypeScript types plus a few pure helpers (URL builders, the audit rollup, `staticPathFor`). Defines `render()`, the dev-server ↔ dev-ui data API and the HMR protocol, versioned by `PD_PROTOCOL_VERSION`. | — |
+| `contracts` | The seams: TypeScript types plus a few pure helpers (URL builders, the audit rollup, `staticPathFor`, the preview height fitter). Defines `render()`, the dev-server ↔ dev-ui data API and the HMR protocol, versioned by `PD_PROTOCOL_VERSION`. | — |
 | `config` | Loads `pattern-dump.config.ts` / `.json` (TypeScript wins). Shared config types. | contracts |
 | `build` | esbuild (TypeScript), Sass + Autoprefixer, Chokidar watching, incremental builds, the SCSS dependency graph. | contracts |
 | `hotreloader` | `ws`-based hot-reload server and browser client. | contracts |
@@ -81,7 +81,10 @@ diagnostics) are built inside `dev-server` from one compile, all keyed on `disco
 
 **Known deviation:** `contracts` is not a pure-types leaf. `src/dev-protocol.ts` ships runtime helpers
 (`buildAuditRollup`, the URL builders, `staticPathFor`) because `dev-server` and `dev-ui` both need the
-same logic and no shared-logic package exists.
+same logic and no shared-logic package exists. `src/iframe-fit.ts` is one dependency-free browser module:
+the preview height fitter (content-fit height and its loop guard). The workbench Stage imports it; pages
+without a bundle inline its factory's source, which is why the factory references nothing outside its
+own body (pinned by `iframe-fit.spec.ts`).
 
 ---
 
