@@ -163,6 +163,33 @@ test.describe("the skin", () => {
     await expectField(".article-header", "--sk-slate");
   });
 
+  for (const route of ["/", "/guides/setup/"]) {
+    test(`${route}: shows its live example as a specimen plate: the frame on a slate mat, the caption plate with the workbench link inside it`, async ({ page }) => {
+      await page.goto(route);
+      await settle(page);
+      const plate = await page.locator("figure.doc-example").evaluate(fig => {
+        const probe = document.createElement("i");
+        probe.style.backgroundColor = "var(--sk-slate)";
+        document.body.append(probe);
+        const slate = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        const f = fig.getBoundingClientRect(), frame = fig.querySelector("iframe")!.getBoundingClientRect();
+        const caption = fig.querySelector("figcaption")!, c = caption.getBoundingClientRect(), link = caption.querySelector("a");
+        return {
+          mat: getComputedStyle(fig).backgroundColor === slate,
+          matAround: Math.min(frame.left - f.left, f.right - frame.right, frame.top - f.top, f.bottom - c.bottom) >= 12,
+          captionInPlate: c.top >= frame.bottom && c.left >= f.left && c.right <= f.right && c.bottom <= f.bottom,
+          link: link?.getAttribute("href") ?? null,
+          linkNames: link?.textContent ?? "",
+          title: fig.querySelector("iframe")!.title,
+        };
+      });
+      expect(plate).toMatchObject({ mat: true, matAround: true, captionInPlate: true });
+      expect(plate.link).toMatch(/\/components\/callout(#warning)?$/);
+      expect(plate.linkNames).toContain(plate.title);
+    });
+  }
+
   test("takes its brand colour from --sk-accent alone", async ({ page }) => {
     await page.goto("/");
     const read = () => page.evaluate(() => ({
@@ -227,7 +254,7 @@ test.describe("motion and print", () => {
 
   test("prints its colour fields as ink on paper, since printers drop background colours", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark", media: "print" });
-    for (const [route, selector] of [["/", ".home-cover"], ["/about/", ".page-header"], ["/guides/setup/", ".article-header"], ["/", ".site-footer"]] as const) {
+    for (const [route, selector] of [["/", ".home-cover"], ["/about/", ".page-header"], ["/guides/setup/", ".article-header"], ["/", ".site-footer"], ["/", "figure.doc-example"]] as const) {
       await page.goto(route);
       const printed = await page.locator(selector).evaluate(el => {
         const cs = getComputedStyle(el);

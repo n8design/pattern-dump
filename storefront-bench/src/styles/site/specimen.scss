@@ -1,0 +1,38 @@
+// A live example as a specimen plate: the frame on a slate mat, with the skin's corner, and beneath it
+// a caption plate in the mono that names the component and links to it in the workbench. The frame
+// fills the plate's width; its height is the preview's own (the storefront's height fitter).
+.doc-example {
+  display: grid;
+  gap: var(--sk-space-3);
+  padding: var(--sk-space-4);
+  background: var(--sk-slate);
+  color: var(--sk-on-dark);
+  border-end-start-radius: var(--sk-corner);
+}
+
+.doc-example figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sk-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding-block-start: var(--sk-space-3);
+  border-block-start: 1px solid currentcolor;
+}
+
+.doc-example figcaption a {
+  text-decoration-color: currentcolor;
+}
+
+.doc-example figcaption a::after {
+  content: " ↗";
+}
+
+.doc-example figcaption a:hover {
+  color: inherit;
+  text-decoration-thickness: 0.18em;
+}
+
+.doc-example :focus-visible {
+  outline-color: currentcolor;
+}
