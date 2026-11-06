@@ -18,10 +18,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
+import { PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview,
-  RuleTiers, ShellClientConfig, ThemeSummary, VersionInfo,
+  RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
 } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { compileScriptFile } from "@pattern-dump/build";
@@ -47,6 +47,9 @@ import {
 import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
+import { readPages } from "./storefront/pages.js";
+import { assemblePage } from "./storefront/page.js";
+import { pageStylesheets } from "./storefront/page-head.js";
 
 /** Everything the routes need, handed in explicitly rather than captured from a closure. */
 export interface RouteContext {
@@ -63,6 +66,8 @@ export interface RouteContext {
   readonly boot: BootStamp;
   /** The clock for response time stamps (the audit's `generatedAt`). See DevServerOptions.now. */
   readonly now: () => Date;
+  /** false when headless (`pd build`): there is no live-reload socket, so pages carry no client for it. */
+  readonly live: boolean;
 }
 
 /** What the running process knows about itself, frozen at startup. The wire shape adds `protocol`. */
@@ -423,6 +428,38 @@ export async function handleRequest(
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end(`Data file not found: ${String(e)}`);
       }
+      return;
+    }
+
+    // --- Storefront pages, on the storefront's own host ---
+    // Every route above serves the same on every host (a page's iframes load /preview/, its
+    // stylesheets /_pd/). What is left is the page URL space: on the storefront host it is the
+    // storefront's, on every other host the workbench's, as before. Without a storefront config
+    // every host is the workbench.
+    const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
+    if (cfg.storefront && host === cfg.storefront.host) {
+      if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
+      const discoveryMap = state.discoveryResult.discoveryMap;
+      const model = await readPages(cfg.storefront.pagesDir);
+      if (pathname === PD_ROUTES.pages) {
+        if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
+        json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);
+        return;
+      }
+      // A page route is a folder path; /about is /about/, as a static host serves it.
+      const route = /\.[a-z0-9]+$/i.test(pathname) ? null : pathname.endsWith("/") ? pathname : `${pathname}/`;
+      if (route === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end(`Not found: ${pathname}`); return; }
+      // In pd dev a page links to the workbench of this same process, whatever the config's build-time URL.
+      const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
+      const page = await assemblePage(route, model, {
+        discoveryMap, render, site: cfg.storefront.site,
+        workbenchUrl: `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
+        head: (layoutId, html) => pageStylesheets(cfg, state, discoveryMap, layoutId, html),
+        ...(ctx.live ? { live: { wsPort } } : {}),
+      });
+      if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
+      res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(page.html);
       return;
     }
 

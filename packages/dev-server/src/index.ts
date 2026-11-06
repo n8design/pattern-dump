@@ -242,7 +242,7 @@ export async function startDevServer(
       .catch(() => null),
   };
 
-  const routeCtx: RouteContext = { cfg, state, render, tracker, globalData, devUiDist, boot, now };
+  const routeCtx: RouteContext = { cfg, state, render, tracker, globalData, devUiDist, boot, now, live };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 
   await new Promise<void>((resolve, reject) => {
