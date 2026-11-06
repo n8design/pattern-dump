@@ -1,0 +1,28 @@
+// On paper: no site navigation or cards (a page prints
+// alone), and every link to another site with its address written out.
+// (The light scheme itself is set with the tokens, in tokens.scss.)
+@media print {
+  .site-nav,
+  .site-cards {
+    display: none;
+  }
+
+  .site {
+    row-gap: var(--sk-space-5);
+  }
+
+  :is(.page-body, .article-body, .doc-example) a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    word-break: break-all;
+  }
+
+  :is(.page-body, .article-body) > *,
+  .doc-example {
+    break-inside: avoid;
+  }
+
+  :is(h1, h2, h3) {
+    break-after: avoid;
+  }
+}

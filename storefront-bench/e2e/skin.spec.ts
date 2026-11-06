@@ -69,6 +69,41 @@ test.describe("the skin", () => {
   }
 });
 
+test.describe("motion and print", () => {
+  for (const [motion, transitions] of [["no-preference", true], ["reduce", false]] as const) {
+    test(`moving to another page ${transitions ? "runs" : "skips"} a view transition when the reader's motion preference is ${motion}`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: motion });
+      await page.addInitScript(() => {
+        addEventListener("pagereveal", e => { (window as unknown as { revealed: boolean | null }).revealed = !!(e as Event & { viewTransition: unknown }).viewTransition; });
+      });
+      await page.goto("/");
+      await page.locator('.site-nav a[href="/about/"]').click();
+      await expect(page.locator("h1")).toHaveText("About");
+      await expect.poll(() => page.evaluate(() => (window as unknown as { revealed?: boolean }).revealed)).toBe(transitions);
+    });
+  }
+
+  test("prints in the light scheme, without the site navigation or cards, with other sites' addresses written out", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark", media: "print" });
+    await page.goto("/");
+    await settle(page);
+    const printed = await page.evaluate(() => {
+      const link = document.querySelector<HTMLAnchorElement>("figure.doc-example figcaption a")!;
+      return {
+        paper: getComputedStyle(document.body).backgroundColor,
+        nav: getComputedStyle(document.querySelector(".site-nav")!).display,
+        cards: getComputedStyle(document.querySelector(".site-cards")!).display,
+        after: getComputedStyle(link, "::after").content,
+        href: link.href,
+      };
+    });
+    expect(printed.paper).toBe("oklch(0.985 0.006 85)");
+    expect(printed.nav).toBe("none");
+    expect(printed.cards).toBe("none");
+    expect(printed.after).toBe(`" (${printed.href})"`);
+  });
+});
+
 test.describe("accessibility (axe)", () => {
   for (const scheme of ["light", "dark"] as const) {
     for (const route of ROUTES) {

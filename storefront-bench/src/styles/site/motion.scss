@@ -1,0 +1,16 @@
+// Moving between pages cross-fades the page, quickly, instead of flashing. A reader who asks for less
+// motion gets plain navigation.
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}

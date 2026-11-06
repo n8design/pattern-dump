@@ -39,3 +39,19 @@
   --sk-page: 76rem;
   --sk-corner: 1.75rem;
 }
+
+// On paper: the light scheme whatever the screen uses, and a fixed type scale (a viewport-based step
+// means nothing there).
+@media print {
+  :root {
+    color-scheme: light;
+
+    --sk-step-n1: 0.8rem;
+    --sk-step-0: 0.95rem;
+    --sk-step-1: 1.2rem;
+    --sk-step-2: 1.5rem;
+    --sk-step-3: 1.9rem;
+    --sk-step-4: 2.4rem;
+    --sk-step-5: 3rem;
+  }
+}
