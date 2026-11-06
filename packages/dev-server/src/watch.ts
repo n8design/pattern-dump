@@ -37,7 +37,7 @@ import { auditComponent } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
-import { routeFor } from "./storefront/pages.js";
+import { readPages, routeFor } from "./storefront/pages.js";
 
 /** Everything the watcher needs, handed in explicitly rather than captured from a closure. */
 export interface WatchContext {
@@ -175,6 +175,11 @@ async function restyleAll(
   }
   if (changes.baseChanged && state.lastComponentId) {
     hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
+  }
+  // Every storefront page links the base layer, so every page changed. Said page by page: the
+  // workbench's reload above names the component on screen, and there may be none.
+  if (changes.baseChanged && pagesDir) {
+    for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
   }
   const what = [
     `${changes.changedComponents.length} component(s)`,

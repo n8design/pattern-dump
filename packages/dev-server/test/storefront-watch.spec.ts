@@ -104,6 +104,34 @@ describe("pd dev reloads storefront pages", () => {
   });
 });
 
+describe("a change to the base layer, with no workbench open", () => {
+  // The base layer is in every page's head, so every page changed. Nothing has asked for a component
+  // (state.lastComponentId is unset), so the workbench's own reload message has no component to name.
+  const everyPage = ["/", "/guides/", "/guides/setup/", "/about/"].map(route => ({ type: "page-changed", route }));
+  let root = "";
+  let messages: Message[] = [];
+  beforeAll(async () => {
+    root = await benchCopy("base-layer");
+    messages = await watch(root, config);
+  }, 120_000);
+  const settled = async (act: () => Promise<void>) => {
+    await after(messages, act, m => m.type === "page-changed" && m.route === "/about/");
+    await new Promise(r => setTimeout(r, 300));
+  };
+
+  it("reloads every page when a file is added to it", async () => {
+    const from = messages.length;
+    await settled(() => writeFile(join(root, "src", "styles", "site", "zz-added.scss"), ".site-footer {\n  letter-spacing: 0.3em;\n}\n"));
+    expect(messages.slice(from).filter(pageChanged)).toEqual(everyPage);
+  }, 20_000);
+
+  it("reloads every page when one of its files is edited", async () => {
+    const from = messages.length;
+    await settled(() => appendFile(join(root, "src", "styles", "site", "tokens.scss"), "\n:root {\n  --sk-probe: 1;\n}\n"));
+    expect(messages.slice(from).filter(pageChanged)).toEqual(everyPage);
+  }, 20_000);
+});
+
 describe("a pages folder beside the patterns, with a name that starts the same", () => {
   it("is still the pages folder, not part of the patterns", async () => {
     const root = await benchCopy("sibling");
