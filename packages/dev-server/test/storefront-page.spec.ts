@@ -10,6 +10,7 @@ import { parse } from "node-html-parser";
 import { createHeightFitter, type DiscoveryMap, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
+import { loadHelperRegistrars } from "../src/project-loaders.js";
 import { buildCompositionRegistry, type CompositionRegistry } from "../src/composition.js";
 import { frontmatterBody } from "../src/frontmatter.js";
 import { readPages } from "../src/storefront/pages.js";
@@ -30,7 +31,9 @@ beforeAll(async () => {
   const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
   map = discoveryMap;
   composition = await buildCompositionRegistry(patterns, handleMap, discoveryMap);
-  render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap });
+  // The bench's own helpers, as pd dev and pd build load them from its config.
+  const helperRegistrars = await loadHelperRegistrars(fileURLToPath(new URL("../../../storefront-bench/src/helpers/skin.ts", import.meta.url)));
+  render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap, helperRegistrars });
 });
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
@@ -63,8 +66,8 @@ describe("assemblePage — the bench's pages", () => {
     expect(html).toContain(`<meta name="description" content="A small website rendered from markdown, with the bench's own skin.">`);
     expect(html).toContain(`<link rel="stylesheet" href="/_pd/head-for/layouts/home">`);
     expect(html).toContain(`<h1 class="home-title">Storefront bench</h1>`);
-    expect(html).toContain(`<a href="/" aria-current="page">Storefront bench</a>`);
-    expect(html).toContain(`<a href="/guides/">Guides</a>`);
+    expect(html).toContain(`<a class="site-title" href="/" aria-current="page">Storefront bench</a>`);
+    expect(html).toContain(`<a href="/guides/">(01) Guides</a>`);
     expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>`);
     expect(html).toContain(`<a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a>`);
     expect(html).toContain("<p>Built with Pattern Dump from the storefront bench.</p>");
@@ -91,7 +94,8 @@ describe("assemblePage — the bench's pages", () => {
     expect(page.status).toBe(200);
     expect(page.html).toContain(`<title>Setup — Storefront bench</title>`);
     expect(page.html).toContain(`<p class="article-lede">Three folders make a site — the pages, the layouts that dress them, and the components they show.</p>`);
-    expect(page.html).toContain(`<a href="/guides/setup/" aria-current="page">Setup</a>`);
+    // The page's section is current in the header: the page itself has no entry there.
+    expect(page.html).toContain(`<a href="/guides/" aria-current="true">(01) Guides</a>`);
     expect(page.html).not.toContain(`<a href="/" aria-current="page">`);
   });
 
@@ -121,7 +125,7 @@ describe("assemblePage — the layouts' sample data never reaches a page", () =>
 
   it("takes the nav from the pages, not from the sample", async () => {
     const page = await build("/", await pagesOf({ "index.md": "---\ntitle: Alpha\n---\n", "beta.md": "---\ntitle: Beta\n---\n" }));
-    expect(page.html).toContain(`<a href="/beta/">Beta</a>`);
+    expect(page.html).toContain(`<a href="/beta/">(01) Beta</a>`);
     expect(page.html).not.toContain("Guides");
   });
 });

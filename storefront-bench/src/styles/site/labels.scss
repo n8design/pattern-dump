@@ -1,8 +1,9 @@
 // The skin's micro labels, set in the mono: section numbers, metadata and captions. One rule, so they
 // read as one voice wherever they sit.
+.site-title,
 .site-tagline,
 .site-footer,
-.site-nav-list > li > a::before,
+.site-nav a,
 .card-pages,
 .doc-example figcaption,
 .callout-title {
@@ -14,7 +15,7 @@
   text-transform: uppercase;
 }
 
-.site-nav-list > li > a::before,
+.site-title,
 .callout-title {
   font-weight: 500;
 }

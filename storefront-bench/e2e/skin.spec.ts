@@ -205,17 +205,23 @@ test.describe("the skin", () => {
 
   test("takes its brand colour from --sk-accent alone", async ({ page }) => {
     await page.goto("/");
-    const read = () => page.evaluate(() => ({
-      mark: getComputedStyle(document.querySelector(".site-title")!, "::before").backgroundColor,
-      cover: getComputedStyle(document.querySelector(".home-cover")!).backgroundColor,
-      onCover: getComputedStyle(document.querySelector(".home-cover")!).color,
-      current: getComputedStyle(document.querySelector('.site-nav a[aria-current="page"]')!).textDecorationColor,
-    }));
+    const read = () => page.evaluate(() => {
+      // What the accent's text token resolves to now, read off a probe.
+      const probe = document.createElement("i");
+      probe.style.color = "var(--sk-accent-text)";
+      document.body.append(probe);
+      const accentText = getComputedStyle(probe).color;
+      probe.remove();
+      const cover = getComputedStyle(document.querySelector(".home-cover")!);
+      return { accentText, cover: cover.backgroundColor, onCover: cover.color,
+        current: getComputedStyle(document.querySelector('.site-header [aria-current="page"]')!).color };
+    });
     const before = await read();
     await page.addStyleTag({ content: ":root { --sk-accent: rgb(0, 110, 70); }" });
     const after = await read();
-    expect(after.mark).toBe("rgb(0, 110, 70)");
-    expect(after.current).toBe("rgb(0, 110, 70)");
+    // The current page's label is the accent as text, which follows the accent.
+    expect(after.current).toBe(after.accentText);
+    expect(after.current).not.toBe(before.current);
     // The cover is the accent's field, and the text on it follows the accent's lightness.
     expect(after.cover).toBe("rgb(0, 110, 70)");
     expect(after.cover).not.toBe(before.cover);
@@ -224,6 +230,7 @@ test.describe("the skin", () => {
     expect(light.cover).toBe("rgb(250, 220, 120)");
     expect(light.onCover).not.toBe(after.onCover);
   });
+
 
   for (const [name, width, beside] of [["a wide card", 1440, true], ["a narrow card", 390, false]] as const) {
     test(`${name} sets a folder's pages ${beside ? "beside" : "beneath"} its title`, async ({ page }) => {

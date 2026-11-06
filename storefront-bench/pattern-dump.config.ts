@@ -21,6 +21,7 @@ export default defineConfig({
       title: "Storefront bench",
       tagline: "A website written in markdown",
       href: "/",
+      year: "2026",
       footer: "Built with Pattern Dump from the storefront bench.",
     },
   },

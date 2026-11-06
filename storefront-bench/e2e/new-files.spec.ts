@@ -45,7 +45,7 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
       JSON.stringify({ type: "object", required: ["title"], properties: { title: { type: "string" }, description: { type: "string" } } }));
     await put("pages/zz-new.md", "---\nlayout: zz-plain\ntitle: New page\norder: 9\n---\n\nA page on a new layout.\n");
     await reloaded(page);
-    await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About", "New page"]);
+    await expect(page.locator(".site-nav a")).toHaveText(["(01) Guides", "(02) About", "(03) New page"]);
     await page.locator('.site-nav a[href="/zz-new/"]').click();
     await expect(page.locator("h1.zz-plain-title")).toHaveText("New page");
   });

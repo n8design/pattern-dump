@@ -5,6 +5,8 @@
 // The content column is a fixed track, so on a narrow screen it keeps the width and the wide margins
 // give way first.
 .site {
+  // The page is a size container: its parts lay themselves out by the page's width.
+  container: sk-page / inline-size;
   display: grid;
   grid-template-columns:
     [full-start] minmax(var(--sk-gutter), 1fr)

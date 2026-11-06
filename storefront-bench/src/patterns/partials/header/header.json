@@ -1,1 +1,29 @@
-{ "site": { "title": "Storefront bench", "tagline": "A website written in markdown", "href": "/" } }
+{
+  "site": {
+    "title": "Storefront bench",
+    "tagline": "A website written in markdown",
+    "href": "/",
+    "year": "2026"
+  },
+  "nav": [
+    {
+      "route": "/",
+      "title": "Home"
+    },
+    {
+      "route": "/guides/",
+      "title": "Guides",
+      "children": [
+        {
+          "route": "/guides/setup/",
+          "title": "Setup",
+          "current": true
+        }
+      ]
+    },
+    {
+      "route": "/about/",
+      "title": "About"
+    }
+  ]
+}

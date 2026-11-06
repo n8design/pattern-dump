@@ -101,8 +101,8 @@ describe("checkSampleData", () => {
     const patterns = fileURLToPath(new URL("../../../storefront-bench/src/patterns/", import.meta.url));
     const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
     const composition = await buildCompositionRegistry(patterns, handleMap, discoveryMap);
-    expect(await checkSampleData("layouts/page", discoveryMap, composition, ["title", "description"], ["title", "tagline", "href", "footer"])).toEqual([]);
-    expect(await checkSampleData("layouts/article", discoveryMap, composition, ["title", "description", "lede"], ["title", "tagline", "href", "footer"])).toEqual([]);
+    expect(await checkSampleData("layouts/page", discoveryMap, composition, ["title", "description"], ["title", "tagline", "href", "footer", "year"])).toEqual([]);
+    expect(await checkSampleData("layouts/article", discoveryMap, composition, ["title", "description", "lede"], ["title", "tagline", "href", "footer", "year"])).toEqual([]);
   });
 });
 

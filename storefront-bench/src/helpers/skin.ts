@@ -50,6 +50,11 @@ export function skinSections(nav: unknown): Array<NavEntry & { number: string; i
   }));
 }
 
+/** Whether the page is the home page. */
+export function skinAtHome(nav: unknown): boolean {
+  return isNav(nav) && nav.some(e => e.route === "/" && !!e.current);
+}
+
 /** The page's place in the nav: "00" for the home page, "01" for a section, "01.1" for its first page. */
 export function skinIndex(nav: unknown): string {
   if (!isNav(nav)) return "—";

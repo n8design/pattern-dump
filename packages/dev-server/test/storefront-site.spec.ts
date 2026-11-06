@@ -121,7 +121,7 @@ describe("checkSite — the storefront bench", () => {
     const map = (await buildDiscoveryMap(join(bench, "src", "patterns"))).discoveryMap;
     const site = validateConfig(benchConfig, "storefront-bench").storefront?.site;
     expect(await checkSite(site, map)).toEqual({
-      values: { title: "Storefront bench", tagline: "A website written in markdown", href: "/", footer: "Built with Pattern Dump from the storefront bench." },
+      values: { title: "Storefront bench", tagline: "A website written in markdown", href: "/", year: "2026", footer: "Built with Pattern Dump from the storefront bench." },
       problems: [],
     });
   });

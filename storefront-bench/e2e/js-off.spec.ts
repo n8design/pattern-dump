@@ -30,6 +30,6 @@ test.describe("storefront pages with JavaScript off", () => {
   test("an article reads, nav and all", async ({ page }) => {
     await page.goto("/guides/setup/");
     await expect(page.locator(".article-lede")).toHaveText("Three folders make a site — the pages, the layouts that dress them, and the components they show.");
-    await expect(page.locator('.site-nav a[aria-current="page"]')).toHaveText(["Setup"]);
+    await expect(page.locator('.site-nav a[aria-current="true"]')).toHaveText(["(01) Guides"]);
   });
 });
