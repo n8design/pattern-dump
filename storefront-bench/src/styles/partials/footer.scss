@@ -1,5 +1,11 @@
-// Wireframe only: the design pass replaces this.
+// The footer: a rule, then the site's line in small type.
 .site-footer {
-  border-block-start: 1px solid;
-  padding-block-start: 0.5rem;
+  padding-block: var(--sk-space-5) var(--sk-space-6);
+  border-block-start: 1px solid var(--sk-rule);
+  color: var(--sk-muted);
+  font-size: var(--sk-step-n1);
+}
+
+.site-footer p {
+  margin: 0;
 }

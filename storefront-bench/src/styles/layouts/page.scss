@@ -1,0 +1,24 @@
+// The default layout: a display title, a description beneath it, and the body.
+.page-title {
+  grid-column: wide;
+  margin: 0;
+  font-family: var(--sk-font-display);
+  font-size: var(--sk-step-5);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.page-description {
+  margin-block: var(--sk-space-5) 0;
+  color: var(--sk-muted);
+  font-size: var(--sk-step-1);
+  font-style: italic;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.page-body {
+  margin-block-start: var(--sk-space-6);
+}

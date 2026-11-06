@@ -1,0 +1,31 @@
+// A longer text: the title and lede set apart by a rule, then the body.
+.article-header {
+  display: grid;
+  grid-column: wide;
+  grid-template-columns: subgrid;
+  padding-block-end: var(--sk-space-6);
+  border-block-end: 1px solid var(--sk-rule);
+}
+
+.article-title {
+  grid-column: wide;
+  margin: 0;
+  font-family: var(--sk-font-display);
+  font-size: var(--sk-step-5);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.article-lede {
+  grid-column: content;
+  margin-block: var(--sk-space-5) 0;
+  font-size: var(--sk-step-2);
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+
+.article-body {
+  margin-block-start: var(--sk-space-6);
+}
