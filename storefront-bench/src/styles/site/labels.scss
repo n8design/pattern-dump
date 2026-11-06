@@ -1,0 +1,20 @@
+// The skin's micro labels, set in the mono: section numbers, metadata and captions. One rule, so they
+// read as one voice wherever they sit.
+.site-tagline,
+.site-footer,
+.site-nav-list > li > a::before,
+.card-pages,
+.doc-example figcaption,
+.callout-title {
+  font-family: var(--sk-font-mono);
+  font-size: var(--sk-label-size);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: var(--sk-label-tracking);
+  text-transform: uppercase;
+}
+
+.site-nav-list > li > a::before,
+.callout-title {
+  font-weight: 500;
+}

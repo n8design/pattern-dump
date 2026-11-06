@@ -13,7 +13,7 @@ async function settle(page: Page): Promise<void> {
 }
 
 test.describe("the skin", () => {
-  test("loads its own fonts: Montserrat for display, Source Serif 4 (roman and italic) for text", async ({ page }) => {
+  test("loads its own fonts: Montserrat for display, Source Serif 4 for text, IBM Plex Mono for labels", async ({ page }) => {
     await page.goto("/guides/setup/");
     await settle(page);
     const fonts = await page.evaluate(() => ({
@@ -21,8 +21,8 @@ test.describe("the skin", () => {
       title: getComputedStyle(document.querySelector("h1")!).fontFamily,
       text: getComputedStyle(document.querySelector(".article-body p")!).fontFamily,
     }));
-    // All three faces: the tagline is set in italic.
-    expect(fonts.loaded).toEqual(["Montserrat normal", "Source Serif 4 italic", "Source Serif 4 normal"]);
+    // Every face this page uses: the mono's two weights for its labels. Nothing on it is set in italic.
+    expect(fonts.loaded).toEqual(["IBM Plex Mono normal", "IBM Plex Mono normal", "Montserrat normal", "Source Serif 4 normal"]);
     expect(fonts.title).toMatch(/^"?Montserrat"?,/);
     expect(fonts.text).toMatch(/^"Source Serif 4",/);
   });
@@ -35,6 +35,27 @@ test.describe("the skin", () => {
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light dark");
     expect(await page.locator("figure.doc-example iframe").evaluate((f: HTMLIFrameElement) =>
       f.contentWindow!.getComputedStyle(f.contentDocument!.documentElement).colorScheme)).toBe("light dark");
+  });
+
+  test("sets its micro labels (section numbers, metadata, captions) in the mono, uppercase and widely tracked", async ({ page }) => {
+    await page.goto("/guides/setup/");
+    await settle(page);
+    const label = (el: Element) => {
+      const cs = getComputedStyle(el);
+      return [cs.fontFamily.split(",")[0], cs.textTransform, parseFloat(cs.letterSpacing) / parseFloat(cs.fontSize) > 0.15];
+    };
+    const mono = ['"IBM Plex Mono"', "uppercase", true];
+    expect(await page.locator(".site-tagline").evaluate(label)).toEqual(mono);
+    expect(await page.locator(".site-footer").evaluate(label)).toEqual(mono);
+    expect(await page.locator(".site-nav-list > li > a").nth(1).evaluate(el => {
+      const cs = getComputedStyle(el, "::before");
+      return [cs.fontFamily.split(",")[0], cs.textTransform, parseFloat(cs.letterSpacing) / parseFloat(cs.fontSize) > 0.15];
+    })).toEqual(mono);
+    expect(await page.locator("figure.doc-example figcaption").evaluate(label)).toEqual(mono);
+    expect(await page.locator("figure.doc-example iframe").evaluate((f: HTMLIFrameElement) => {
+      const cs = f.contentWindow!.getComputedStyle(f.contentDocument!.querySelector(".callout-title")!);
+      return [cs.fontFamily.split(",")[0], cs.textTransform, parseFloat(cs.letterSpacing) / parseFloat(cs.fontSize) > 0.15];
+    })).toEqual(mono);
   });
 
   for (const [scheme, paper] of [["light", "oklch(0.985 0.006 85)"], ["dark", "oklch(0.18 0.015 260)"]] as const) {

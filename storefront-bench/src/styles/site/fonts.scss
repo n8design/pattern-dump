@@ -22,3 +22,19 @@
   font-display: swap;
   src: url("/assets/fonts/source-serif-4-italic.woff2") format("woff2");
 }
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/assets/fonts/ibm-plex-mono-regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/assets/fonts/ibm-plex-mono-medium.woff2") format("woff2");
+}

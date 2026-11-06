@@ -18,6 +18,11 @@
 
   --sk-font-display: "Montserrat", "Helvetica Neue", arial, sans-serif;
   --sk-font-body: "Source Serif 4", georgia, serif;
+  --sk-font-mono: "IBM Plex Mono", ui-monospace, menlo, monospace;
+
+  // Micro labels: nav numbers, metadata, captions. Mono, uppercase, widely tracked.
+  --sk-label-size: 0.72rem;
+  --sk-label-tracking: 0.16em;
 
   // A fluid type scale: each step grows with the viewport between its two ends.
   --sk-step-n1: clamp(0.83rem, 0.8rem + 0.15vw, 0.9rem);
