@@ -20,10 +20,14 @@ import { readSchema } from "./declared-values.js";
 import { checkPageFrontmatter } from "./frontmatter-contract.js";
 import type { PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
+import { checkSampleData } from "./sample-data.js";
+import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 
 export interface PageAssembly {
   discoveryMap: DiscoveryMap;
+  /** Which components include which: the layout's include tree, for its sample-data check. */
+  composition: CompositionRegistry;
   render: Render;
   /** The stylesheet links for a page rendered with `layoutId` whose markup is `html`. */
   head(layoutId: string, html: string): Promise<string>;
@@ -121,16 +125,23 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     { embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems },
   );
   problems.push(...docProblems.map(p => `${page.path}: ${p}`));
+
+  // The layout's sample data, and that of every partial it includes, must stay out of real pages.
+  const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath)).schema;
+  const siteSchema = (await readSchema(a.discoveryMap.get(SITE_SCHEMA_OWNER)?.schemaPath)).schema;
+  const layoutDeclared = Object.keys(layoutSchema?.properties ?? {});
+  const siteDeclared = Object.keys(siteSchema?.properties?.site?.properties ?? {});
+  if (a.discoveryMap.has(checked.layoutId)) {
+    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared));
+  }
   if (problems.length) return fail(problems);
 
   // What the layout gets: its declared values, null where the page sets none, then what the storefront fills.
-  const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath)).schema;
-  const siteSchema = (await readSchema(a.discoveryMap.get(SITE_SCHEMA_OWNER)?.schemaPath)).schema;
   const data = {
-    ...withDeclaredAbsentAsNull(checked.values, Object.keys(layoutSchema?.properties ?? {}), ["body", "nav", "site"]),
+    ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site"]),
     body,
     nav: markCurrent(model.nav, route),
-    site: withDeclaredAbsentAsNull(site.values, Object.keys(siteSchema?.properties?.site?.properties ?? {})),
+    site: withDeclaredAbsentAsNull(site.values, siteDeclared),
   };
   const { html } = await a.render({ component: checked.layoutId, data });
 

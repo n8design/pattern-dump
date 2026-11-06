@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { createHeightFitter, type DiscoveryMap, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
+import { buildCompositionRegistry, type CompositionRegistry } from "../src/composition.js";
 import { frontmatterBody } from "../src/frontmatter.js";
 import { readPages } from "../src/storefront/pages.js";
 import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
@@ -20,18 +21,20 @@ const WB = "https://workbench.example.test/";
 
 let tmp = "";
 let map: DiscoveryMap;
+let composition: CompositionRegistry;
 let render: Render;
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "pd-page-"));
   const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
   map = discoveryMap;
+  composition = await buildCompositionRegistry(patterns, handleMap, discoveryMap);
   render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap });
 });
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
 const assembly = (over: Partial<PageAssembly> = {}): PageAssembly => ({
-  discoveryMap: map, render, site: SITE, workbenchUrl: WB,
+  discoveryMap: map, composition, render, site: SITE, workbenchUrl: WB,
   head: async (layoutId) => `<link rel="stylesheet" href="/_pd/head-for/${layoutId}">`,
   ...over,
 });

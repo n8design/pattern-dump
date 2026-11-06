@@ -451,8 +451,11 @@ export async function handleRequest(
       if (route === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end(`Not found: ${pathname}`); return; }
       // In pd dev a page links to the workbench of this same process, whatever the config's build-time URL.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
+      if (!state.compositionRegistry) {
+        state.compositionRegistry = await buildCompositionRegistry(patternDirs, state.discoveryResult.handleMap, discoveryMap);
+      }
       const page = await assemblePage(route, model, {
-        discoveryMap, render, site: cfg.storefront.site,
+        discoveryMap, composition: state.compositionRegistry, render, site: cfg.storefront.site,
         workbenchUrl: `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html) => pageStylesheets(cfg, state, discoveryMap, layoutId, html),
         ...(ctx.live ? { live: { wsPort } } : {}),
