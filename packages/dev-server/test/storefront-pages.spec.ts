@@ -1,0 +1,200 @@
+// The storefront's page model: routes from file paths, the nav from folders and `order` (the component
+// tree's rules, inherited), and every problem that keeps a pages folder from being a sound site.
+import { afterAll, describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { readPages, routeFor } from "../src/storefront/pages.js";
+
+const roots: string[] = [];
+afterAll(async () => { await Promise.all(roots.map(r => rm(r, { recursive: true, force: true }))); });
+
+/** A pages folder from { "path": "contents" }. A page body defaults to a title-only frontmatter. */
+async function pages(files: Record<string, string>): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "pd-pages-"));
+  roots.push(root);
+  for (const [path, body] of Object.entries(files)) {
+    const file = join(root, ...path.split("/"));
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, body);
+  }
+  return root;
+}
+const page = (title: string, extra = ""): string => `---\ntitle: ${title}\n${extra}---\n\nBody of ${title}.\n`;
+const navRoutes = (nav: Awaited<ReturnType<typeof readPages>>["nav"]) =>
+  nav.map(n => n.children ? `${n.route} [${n.children.map(c => c.route).join(" ")}]` : n.route);
+
+describe("routeFor", () => {
+  it("maps a file to the route its path names", () => {
+    expect(routeFor("index.md")).toBe("/");
+    expect(routeFor("about.md")).toBe("/about/");
+    expect(routeFor("guides/index.md")).toBe("/guides/");
+    expect(routeFor("guides/setup.md")).toBe("/guides/setup/");
+    expect(routeFor("a/b/c.md")).toBe("/a/b/c/");
+  });
+});
+
+describe("readPages — the storefront bench", () => {
+  it("reads its four pages, their titles and layouts, and its nav, with no problems", async () => {
+    const bench = fileURLToPath(new URL("../../../storefront-bench/pages/", import.meta.url));
+    const model = await readPages(bench);
+    expect(model.problems).toEqual([]);
+    expect(model.pages).toEqual([
+      { route: "/", title: "Storefront bench", layout: "page" },
+      { route: "/guides/", title: "Guides", layout: "page" },
+      { route: "/guides/setup/", title: "Setup", layout: "article" },
+      { route: "/about/", title: "About", layout: "page" },
+    ]);
+    expect(model.nav).toEqual([
+      { route: "/", title: "Storefront bench" },
+      { route: "/guides/", title: "Guides", children: [{ route: "/guides/setup/", title: "Setup" }] },
+      { route: "/about/", title: "About" },
+    ]);
+    expect([...model.files.keys()]).toEqual(["/", "/guides/", "/guides/setup/", "/about/"]);
+    expect(model.files.get("/guides/setup/")?.path).toBe("guides/setup.md");
+  });
+});
+
+describe("readPages — order, as in the component tree", () => {
+  it("without any order, sorts by name, numbers numerically", async () => {
+    const root = await pages({ "index.md": page("Home"), "b.md": page("B"), "a.md": page("A"), "item10.md": page("10"), "item2.md": page("2") });
+    // Home is a top-level item like any other: with no number it sorts by its name, "index".
+    expect(navRoutes((await readPages(root)).nav)).toEqual(["/a/", "/b/", "/", "/item2/", "/item10/"]);
+  });
+
+  it("ranks a page and a folder by their own number", async () => {
+    const root = await pages({
+      "index.md": page("Home", "order: -10\n"), "a.md": page("A", "order: 5\n"), "b.md": page("B"),
+      "g/index.md": page("G", "order: 1\n"), "g/x.md": page("X"),
+    });
+    expect(navRoutes((await readPages(root)).nav)).toEqual(["/", "/b/", "/g/ [/g/x/]", "/a/"]);
+  });
+
+  it("orders a folder's pages by the list in its index.md, with ... for the rest", async () => {
+    const root = await pages({
+      "index.md": page("Home"),
+      "g/index.md": page("G", "order: [zeta, ..., alpha]\n"),
+      "g/alpha.md": page("Alpha"), "g/beta.md": page("Beta"), "g/gamma.md": page("Gamma"), "g/zeta.md": page("Zeta"),
+    });
+    expect(navRoutes((await readPages(root)).nav)).toEqual(["/g/ [/g/zeta/ /g/beta/ /g/gamma/ /g/alpha/]", "/"]);
+  });
+
+  it("lets a number win over the parent's list", async () => {
+    const root = await pages({
+      "index.md": page("Home"),
+      "g/index.md": page("G", "order: [b, a]\n"), "g/a.md": page("A", "order: -1\n"), "g/b.md": page("B"),
+    });
+    expect(navRoutes((await readPages(root)).nav)).toEqual(["/g/ [/g/a/ /g/b/]", "/"]);
+  });
+
+  describe("the root index.md is both Home and the root folder's index", () => {
+    it("its number ranks Home among the top-level items", async () => {
+      // Without its number Home would rank 0 and sort before z by name; with it, it comes after z.
+      const root = await pages({ "index.md": page("Home", "order: 5\n"), "z.md": page("Z"), "b.md": page("B", "order: 9\n") });
+      expect(navRoutes((await readPages(root)).nav)).toEqual(["/z/", "/", "/b/"]);
+    });
+
+    it("its list orders the top level; Home is the name index in it", async () => {
+      const root = await pages({ "index.md": page("Home", "order: [b, index, a]\n"), "a.md": page("A"), "b.md": page("B") });
+      expect(navRoutes((await readPages(root)).nav)).toEqual(["/b/", "/", "/a/"]);
+    });
+
+    it("a list that leaves Home out puts it with the rest", async () => {
+      const root = await pages({ "index.md": page("Home", "order: [b, a]\n"), "a.md": page("A"), "b.md": page("B"), "c.md": page("C") });
+      expect(navRoutes((await readPages(root)).nav)).toEqual(["/b/", "/a/", "/c/", "/"]);
+    });
+  });
+});
+
+describe("readPages — what the nav shows", () => {
+  it("adding a markdown file adds a page and a nav entry, and changes nothing else", async () => {
+    const files = { "index.md": page("Home", "order: 0\n"), "about.md": page("About", "order: 2\n"), "g/index.md": page("G", "order: 1\n"), "g/x.md": page("X") };
+    const before = await readPages(await pages(files));
+    const after = await readPages(await pages({ ...files, "g/y.md": page("Y"), "contact.md": page("Contact", "order: 3\n") }));
+    expect(after.problems).toEqual([]);
+    expect(after.pages.map(p => p.route)).toEqual([...before.pages.map(p => p.route).slice(0, 3), "/g/y/", "/about/", "/contact/"]);
+    expect(after.nav).toEqual([
+      before.nav[0],
+      { ...before.nav[1], children: [...before.nav[1].children!, { route: "/g/y/", title: "Y" }] },
+      before.nav[2],
+      { route: "/contact/", title: "Contact" },
+    ]);
+  });
+
+  it("is one level deep: deeper pages exist at their routes, but not in the nav", async () => {
+    const root = await pages({
+      "index.md": page("Home"), "a/index.md": page("A"), "a/b/index.md": page("B"), "a/b/deep.md": page("Deep"),
+    });
+    const model = await readPages(root);
+    expect(model.problems).toEqual([]);
+    expect(model.nav).toEqual([
+      { route: "/a/", title: "A", children: [{ route: "/a/b/", title: "B" }] },
+      { route: "/", title: "Home" },
+    ]);
+    expect(model.pages.map(p => p.route)).toEqual(["/a/", "/a/b/", "/", "/a/b/deep/"]);
+  });
+
+  it("falls back to the route for the label only: the page's frontmatter values keep no title", async () => {
+    // Step 8 validates the values against the layout's schema; a missing required title must still be
+    // missing there, so the fallback lives in the page entry and the nav, never in the values.
+    const model = await readPages(await pages({ "index.md": page("Home"), "untitled.md": "---\ndescription: No title here\n---\n" }));
+    expect(model.files.get("/untitled/")?.frontmatter.values).toEqual({ description: "No title here" });
+    expect("title" in model.files.get("/untitled/")!.frontmatter.values).toBe(false);
+    expect(model.pages.find(p => p.route === "/untitled/")?.title).toBe("/untitled/");
+    expect(model.nav.find(n => n.route === "/untitled/")?.title).toBe("/untitled/");
+  });
+
+  it("titles a page by its route when it has no title, and gives it the page layout when it names none", async () => {
+    const model = await readPages(await pages({ "index.md": "No frontmatter.\n", "x.md": "---\nlayout: article\n---\n" }));
+    expect(model.pages).toEqual([{ route: "/", title: "/", layout: "page" }, { route: "/x/", title: "/x/", layout: "article" }]);
+  });
+});
+
+describe("readPages — problems (each one fatal to the caller)", () => {
+  it("a folder of pages with no index.md", async () => {
+    const model = await readPages(await pages({ "index.md": page("Home"), "guides/setup.md": page("Setup") }));
+    expect(model.problems).toEqual(["the folder guides/ holds pages but has no index.md — it needs one, as the folder's own page"]);
+    expect(model.nav.map(n => n.route)).toEqual(["/"]);
+  });
+
+  it("two files that are the same page", async () => {
+    const model = await readPages(await pages({ "index.md": page("Home"), "about.md": page("About"), "about/index.md": page("About too") }));
+    expect(model.problems).toEqual(["about.md and about/index.md are both the page at /about/"]);
+  });
+
+  it("a page file name that cannot be part of a URL", async () => {
+    const model = await readPages(await pages({ "index.md": page("Home"), "Setup.md": page("S"), "my_page.md": page("M"), "café.md": page("C") }));
+    expect(model.problems).toEqual([
+      "Setup.md: a page's file name is part of the URL, so it is lowercase letters, digits and hyphens only, then .md",
+      "café.md: a page's file name is part of the URL, so it is lowercase letters, digits and hyphens only, then .md",
+      "my_page.md: a page's file name is part of the URL, so it is lowercase letters, digits and hyphens only, then .md",
+    ]);
+    expect(model.pages.map(p => p.route)).toEqual(["/"]);
+  });
+
+  it("a folder name that cannot be part of a URL, whose files are then not read", async () => {
+    const model = await readPages(await pages({ "index.md": page("Home"), "My Guides/index.md": page("G"), "My Guides/x.md": page("X") }));
+    expect(model.problems).toEqual(["My Guides/: a folder name is part of the URL, so it is lowercase letters, digits and hyphens only"]);
+    expect(model.pages.map(p => p.route)).toEqual(["/"]);
+  });
+
+  it("a file that is not a page", async () => {
+    const model = await readPages(await pages({ "index.md": page("Home"), "logo.png": "png", "guides/index.md": page("G"), "guides/notes.txt": "x" }));
+    expect(model.problems).toEqual([
+      "guides/notes.txt is not a page: only .md files belong in the pages folder (images and other files go in the project's assets)",
+      "logo.png is not a page: only .md files belong in the pages folder (images and other files go in the project's assets)",
+    ]);
+  });
+
+  it("ignores dotfiles and dot-folders", async () => {
+    const model = await readPages(await pages({ "index.md": page("Home"), ".DS_Store": "x", ".drafts/secret.md": page("Secret"), "g/index.md": page("G"), "g/.notes": "x" }));
+    expect(model.problems).toEqual([]);
+    expect(model.pages.map(p => p.route)).toEqual(["/g/", "/"]);
+  });
+
+  it("an empty pages folder is a site with no pages, and no problem", async () => {
+    const model = await readPages(await pages({}));
+    expect(model).toEqual({ pages: [], nav: [], files: new Map(), problems: [] });
+  });
+});
