@@ -136,11 +136,39 @@ test.describe("the skin", () => {
     });
   }
 
+  test("puts each section on a field of the illustration's palette, edge to edge, and each card on a field of its own", async ({ page }) => {
+    /** Each element's background next to the token it should be, both resolved on the page; and whether it spans the viewport. */
+    const field = (selector: string, token: string) => page.locator(selector).first().evaluate((el, t) => {
+      const probe = document.createElement("i");
+      probe.style.backgroundColor = `var(${t})`;
+      document.body.append(probe);
+      const want = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      const r = el.getBoundingClientRect();
+      return { got: getComputedStyle(el).backgroundColor, want, edgeToEdge: r.left === 0 && Math.abs(r.width - document.documentElement.clientWidth) < 1 };
+    }, token);
+    const expectField = async (selector: string, token: string, edgeToEdge = true) => {
+      const f = await field(selector, token);
+      expect(f.got, `${selector} on ${token}`).toBe(f.want);
+      if (edgeToEdge) expect(f.edgeToEdge, `${selector} edge to edge`).toBe(true);
+    };
+    await page.goto("/");
+    await expectField(".home-cover", "--sk-accent");
+    await expectField(".site-footer", "--sk-deep");
+    await expectField(".card:nth-child(1)", "--sk-accent", false);
+    await expectField(".card:nth-child(2)", "--sk-ochre", false);
+    await page.goto("/about/");
+    await expectField(".page-header", "--sk-ochre");
+    await page.goto("/guides/setup/");
+    await expectField(".article-header", "--sk-slate");
+  });
+
   test("takes its brand colour from --sk-accent alone", async ({ page }) => {
     await page.goto("/");
     const read = () => page.evaluate(() => ({
       mark: getComputedStyle(document.querySelector(".site-title")!, "::before").backgroundColor,
       cover: getComputedStyle(document.querySelector(".home-cover")!).backgroundColor,
+      onCover: getComputedStyle(document.querySelector(".home-cover")!).color,
       current: getComputedStyle(document.querySelector('.site-nav a[aria-current="page"]')!).textDecorationColor,
     }));
     const before = await read();
@@ -148,8 +176,13 @@ test.describe("the skin", () => {
     const after = await read();
     expect(after.mark).toBe("rgb(0, 110, 70)");
     expect(after.current).toBe("rgb(0, 110, 70)");
-    // The cover's wash is mixed from the accent, so it follows too.
+    // The cover is the accent's field, and the text on it follows the accent's lightness.
+    expect(after.cover).toBe("rgb(0, 110, 70)");
     expect(after.cover).not.toBe(before.cover);
+    await page.addStyleTag({ content: ":root { --sk-accent: rgb(250, 220, 120); }" });
+    const light = await read();
+    expect(light.cover).toBe("rgb(250, 220, 120)");
+    expect(light.onCover).not.toBe(after.onCover);
   });
 
   for (const [name, width, beside] of [["a wide card", 1440, true], ["a narrow card", 390, false]] as const) {

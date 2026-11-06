@@ -11,6 +11,16 @@
   --sk-muted: light-dark(oklch(48% 0.02 260deg), oklch(72% 0.02 260deg));
   --sk-rule: light-dark(oklch(88% 0.01 85deg), oklch(32% 0.015 260deg));
 
+  // The illustration's palette as colour fields, the same in both schemes, each with the text that
+  // reads on it. The accent's field is the accent itself; the text on it follows the accent's
+  // lightness (dark on a light accent, light on a dark one), so a rebrand keeps it readable.
+  --sk-ochre: oklch(79.1% 0.134 79deg);
+  --sk-slate: oklch(41% 0.05 265deg);
+  --sk-deep: oklch(26.1% 0.03 265deg);
+  --sk-on-light: oklch(22% 0.02 260deg);
+  --sk-on-dark: oklch(95.9% 0.014 85deg);
+  --sk-on-accent: oklch(from var(--sk-accent) clamp(0.2, (0.66 - l) * 1000, 0.97) 0.012 h);
+
   // The accent's washes keep its hue (relative colour syntax): pale on paper, deep on the dark
   // paper. Mixing the accent into the dark paper would cross the hue circle through purple.
   --sk-accent-wash: light-dark(oklch(from var(--sk-accent) 95% 0.03 h), oklch(from var(--sk-accent) 27% 0.04 h));

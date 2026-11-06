@@ -16,12 +16,38 @@
 
 .card {
   container-type: inline-size;
-  border: 1px solid var(--sk-rule);
+  background: var(--sk-accent);
+  color: var(--sk-on-accent);
   border-end-start-radius: var(--sk-corner);
 }
 
+// Each card on a field of its own, in turn: the accent, ochre, slate.
+.card:nth-child(3n + 2) {
+  background: var(--sk-ochre);
+  color: var(--sk-on-light);
+}
+
+.card:nth-child(3n) {
+  background: var(--sk-slate);
+  color: var(--sk-on-dark);
+}
+
+// On a coloured field the accent can't mark a link or focus: the field's own text colour does.
+.card a {
+  text-decoration-color: currentcolor;
+}
+
+.card a:hover {
+  color: inherit;
+}
+
+.card :focus-visible {
+  outline-color: currentcolor;
+}
+
 .card:has(a:hover) {
-  border-color: var(--sk-accent);
+  outline: 2px solid var(--sk-ink);
+  outline-offset: 3px;
 }
 
 // As tall as what it holds: a title, and a folder's pages.
@@ -41,7 +67,6 @@
 
 .card-title::after {
   content: " →";
-  color: var(--sk-accent);
 }
 
 .card-pages {

@@ -1,10 +1,14 @@
-// The footer: a rule, then the site's line in small type.
+// The footer: the site's line in the mono, on the deep ink field, edge to edge.
 .site-footer {
-  padding-block: var(--sk-space-5) var(--sk-space-6);
-  border-block-start: 1px solid var(--sk-rule);
-  color: var(--sk-muted);
+  display: grid;
+  grid-column: full;
+  grid-template-columns: subgrid;
+  padding-block: var(--sk-space-6);
+  background: var(--sk-deep);
+  color: var(--sk-on-dark);
 }
 
 .site-footer p {
+  grid-column: wide;
   margin: 0;
 }

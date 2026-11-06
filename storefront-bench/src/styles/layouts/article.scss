@@ -1,10 +1,11 @@
-// A longer text: the title and lede set apart by a rule, then the body.
+// A longer text: the title and lede on a slate field, edge to edge, then the body.
 .article-header {
   display: grid;
-  grid-column: wide;
+  grid-column: full;
   grid-template-columns: subgrid;
-  padding-block-end: var(--sk-space-6);
-  border-block-end: 1px solid var(--sk-rule);
+  padding-block: var(--sk-space-7) var(--sk-space-6);
+  background: var(--sk-slate);
+  color: var(--sk-on-dark);
 }
 
 .article-title {

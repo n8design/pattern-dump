@@ -1,11 +1,17 @@
-// The front page: a cover in the accent's wash, with the skin's corner, holding the site's heading.
+// The front page: a cover on the accent's field, edge to edge, with the skin's corner, holding the site's heading.
 .home-cover {
   display: grid;
-  grid-column: wide;
-  gap: var(--sk-space-5);
-  padding: var(--sk-space-7) var(--sk-gutter);
-  background: var(--sk-accent-wash);
+  grid-column: full;
+  grid-template-columns: subgrid;
+  row-gap: var(--sk-space-5);
+  padding-block: var(--sk-space-7);
+  background: var(--sk-accent);
+  color: var(--sk-on-accent);
   border-end-start-radius: calc(2 * var(--sk-corner));
+}
+
+.home-cover > * {
+  grid-column: wide;
 }
 
 .home-title {
