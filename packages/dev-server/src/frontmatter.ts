@@ -28,6 +28,8 @@ export interface FrontmatterError {
 export interface FrontmatterReading {
   values: Record<string, FrontmatterValue>;
   errors: FrontmatterError[];
+  /** The 1-based line each key is set on; for a duplicate key, the line whose value counts (the last). */
+  lines: Record<string, number>;
 }
 
 const BOM = "﻿";
@@ -53,15 +55,16 @@ function scan(md: string): FrontmatterReading {
     // No block, which is valid — unless it is one written with bare-CR line endings, which leave the
     // whole file on one line and so never read as a block.
     if (/^---\r(?!\n)/.test(text)) err(1, "lines end in a bare CR — use LF or CRLF line endings");
-    return { values: {}, errors };
+    return { values: {}, errors, lines: {} };
   }
   const end = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
   if (end < 0) {
     err(1, "the frontmatter block opened here is never closed — end it with a line holding only ---");
-    return { values: {}, errors };
+    return { values: {}, errors, lines: {} };
   }
 
   const out: Record<string, FrontmatterValue> = {};
+  const keyLines: Record<string, number> = {};
   let listKey: string | null = null;
 
   for (let i = 1; i < end; i++) {
@@ -91,6 +94,7 @@ function scan(md: string): FrontmatterReading {
     }
     const [, key, raw] = kv;
     if (key in out) lineErr(`duplicate key "${key}"`);
+    keyLines[key] = n;
     const value = raw.trim();
     if (value === "") {
       // `key:` with nothing after it opens a block list (`- a` lines follow).
@@ -108,7 +112,7 @@ function scan(md: string): FrontmatterReading {
       listKey = null;
     }
   }
-  return { values: out, errors };
+  return { values: out, errors, lines: keyLines };
 }
 
 /** Parse the leading `---` block. Returns an empty object when the file has none. Lenient: a line it
@@ -117,8 +121,8 @@ export function readFrontmatter(md: string): Record<string, FrontmatterValue> {
   return scan(md).values;
 }
 
-/** The same values as readFrontmatter, and every problem the lenient reading passes over, with its
- *  line. A file with no block is valid: no values, no errors. */
+/** The same values as readFrontmatter, every problem the lenient reading passes over with its line, and
+ *  the line each key is set on. A file with no block is valid: no values, no errors, no lines. */
 export function readFrontmatterStrict(md: string): FrontmatterReading {
   return scan(md);
 }

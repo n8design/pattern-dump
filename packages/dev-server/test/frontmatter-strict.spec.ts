@@ -16,23 +16,35 @@ const spellings = (md: string): Array<[string, string]> => [["clean", md], ["BOM
 describe("readFrontmatterStrict — valid input", () => {
   const md = "---\ntitle: Setup\ndescription: \"How to: start\"\norder: 2\n\ntags:\n  - a\n  - 'b'\nmore: [c, \"d\"]\n---\n# Body\nbody: not frontmatter\n";
   const values = { title: "Setup", description: "How to: start", order: "2", tags: ["a", "b"], more: ["c", "d"] };
+  const lines = { title: 2, description: 3, order: 4, tags: 6, more: 9 };
 
   for (const [name, text] of spellings(md)) {
     it(`reads ${name} with no errors, to the same values as the lenient reading`, () => {
-      expect(readFrontmatterStrict(text)).toEqual({ values, errors: [] });
+      expect(readFrontmatterStrict(text)).toEqual({ values, errors: [], lines });
       expect(readFrontmatter(text)).toEqual(values);
     });
   }
 
   it("takes a file with no block as valid: no values, no errors", () => {
     for (const text of ["# Just a body\n", "", "\n---\ntitle: x\n---\n", BOM + "# Body"]) {
-      expect(readFrontmatterStrict(text), JSON.stringify(text)).toEqual({ values: {}, errors: [] });
+      expect(readFrontmatterStrict(text), JSON.stringify(text)).toEqual({ values: {}, errors: [], lines: {} });
     }
   });
 
   it("allows blank lines inside the block", () => {
-    expect(readFrontmatterStrict("---\n\ntitle: A\n\n---\n")).toEqual({ values: { title: "A" }, errors: [] });
+    expect(readFrontmatterStrict("---\n\ntitle: A\n\n---\n")).toEqual({ values: { title: "A" }, errors: [], lines: { title: 3 } });
   });
+});
+
+describe("readFrontmatterStrict — the line of each key", () => {
+  const md = "---\n\ntitle: First\nlayout: article\ntags:\n  - a\ntitle: Second\n---\n";
+  for (const [name, text] of spellings(md)) {
+    it(`gives the line each key is set on, the last one for a duplicate key (${name})`, () => {
+      const r = readFrontmatterStrict(text);
+      expect(r.lines).toEqual({ title: 7, layout: 4, tags: 5 });
+      expect(r.values["title"]).toBe("Second");
+    });
+  }
 });
 
 describe("readFrontmatterStrict — every problem, with its line", () => {
@@ -73,7 +85,7 @@ describe("readFrontmatterStrict — every problem, with its line", () => {
   it("reports bare-CR line endings, which the lenient reading takes for no block at all", () => {
     expect(readFrontmatter("---\rtitle: Setup\r---\r")).toEqual({});
     expect(readFrontmatterStrict("---\rtitle: Setup\r---\r")).toEqual({
-      values: {}, errors: [{ line: 1, message: "lines end in a bare CR — use LF or CRLF line endings" }],
+      values: {}, errors: [{ line: 1, message: "lines end in a bare CR — use LF or CRLF line endings" }], lines: {},
     });
     // The same with a byte-order mark in front.
     expect(readFrontmatterStrict(BOM + "---\rtitle: Setup\r---\r").errors).toEqual([
@@ -84,11 +96,13 @@ describe("readFrontmatterStrict — every problem, with its line", () => {
     expect(readFrontmatterStrict("---\ntitle: A\rB\n---\n")).toEqual({
       values: readFrontmatter("---\ntitle: A\rB\n---\n"),
       errors: [{ line: 2, message: "line ends in a bare CR — use LF or CRLF line endings" }],
+      lines: {},
     });
     expect(readFrontmatter("---\ntitle:\rB\n---\n")).toEqual({ title: "B" });
     expect(readFrontmatterStrict("---\ntitle:\rB\n---\n")).toEqual({
       values: { title: "B" },
       errors: [{ line: 2, message: "line ends in a bare CR — use LF or CRLF line endings" }],
+      lines: { title: 2 },
     });
   });
 });
