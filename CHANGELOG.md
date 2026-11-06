@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A variant reached by its own id (`/preview/atoms/toggle-demo~alt`) is now the same document as
+  `?variant=alt`: it gets its base's behaviour scripts (`requireScript`), layout and CSS. It used to
+  lose the base's scripts.
+
 ## 0.1.0-alpha.4
 
 Fixes found while moving a third PatternLab styleguide (CTS) to Pattern Dump with hTWOo consumed only as

@@ -338,8 +338,11 @@ export async function handleRequest(
 
     // --- Preview documents (iframe src, standalone — on-demand variants + open-in-new-tab) ---
     if (pathname.startsWith(PD_ROUTE_PREFIX.preview)) {
-      const componentId = pathname.slice(PD_ROUTE_PREFIX.preview.length);
-      const variant     = url.searchParams.get("variant") ?? undefined;
+      // The requested id names the document (data-component-id); what is rendered may be a variant
+      // addressed by its own id, resolved below.
+      const requestedId = pathname.slice(PD_ROUTE_PREFIX.preview.length);
+      let componentId   = requestedId;
+      let variant       = url.searchParams.get("variant") ?? undefined;
       // ?theme= bakes data-theme into <body> pre-paint (fixes one-frame flash on non-default
       // themes). Validated against the known theme set before use — unknown values fall back
       // to the config defaultTheme (same reconcile rule as the client store).
@@ -351,6 +354,15 @@ export async function handleRequest(
       try {
         if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
         const { handleMap: previewHandleMap, discoveryMap: previewDiscoveryMap } = state.discoveryResult;
+        // A variant addressed by its own id, /preview/<base>~<variant>, is the base with that variant:
+        // the same document as /preview/<base>?variant=<variant>. Resolved here, before anything is
+        // looked up, so its layout, its requirements (a base's requireScript) and its CSS closure are
+        // the base's — the renderer applies the same rule to its data and template.
+        const tilde = requestedId.indexOf("~");
+        if (variant === undefined && tilde > 0 && previewDiscoveryMap.has(requestedId.slice(0, tilde))) {
+          componentId = requestedId.slice(0, tilde);
+          variant = requestedId.slice(tilde + 1);
+        }
         const [{ html }, layout] = await Promise.all([
           render({ component: componentId, variant }),
           resolveLayoutMode(componentId, patternDirs, previewDiscoveryMap),
@@ -366,7 +378,7 @@ export async function handleRequest(
         });
         const doc = buildPreviewDocument(
           normalizeAssetRefs(html, assetRootNames), assets.closureIds, layout, themeNames, effectiveTheme,
-          assets.scripts, assets.svgContents, assetsCss, componentId, undefined, assets.scriptVersions,
+          assets.scripts, assets.svgContents, assetsCss, requestedId, undefined, assets.scriptVersions,
           documentBaseEnabled, themeSwitch, state.baseCssVersion
         );
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
