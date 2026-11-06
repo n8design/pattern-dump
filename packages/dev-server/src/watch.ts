@@ -17,7 +17,7 @@
 // Guarded by test/watcher.spec.ts, which asserts both the durable HTTP effects and the broadcasts
 // themselves over a real socket.
 
-import { basename, extname, relative, resolve } from "node:path";
+import { basename, extname, relative, resolve, sep } from "node:path";
 import chokidar from "chokidar";
 import type { FSWatcher } from "chokidar";
 import { componentCssUrl } from "@pattern-dump/contracts";
@@ -37,6 +37,7 @@ import { auditComponent } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
+import { routeFor } from "./storefront/pages.js";
 
 /** Everything the watcher needs, handed in explicitly rather than captured from a closure. */
 export interface WatchContext {
@@ -60,7 +61,9 @@ export function startWatching(ctx: WatchContext): FSWatcher {
   // The project's documentBase: a listed file's rules live in the base layer (see buildAllStyleData).
   const inProjectBase = documentBaseMatcher(stylesDir, cfg.config.documentBase);
 
-const watchDirs = [patternsDir, stylesDir, ...(themesDir ? [themesDir] : []), ...(scriptsDir ? [scriptsDir] : [])];
+// The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
+const pagesDir = cfg.storefront?.pagesDir ?? null;
+const watchDirs = [patternsDir, stylesDir, ...(themesDir ? [themesDir] : []), ...(scriptsDir ? [scriptsDir] : []), ...(pagesDir ? [pagesDir] : [])];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
 
 // Single source of truth for link-set membership: a component is linkable iff it has
@@ -228,7 +231,26 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
   }
 }
 
+// Storefront pages. Nothing is cached server-side — every page request reads the folder — so all a
+// change needs is a reload of the pages it touches: an edited page reloads itself; a file or folder
+// added or removed can change the nav (or the folder's problems), so every page reloads. Dotfiles are
+// not pages and change nothing. Checked first, with a folder boundary, because the other handlers
+// match on a path prefix.
+const inPages = (p: string): boolean => pagesDir !== null && (p === pagesDir || p.startsWith(pagesDir + sep));
+function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): boolean {
+  if (!inPages(filePath)) return false;
+  const rel = relative(pagesDir!, filePath).split(sep).join("/");
+  if (rel.split("/").some(seg => seg.startsWith("."))) return true;
+  const route = event === "change" && rel.endsWith(".md") ? routeFor(rel) : null;
+  hotreloader.push({ type: "page-changed", route });
+  console.log(`[dev-server] Page ${event}: ${rel || "."} → page-changed ${route ?? "(every page)"}`);
+  return true;
+}
+
+watcher.on("addDir", (dirPath) => { handlePages(dirPath, "addDir"); });
+
 watcher.on("change", async (filePath) => {
+  if (handlePages(filePath, "change")) return;
   const ext = extname(filePath);
 
   if (ext === ".md" && filePath.startsWith(patternsDir)) {
@@ -324,6 +346,7 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
 }
 
 watcher.on("add", async (filePath) => {
+  if (handlePages(filePath, "add")) return;
   const ext = extname(filePath);
   if (ext === ".scss" && !(themesDir && filePath.startsWith(themesDir))) {
     await handleComponentScss(filePath);
@@ -336,6 +359,7 @@ watcher.on("add", async (filePath) => {
 
 // Component template removed — rebuild discovery and signal nav rebuild.
 watcher.on("unlink", async (filePath) => {
+  if (handlePages(filePath, "unlink")) return;
   if (extname(filePath) === ".hbs" && filePath.startsWith(patternsDir)) {
     await rebuildAndSignalTree(`Pattern removed: ${relative(patternsDir, filePath)}`);
   } else if (extname(filePath) === ".md" && filePath.startsWith(patternsDir)) {
@@ -345,6 +369,7 @@ watcher.on("unlink", async (filePath) => {
 
 // Component directory removed — covers the case where the entire component folder is deleted.
 watcher.on("unlinkDir", async (dirPath) => {
+  if (handlePages(dirPath, "unlinkDir")) return;
   if (dirPath.startsWith(patternsDir) && dirPath !== patternsDir) {
     await rebuildAndSignalTree(`Pattern dir removed: ${relative(patternsDir, dirPath)}`);
   }
