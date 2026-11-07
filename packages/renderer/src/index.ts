@@ -150,6 +150,31 @@ function registerHelpers(
 }
 
 /**
+ * A template called a helper that is not registered. It names the helper, and the template that called
+ * it: the innermost template the error passes through stamps itself on it, so a helper missing in a
+ * partial is reported against the partial, not the page that included it. `location` is a diagnostic's.
+ */
+export class MissingHelperError extends Error {
+  template?: string;
+  file?: string;
+  constructor(readonly helper: string, readonly line?: number, readonly column?: number) {
+    super(`Missing helper "${helper}"`);
+    this.name = "MissingHelperError";
+  }
+  /** Stamp the template running when the error passed through, if none has yet: the one that called it. */
+  stamp(template: string, file: string | undefined): void {
+    if (this.template !== undefined) return;
+    this.template = template;
+    this.file = file;
+    const at = this.line !== undefined ? ` (line ${this.line}${this.column !== undefined ? `, column ${this.column + 1}` : ""})` : "";
+    this.message = `Missing helper "${this.helper}", called by ${template}${at}`;
+  }
+  get location(): { file?: string; line?: number; column?: number } {
+    return { ...(this.file ? { file: this.file } : {}), ...(this.line !== undefined ? { line: this.line } : {}), ...(this.column !== undefined ? { column: this.column + 1 } : {}) };
+  }
+}
+
+/**
  * How a diagnostic names a file: the caller's `displayPath`, else the path relative to the pattern root
  * that holds it, else its base name. Never an absolute path: one the caller returns falls back too.
  */
@@ -271,6 +296,14 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // invocationCounters: "flatName:parentBase" → count of invocations so far
     const invocationCounters = new Map<string, number>();
 
+    // A helper the templates call but nobody registered: stock Handlebars throws a bare `Missing helper`.
+    // This one says which template called it (MissingHelperError). A `{{name}}` with no arguments is not
+    // a helper call and renders nothing, as stock. Registered first, so a project may still replace it.
+    env.registerHelper("helperMissing", function (...args: unknown[]) {
+      if (args.length === 1) return undefined;
+      const opts = args[args.length - 1] as { name: string; loc?: { start?: { line: number; column: number } } };
+      throw new MissingHelperError(opts.name, opts.loc?.start?.line, opts.loc?.start?.column);
+    });
     registerHelpers(env, mintId, () => lastMintedId, options.helpers, options.helperRegistrars);
 
     // Register every discovered component as a cascade-aware, base-seeded partial.
@@ -350,9 +383,15 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
             const runtime: Handlebars.RuntimeOptions = opts?.fn
               ? { data, partials: { ...env.partials, "@partial-block": opts.fn as unknown as Handlebars.TemplateDelegate } }
               : { data };
-            const result = childTemplate(merged, runtime);
-
-            currentBase = savedBase;
+            let result: string;
+            try {
+              result = childTemplate(merged, runtime);
+            } catch (e) {
+              if (e instanceof MissingHelperError) e.stamp(compId, display(compEntry.hbsPath));
+              throw e;
+            } finally {
+              currentBase = savedBase;
+            }
             return result;
           } as unknown as string
         );
@@ -364,9 +403,15 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // A no-op `@partial-block` for the top-level render: a block partial viewed standalone (e.g.
     // dialog-content, whose template has `{{> @partial-block}}`) has no enclosing block, so it must
     // render an empty block rather than throw. Block invocations override this with the real body.
-    const html = env.compile(templateSrc)(data, {
-      partials: { ...env.partials, "@partial-block": () => "" },
-    });
+    let html: string;
+    try {
+      html = env.compile(templateSrc)(data, {
+        partials: { ...env.partials, "@partial-block": () => "" },
+      });
+    } catch (e) {
+      if (e instanceof MissingHelperError) e.stamp(input.component, templateHbsPath ? display(templateHbsPath) : undefined);
+      throw e;
+    }
 
     // ---- Diagnostics (M4.9 / M4.9-finalise) ----
     const diagnostics: Diagnostic[] = [...dataDiagnostics.values()];

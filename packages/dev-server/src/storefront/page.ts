@@ -152,7 +152,14 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     nav: markCurrent(model.nav, route),
     site: withDeclaredAbsentAsNull(site.values, siteDeclared),
   };
-  const { html } = await a.render({ component: checked.layoutId, data });
+  // A template that fails to render (a helper it calls that is not registered, say) is a page problem
+  // like any other, listed and escaped, never an unhandled 500.
+  let html: string;
+  try {
+    ({ html } = await a.render({ component: checked.layoutId, data }));
+  } catch (e) {
+    return fail([`${page.path}: ${e instanceof Error ? e.message : String(e)}`]);
+  }
 
   const title = typeof checked.values["title"] === "string" ? checked.values["title"] : route;
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;

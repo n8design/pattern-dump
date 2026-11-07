@@ -77,6 +77,8 @@ export async function checkComponent(
     const a11yDiags = await runA11yProducer(previewHtml);
     return { previewHtml, diagnostics: [...renderDiags, ...a11yDiags] };
   } catch (e) {
+    // A render error that knows where it happened (a missing helper: the template that called it) says so.
+    const location = e instanceof Error && "location" in e ? (e as { location?: Diagnostic["location"] }).location : undefined;
     return {
       previewHtml: "",
       diagnostics: [{
@@ -84,6 +86,7 @@ export async function checkComponent(
         severity: "error",
         source: "render",
         message: e instanceof Error ? e.message : String(e),
+        ...(location && Object.keys(location).length ? { location } : {}),
       }],
     };
   }
