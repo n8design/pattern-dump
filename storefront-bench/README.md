@@ -4,4 +4,7 @@ A sandbox for the storefront: a few markdown pages in `pages/`, rendered with th
 `src/patterns/layouts/` and `src/patterns/partials/`, embedding the components in `src/patterns/components/`.
 The skin and the components are ordinary patterns, so `pd dev` shows them in the workbench too.
 
+The skin is a wireframe, plain on purpose: the bench tests the storefront's pipeline, not a design.
+Designs are skins of their own, as pattern packages in `skins/` with their own tests.
+
 It is also a test fixture: specs read it, and the storefront Playwright project runs against it.

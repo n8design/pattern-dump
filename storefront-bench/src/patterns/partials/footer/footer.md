@@ -1,8 +1,7 @@
 ---
 title: Footer
-description: The next chapter, as a giant outlined link, then the line at the bottom of every page.
+description: The line at the bottom of every page, and the year.
 ---
 
-At the bottom of every page: "Next chapter" and the page after this one in nav order (the last wraps to
-the first), derived from the nav; then `site.footer`, from `storefront.site` in the config. The sample
-data here stands in for both.
+At the bottom of every page: `site.footer`, then `site.year` when the site sets one, both from
+`storefront.site` in the config. The sample data here stands in for it.

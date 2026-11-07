@@ -1,22 +1,5 @@
-// A short note set apart from the text around it: the accent's wash, a rule in the accent, and the
-// skin's corner. The warning tone strengthens both.
+// The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design.
 .callout {
-  display: grid;
-  gap: var(--sk-space-1);
-  padding: var(--sk-space-4) var(--sk-space-5);
-  background: var(--sk-accent-wash);
-  border-inline-start: 0.25rem solid var(--sk-accent);
-  border-end-start-radius: var(--sk-corner);
-}
-
-.callout-title {
-  margin: 0;
-}
-
-.callout-text {
-  margin: 0;
-}
-
-.callout-warning {
-  background: var(--sk-accent-wash-strong);
+  border-inline-start: 0.25rem solid;
+  padding: 0.5rem 1rem;
 }

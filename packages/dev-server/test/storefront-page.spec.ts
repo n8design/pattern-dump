@@ -6,11 +6,9 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parse } from "node-html-parser";
 import { createHeightFitter, type DiscoveryMap, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
-import { loadHelperRegistrars } from "../src/project-loaders.js";
 import { buildCompositionRegistry, type CompositionRegistry } from "../src/composition.js";
 import { frontmatterBody } from "../src/frontmatter.js";
 import { readPages } from "../src/storefront/pages.js";
@@ -31,9 +29,7 @@ beforeAll(async () => {
   const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
   map = discoveryMap;
   composition = await buildCompositionRegistry(patterns, handleMap, discoveryMap);
-  // The bench's own helpers, as pd dev and pd build load them from its config.
-  const helperRegistrars = await loadHelperRegistrars(fileURLToPath(new URL("../../../storefront-bench/src/helpers/skin.ts", import.meta.url)));
-  render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap, helperRegistrars });
+  render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap });
 });
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
@@ -65,41 +61,15 @@ describe("assemblePage — the bench's pages", () => {
     expect(html).toContain("<title>Storefront bench</title>");
     expect(html).toContain(`<meta name="description" content="A small website rendered from markdown, with the bench's own skin.">`);
     expect(html).toContain(`<link rel="stylesheet" href="/_pd/head-for/layouts/home">`);
-    expect(html).toContain(`<h1 class="hero-title home-title" style="--sk-title-em: 5.026">Storefront bench</h1>`);
-    expect(html).toContain(`<a class="site-title" href="/" aria-current="page">Storefront bench</a>`);
-    expect(html).toContain(`<a href="/guides/">(01) Guides</a>`);
+    expect(html).toContain(`<h1 class="page-title">Storefront bench</h1>`);
+    expect(html).toContain(`<a href="/" aria-current="page">Storefront bench</a>`);
+    expect(html).toContain(`<a href="/guides/">Guides</a>`);
     expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>`);
     expect(html).toContain(`<a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a>`);
-    expect(html).toContain(`<p class="site-footer-line">Built with Pattern Dump from the storefront bench.</p>`);
-    // A row for every other part of the site, none for the home page itself, each with its description;
-    // a folder's row lists its pages.
-    const rows = parse(html).querySelectorAll(`nav.site-rows[aria-label="Sections"] .row`);
-    expect(rows.map(r => [r.querySelector(".row-title")?.getAttribute("href"), r.querySelector(".row-title")?.text, r.querySelector(".row-description")?.text]))
-      .toEqual([["/guides/", "(01) Guides", "Longer texts about the bench."], ["/about/", "(02) About", "What the bench is for."]]);
-    expect(rows[0].querySelectorAll(".row-pages a").map(a => [a.getAttribute("href"), a.text])).toEqual([["/guides/setup/", "Setup"]]);
+    expect(html).toContain("<p>Built with Pattern Dump from the storefront bench.</p>");
     // The layout's sample body never shows.
     expect(html).not.toContain("This is the body of a page");
     expect(html).not.toContain("data-pd-live");
-  });
-
-  it("shows a folder's pages as rows on the folder's own page, with their descriptions, and none on a page without pages", async () => {
-    const guides = parse((await build("/guides/", join(bench, "pages"))).html);
-    expect(guides.querySelectorAll(`nav.site-rows[aria-label="In this section"] .row`).map(r => [r.querySelector(".row-title")?.getAttribute("href"), r.querySelector(".row-title")?.text, r.querySelector(".row-description")?.text]))
-      .toEqual([["/guides/setup/", "(01) Setup", "How the bench is put together."]]);
-    for (const route of ["/about/", "/guides/setup/"]) {
-      expect(parse((await build(route, join(bench, "pages"))).html).querySelectorAll(".site-rows"), route).toHaveLength(0);
-    }
-  });
-
-  it("turns an article's sections into chapters: one <details> per h2, the first open, its heading in the summary", async () => {
-    const html = parse((await build("/guides/setup/", join(bench, "pages"))).html);
-    const chapters = html.querySelectorAll("details.chapter");
-    expect(chapters.map(d => [d.hasAttribute("open"), d.querySelector("summary > h2.chapter-title")?.text])).toEqual([
-      [true, "(01) Pages"], [false, "(02) Layouts"],
-    ]);
-    expect(chapters[1].querySelector(".chapter-body figure.doc-example iframe")?.getAttribute("src")).toBe("/preview/components/callout~warning");
-    // Every h2 of the body is a chapter's heading: none is left in the running text.
-    expect(html.querySelectorAll(".article-body h2:not(.chapter-title)")).toHaveLength(0);
   });
 
   it("renders an article with its lede, and marks it current in the nav", async () => {
@@ -107,8 +77,7 @@ describe("assemblePage — the bench's pages", () => {
     expect(page.status).toBe(200);
     expect(page.html).toContain(`<title>Setup — Storefront bench</title>`);
     expect(page.html).toContain(`<p class="article-lede">Three folders make a site — the pages, the layouts that dress them, and the components they show.</p>`);
-    // The page's section is current in the header: the page itself has no entry there.
-    expect(page.html).toContain(`<a href="/guides/" aria-current="true">(01) Guides</a>`);
+    expect(page.html).toContain(`<a href="/guides/setup/" aria-current="page">Setup</a>`);
     expect(page.html).not.toContain(`<a href="/" aria-current="page">`);
   });
 
@@ -138,7 +107,7 @@ describe("assemblePage — the layouts' sample data never reaches a page", () =>
 
   it("takes the nav from the pages, not from the sample", async () => {
     const page = await build("/", await pagesOf({ "index.md": "---\ntitle: Alpha\n---\n", "beta.md": "---\ntitle: Beta\n---\n" }));
-    expect(page.html).toContain(`<a href="/beta/">(01) Beta</a>`);
+    expect(page.html).toContain(`<a href="/beta/">Beta</a>`);
     expect(page.html).not.toContain("Guides");
   });
 });
@@ -211,13 +180,7 @@ describe("the skin's templates", () => {
     };
     await walk(join(patterns, "layouts"));
     await walk(join(patterns, "partials"));
-    // A page's body, or the two slices of it the chapters helper cuts (its intro, a chapter's HTML):
-    // the markdown renderer's output, which escapes everything an author writes.
-    expect(found).toEqual([
-      "layouts/article/article.hbs: {{{intro}}}", "layouts/article/article.hbs: {{{html}}}",
-      "layouts/home/home.hbs: {{{body}}}",
-      "layouts/page/page.hbs: {{{intro}}}", "layouts/page/page.hbs: {{{html}}}",
-    ]);
+    expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}"]);
   });
 });
 

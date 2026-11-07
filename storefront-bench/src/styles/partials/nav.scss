@@ -1,20 +1,8 @@
-// The sections, one label each in the header's grid, in equal columns. The section a page is in, and
-// the page itself, are in the accent.
+// The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design.
 .site-nav-list {
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  gap: var(--sk-space-4);
-  margin: 0;
-  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
   list-style: none;
-}
-
-.site-nav a {
-  text-decoration: none;
-}
-
-.site-nav a[aria-current],
-.site-nav a:hover {
-  color: var(--sk-accent-text);
+  padding: 0;
 }

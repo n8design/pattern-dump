@@ -1,39 +1,10 @@
-// The page frame. One grid with named columns, used all the way down through subgrid:
-//   full     edge to edge, with a gutter
-//   wide     at most --sk-page across: the masthead, display titles, large images
-//   content  the reading measure: text, and the live examples
-// The content column is a fixed track, so on a narrow screen it keeps the width and the wide margins
-// give way first.
+// The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design.
 .site {
-  // The page is a size container: its parts lay themselves out by the page's width.
-  container: sk-page / inline-size;
   display: grid;
-  grid-template-columns: var(--sk-columns);
-
-  // Header, main, footer: the main row takes the slack, so a short page keeps its footer at the bottom.
-  grid-template-rows: auto 1fr auto;
-  row-gap: var(--sk-space-6);
-  min-block-size: 100dvh;
-}
-
-:where(.site) > * {
-  grid-column: wide;
-}
-
-// The main column and the page or article in it pass the frame's columns down, so their parts line up
-// on the same tracks.
-.site-main,
-.site-main > article {
-  display: grid;
-  grid-column: full;
-  grid-template-columns: subgrid;
-  align-content: start;
-}
-
-// Everything in a page sits in the content column unless its own rule places it; :where() keeps this
-// default at zero specificity so any such rule wins.
-:where(.site-main > article) > * {
-  grid-column: content;
+  gap: 1rem;
+  max-inline-size: var(--wf-measure);
+  margin-inline: auto;
+  padding: 1rem;
 }
 
 // A live example on a page: its preview frame fills the content column. The frame's height follows the

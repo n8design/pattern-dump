@@ -1,6 +1,6 @@
 ---
 title: Home
-description: The front page — the hero with the site's name, the marquee of its sections, the page's body, and a chapter row for each section.
+description: The front page — the site's name as its heading, an optional description, and the page's body.
 ---
 
 For the site's own `index.md`: set `layout: home` in its frontmatter.
@@ -9,6 +9,3 @@ For the site's own `index.md`: set `layout: home` in its frontmatter.
 |---|---|---|
 | `title` | string | required |
 | `description` | string | optional |
-
-The rows come from the navigation: one for every top-level page or folder other than the home page, with
-its description and a folder's pages.

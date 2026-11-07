@@ -7,12 +7,10 @@ const SKIN: Array<[id: string, docs: string]> = [
   ["layouts/page", "Every page without a layout: uses this one."],
   ["layouts/article", "lede string optional"],
   ["layouts/home", "For the site's own index.md"],
-  ["partials/rows", "On a folder's own page, one row for each page in the folder"],
   ["partials/base", "Used as a block partial"],
   ["partials/header", "At the top of every page"],
   ["partials/nav", "Built from the pages folder"],
   ["partials/footer", "At the bottom of every page"],
-  ["partials/marquee", "Built from the page itself"],
 ];
 
 test.describe("the skin in the workbench", () => {
@@ -20,7 +18,7 @@ test.describe("the skin in the workbench", () => {
     await page.goto(`${WORKBENCH}/layouts/page`);
     await page.waitForSelector("#preview-frame[srcdoc]");
     const hrefs = await page.locator(".sidebar-tree a.tree-link").evaluateAll(as => as.map(a => a.getAttribute("href")));
-    expect(hrefs.sort()).toEqual(["/components/callout", "/layouts/article", "/layouts/home", "/layouts/page", "/partials/base", "/partials/footer", "/partials/header", "/partials/marquee", "/partials/nav", "/partials/rows"]);
+    expect(hrefs.sort()).toEqual(["/components/callout", "/layouts/article", "/layouts/home", "/layouts/page", "/partials/base", "/partials/footer", "/partials/header", "/partials/nav"]);
   });
 
   for (const [id, docs] of SKIN) {

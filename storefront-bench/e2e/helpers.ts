@@ -10,11 +10,6 @@ export const BUILD_WORKBENCH_URL = "https://workbench.example.test/";
 /** Whether this test runs against pd dev (true) or the built root on a static host (false). */
 export const isDev = (info: TestInfo): boolean => info.project.name === "storefront";
 
-/** Open every chapter row on the page (each is a <details>; only the first starts open), as a reader would. */
-export async function openChapters(page: Page): Promise<void> {
-  for (const summary of await page.locator("details.chapter:not([open]) > summary").all()) await summary.click();
-}
-
 /** The page's DOM as markup, without pd dev's live-reload client. */
 export const domWithoutLiveClient = (page: Page): Promise<string> => page.evaluate(() => {
   const d = document.documentElement.cloneNode(true) as HTMLElement;

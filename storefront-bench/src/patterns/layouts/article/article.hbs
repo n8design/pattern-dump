@@ -1,27 +1,9 @@
 {{#> partials-base }}
 <article class="article">
-  <header class="hero">
-    <h1 class="hero-title article-title" style="--sk-title-em: {{skinTitleEm title}}">{{title}}</h1>
+  <header class="article-header">
+    <h1 class="article-title">{{title}}</h1>
+    {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
   </header>
-  <dl class="hero-meta">
-    <div><dt>Index</dt><dd>{{skinIndex nav}}</dd></div>
-    <div><dt>Layout</dt><dd>article</dd></div>
-    <div><dt>Sections</dt><dd>{{#with (skinChapters body)}}{{count}}{{/with}}</dd></div>
-  </dl>
-  {{> partials-marquee }}
-  {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
-  {{#with (skinChapters body)}}
-  <div class="article-body">
-    {{{intro}}}
-    {{#each chapters}}
-    <details class="chapter"{{#if @first}} open{{/if}}>
-      <summary><h2 class="chapter-title"><span class="chapter-number">({{number}})</span> {{title}}</h2></summary>
-      <div class="chapter-body">
-        {{{html}}}
-      </div>
-    </details>
-    {{/each}}
-  </div>
-  {{/with}}
+  <div class="article-body">{{{body}}}</div>
 </article>
 {{/partials-base}}

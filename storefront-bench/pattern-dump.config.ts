@@ -1,20 +1,17 @@
 import { defineConfig } from "@pattern-dump/config";
 
-// The storefront bench: a small website written as markdown pages, rendered with the skin's layouts.
-// The skin (layouts/ and partials/) and the components the pages embed are ordinary patterns, so they
-// also appear in this project's workbench.
+// The storefront bench: a small website written as markdown pages, rendered with a wireframe skin that is
+// plain on purpose, so the storefront's tests depend on no design. The skin (layouts/ and partials/) and
+// the components the pages embed are ordinary patterns, so they also appear in this project's workbench.
+// Designs are skins of their own, in skins/.
 export default defineConfig({
   sourceDir: "./src",
   patternsDir: "./src/patterns",
   outDir: "./.out/workbench",
   styles: { strategy: "parallel", dir: "./src/styles" },
-  // The skin's tokens, fonts and document defaults: linked into every page and every preview.
+  // The skin's document defaults: linked into every page and every preview.
   documentBase: ["site"],
   assets: { dir: "./src/assets" },
-  // The skin's helpers: a page's chapters, sections, index and next page, derived from its body and the nav.
-  helpers: "./src/helpers/skin.ts",
-  // The skin's behaviour scripts, compiled by pd dev and linked from its templates.
-  scriptsDir: "./src/scripts",
   storefront: {
     pagesDir: "./pages",
     outDir: "./.out/storefront",

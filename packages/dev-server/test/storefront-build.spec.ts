@@ -65,33 +65,19 @@ describe("pd build — the storefront root", () => {
       ".nojekyll",
       "_pd/base.css",
       "_pd/components/components/callout.css",
-      "_pd/components/layouts/article.css",
-      "_pd/components/layouts/home.css",
-      "_pd/components/layouts/page.css",
       "_pd/components/partials/base.css",
       "_pd/components/partials/footer.css",
       "_pd/components/partials/header.css",
-      "_pd/components/partials/marquee.css",
       "_pd/components/partials/nav.css",
-      "_pd/components/partials/rows.css",
-      "_pd/scripts/variant-switcher.js",
       "about/index.html",
-      "assets/fonts/ibm-plex-mono-medium.woff2",
-      "assets/fonts/ibm-plex-mono-regular.woff2",
-      "assets/fonts/montserrat-black.woff2",
-      "assets/fonts/montserrat-italic-variable.woff2",
-      "assets/fonts/montserrat-variable.woff2",
-      "assets/fonts/source-serif-4-italic.woff2",
-      "assets/fonts/source-serif-4-roman.woff2",
       "assets/images/bench-blocks.svg",
-      "assets/images/grain.svg",
       "guides/index.html",
       "guides/setup/index.html",
       "index.html",
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 28, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 14, bytes: expect.any(Number) });
   });
 
   it("resolves every reference inside it to a file it holds", () => {

@@ -1,49 +1,5 @@
-// The header: one row of mono labels on a four-column grid. The site's name and year, one label per
-// section, the tagline aligned to the end. On a narrow screen it stacks to two rows: the name and the
-// tagline, then the sections.
+// The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design.
 .site-header {
-  // Above what follows it: a poster title's glyphs reach above its own box, and must not cover (or take
-  // the clicks of) the header.
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
-  gap: var(--sk-space-3) var(--sk-space-4);
-  align-items: baseline;
-  padding-block: var(--sk-space-5);
-  border-block-end: 1px solid var(--sk-rule);
-}
-
-.site-title {
-  text-decoration: none;
-}
-
-.site-title[aria-current="page"],
-.site-title:hover {
-  color: var(--sk-accent-text);
-}
-
-.site-tagline {
-  margin: 0;
-  color: var(--sk-muted);
-  text-align: end;
-}
-
-@container sk-page (width < 40rem) {
-  .site-header {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "title tagline" "nav nav";
-  }
-
-  .site-title {
-    grid-area: title;
-  }
-
-  .site-tagline {
-    grid-area: tagline;
-  }
-
-  .site-nav {
-    grid-area: nav;
-  }
+  border-block-end: 1px solid;
+  padding-block-end: 0.5rem;
 }

@@ -32,7 +32,7 @@
         },
         "year": {
           "type": "string",
-          "description": "The year beside the site's name in the header"
+          "description": "The year, in the footer"
         }
       }
     }

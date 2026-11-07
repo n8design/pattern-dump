@@ -1,7 +1,7 @@
 {
   "title": "Storefront bench",
   "description": "A small website rendered from markdown, with the bench's own skin.",
-  "body": "<p>The home page: the hero, the page's own text, and a row for each part of the site.</p>",
+  "body": "<p>The home page: the site’s name, then the page’s own text.</p>",
   "site": {
     "title": "Storefront bench",
     "tagline": "A website written in markdown",

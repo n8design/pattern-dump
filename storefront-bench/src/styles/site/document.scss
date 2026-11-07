@@ -1,28 +1,7 @@
-// What every document the skin dresses starts from: the storefront's pages and the component
+// The bench's wireframe skin: what every document it dresses starts from, the storefront's pages and the
 // previews they embed.
 body {
   margin: 0;
-  background: var(--sk-paper);
-  color: var(--sk-ink);
-  font-family: var(--sk-font-body);
-  font-size: var(--sk-step-0);
-  line-height: 1.6;
-  font-optical-sizing: auto;
-  text-rendering: optimizelegibility;
-}
-
-a {
-  color: inherit;
-  text-decoration-color: var(--sk-accent);
-  text-decoration-thickness: 0.08em;
-  text-underline-offset: 0.18em;
-}
-
-a:hover {
-  color: var(--sk-accent);
-}
-
-:focus-visible {
-  outline: 3px solid var(--sk-accent);
-  outline-offset: 3px;
+  font-family: var(--wf-font);
+  line-height: 1.5;
 }

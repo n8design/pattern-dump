@@ -27,21 +27,9 @@ test.describe("storefront pages with JavaScript off", () => {
     await expect(page.locator("body")).toContainText("Careful");
   });
 
-  test("a page's chapters open and close without script, the first one open", async ({ page }) => {
-    await page.goto("/guides/setup/");
-    const chapters = page.locator("details.chapter");
-    await expect(chapters.locator("summary h2")).toHaveText(["(01) Pages", "(02) Layouts"]);
-    expect(await chapters.evaluateAll(ds => ds.map(d => (d as HTMLDetailsElement).open))).toEqual([true, false]);
-    await expect(page.getByText("A page picks its layout in its frontmatter")).toBeHidden();
-    await chapters.nth(1).locator("summary").click();
-    await expect(page.getByText("A page picks its layout in its frontmatter")).toBeVisible();
-    await chapters.nth(0).locator("summary").click();
-    await expect(page.getByText("Each markdown file in pages/ is a page")).toBeHidden();
-  });
-
   test("an article reads, nav and all", async ({ page }) => {
     await page.goto("/guides/setup/");
     await expect(page.locator(".article-lede")).toHaveText("Three folders make a site — the pages, the layouts that dress them, and the components they show.");
-    await expect(page.locator('.site-nav a[aria-current="true"]')).toHaveText(["(01) Guides"]);
+    await expect(page.locator('.site-nav a[aria-current="page"]')).toHaveText(["Setup"]);
   });
 });

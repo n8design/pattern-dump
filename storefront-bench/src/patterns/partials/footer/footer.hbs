@@ -1,6 +1,4 @@
 <footer class="site-footer">
-  {{#with (skinNext nav)}}
-  <a class="next-chapter" href="{{route}}"><span class="next-label">Next chapter</span> <span class="next-title">{{title}}</span></a>
-  {{/with}}
-  <p class="site-footer-line">{{site.footer}}</p>
+  <p>{{site.footer}}</p>
+  {{#if site.year}}<p class="site-year">© {{site.year}}</p>{{/if}}
 </footer>
