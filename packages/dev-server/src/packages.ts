@@ -13,7 +13,7 @@
 // esbuild, Node's own imports) must agree on one path for each file. A package whose real folder is
 // itself inside a node_modules folder is an installed copy, not a link.
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import type { PackageReference } from "@pattern-dump/config";
 import type { PackageManifest } from "@pattern-dump/contracts";
@@ -56,6 +56,34 @@ interface PackageJson {
   peerDependencies?: Record<string, string>;
 }
 
+const TS = /\.[mc]?ts$/;
+const JS = /\.[mc]?js$/;
+
+/**
+ * A package's helpers must be JavaScript: Node does not strip types from files under node_modules, so
+ * TypeScript helpers would load from a link and fail from an installed copy, every page then failing on a
+ * missing helper. A package ships `.js` built from its TypeScript source, and its manifest names that.
+ * Checked at startup and named, rather than skipped one helper module at a time.
+ */
+function checkHelpers(name: string, dir: string, helpers: string | undefined): void {
+  if (!helpers) return;
+  const path = join(dir, helpers);
+  const fix = `Ship compiled helpers: build .js from the TypeScript source and name the .js in "patternDump.helpers".`;
+  if (TS.test(path)) {
+    throw new Error(`pattern package "${name}": its helpers are TypeScript (${helpers}), which Node does not load from an installed package. ${fix}`);
+  }
+  let files: string[];
+  try {
+    if (!statSync(path).isDirectory()) return;
+    files = readdirSync(path);
+  } catch {
+    return; // a missing helpers path is reported where helpers load
+  }
+  if (files.some(f => TS.test(f)) && !files.some(f => JS.test(f))) {
+    throw new Error(`pattern package "${name}": its helpers folder (${helpers}) holds TypeScript and no .js, which Node does not load from an installed package. ${fix}`);
+  }
+}
+
 export function loadPatternPackages(references: PackageReference[] | undefined, root: string): ResolvedPackage[] {
   const out: ResolvedPackage[] = [];
   const seen = new Set<string>();
@@ -76,6 +104,7 @@ export function loadPatternPackages(references: PackageReference[] | undefined, 
         "patterns, styles and themes are. See PackageManifest in @pattern-dump/contracts.",
       );
     }
+    checkHelpers(name, dir, pkg.patternDump.helpers);
     seen.add(name);
     out.push({
       name,

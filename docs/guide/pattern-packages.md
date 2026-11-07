@@ -59,7 +59,7 @@ the package folder, and every field is optional:
   "patternDump": {
     "patterns": "patterns",                      // Handlebars components
     "data": "data",                              // global data, merged beneath the project's
-    "helpers": "helpers",                        // Handlebars helper module or folder
+    "helpers": "dist/helpers.js",                // compiled Handlebars helpers, a module or folder
     "assets": ["images", "fonts"],               // served at /assets/images/…, /assets/fonts/…
     "styles": {
       "dir": "scss",
@@ -81,6 +81,30 @@ List the second as a `peerDependency` of the first; Pattern Dump follows peer de
 `patternDump` field, so naming the patterns package is enough.
 
 Make sure the folders named in `patternDump` are included in the package's `files`.
+
+### Helpers ship compiled
+
+A package's helpers are JavaScript. Write them in TypeScript if you like, but publish the `.js` built from
+it and name that in `helpers`: Node does not load TypeScript from a package installed in `node_modules`.
+A manifest that names a `.ts` file, or a helpers folder that holds TypeScript and no `.js`, stops
+`pd dev`, `pd audit` and `pd build` at startup with an error that says so. (A project's own `helpers` may
+still be TypeScript.)
+
+One esbuild command does it, bundling each helper module and what it imports into one file:
+
+```jsonc
+// the package's package.json
+"scripts": {
+  "build": "esbuild helpers/index.ts --bundle --platform=node --format=esm --outfile=dist/helpers.js",
+  "watch:helpers": "esbuild helpers/index.ts --bundle --platform=node --format=esm --outfile=dist/helpers.js --watch"
+}
+```
+
+Leave `dist/` out of version control and build it before packing (a `prepack` script, or your CI).
+
+**Authoring a package's helpers next to a site** takes two processes: in the package,
+`npm run watch:helpers` rebuilds `dist/` on every save of the TypeScript; in the site, `pd dev` serves it.
+`pd dev` reads helpers when it starts, so restart it to load a rebuilt helper.
 
 An asset folder is served under its own name, `/assets/<folder name>/…`, and a project's folder of the same
 name hides a package's. Give a package's asset folder a name of its own, such as the package's
