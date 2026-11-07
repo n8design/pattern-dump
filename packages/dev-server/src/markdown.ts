@@ -189,7 +189,7 @@ async function _resolveFence(
       out.set(idx, `<figure class="doc-example">\n`
         + `<iframe src="${escapeAttr(`/preview/${fullId}`)}" title="${escapeAttr(fullId)}" loading="lazy"></iframe>\n`
         + _frameVariants(compId, variant, discoveryMap)
-        + `<figcaption><a href="${escapeAttr(workbench)}">Open ${escapeHtml(fullId)} in the workbench</a></figcaption>\n`
+        + `<figcaption><span class="doc-example-id">${escapeHtml(fullId)}</span> <a href="${escapeAttr(workbench)}">Open ${escapeHtml(fullId)} in the workbench</a></figcaption>\n`
         + `</figure>\n`);
       return;
     }

@@ -37,7 +37,7 @@ describe("renderDoc frame mode — pattern fences", () => {
       + `<li><a href="/preview/components/callout" aria-current="true">default</a></li>\n`
       + `<li><a href="/preview/components/callout~warning">warning</a></li>\n`
       + `</ul>\n`
-      + `<figcaption><a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a></figcaption>\n`
+      + `<figcaption><span class="doc-example-id">components/callout</span> <a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a></figcaption>\n`
       + `</figure>\n`,
     );
     expect(problems).toEqual([]);
@@ -82,13 +82,18 @@ describe("renderDoc frame mode — a component's variants", () => {
       + `</ul>\n`);
   });
 
+  it("names the component it shows in its caption, beside the workbench link", async () => {
+    const html = await renderDoc("```pattern components/callout~warning\n```\n", renderComponent, map, frame());
+    expect(html).toContain(`<figcaption><span class="doc-example-id">components/callout~warning</span> <a href="https://workbench.example.test/components/callout#warning">Open components/callout~warning in the workbench</a></figcaption>`);
+  });
+
   it("lists nothing for a component without variants", async () => {
     const noVariants: DiscoveryMap = new Map([...map].filter(([id]) => !id.includes("~")));
     const html = await renderDoc("```pattern components/callout\n```\n", renderComponent, noVariants, frame());
     expect(html).toBe(
       `<figure class="doc-example">\n`
       + `<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>\n`
-      + `<figcaption><a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a></figcaption>\n`
+      + `<figcaption><span class="doc-example-id">components/callout</span> <a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a></figcaption>\n`
       + `</figure>\n`);
   });
 
