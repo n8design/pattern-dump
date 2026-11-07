@@ -179,7 +179,13 @@ export async function startDevServer(
   });
 
   // Main tracker: component styles only (no themes — those are served as separate linked files).
-  const tracker = await createSassDependencyTracker([stylesDir]);
+  // Every watched style root: the project's, and each linked package's. A package root that compiles
+  // only declared entries is tracked through those (as buildAllStyleData compiles it).
+  const linkedStyleRoots = styleRoots.filter(r => r.source !== undefined && cfg.packages.some(p => p.linked && p.name === r.source));
+  const tracker = await createSassDependencyTracker(
+    [stylesDir, ...linkedStyleRoots.filter(r => !r.entries).map(r => r.dir)],
+    linkedStyleRoots.flatMap(r => r.entries ?? []),
+  );
   console.log("[dev-server] SCSS compiled (dependency tracker ready)");
 
   // All mutable server state in one object, shared by reference with the route handlers and the

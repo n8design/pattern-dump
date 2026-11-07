@@ -32,8 +32,8 @@ import { buildCompositionRegistry } from "./composition.js";
 import {
   computeCssClosure, linkableClosure, recomputeComponentCss, withRenderedClassOwners,
 } from "./css-closure.js";
-import { buildAllStyleData, documentBaseMatcher, patchClassOwnerIndex } from "./style-index.js";
-import { rootMatchers, within, type WatchedRoots } from "./watch-roots.js";
+import { buildAllStyleData, patchClassOwnerIndex } from "./style-index.js";
+import { rootMatchers, watchedRoots, within, type WatchedRoots } from "./watch-roots.js";
 import { auditComponent } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
@@ -53,16 +53,11 @@ export interface WatchContext {
 export function startWatching(ctx: WatchContext): FSWatcher {
   const { cfg, state, render, tracker, hotreloader } = ctx;
   // Destructured so the body below reads exactly as it did inside startDevServer.
-  const { patternsDir, stylesDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
-  // The source roots watched, by kind. Each handler works from the root a file is in (its folder, and for
-  // stylesheets the root's own base layer), never from the project's folders by name. Only the
-  // PROJECT's own roots are watched here.
-  const watched: WatchedRoots = {
-    patterns: [patternsDir],
-    styles: [{ dir: stylesDir, inBase: documentBaseMatcher(stylesDir, cfg.config.documentBase) }],
-    themes: cfg.config.themes?.dir ? [cfg.themesDir!] : [],
-    scripts: cfg.config.scriptsDir && cfg.scriptsDirs[0] ? [cfg.scriptsDirs[0]] : [],
-  };
+  const { patternsDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
+  // The source roots watched, by kind: the project's, and every linked package's (watch-roots.ts). Each
+  // handler works from the root a file is in (its folder, and for stylesheets the root's own base
+  // layer), never from the project's folders by name.
+  const watched: WatchedRoots = watchedRoots(cfg);
   const { patternRootOf, styleRootOf, themeDirOf, scriptDirOf, inBase, componentOfScss } = rootMatchers(watched);
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).

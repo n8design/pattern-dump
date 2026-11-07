@@ -115,13 +115,17 @@ export interface SassDependencyTracker {
 }
 
 export async function createSassDependencyTracker(
-  dirs: string[]
+  dirs: string[],
+  /** Further source files to track, listed rather than found: a style root that compiles only
+   *  declared entries contributes those, not every non-partial file under it. */
+  files: string[] = [],
 ): Promise<SassDependencyTracker> {
   // The ordered list of non-partial SCSS source files (order preserved for deterministic CSS output).
   const sourceFiles: string[] = [];
   for (const dir of dirs) {
     sourceFiles.push(...(await collectScssFiles(dir)));
   }
+  sourceFiles.push(...files.map(f => resolve(f)));
 
   // Per-file compiled CSS.
   const perFileCss = new Map<string, string>();
