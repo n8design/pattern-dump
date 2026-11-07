@@ -17,9 +17,9 @@
 // Guarded by test/watcher.spec.ts, which asserts both the durable HTTP effects and the broadcasts
 // themselves over a real socket.
 
+import { statSync } from "node:fs";
 import { basename, extname, relative, resolve, sep } from "node:path";
 import chokidar from "chokidar";
-import type { FSWatcher } from "chokidar";
 import { componentCssUrl } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { compileSassFile } from "@pattern-dump/build";
@@ -55,8 +55,53 @@ export interface WatchContext {
   readonly hotreloader: HotReloader;
 }
 
-/** Start watching the project. Returns the chokidar watcher so the caller owns teardown. */
-export function startWatching(ctx: WatchContext): FSWatcher {
+/**
+ * How long after a change is handled the file is looked at again. chokidar drops a `change` to a path
+ * that comes within 50 ms of the previous one and never reports it later (`_throttle(EV_CHANGE, path,
+ * 50)` in its `_emit`). On Linux, where events arrive within a few milliseconds, a quick second save
+ * is lost that way, and the page keeps the first one. So after each change is handled the file's
+ * modification time and size are compared with what they were when the handler read the file, past
+ * that window, and a difference is handled as one more change, again until they hold still. Must stay
+ * above chokidar's window: test/watcher-chokidar.spec.ts pins it.
+ */
+export const CHANGE_RECHECK_MS = 60;
+
+/** The file watcher could not start (an inotify limit, a folder it may not read): pd dev cannot run. */
+export class WatchStartError extends Error {
+  override name = "WatchStartError";
+}
+
+/** What a chokidar error says, named for the terminal: what failed, and for a known cause, what to do. */
+export function describeWatchError(e: unknown): string {
+  const err = e as NodeJS.ErrnoException;
+  const what = `file watching failed${err?.path ? ` on ${err.path}` : ""}: ${err?.message ?? String(e)}`;
+  if (err?.code === "ENOSPC") return `${what} — the system's limit on watched files is reached (on Linux, raise fs.inotify.max_user_watches)`;
+  if (err?.code === "EMFILE") return `${what} — too many open files (raise the open-file limit, ulimit -n)`;
+  return what;
+}
+
+/** A running watcher. `close` stops it and every recheck still pending. */
+export interface WatchHandle {
+  close(): Promise<void>;
+}
+
+/** The file's inode, change and modification times and size, or null when it is gone. */
+function stamp(path: string): string | null {
+  try {
+    const s = statSync(path);
+    return `${s.ino}:${s.ctimeMs}:${s.mtimeMs}:${s.size}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Start watching the project. Resolves once chokidar has finished its initial scan (until then a file
+ * written into a folder it has not reached produces no event), and rejects with a WatchStartError when
+ * chokidar reports an error before that. An error later is a problem in the terminal and on the
+ * Console, never silent.
+ */
+export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
   const { cfg, state, render, rendering, tracker, hotreloader } = ctx;
   // Destructured so the body below reads exactly as it did inside startDevServer.
   const { patternsDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
@@ -83,20 +128,72 @@ const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: t
 // it costs a counter and a name check. Not exported, not part of any contract.
 type TestOnlyEventHandled = (event: string, path: string, stillRunning: number) => void;
 let running = 0;
+let closed = false;
+// One pending recheck per changed file (CHANGE_RECHECK_MS), by its timer.
+const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
+// A file a recheck handled, as it was then: chokidar's own event for that same write can still follow
+// (macOS reports writes about 100 ms late, after the recheck), and is not handled a second time.
+const recheckHandled = new Map<string, string>();
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
-  watcher.on(event, (path: string) => {
+  const dispatch = (path: string, fromRecheck = false): void => {
+    // A change: the file as the handler is about to read it. A newer event for the same file replaces
+    // the pending recheck, since it is handled with whatever the file holds by then.
+    let seen: string | null = null;
+    if (event === "change") {
+      seen = stamp(path);
+      const already = recheckHandled.get(path);
+      recheckHandled.delete(path);
+      if (!fromRecheck && already !== undefined && already === seen) return;
+      if (fromRecheck && seen !== null) recheckHandled.set(path, seen);
+      clearTimeout(rechecks.get(path));
+      rechecks.delete(path);
+    } else if (event === "unlink") {
+      clearTimeout(rechecks.get(path));
+      rechecks.delete(path);
+      recheckHandled.delete(path);
+    }
     running++;
     const done = () => {
       running--;
       (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, running);
+      if (event !== "change" || closed || seen === null) return;
+      rechecks.set(path, setTimeout(() => {
+        rechecks.delete(path);
+        if (closed) return;
+        const now = stamp(path);
+        // Still as the handler read it: done. Gone: its unlink is on its way. Otherwise a write chokidar
+        // dropped, handled as a change (which looks again after it).
+        if (now !== null && now !== seen) dispatch(path, true);
+      }, CHANGE_RECHECK_MS));
     };
     if (basename(path) === ".__testOnly_barrier") { done(); return; }
     // The handler starts synchronously, as chokidar called it before; only its end is observed.
     let result: unknown;
     try { result = handler(path); } catch (e) { done(); throw e; }
     void Promise.resolve(result).finally(done);
-  });
+  };
+  watcher.on(event, (path: string) => dispatch(path));
 }
+
+// chokidar's errors: before "ready" the watcher cannot start, and startWatching rejects; after it, each is
+// a named problem in the terminal and on the Console. Without a listener chokidar's error would throw.
+let ready = false;
+const started = new Promise<void>((resolve, reject) => {
+  watcher.once("ready", () => { ready = true; resolve(); });
+  watcher.on("error", (e: unknown) => {
+    const message = describeWatchError(e);
+    if (!ready) { reject(new WatchStartError(message)); return; }
+    hotreloader.push({ type: "error", scope: "build", message });
+    console.error(`[dev-server] ${message}`);
+  });
+});
+const close = async (): Promise<void> => {
+  closed = true;
+  for (const timer of rechecks.values()) clearTimeout(timer);
+  rechecks.clear();
+  recheckHandled.clear();
+  await watcher.close();
+};
 
 // Single source of truth for link-set membership: a component is linkable iff it has
 // non-empty compiled CSS. Applied identically by the render path and the HMR reconcile
@@ -505,5 +602,11 @@ on("unlinkDir", async (dirPath) => {
   }
 });
 
-  return watcher;
+  try {
+    await started;
+  } catch (e) {
+    await close();
+    throw e;
+  }
+  return { close };
 }

@@ -81,7 +81,7 @@ import { createDisplayPath } from "./display-path.js";
 import { createRenderingHandle, type BuildRenderer } from "./rendering.js";
 import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
-import { startWatching } from "./watch.js";
+import { startWatching, type WatchHandle } from "./watch.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
 // module graph. Substrate for the style and style-modules graphs.
 import { buildAllStyleData } from "./style-index.js";
@@ -285,11 +285,18 @@ export async function startDevServer(
 
   // ---- File watcher ----
 
-  const watcher = live ? startWatching({ cfg, state, render, rendering, tracker, hotreloader }) : null;
-  // Resolve only once chokidar has finished its initial scan. Until "ready", a file written into a
-  // directory it has not reached yet produces no event — so an edit made right after startup (or a
-  // test writing a fixture straight after startDevServer resolves) was silently missed under load.
-  if (watcher) await new Promise<void>(resolve => watcher.once("ready", () => resolve()));
+  // Resolves once chokidar has finished its initial scan (an edit made before that would be missed). A
+  // watcher that cannot start fails startup, named, after closing what is already listening.
+  let watcher: WatchHandle | null = null;
+  if (live) {
+    try {
+      watcher = await startWatching({ cfg, state, render, rendering, tracker, hotreloader });
+    } catch (e) {
+      await hotreloader.close().catch(() => {});
+      await new Promise<void>(res => httpServer.close(() => res()));
+      throw e;
+    }
+  }
 
   return {
     port: actualPort,
