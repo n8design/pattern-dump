@@ -1,13 +1,14 @@
 // A pattern package ships compiled helpers: a manifest naming a TypeScript helper file, or a helpers
 // folder holding TypeScript and no .js, stops startup with an error that says so, in pd dev, pd audit
 // and pd build alike. The project's own helpers may still be TypeScript.
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { buildStaticSite, runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { loadPatternPackages } from "../src/packages.js";
+import { loadHelperRegistrars } from "../src/project-loaders.js";
 
 let tmp = "";
 let n = 0;
@@ -68,6 +69,39 @@ describe("a package's helpers", () => {
     await expect(startDevServer(cfg, root, { port: 0, live: false })).rejects.toThrow(TS_FILE);
     await expect(runDiagnosticsAudit(cfg, root)).rejects.toThrow(TS_FILE);
     await expect(buildStaticSite(cfg, root, { outDir: join(root, "site"), pdVersion: "0.0.0-test" })).rejects.toThrow(TS_FILE);
+  });
+});
+
+describe("a package helpers folder with .js and .ts files", () => {
+  it("loads the .js and warns at startup, naming the TypeScript files it skips", async () => {
+    const root = await project("helpers", {
+      "helpers/shout.js": "export function shout(s) { return String(s).toUpperCase(); }\n",
+      "helpers/shout.ts": "export function shout(s: string): string { return s.toUpperCase(); }\n",
+      "helpers/whisper.mts": "export const whisper = (s: string): string => s;\n",
+    });
+    const warnings: string[] = [];
+    const spy = vi.spyOn(console, "warn").mockImplementation((...a: unknown[]) => { warnings.push(a.join(" ")); });
+    let dir = "";
+    try {
+      dir = loadPatternPackages(["@acme/ds"], root)[0].dir;
+    } finally {
+      spy.mockRestore();
+    }
+    expect(warnings).toEqual([`[dev-server] pattern package "@acme/ds": helpers folder helpers loads its .js files; skipped TypeScript: shout.ts, whisper.mts`]);
+    const names: string[] = [];
+    for (const register of await loadHelperRegistrars(join(dir, "helpers"))) register({ registerHelper: (name: string) => names.push(name) });
+    expect(names).toEqual(["shout"]);
+  });
+
+  it("warns about nothing when the folder holds only .js", async () => {
+    const root = await project("helpers", { "helpers/shout.js": "export function shout(s) { return s; }\n" });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      loadPatternPackages(["@acme/ds"], root);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

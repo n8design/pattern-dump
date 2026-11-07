@@ -79,9 +79,12 @@ function checkHelpers(name: string, dir: string, helpers: string | undefined): v
   } catch {
     return; // a missing helpers path is reported where helpers load
   }
-  if (files.some(f => TS.test(f)) && !files.some(f => JS.test(f))) {
+  const ts = files.filter(f => TS.test(f)).sort();
+  if (ts.length && !files.some(f => JS.test(f))) {
     throw new Error(`pattern package "${name}": its helpers folder (${helpers}) holds TypeScript and no .js, which Node does not load from an installed package. ${fix}`);
   }
+  // Beside compiled helpers, TypeScript files are sources: only the .js load. Said, not skipped silently.
+  if (ts.length) console.warn(`[dev-server] pattern package "${name}": helpers folder ${helpers} loads its .js files; skipped TypeScript: ${ts.join(", ")}`);
 }
 
 export function loadPatternPackages(references: PackageReference[] | undefined, root: string): ResolvedPackage[] {

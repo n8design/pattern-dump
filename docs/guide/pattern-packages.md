@@ -87,8 +87,9 @@ Make sure the folders named in `patternDump` are included in the package's `file
 A package's helpers are JavaScript. Write them in TypeScript if you like, but publish the `.js` built from
 it and name that in `helpers`: Node does not load TypeScript from a package installed in `node_modules`.
 A manifest that names a `.ts` file, or a helpers folder that holds TypeScript and no `.js`, stops
-`pd dev`, `pd audit` and `pd build` at startup with an error that says so. (A project's own `helpers` may
-still be TypeScript.)
+`pd dev`, `pd audit` and `pd build` at startup with an error that says so. In a folder that has both, the
+`.js` files load and the TypeScript ones are skipped with a startup warning naming them. (A project's own
+`helpers` may still be TypeScript.)
 
 One esbuild command does it, bundling each helper module and what it imports into one file:
 
