@@ -77,8 +77,9 @@ const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: t
 
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
 // after each watcher event's handler has finished, with the number of handlers still running. Tests
-// use it as a barrier ("every event so far has been handled") instead of waiting for quiet. Unset, it
-// costs a counter. Not exported, not part of any contract.
+// use it as a barrier ("every event so far has been handled") instead of waiting for quiet; a file named
+// `.__testOnly_barrier`, which a test puts in every watched folder, is reported but never handled. Unset,
+// it costs a counter and a name check. Not exported, not part of any contract.
 type TestOnlyEventHandled = (event: string, path: string, stillRunning: number) => void;
 let running = 0;
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
@@ -88,6 +89,7 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       running--;
       (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, running);
     };
+    if (basename(path) === ".__testOnly_barrier") { done(); return; }
     // The handler starts synchronously, as chokidar called it before; only its end is observed.
     let result: unknown;
     try { result = handler(path); } catch (e) { done(); throw e; }

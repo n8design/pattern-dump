@@ -1,20 +1,25 @@
 // A harness for watcher specs: a served project, its HMR socket's messages, and acts on its files, with
 // no waiting for quiet. The dev-server calls the test-only hook `__testOnly_onEventHandled` when each
-// watcher event's handler has finished; a step waits until the events its act causes are handled, then
-// edits a sentinel file and waits until that is handled with no handler still running (every event so
-// far has been handled), then pings the socket (frames on one socket arrive in order, so every message
-// sent so far has arrived). New files are written beside the project and renamed into place, so each
-// appears in one event.
+// watcher event's handler has finished. A step waits until the events its act causes are handled, then
+// for its barrier: a `.__testOnly_barrier` file (a dotfile, which every reader of a folder skips) in every watched folder (the project's and each linked
+// package's), all edited, all handled (the watcher reports them and handles nothing), and then no handler
+// still running. The OS orders events within a folder, not across folders, hence one per folder. Then a
+// socket ping: frames on one socket arrive in order, so every message sent so far has arrived. New files
+// are written beside the project and renamed into place, so each appears in one event.
 import { appendFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { createServer } from "node:net";
-import { dirname, join, relative } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, dirname, join, relative } from "node:path";
 import WebSocket from "ws";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import { loadPatternPackages } from "../src/packages.js";
+import { resolveServerConfig } from "../src/server-config.js";
+import { watchedRoots } from "../src/watch-roots.js";
 
-/** A file in the patterns folder whose edits the watcher handles and ignores: the barrier's sentinel. */
-export const SENTINEL = "src/patterns/zz-sentinel.txt";
+/** The barrier's file: in every watched folder, reported by the watcher and never handled. */
+const BARRIER = ".__testOnly_barrier";
 
 // Every watcher event handled, from every server in this process, as the hook reports it.
 type Handled = { event: string; path: string; stillRunning: number };
@@ -70,12 +75,21 @@ export class Bench {
   messages: string[] = [];
   private ws!: WebSocket;
   private port = 0;
+  /** One barrier file per watched folder. */
+  private barriers: string[] = [];
   /** `staging`: a folder outside every watched one, where new files are written before they're moved in. */
   constructor(readonly root: string, private readonly component: string, private readonly staging: string) {}
 
   async start(cfg: PatternDumpConfig): Promise<void> {
-    await mkdir(dirname(this.at(SENTINEL)), { recursive: true });
-    await writeFile(this.at(SENTINEL), "");
+    // The folders the watcher will watch, as it finds them.
+    const rc = resolveServerConfig(cfg, this.root, {}, loadPatternPackages(cfg.packages, this.root));
+    const w = watchedRoots(rc);
+    const folders = [
+      ...w.patterns, ...w.styles.map(r => r.dir), ...w.themes, ...w.scripts, ...w.data, ...w.assets,
+      ...w.helpers.map(h => h.scope), ...(rc.storefront?.pagesDir ? [rc.storefront.pagesDir] : []),
+    ].filter(d => existsSync(d));
+    this.barriers = [...new Set(folders)].map(d => join(d, BARRIER));
+    for (const file of this.barriers) await writeFile(file, "");
     const wsPort = await freePort();
     const server = await startDevServer(cfg, this.root, { port: 0, wsPort });
     servers.push(server);
@@ -112,20 +126,23 @@ export class Bench {
 
   /** The events handled for this project since `from`, as [event, path in the project], the sentinel's left out. */
   handledSince(from: number): string[][] {
-    return handled.slice(from).filter(h => this.owns(h.path))
-      .map(h => [h.event, this.rel(h.path)]).filter(([, p]) => p !== SENTINEL);
+    return handled.slice(from).filter(h => this.owns(h.path) && basename(h.path) !== BARRIER)
+      .map(h => [h.event, this.rel(h.path)]);
   }
 
   /** Until every event so far is handled and every message sent so far has arrived. */
   async barrier(): Promise<void> {
     const from = handled.length;
-    await this.edit(SENTINEL, ".");
+    for (const file of this.barriers) await appendFile(file, ".");
     const mine = (h: Handled) => this.owns(h.path);
+    const wanted = this.barriers.map(f => this.rel(f));
     await whenHandled(() => {
       const after = handled.slice(from);
-      const at = after.findIndex(h => h.path === this.at(SENTINEL));
-      return at >= 0 && after.slice(at).some(h => mine(h) && h.stillRunning === 0);
-    }, () => `barrier: the sentinel's change, then no handler still running; handled since: ${JSON.stringify(handled.slice(from).filter(mine).map(h => [h.event, this.rel(h.path), h.stillRunning]))}`);
+      // The last barrier file handled, then a moment with no handler running.
+      const seen = wanted.map(rel => after.findIndex(h => mine(h) && this.rel(h.path) === rel));
+      if (seen.some(i => i < 0)) return false;
+      return after.slice(Math.max(...seen)).some(h => mine(h) && h.stillRunning === 0);
+    }, () => `barrier: ${JSON.stringify(wanted)} each handled, then no handler still running; handled since: ${JSON.stringify(handled.slice(from).filter(mine).map(h => [h.event, this.rel(h.path), h.stillRunning]))}`);
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`latch: no pong within ${LATCH_MS} ms`)), LATCH_MS);
       this.ws.once("pong", () => { clearTimeout(timer); resolve(); });
