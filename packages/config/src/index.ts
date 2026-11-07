@@ -2,7 +2,7 @@
 // Load and validate pattern-dump.config (.ts/.json, TS wins). Shared config types.
 import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/contracts";
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
-export { ConfigError, configProblems, validateConfig } from "./validate.js";
+export { ConfigError, configProblems, suggest, validateConfig } from "./validate.js";
 
 export interface AssetsConfig {
   /** Where assets live. Only 'central' (the default: one assets dir, served at /assets/) is supported
@@ -156,6 +156,39 @@ export interface PatternDumpConfig {
    * static site has no Audit tab. All three can be overridden on the command line.
    */
   build?: { outDir?: string; basePath?: string; audit?: boolean };
+  /** The storefront: a website of real HTML pages, written from markdown, beside the workbench. */
+  storefront?: StorefrontConfig;
+}
+
+/**
+ * The storefront. `pd dev` serves it on its own host (`live.localhost` unless `host` says otherwise),
+ * the workbench on `pd.localhost`, both from `/`. `pd build` writes it to its own folder, apart from
+ * the workbench snapshot. A page renders with the layout `layouts/<layout>` from the project's patterns.
+ */
+export interface StorefrontConfig {
+  /** Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/`.
+   *  `pagesDir`, `patternsDir` and `outDir` are three separate folders: none is another, and none is inside
+   *  another. */
+  pagesDir: string;
+  /** Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench
+   *  snapshot, and separate from `pagesDir` and `patternsDir` (see `pagesDir`). */
+  outDir: string;
+  /** The host name `pd dev` serves the storefront on. Default: `live.localhost`. */
+  host?: string;
+  /**
+   * Where the built workbench will be hosted, e.g. `https://workbench.example.com/` or
+   * `https://htwoo.io/workbench/`: an absolute http(s) URL, with no query or fragment. Loaded with exactly
+   * one trailing slash, whether written with one or not; links from storefront pages to the workbench are
+   * this value followed by a path. Used by `pd build` only: in `pd dev` those links always go to
+   * `http://pd.localhost:<port>`, the workbench of the same process.
+   */
+  workbenchUrl?: string;
+  /**
+   * Values every page of the site shares, such as its title or the line in its footer. Every layout gets
+   * them as `site`; a page cannot set them. Which keys there are, and their types, is what the `site`
+   * property of `partials/base`'s schema declares: they are checked against it, not inferred.
+   */
+  site?: Record<string, unknown>;
 }
 
 export function defineConfig(config: PatternDumpConfig): PatternDumpConfig {

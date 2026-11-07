@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Callout",
+  "type": "object",
+  "required": ["title", "text"],
+  "properties": {
+    "title": { "type": "string" },
+    "text":  { "type": "string" },
+    "tone":  { "type": "string", "enum": ["warning"] }
+  }
+}

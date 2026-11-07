@@ -1,0 +1,5 @@
+<header class="site-header">
+  <a class="site-title" href="{{site.href}}"{{#if (skinAtHome nav)}} aria-current="page"{{/if}}>{{site.title}}{{#if site.year}} <span class="site-year">©{{site.year}}</span>{{/if}}</a>
+  {{> partials-nav }}
+  <p class="site-tagline">{{site.tagline}}</p>
+</header>

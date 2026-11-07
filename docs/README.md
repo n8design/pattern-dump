@@ -12,6 +12,7 @@ For people building a design system with Pattern Dump.
 | [Themes](guide/themes.md) | Writing and switching themes |
 | [Pattern packages](guide/pattern-packages.md) | Using and publishing design systems as npm packages |
 | [Static build](guide/static-build.md) | `pd build`: options, hosting and troubleshooting |
+| [Storefront](guide/storefront.md) | A website written in markdown, with live examples, beside the workbench |
 | [Command line](guide/cli.md) | Every `pd` command and option |
 
 ## Development: working on Pattern Dump

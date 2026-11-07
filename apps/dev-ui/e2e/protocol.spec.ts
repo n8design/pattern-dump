@@ -24,4 +24,43 @@ test.describe("protocol version marker", () => {
     await expect(page.locator("#dock-panel-console .console p", { hasText: "Protocol mismatch" })).toHaveCount(0);
     await expect(page.locator(".rail-status")).not.toHaveAttribute("data-state", "disconnected");
   });
+
+  // page-changed is for storefront pages. The workbench receives every frame on the shared socket, so
+  // it must ignore this one: no reload, no Console line, no tree rebuild, no preview swap. The socket
+  // is proxied to the real server and the frames are injected into it; a tree-changed injected last
+  // proves the injection reaches the shell, so the "nothing happened" above it is not an untested path.
+  test("a page-changed frame leaves the workbench untouched", async ({ page }) => {
+    let inject: ((frame: object) => void) | null = null;
+    await page.routeWebSocket(/^ws:\/\/localhost:\d+\/?$/, ws => {
+      const server = ws.connectToServer();
+      ws.onMessage(m => server.send(m));
+      server.onMessage(m => ws.send(m));
+      inject = frame => ws.send(JSON.stringify(frame));
+    });
+
+    await gotoComponent(page, "atoms/button");
+    await page.click("#dock-tab-console");
+    const consoleLines = page.locator("#dock-panel-console .console p");
+    await expect(consoleLines.filter({ hasText: "HMR connected" })).toBeAttached();
+    await expect.poll(() => inject !== null).toBe(true);
+
+    await page.evaluate(() => { (window as unknown as { __pdMarker: number }).__pdMarker = 1; });
+    const link = await page.locator('.sidebar-tree a[href="/atoms/button"]').elementHandle();
+    const srcdoc = await page.locator("#preview-frame").getAttribute("srcdoc");
+    const lines = await consoleLines.count();
+
+    inject!({ type: "page-changed", route: "/guides/setup/" });
+    inject!({ type: "page-changed", route: null });
+    await page.waitForTimeout(500);
+
+    expect(await page.evaluate(() => (window as unknown as { __pdMarker?: number }).__pdMarker)).toBe(1);
+    expect(await link!.evaluate(el => el.isConnected)).toBe(true);
+    expect(await page.locator("#preview-frame").getAttribute("srcdoc")).toBe(srcdoc);
+    expect(await consoleLines.count()).toBe(lines);
+
+    // The control: the same channel does reach the shell — tree-changed rebuilds the Nav Rail.
+    inject!({ type: "tree-changed" });
+    await expect.poll(() => link!.evaluate(el => el.isConnected)).toBe(false);
+    await expect(page.locator('.sidebar-tree a[href="/atoms/button"]')).toBeAttached();
+  });
 });

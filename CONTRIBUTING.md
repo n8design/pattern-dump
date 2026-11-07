@@ -25,7 +25,11 @@ npm run typecheck      # nx run-many -t typecheck
 npm run lint           # ESLint, one root config for every project
 npm test               # Vitest across all packages
 npm run e2e            # Playwright; builds first, starts its own servers on :4100 and :4200
+npm run e2e:storefront # Playwright for the storefront bench, on :4300 and :4400
+npm run e2e:skin-experimental   # Playwright for the experimental skin's demo, on :4600 and :4700
 npm run lint:css --workspace @pattern-dump/dev-ui    # Stylelint for the shell
+npm run lint:css --workspace storefront-bench        # … for the storefront bench's skin
+npm run lint:css --workspace @pattern-dump/skin-experimental   # … for the experimental skin
 npm run affected       # build, test, lint and typecheck only what changed
 npm run graph          # the Nx project graph
 npm run dev:check      # is a running dev server older than the build on disk?
@@ -33,18 +37,19 @@ npm run pack:pd        # build the installable package → .pd-pack/pattern-dump
 npm run verify:install # pack, pd init a project outside the repo, boot, audit and build it
 ```
 
-Run `npm run e2e` from the root, not with `--workspace`: the root target builds the runtime chain first.
+Run the e2e scripts from the root, not with `--workspace`: the root targets build the runtime chain first.
 
 ## Checks before a merge
 
 All of these must pass:
 
 1. `npm run build`
-2. `npm run lint:css --workspace @pattern-dump/dev-ui`: a Stylelint error blocks; a warning is advisory
+2. `npm run lint:css` in each of `@pattern-dump/dev-ui`, `storefront-bench` and
+   `@pattern-dump/skin-experimental`: a Stylelint error blocks; a warning is advisory
 3. `npm run lint`
 4. `npm run typecheck`
 5. `npm test`
-6. `npm run e2e`
+6. `npm run e2e`, `npm run e2e:storefront` and `npm run e2e:skin-experimental`
 
 If a check fails, fix the cause, or add a narrowly scoped disable with a written reason.
 

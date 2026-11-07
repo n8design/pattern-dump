@@ -58,7 +58,8 @@ import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 import { surfaceAssetRoots, surfaceCollisions, surfaceDefaultTheme, surfaceDocumentBase, surfaceFlattening } from "./surfacing.js";
 // Headless `pd audit`. Re-exported: packages/core imports it.
 export { runDiagnosticsAudit } from "./audit.js";
-export { buildStaticSite, withBasePath } from "./static-build.js";
+export { buildStaticSite } from "./static-build.js";
+export { withBasePath } from "./snapshot-writer.js";
 export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // Folder overview gallery — public leaves under a group node.
 // Component detail. Widest fan-out in the package — nothing may import it back.
@@ -115,6 +116,13 @@ export interface DevServerOptions {
   /** false = headless: no live-reload socket and no file watcher. Used by `pd build`, which only
    *  reads the routes once. Default true. */
   live?: boolean;
+  /** The clock behind the server's time stamps: the boot `startedAt` (/api/version) and the audit's
+   *  `generatedAt`. Default: real time. `pd build` passes a fixed one when asked for a reproducible
+   *  snapshot. */
+  now?: () => Date;
+  /** `pd build` only: where storefront pages link into the workbench — the built workbench's address
+   *  (storefront.workbenchUrl). Without it, pages link to this process's own workbench on pd.localhost. */
+  storefrontWorkbenchUrl?: string;
 }
 export interface DevServer {
   port: number;
@@ -229,14 +237,18 @@ export async function startDevServer(
   // Node has already cached the old module, so nothing short of a restart can fix that.
   //
   // Degrades to null rather than failing startup — a missing stamp must never stop the server.
+  const now = opts.now ?? (() => new Date());
   const boot: BootStamp = {
-    startedAt: new Date().toISOString(),
+    startedAt: now().toISOString(),
     serverBundleMtime: await stat(fileURLToPath(import.meta.url))
       .then(st => st.mtimeMs)
       .catch(() => null),
   };
 
-  const routeCtx: RouteContext = { cfg, state, render, tracker, globalData, devUiDist, boot };
+  const routeCtx: RouteContext = {
+    cfg, state, render, tracker, globalData, devUiDist, boot, now, live,
+    ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
+  };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 
   await new Promise<void>((resolve, reject) => {

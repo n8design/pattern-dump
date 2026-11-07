@@ -24,7 +24,23 @@ import { readFile } from "node:fs/promises";
 import MarkdownIt from "markdown-it";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { highlight, wrapWithCopyButton, deepMerge } from "@pattern-dump/renderer";
-import { escapeHtml } from "./http-utils.js";
+import { escapeAttr, escapeHtml } from "./http-utils.js";
+
+/**
+ * How a doc's live examples are embedded.
+ *  - "inline" (the workbench's docs panel): a `pattern` fence is the rendered component, in place;
+ *    `pattern:` links go to the workbench route.
+ *  - "frame" (a storefront page): a `pattern` fence is an iframe on the component's own preview
+ *    document, with a link to it in the workbench beside it — the page styles only itself, never the
+ *    component (the preview is its own document). `pattern:` links go to `workbenchUrl` (which ends
+ *    with "/"). A component that does not exist is still marked in the page, and is also added to
+ *    `problems`: a storefront page with a broken example or link is a page that fails to build.
+ */
+export type DocEmbed =
+  | { embed: "inline" }
+  | { embed: "frame"; workbenchUrl: string; problems: string[] };
+
+const INLINE: DocEmbed = { embed: "inline" };
 
 const _md = new MarkdownIt({ html: false, linkify: false });
 
@@ -48,6 +64,24 @@ function _mdPlainPre(code: string): string {
 }
 
 
+/**
+ * A frame-mode example's variants, when its component has any: one link per variant, the base first
+ * (`default`), each to that variant's own preview, with `aria-current` on the one the fence shows. With
+ * scripting off a link opens that preview; a page's script may swap the frame's src in place instead.
+ * Read from discovery, so it lists what exists; nothing when the component has no variants.
+ */
+function _frameVariants(compId: string, shown: string | undefined, discoveryMap: DiscoveryMap): string {
+  const prefix = `${compId}~`;
+  const variants = [...discoveryMap.keys()].filter(id => id.startsWith(prefix)).map(id => id.slice(prefix.length)).sort();
+  if (variants.length === 0) return "";
+  const items = [undefined, ...variants].map(v => {
+    const id = v ? `${prefix}${v}` : compId;
+    const current = v === shown ? ` aria-current="true"` : "";
+    return `<li><a href="${escapeAttr(`/preview/${id}`)}"${current}>${escapeHtml(v ?? "default")}</a></li>\n`;
+  });
+  return `<ul class="doc-example-variants" aria-label="${escapeAttr(`Variants of ${compId}`)}">\n${items.join("")}</ul>\n`;
+}
+
 /** Shared parser for pattern specs used by both fence blocks and cross-links. */
 function _parsePatternSpec(spec: string): { compId: string; variant?: string } {
   const tildeIdx = spec.indexOf("~");
@@ -66,7 +100,8 @@ function _parsePatternSpec(spec: string): { compId: string; variant?: string } {
  */
 function _resolvePatternLinks(
   tokens: ReturnType<typeof _md.parse>,
-  discoveryMap: DiscoveryMap
+  discoveryMap: DiscoveryMap,
+  embed: DocEmbed
 ): void {
   for (const blockTok of tokens) {
     if (blockTok.type !== "inline" || !blockTok.children) continue;
@@ -79,11 +114,13 @@ function _resolvePatternLinks(
       // button~ghost isn't in the map (variant typos surface instead of falling back silently).
       const fullId = variant ? `${compId}~${variant}` : compId;
       if (discoveryMap.has(fullId)) {
-        child.attrSet("href", "/" + compId + (variant ? "#" + variant : ""));
+        const base = embed.embed === "frame" ? embed.workbenchUrl : "/";
+        child.attrSet("href", base + compId + (variant ? "#" + variant : ""));
         child.attrPush(["class", "pattern-link"]);
         child.attrPush(["data-pattern-id", compId]);
         if (variant) child.attrPush(["data-variant", variant]);
       } else {
+        if (embed.embed === "frame") embed.problems.push(`pattern:${compId}${variant ? `~${variant}` : ""}: there is no such component`);
         child.attrSet("href", "#");
         child.attrPush(["class", "pattern-link--unresolved"]);
         child.attrPush(["aria-disabled", "true"]);
@@ -95,19 +132,20 @@ function _resolvePatternLinks(
 export async function renderDoc(
   body: string,
   renderComponent: (id: string, variant?: string) => Promise<string>,
-  discoveryMap: DiscoveryMap
+  discoveryMap: DiscoveryMap,
+  embed: DocEmbed = INLINE
 ): Promise<string> {
   const tokens = _md.parse(body, {});
 
   // Resolve pattern: cross-links synchronously (discoveryMap.has is sync).
-  _resolvePatternLinks(tokens, discoveryMap);
+  _resolvePatternLinks(tokens, discoveryMap, embed);
 
   // Resolve all fence tokens asynchronously — identification via markdown-it's tokenizer,
   // not a regex pre-scan (which breaks on indented fences, fences inside blockquotes, etc.).
   const resolvedFences = new Map<number, string>();
   await Promise.all(
     tokens.flatMap((tok, idx) =>
-      tok.type === "fence" ? [_resolveFence(tok.info, tok.content, idx, renderComponent, resolvedFences, discoveryMap)] : []
+      tok.type === "fence" ? [_resolveFence(tok.info, tok.content, idx, renderComponent, resolvedFences, discoveryMap, embed)] : []
     )
   );
 
@@ -127,7 +165,8 @@ async function _resolveFence(
   idx: number,
   renderComponent: (id: string, variant?: string) => Promise<string>,
   out: Map<number, string>,
-  discoveryMap: DiscoveryMap
+  discoveryMap: DiscoveryMap,
+  embed: DocEmbed
 ): Promise<void> {
   const lang = info.trim();
   const code = content;
@@ -136,6 +175,24 @@ async function _resolveFence(
     const spec = lang.startsWith("pattern ") ? lang.slice("pattern ".length).trim() : code.split("\n")[0]?.trim() ?? "";
     if (!spec) { out.set(idx, `<pre><code></code></pre>`); return; }
     const { compId, variant } = _parsePatternSpec(spec);
+    if (embed.embed === "frame") {
+      // The component's own preview document, addressed by its id (a variant by `<base>~<variant>`,
+      // the form a static host can serve), and a way into the workbench beside it that works with
+      // scripting off. Nothing of the component is rendered into the page itself.
+      const fullId = variant ? `${compId}~${variant}` : compId;
+      if (!discoveryMap.has(fullId)) {
+        embed.problems.push(`pattern ${spec}: there is no such component`);
+        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — no such component]</p>`);
+        return;
+      }
+      const workbench = embed.workbenchUrl + compId + (variant ? `#${variant}` : "");
+      out.set(idx, `<figure class="doc-example">\n`
+        + `<iframe src="${escapeAttr(`/preview/${fullId}`)}" title="${escapeAttr(fullId)}" loading="lazy"></iframe>\n`
+        + _frameVariants(compId, variant, discoveryMap)
+        + `<figcaption><span class="doc-example-id">${escapeHtml(fullId)}</span> <a href="${escapeAttr(workbench)}">Open ${escapeHtml(fullId)} in the workbench</a></figcaption>\n`
+        + `</figure>\n`);
+      return;
+    }
     try {
       const html = await renderComponent(compId, variant);
       // WORKBENCH SELF-TRUST BOUNDARY: pattern embeds inject rendered component HTML into the

@@ -191,6 +191,10 @@ test.describe("Audit facet — corpus diagnostics", () => {
       await expect
         .poll(async () => page.locator("#preview-frame").getAttribute("srcdoc"), { timeout: 10_000 })
         .not.toContain("audited");
+      // The restore also refetches the rollup. End the intercept only once that request's handler has
+      // finished: a handler still awaiting route.fetch() when the page closes fails the test after the
+      // fact ("Fetch response has been disposed"), whatever the assertions above found.
+      await page.unrouteAll({ behavior: "wait" });
     }
   });
 });

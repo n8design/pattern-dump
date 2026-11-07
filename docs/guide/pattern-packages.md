@@ -81,3 +81,10 @@ List the second as a `peerDependency` of the first; Pattern Dump follows peer de
 `patternDump` field, so naming the patterns package is enough.
 
 Make sure the folders named in `patternDump` are included in the package's `files`.
+
+An asset folder is served under its own name, `/assets/<folder name>/…`, and a project's folder of the same
+name hides a package's. Give a package's asset folder a name of its own, such as the package's
+(`assets/acme-design-system/`), and reference its files by that path.
+
+A package can also be a [storefront skin](storefront.md#skins): its layouts and partials are patterns like
+any other.

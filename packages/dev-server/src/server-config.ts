@@ -10,7 +10,7 @@
 
 import { basename, join, resolve } from "node:path";
 import type { PatternDumpConfig } from "@pattern-dump/config";
-import type { ThemeSwitch } from "@pattern-dump/contracts";
+import { PD_HOSTS, type ThemeSwitch } from "@pattern-dump/contracts";
 import type { PatternRoot } from "@pattern-dump/discovery";
 import type { ResolvedPackage } from "./packages.js";
 
@@ -71,6 +71,16 @@ export interface ResolvedConfig {
   readonly globalScripts: string[];
   /** Prepend globalScripts to a component's own requireScripts, deduped, so they load first. */
   withGlobalScripts(own: string[] | undefined): string[];
+
+  /** The storefront, when the project has one: its folders resolved against the root, and the host
+   *  `pd dev` serves it on. null without a `storefront` block — every host then serves the workbench. */
+  readonly storefront: {
+    readonly pagesDir: string;
+    readonly outDir: string;
+    readonly host: string;
+    readonly site: Record<string, unknown> | undefined;
+    readonly workbenchUrl: string | undefined;
+  } | null;
 
   readonly overviewsEnabled: boolean;
   /** Inject the compiled base layer (/_pd/base.css) beneath every preview's closure. Only when
@@ -193,6 +203,13 @@ export function resolveServerConfig(
     scriptsDir:     scriptsDirs[0] ?? null,
     globalScripts,
     withGlobalScripts: (own) => [...new Set([...globalScripts, ...(own ?? [])])],
+    storefront: config.storefront ? {
+      pagesDir: resolve(cwd, config.storefront.pagesDir),
+      outDir: resolve(cwd, config.storefront.outDir),
+      host: (config.storefront.host ?? PD_HOSTS.storefront).toLowerCase(),
+      site: config.storefront.site,
+      workbenchUrl: config.storefront.workbenchUrl,
+    } : null,
     overviewsEnabled:    config.overviews !== false,
     documentBaseEnabled,
     themeSwitch,

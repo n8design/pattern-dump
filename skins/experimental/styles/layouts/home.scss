@@ -1,0 +1,6 @@
+// The front page: the hero with the site's name, the marquee of its sections, its description and
+// body, then a chapter row for each section (partials/rows). The hero, meta row and description are
+// shared with the other layouts.
+.home .page-body {
+  margin-block-start: var(--sk-space-6);
+}

@@ -275,6 +275,8 @@ export function connectHmr(): void {
         `Handle collision — "${msg.handle}" is held by ${msg.incumbentPath}; ${msg.quarantinedPath} is quarantined until one is renamed`,
         "error",
       );
+    } else if (msg.type === "page-changed") {
+      // Storefront pages reload on this; the workbench shows no storefront page, so it ignores it.
     } else {
       // Exhaustiveness: adding an arm to HmrMessage without handling it here is a compile error.
       const unhandled: never = msg;

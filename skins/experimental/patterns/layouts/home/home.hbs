@@ -1,0 +1,16 @@
+{{#> partials-base }}
+<article class="home">
+  <header class="hero">
+    <h1 class="hero-title home-title" style="--sk-title-em: {{skinTitleEm title}}">{{title}}</h1>
+  </header>
+  <dl class="hero-meta">
+    <div><dt>Index</dt><dd>{{skinIndex nav}}</dd></div>
+    <div><dt>Layout</dt><dd>home</dd></div>
+    <div><dt>Sections</dt><dd>{{#with (skinSections nav)}}{{length}}{{/with}}</dd></div>
+  </dl>
+  {{> partials-marquee }}
+  {{#if description}}<p class="page-description home-description">{{description}}</p>{{/if}}
+  <div class="page-body">{{{body}}}</div>
+  {{> partials-rows sections=true }}
+</article>
+{{/partials-base}}

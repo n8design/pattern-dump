@@ -1,0 +1,6 @@
+// The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design. Its base
+// layer (documentBase: ["site"]) is linked into every page and every preview; these are its few values.
+:root {
+  --wf-font: system-ui, sans-serif;
+  --wf-measure: 60rem;
+}

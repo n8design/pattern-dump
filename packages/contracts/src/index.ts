@@ -332,3 +332,7 @@ export type SwatchSlots = string[];
 // ComponentDetail, ComponentSource, previewUrl, renderedSourceUrl, A11yResult,
 // HmrMessage, HelloMessage, ContentSwapMessage, ErrorMessage, etc.
 export * from "./dev-protocol";
+
+// ---- Preview iframe height fitting (browser) ----
+// The one fitter: the workbench Stage imports it; storefront pages inline it. See iframe-fit.ts.
+export * from "./iframe-fit";

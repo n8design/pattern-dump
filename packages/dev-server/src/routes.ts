@@ -18,10 +18,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
+import { PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview,
-  RuleTiers, ShellClientConfig, ThemeSummary, VersionInfo,
+  RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
 } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { compileScriptFile } from "@pattern-dump/build";
@@ -35,10 +35,10 @@ import { buildCompositionRegistry } from "./composition.js";
 import { buildComponentTree } from "./component-tree.js";
 import { buildComponentDetail } from "./detail.js";
 import { buildFolderOverview } from "./overview.js";
-import { buildPreviewDocument, buildScriptVersions, normalizeAssetRefs } from "./preview-document.js";
+import { buildPreviewDocument, normalizeAssetRefs } from "./preview-document.js";
+import { resolveDocumentAssets } from "./document-layers.js";
 import { resolveLayoutMode } from "./layout-mode.js";
-import { computeCssClosure, linkableClosure, withRenderedClassOwners } from "./css-closure.js";
-import { aggregateRequires, loadSvgAssets, normalizeScriptId } from "./requires.js";
+import { aggregateRequires, normalizeScriptId } from "./requires.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
@@ -47,6 +47,9 @@ import {
 import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
+import { readPages } from "./storefront/pages.js";
+import { assemblePage } from "./storefront/page.js";
+import { pageStylesheets } from "./storefront/page-head.js";
 
 /** Everything the routes need, handed in explicitly rather than captured from a closure. */
 export interface RouteContext {
@@ -61,6 +64,12 @@ export interface RouteContext {
   /** Build identity captured at BOOT — see /api/version. Must be the value from startup, not a
    *  fresh stat, or it could never detect that the running process is behind its own bundle. */
   readonly boot: BootStamp;
+  /** The clock for response time stamps (the audit's `generatedAt`). See DevServerOptions.now. */
+  readonly now: () => Date;
+  /** false when headless (`pd build`): there is no live-reload socket, so pages carry no client for it. */
+  readonly live: boolean;
+  /** Set by `pd build`: storefront pages link into the workbench at this address. See DevServerOptions. */
+  readonly storefrontWorkbenchUrl?: string;
 }
 
 /** What the running process knows about itself, frozen at startup. The wire shape adds `protocol`. */
@@ -77,8 +86,8 @@ export async function handleRequest(
   const {
     patternRoots, patternDirs, styleRoots,
     themesDir, defaultTheme,
-    assetRoots, assetRootNames, assetsDir, assetsCss,
-    scriptsDirs, withGlobalScripts,
+    assetRoots, assetRootNames, assetsCss,
+    scriptsDirs,
     overviewsEnabled, documentBaseEnabled, themeSwitch, config, cwd, wsPort,
   } = cfg;
 
@@ -231,7 +240,7 @@ export async function handleRequest(
         }
         // _liveReaudits: total surgical HMR re-audits since startup — the incremental-proof instrument
         // (rises by exactly 1 per .hbs edit, 0 per .scss edit). Debug envelope field, not the graph.
-        json(res, 200, { ...graph, generatedAt: new Date().toISOString(), _liveReaudits: state.liveReauditCount } satisfies AuditResponse);
+        json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount } satisfies AuditResponse);
       } catch (e) {
         json(res, 500, { error: e instanceof Error ? e.message : String(e) } satisfies ApiError);
       }
@@ -273,19 +282,13 @@ export async function handleRequest(
         const { previewHtml, diagnostics } = await checkComponent(componentId, variant, render, quarantineEntry);
 
         const themeNames = themesDir ? [...state.themeCss.keys()] : [];
-        const svgContents = detail.requireAssets && assetsDir
-          ? await loadSvgAssets(detail.requireAssets, assetsDir)
-          : [];
-        const closureIds = withRenderedClassOwners(await computeCssClosure(
-          componentId, compReg, patternDirs, state.classOwnerIndex ?? new Map(), state.discoveryResult!.discoveryMap
-        ), previewHtml, state.classOwnerIndex ?? new Map());
-        const previewScripts = withGlobalScripts(detail.requireScripts);
-        const scriptVersions = scriptsDirs.length && previewScripts.length
-          ? await buildScriptVersions(previewScripts, scriptsDirs)
-          : undefined;
+        const assets = await resolveDocumentAssets(cfg, state, {
+          componentId, html: previewHtml, requireScripts: detail.requireScripts, requireAssets: detail.requireAssets,
+          compositionRegistry: compReg, discoveryMap: state.discoveryResult.discoveryMap,
+        });
         const previewDoc = buildPreviewDocument(
-          normalizeAssetRefs(previewHtml, assetRootNames), linkableClosure(closureIds, state.perComponentCss), detail.layout, themeNames, defaultTheme,
-          previewScripts, svgContents, assetsCss, componentId, undefined, scriptVersions,
+          normalizeAssetRefs(previewHtml, assetRootNames), assets.closureIds, detail.layout, themeNames, defaultTheme,
+          assets.scripts, assets.svgContents, assetsCss, componentId, undefined, assets.scriptVersions,
           documentBaseEnabled, themeSwitch, state.baseCssVersion
         );
         json(res, 200, { ...detail, document: previewDoc, diagnostics } satisfies ComponentDetailResponse);
@@ -342,8 +345,11 @@ export async function handleRequest(
 
     // --- Preview documents (iframe src, standalone — on-demand variants + open-in-new-tab) ---
     if (pathname.startsWith(PD_ROUTE_PREFIX.preview)) {
-      const componentId = pathname.slice(PD_ROUTE_PREFIX.preview.length);
-      const variant     = url.searchParams.get("variant") ?? undefined;
+      // The requested id names the document (data-component-id); what is rendered may be a variant
+      // addressed by its own id, resolved below.
+      const requestedId = pathname.slice(PD_ROUTE_PREFIX.preview.length);
+      let componentId   = requestedId;
+      let variant       = url.searchParams.get("variant") ?? undefined;
       // ?theme= bakes data-theme into <body> pre-paint (fixes one-frame flash on non-default
       // themes). Validated against the known theme set before use — unknown values fall back
       // to the config defaultTheme (same reconcile rule as the client store).
@@ -355,6 +361,15 @@ export async function handleRequest(
       try {
         if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
         const { handleMap: previewHandleMap, discoveryMap: previewDiscoveryMap } = state.discoveryResult;
+        // A variant addressed by its own id, /preview/<base>~<variant>, is the base with that variant:
+        // the same document as /preview/<base>?variant=<variant>. Resolved here, before anything is
+        // looked up, so its layout, its requirements (a base's requireScript) and its CSS closure are
+        // the base's — the renderer applies the same rule to its data and template.
+        const tilde = requestedId.indexOf("~");
+        if (variant === undefined && tilde > 0 && previewDiscoveryMap.has(requestedId.slice(0, tilde))) {
+          componentId = requestedId.slice(0, tilde);
+          variant = requestedId.slice(tilde + 1);
+        }
         const [{ html }, layout] = await Promise.all([
           render({ component: componentId, variant }),
           resolveLayoutMode(componentId, patternDirs, previewDiscoveryMap),
@@ -364,19 +379,13 @@ export async function handleRequest(
           state.compositionRegistry = await buildCompositionRegistry(patternDirs, previewHandleMap, previewDiscoveryMap);
         }
         const requires    = await aggregateRequires(componentId, patternDirs, previewHandleMap, previewDiscoveryMap);
-        const svgContents = assetsDir
-          ? await loadSvgAssets(requires.assets, assetsDir)
-          : [];
-        const closureIds = withRenderedClassOwners(await computeCssClosure(
-          componentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), previewDiscoveryMap
-        ), html, state.classOwnerIndex ?? new Map());
-        const previewScripts = withGlobalScripts(requires.scripts);
-        const scriptVersions = scriptsDirs.length && previewScripts.length
-          ? await buildScriptVersions(previewScripts, scriptsDirs)
-          : undefined;
+        const assets = await resolveDocumentAssets(cfg, state, {
+          componentId, html, requireScripts: requires.scripts, requireAssets: requires.assets,
+          compositionRegistry: state.compositionRegistry, discoveryMap: previewDiscoveryMap,
+        });
         const doc = buildPreviewDocument(
-          normalizeAssetRefs(html, assetRootNames), linkableClosure(closureIds, state.perComponentCss), layout, themeNames, effectiveTheme,
-          previewScripts, svgContents, assetsCss, componentId, undefined, scriptVersions,
+          normalizeAssetRefs(html, assetRootNames), assets.closureIds, layout, themeNames, effectiveTheme,
+          assets.scripts, assets.svgContents, assetsCss, requestedId, undefined, assets.scriptVersions,
           documentBaseEnabled, themeSwitch, state.baseCssVersion
         );
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -421,6 +430,42 @@ export async function handleRequest(
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end(`Data file not found: ${String(e)}`);
       }
+      return;
+    }
+
+    // --- Storefront pages, on the storefront's own host ---
+    // Every route above serves the same on every host (a page's iframes load /preview/, its
+    // stylesheets /_pd/). What is left is the page URL space: on the storefront host it is the
+    // storefront's, on every other host the workbench's, as before. Without a storefront config
+    // every host is the workbench.
+    const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
+    if (cfg.storefront && host === cfg.storefront.host) {
+      if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
+      const discoveryMap = state.discoveryResult.discoveryMap;
+      const model = await readPages(cfg.storefront.pagesDir);
+      if (pathname === PD_ROUTES.pages) {
+        if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
+        json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);
+        return;
+      }
+      // A page route is a folder path; /about is /about/, as a static host serves it.
+      const route = /\.[a-z0-9]+$/i.test(pathname) ? null : pathname.endsWith("/") ? pathname : `${pathname}/`;
+      if (route === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end(`Not found: ${pathname}`); return; }
+      // In pd dev a page links to the workbench of this same process, whatever the config's build-time
+      // URL; pd build passes that URL in, for the built site.
+      const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
+      if (!state.compositionRegistry) {
+        state.compositionRegistry = await buildCompositionRegistry(patternDirs, state.discoveryResult.handleMap, discoveryMap);
+      }
+      const page = await assemblePage(route, model, {
+        discoveryMap, composition: state.compositionRegistry, render, site: cfg.storefront.site,
+        workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
+        head: (layoutId, html) => pageStylesheets(cfg, state, discoveryMap, layoutId, html),
+        ...(ctx.live ? { live: { wsPort } } : {}),
+      });
+      if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
+      res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(page.html);
       return;
     }
 

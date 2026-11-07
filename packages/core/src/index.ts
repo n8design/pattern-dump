@@ -43,6 +43,9 @@ export async function runBuild(
   const mb = (report.bytes / 1024 / 1024).toFixed(1);
   console.log(`[pd build] ${report.components} components → ${report.files} files, ${mb} MB in ${report.ms} ms`);
   console.log(`[pd build] ${report.outDir}  (served from ${report.basePath})`);
+  if (report.storefront) {
+    console.log(`[pd build] storefront: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from /)`);
+  }
   for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
 }
 

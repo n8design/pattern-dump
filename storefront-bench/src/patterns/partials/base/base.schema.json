@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Base",
+  "description": "The frame every layout is built on. Its site property declares what storefront.site may hold.",
+  "type": "object",
+  "required": [
+    "site"
+  ],
+  "properties": {
+    "site": {
+      "type": "object",
+      "description": "Values every page shares, from storefront.site in the config",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The site's name, in the header"
+        },
+        "tagline": {
+          "type": "string",
+          "description": "A line under the name"
+        },
+        "href": {
+          "type": "string",
+          "description": "Where the name links to"
+        },
+        "footer": {
+          "type": "string",
+          "description": "The line at the bottom of every page"
+        },
+        "year": {
+          "type": "string",
+          "description": "The year, in the footer"
+        }
+      }
+    }
+  }
+}

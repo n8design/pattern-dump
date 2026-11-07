@@ -1,0 +1,8 @@
+// The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design.
+.site-nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+}

@@ -79,8 +79,20 @@ test.describe("M4.11 — rendered a11y tier (axe in iframe)", () => {
   });
 
   test("structurally-clean component: 'No issues found' is absent while scan is in flight", async ({ page }) => {
+    // Hold the scan in flight. The pending note lives only as long as the scan (about 60ms), and
+    // page.click() can return after it is already gone, so the state under test would otherwise be
+    // asserted after the fact: measured, the test failed about half the time when run on its own.
+    // The scan loads axe into the fresh preview document, so holding that request holds the scan.
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    let axeRequested = false;
+    await page.route("**/_pd/axe-core.js", async route => {
+      axeRequested = true;
+      await held;
+      await route.continue();
+    });
+
     await gotoComponent(page, "atoms/contrast-fail");
-    // Open diagnostics before the scan settles — click the tab immediately.
     await page.click("[data-tab='diagnostics']");
     await expect(page.locator("#dock-panel-diagnostics")).not.toHaveAttribute("hidden");
 
@@ -88,13 +100,15 @@ test.describe("M4.11 — rendered a11y tier (axe in iframe)", () => {
     const pending = page.locator(".pd-a11y-pending");
     const allClear = page.locator(diag(" p")).filter({ hasText: "No issues found" });
 
-    // The pending note fires first — wait for it to appear.
     await expect(pending).toBeAttached({ timeout: 3_000 });
-    // All-clear must be absent at this point.
     await expect(allClear).toHaveCount(0);
+    // The hold is what keeps the scan in flight here; without the request it would hold nothing.
+    await expect.poll(() => axeRequested).toBe(true);
 
     // Let the scan finish.
+    release();
     await waitForScan(page);
+    await page.unrouteAll({ behavior: "wait" });
   });
 
   test("tier-one structural findings are unaffected on a11y-invalid", async ({ page }) => {

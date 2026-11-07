@@ -11,7 +11,7 @@
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
 import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
@@ -22,6 +22,8 @@ import { startDevServer } from "./index.js";
 import { buildShellHtml } from "./http-utils.js";
 import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
+import { createSnapshotWriter } from "./snapshot-writer.js";
+import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 
 export interface StaticBuildOptions {
   /** Absolute output directory. Emptied first. */
@@ -32,6 +34,10 @@ export interface StaticBuildOptions {
   pdVersion: string;
   /** Include the corpus audit (default: config.build.audit, then true). When false it is not run. */
   audit?: boolean;
+  /** A fixed build time. Every time stamp in the snapshot — the shell's `builtAt`, the audit's
+   *  `generatedAt`, the server's `startedAt` — then comes from it, so two builds of an unchanged
+   *  project are byte-identical. Default: real time. */
+  now?: Date;
   log?: (line: string) => void;
 }
 
@@ -44,24 +50,9 @@ export interface StaticBuildReport {
   /** Requests that did not return 200: a component that fails to render, a missing asset. They are not
    *  written, and do not fail the build. */
   warnings: string[];
+  /** The storefront's own output root, when the project has a storefront. */
+  storefront?: { outDir: string; pages: number; files: number; bytes: number };
   ms: number;
-}
-
-/** Root-relative PD URL prefixes that must move under the base path. */
-const PD_PREFIXES = /(^|["'(\s,=])\/(_pd|api|preview|source|assets)\//g;
-
-/** Prefix every root-relative PD URL in a text response with the base path. "/" leaves it untouched. */
-export function withBasePath(text: string, basePath: string): string {
-  if (basePath === "/") return text;
-  return text.replace(PD_PREFIXES, (_m, lead: string, head: string) => `${lead}${basePath}${head}/`);
-}
-
-const isText = (contentType: string): boolean =>
-  /\b(text\/html|text\/css|application\/json)\b/.test(contentType);
-
-/** The on-disk path for a snapshot URL path: segments decoded, as a static host will look them up. */
-function diskPath(outDir: string, urlPath: string): string {
-  return join(outDir, ...urlPath.split("/").map(seg => decodeURIComponent(seg)));
 }
 
 export async function buildStaticSite(
@@ -89,61 +80,46 @@ export async function buildStaticSite(
       throw new Error(`pd build: --out ${outDir} overlaps ${source}, which Pattern Dump reads — choose another folder`);
     }
   }
+  // The storefront's own output root: the same rules, and apart from the workbench's.
+  const storefront = cfg.storefront;
+  if (storefront) {
+    const sfOut = storefront.outDir;
+    if (inside(project, sfOut)) throw new Error(`pd build: storefront.outDir ${sfOut} would contain the project itself — choose a folder inside or beside it`);
+    for (const source of [cfg.patternsDir, cfg.stylesDir, storefront.pagesDir, ...cfg.themeDirs, ...cfg.assetRoots]) {
+      if (inside(sfOut, source) || inside(source, sfOut)) {
+        throw new Error(`pd build: storefront.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads — choose another folder`);
+      }
+    }
+    if (inside(sfOut, outDir) || inside(outDir, sfOut)) {
+      throw new Error(`pd build: storefront.outDir ${sfOut} and --out ${outDir} overlap — the storefront and the workbench each need a folder of their own`);
+    }
+    if (!storefront.workbenchUrl) {
+      throw new Error("pd build: storefront.workbenchUrl is required to build the storefront — its pages link into the workbench at that address");
+    }
+  }
+
+  const fixed = opts.now;
+  const now = fixed ? (): Date => new Date(fixed.getTime()) : (): Date => new Date();
+  const server = await startDevServer(config, root, {
+    port: 0, live: false, now, ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
+  });
+  log("… server ready");
+
+  // The storefront, crawled before anything is written: a problem anywhere stops the build with both
+  // output roots as they were.
+  const sfGet = storefront ? hostTransport(server.port, storefront.host) : null;
+  const sfCrawl = sfGet ? await crawlStorefront(sfGet) : null;
+  if (sfCrawl && sfCrawl.problems.length) {
+    await server.close();
+    throw new Error(`pd build: the storefront has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
+  }
+  if (sfCrawl) log(`… storefront checked: ${sfCrawl.urls.length} files`);
+
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
-
-  const server = await startDevServer(config, root, { port: 0, live: false });
-  log("… server ready");
   const origin = `http://127.0.0.1:${server.port}`;
   const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], ms: 0 };
-  const done = new Set<string>();
-
-  /** Fetch a live URL and write it to its snapshot file. Returns the (unrewritten) body, or null. */
-  async function capture(liveUrl: string, { optional = false } = {}): Promise<string | null> {
-    const file = staticPathFor(liveUrl);
-    if (done.has(file)) return null;
-    done.add(file);
-    const res = await fetch(`${origin}${liveUrl}`);
-    if (res.status !== 200) {
-      // A component that fails to render is a finding about the design system, not a reason to abort
-      // the build: the static shell reports the missing file exactly as the live one reports the error.
-      // 404s of optional views (a component without a data file) are expected and not listed.
-      if (res.status >= 500 || !optional) {
-        const reason = res.status >= 500 ? `: ${((await res.text()).split("\n")[0] ?? "").slice(0, 160)}` : "";
-        report.warnings.push(`${res.status} ${liveUrl}${reason}`);
-      }
-      return null;
-    }
-    const type = res.headers.get("content-type") ?? "";
-    const target = diskPath(outDir, file);
-    await mkdir(dirname(target), { recursive: true });
-    if (isText(type)) {
-      const body = await res.text();
-      const out = withBasePath(body, basePath);
-      await writeFile(target, out);
-      report.bytes += Buffer.byteLength(out);
-      report.files++;
-      return body;
-    }
-    const buffer = Buffer.from(await res.arrayBuffer());
-    await writeFile(target, buffer);
-    report.bytes += buffer.length;
-    report.files++;
-    return /javascript/.test(type) ? buffer.toString("utf8") : null;
-  }
-
-  /** Write a text body under the snapshot path of a live URL (for responses already in hand). */
-  async function store(liveUrl: string, body: string): Promise<void> {
-    const file = staticPathFor(liveUrl);
-    if (done.has(file)) return;
-    done.add(file);
-    const target = diskPath(outDir, file);
-    await mkdir(dirname(target), { recursive: true });
-    const out = withBasePath(body, basePath);
-    await writeFile(target, out);
-    report.bytes += Buffer.byteLength(out);
-    report.files++;
-  }
+  const { capture, store } = createSnapshotWriter({ outDir, basePath, origin, report });
 
   /** Every /_pd/ stylesheet and script a document references. */
   const referenced = (html: string): string[] =>
@@ -229,21 +205,41 @@ export async function buildStaticSite(
 
     // ---- 6. One shell page per route ----
     const runtime: ShellRuntime = {
-      mode: "static", basePath, builtAt: new Date().toISOString(), pdVersion: opts.pdVersion,
+      mode: "static", basePath, builtAt: now().toISOString(), pdVersion: opts.pdVersion,
       ...(includeAudit ? {} : { audit: false }),
     };
-    const shell = withBasePath(buildShellHtml(runtime), basePath);
+    // Through the writer like every other file: the base path is applied there, once, and a route whose
+    // file is already written (by a capture) is not written over. That only happens when a pattern folder
+    // shares its name with one of PD's own URL prefixes; the route then has no page, so it is reported.
+    const shell = buildShellHtml(runtime);
     for (const route of routes) {
-      const target = diskPath(outDir, staticPathFor(route));
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, shell);
-      report.files++;
-      report.bytes += Buffer.byteLength(shell);
+      const holder = await store(route, shell);
+      if (holder !== null) {
+        report.warnings.push(`shell page for route ${route} not written: ${staticPathFor(route)} already holds the server's response to ${holder}`);
+      }
     }
     // GitHub Pages runs Jekyll unless told otherwise, and Jekyll drops every folder starting with "_"
     // — which would silently remove _pd/ (the shell, its CSS, every theme and component stylesheet).
     await writeFile(join(outDir, ".nojekyll"), "");
     report.files++;
+
+    // ---- 7. The storefront, into its own root, through its own writer ----
+    if (storefront && sfGet && sfCrawl) {
+      const sfOut = storefront.outDir;
+      await rm(sfOut, { recursive: true, force: true });
+      await mkdir(sfOut, { recursive: true });
+      const counts = { files: 0, bytes: 0, warnings: [] as string[] };
+      const sf = createSnapshotWriter({ outDir: sfOut, basePath: "/", origin: "", report: counts, fetch: sfGet });
+      for (const url of sfCrawl.urls) await sf.capture(url, { fatal: true });
+      if (sf.failures.length) {
+        throw new Error(`pd build: the storefront changed while it was being written:\n${sf.failures.map(f => `  - ${f}`).join("\n")}`);
+      }
+      await writeFile(join(sfOut, ".nojekyll"), "");
+      counts.files++;
+      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u)).length;
+      report.storefront = { outDir: sfOut, pages, files: counts.files, bytes: counts.bytes };
+      log(`… storefront: ${pages} pages, ${counts.files} files`);
+    }
 
     // Deliberately no 404.html shell: every route has its own index.html, and a host that served the
     // shell for a missing preview would boot a second workbench inside the preview iframe.

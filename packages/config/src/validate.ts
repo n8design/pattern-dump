@@ -3,13 +3,14 @@
 // Without this, a typo (`"style"` for `"styles"`) surfaces as "Cannot read properties of
 // undefined" from whichever reader touches the key first.
 
+import { relative, resolve, sep } from "node:path";
 import type { PatternDumpConfig } from "./index.js";
 
 type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo";
+  | "packages" | "logo" | "http-url" | "host" | "plain-object";
 type Shape = Readonly<Record<string, Rule>>;
 
 const SHAPE: Shape = {
@@ -53,6 +54,10 @@ const SHAPE: Shape = {
   packages: "packages",
   exclude: "strings",
   build: { keys: { outDir: "string", basePath: "string", audit: "boolean" } },
+  storefront: {
+    keys: { pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "http-url", site: "plain-object" },
+    required: ["pagesDir", "outDir"],
+  },
 };
 
 const REQUIRED = ["sourceDir", "patternsDir", "outDir", "styles"] as const;
@@ -76,7 +81,9 @@ function distance(a: string, b: string): number {
   return row[b.length];
 }
 
-function suggest(key: string, known: string[]): string | undefined {
+/** The closest of `known` to `key` when it is near enough to be a typo of it, else undefined. Used for
+ *  "did you mean" in config problems, and by other checks that name an unknown key. */
+export function suggest(key: string, known: string[]): string | undefined {
   let best: string | undefined;
   let bestD = Infinity;
   for (const k of known) {
@@ -132,6 +139,31 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     if (!ok) fail(`a path or { light, dark }`);
     return;
   }
+  if (rule === "http-url") {
+    // Written into every link a static build makes to the workbench, so it must be a full address.
+    // Links are built by appending a path to it, so it carries no query or fragment.
+    let ok = false;
+    if (typeof value === "string") {
+      try {
+        const url = new URL(value);
+        ok = /^https?:$/.test(url.protocol) && url.search === "" && url.hash === "" && !/[?#]/.test(value);
+      } catch { ok = false; }
+    }
+    if (!ok) fail(`an absolute http(s) URL with no query or fragment, such as "https://workbench.example.com/"`);
+    return;
+  }
+  if (rule === "plain-object") {
+    // Its keys are checked where the patterns are known: against what the site's layouts declare.
+    if (!isObject(value)) fail(`an object of the site's values, such as { title: "My site" }`);
+    return;
+  }
+  if (rule === "host") {
+    // Compared with the request's Host header, so a bare name: no scheme, port or path.
+    if (typeof value !== "string" || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/i.test(value)) {
+      fail(`a host name with no scheme, port or path, such as "live.localhost"`);
+    }
+    return;
+  }
   if ("values" in rule) {
     if (typeof value === "string" && rule.unsupported?.includes(value)) {
       problems.push(`"${at}": "${value}" is not supported yet — use ${rule.values.map(v => `"${v}"`).join(" or ")}, or leave it out`);
@@ -150,13 +182,49 @@ export class ConfigError extends Error {
   override name = "ConfigError";
 }
 
+/** Checks across keys, run once every key has the right type. */
+function checkRelations(raw: Record<string, unknown>, problems: string[]): void {
+  const sf = raw.storefront;
+  if (!isObject(sf)) return;
+  // Three folders that must not share files, so they are pairwise disjoint: not the same folder, and
+  // neither inside the other. Pages are markdown that is not component docs (under patternsDir the
+  // watcher could not tell which an edit belongs to, and the reverse puts component docs among the
+  // pages); the storefront output is emptied and written by `pd build`, so it must hold neither.
+  const folders: Array<[name: string, value: unknown]> = [
+    ["storefront.pagesDir", sf.pagesDir],
+    ["patternsDir", raw.patternsDir],
+    ["storefront.outDir", sf.outDir],
+  ];
+  // All are relative to the project root, so they are compared resolved against the same (any) root.
+  const root = resolve(sep, "pd-root");
+  const inside = (child: string, parent: string): boolean => {
+    const rel = relative(parent, child);
+    return rel !== "" && !rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-zA-Z]:/.test(rel);
+  };
+  for (let i = 0; i < folders.length; i++) {
+    for (let j = i + 1; j < folders.length; j++) {
+      const [a, va] = folders[i], [b, vb] = folders[j];
+      if (typeof va !== "string" || typeof vb !== "string") continue;
+      const pa = resolve(root, va), pb = resolve(root, vb);
+      const label = (name: string, value: string) => `"${name}" ("${value}")`;
+      if (pa === pb) problems.push(`${label(a, va)} and ${label(b, vb)} are the same folder — each needs a folder of its own`);
+      else if (inside(pa, pb)) problems.push(`${label(a, va)} is inside ${label(b, vb)} — each needs a folder of its own, outside the other`);
+      else if (inside(pb, pa)) problems.push(`${label(b, vb)} is inside ${label(a, va)} — each needs a folder of its own, outside the other`);
+    }
+  }
+}
+
 /** The problems with a loaded config, one line each; empty when it is valid. */
 export function configProblems(raw: unknown): string[] {
   if (!isObject(raw)) return ["the config must be an object (a .ts config must `export default defineConfig({ … })`)"];
   const problems: string[] = [];
   checkObject(raw, SHAPE, REQUIRED, "", problems);
+  if (problems.length === 0) checkRelations(raw, problems);
   return problems;
 }
+
+/** A URL that other paths are appended to: exactly one trailing slash. */
+const withOneTrailingSlash = (url: string): string => `${url.replace(/\/+$/, "")}/`;
 
 /** Check a loaded config and return it typed, or throw one error listing every problem. */
 export function validateConfig(raw: unknown, source: string): PatternDumpConfig {
@@ -164,5 +232,13 @@ export function validateConfig(raw: unknown, source: string): PatternDumpConfig 
   if (problems.length > 0) {
     throw new ConfigError(`${source}: invalid config\n${problems.map(p => `  - ${p}`).join("\n")}`);
   }
-  return raw as PatternDumpConfig;
+  const config = raw as PatternDumpConfig;
+  // Normalized here, once, so every reader gets the same form: links are `<workbenchUrl><path>`.
+  // The input is never changed: a config that needs no normalizing is returned as it is, one that does
+  // is returned as a copy.
+  const url = config.storefront?.workbenchUrl;
+  if (config.storefront && url !== undefined && withOneTrailingSlash(url) !== url) {
+    return { ...config, storefront: { ...config.storefront, workbenchUrl: withOneTrailingSlash(url) } };
+  }
+  return config;
 }

@@ -1,0 +1,19 @@
+// The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design.
+.site {
+  display: grid;
+  gap: 1rem;
+  max-inline-size: var(--wf-measure);
+  margin-inline: auto;
+  padding: 1rem;
+}
+
+// A live example on a page: its preview frame fills the content column. The frame's height follows the
+// preview (the storefront's height fitter); its width is the column's. No border on the frame itself: the
+// fitter sets the frame's height to the preview's, so a border would take room from the preview (and
+// make it scroll). A design that wants one draws it on the figure.
+.site-main .doc-example iframe {
+  display: block;
+  box-sizing: border-box;
+  inline-size: 100%;
+  border: 0;
+}
