@@ -5,15 +5,42 @@
   "targets": {
     "dev": {
       "executor": "nx:run-commands",
-      "options": { "command": "npm run dev", "cwd": "skins/experimental" }
+      "options": {
+        "command": "npm run dev",
+        "cwd": "skins/experimental"
+      },
+      "dependsOn": [
+        "build"
+      ]
     },
     "test": {
-      "dependsOn": [{ "projects": ["cli", "dev-server"], "target": "build" }]
+      "dependsOn": [
+        "build",
+        {
+          "projects": [
+            "cli",
+            "dev-server"
+          ],
+          "target": "build"
+        }
+      ]
     },
     "e2e": {
       "executor": "nx:run-commands",
-      "options": { "command": "npm run e2e", "cwd": "skins/experimental" },
-      "dependsOn": [{ "projects": ["cli", "dev-ui"], "target": "build" }],
+      "options": {
+        "command": "npm run e2e",
+        "cwd": "skins/experimental"
+      },
+      "dependsOn": [
+        "build",
+        {
+          "projects": [
+            "cli",
+            "dev-ui"
+          ],
+          "target": "build"
+        }
+      ],
       "cache": false
     }
   }

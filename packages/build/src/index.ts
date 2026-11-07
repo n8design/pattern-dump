@@ -5,7 +5,7 @@ import * as sass from "sass";
 import postcss from "postcss";
 import autoprefixer from "autoprefixer";
 import { build as esbuildBuild } from "esbuild";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { dirname, join, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -115,23 +115,30 @@ export interface SassDependencyTracker {
 }
 
 export async function createSassDependencyTracker(
-  dirs: string[]
+  dirs: string[],
+  /** Further source files to track, listed rather than found: a style root that compiles only
+   *  declared entries contributes those, not every non-partial file under it. */
+  files: string[] = [],
 ): Promise<SassDependencyTracker> {
   // The ordered list of non-partial SCSS source files (order preserved for deterministic CSS output).
   const sourceFiles: string[] = [];
   for (const dir of dirs) {
     sourceFiles.push(...(await collectScssFiles(dir)));
   }
+  sourceFiles.push(...files.map(f => resolve(f)));
 
   // Per-file compiled CSS.
   const perFileCss = new Map<string, string>();
 
-  // Reverse dep map: absolute path of a dep/partial → Set of non-partial source files that load it.
+  // Reverse dep map: real path of a dep/partial → Set of non-partial source files that load it. Real,
+  // because Sass names a partial by the path it reached it through: through a package's link in
+  // node_modules for a `@use` into another package, while the watcher reports the real file.
   const reverseDeps = new Map<string, Set<string>>();
+  const real = (p: string): string => { try { return realpathSync(p); } catch { return resolve(p); } };
 
   function addDeps(sourceFile: string, deps: string[]) {
     for (const dep of deps) {
-      const abs = resolve(dep);
+      const abs = real(dep);
       if (!reverseDeps.has(abs)) reverseDeps.set(abs, new Set());
       reverseDeps.get(abs)!.add(sourceFile);
     }
@@ -171,7 +178,7 @@ export async function createSassDependencyTracker(
       if (perFileCss.has(abs)) filesToRecompile.add(abs);
 
       // Collect all non-partial files that depend on the changed file (handles partials).
-      const dependents = reverseDeps.get(abs);
+      const dependents = reverseDeps.get(real(abs));
       if (dependents) {
         for (const dep of dependents) filesToRecompile.add(dep);
       }
@@ -200,9 +207,14 @@ export async function createSassDependencyTracker(
 
 // ---- Script compilation (for requireScript in dev-server) ----
 
-/** Compile a TypeScript/JavaScript entry point to an ESM browser bundle. */
+/**
+ * Compile a TypeScript/JavaScript entry point to an ESM browser bundle. esbuild heads each module's code
+ * with a comment naming its file, relative to the working directory: from the entry's own folder, so the
+ * output reads `// toggle.ts` from any checkout or working directory and names no folder of the machine.
+ */
 export async function compileScriptFile(entryPoint: string): Promise<string> {
   const result = await esbuildBuild({
+    absWorkingDir: dirname(resolve(entryPoint)),
     entryPoints: [entryPoint],
     bundle: true,
     format: "esm",

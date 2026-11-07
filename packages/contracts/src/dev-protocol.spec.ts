@@ -20,6 +20,7 @@ import {
   type DiagnosticComponentNode, type DiagnosticOccurrence,
   type DiagnosticEngine, type RenderOutcome,
 } from "./dev-protocol.js";
+import type { RendererOptions } from "./index.js";
 
 // ─── URL builders ────────────────────────────────────────────────────────────
 // The invariant under test is builder/parser SYMMETRY. The server parses these with
@@ -398,5 +399,15 @@ describe("normalizeBasePath", () => {
     expect(normalizeBasePath("/")).toBe("/");
     expect(normalizeBasePath("pd")).toBe("/pd/");
     expect(normalizeBasePath("/docs/htwoo")).toBe("/docs/htwoo/");
+  });
+});
+
+describe("RendererOptions.displayPath", () => {
+  it("is optional, and maps an absolute path to the name a diagnostic gives its file", () => {
+    const without: RendererOptions = { patternsDir: "/p" };
+    const withIt: RendererOptions = { patternsDir: "/p", displayPath: (abs: string) => abs.slice(3) };
+    // @ts-expect-error — it returns the name, a string
+    const wrong: RendererOptions = { patternsDir: "/p", displayPath: (abs: string) => abs.length };
+    expect([without.displayPath, withIt.displayPath?.("/p/x.json"), typeof wrong]).toEqual([undefined, "x.json", "object"]);
   });
 });

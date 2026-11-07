@@ -1,0 +1,7 @@
+{
+  "title": "A page",
+  "description": "The layout's sample.",
+  "body": "<p>The sample body.</p>",
+  "site": { "title": "Package bench", "footer": "The sample footer." },
+  "nav": [{ "route": "/", "title": "Home", "current": true }]
+}

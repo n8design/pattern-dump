@@ -1,0 +1,21 @@
+{
+  "name": "package-bench",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Pattern packages consumed as git submodules are: two vendored folders, linked through relative file: dependencies.",
+  "devDependencies": {
+    "@pattern-dump/cli": "*",
+    "pd-fixture-ds": "file:./vendor/fixture-ds",
+    "pd-fixture-skin": "file:./vendor/fixture-skin"
+  },
+  "scripts": {
+    "build": "esbuild vendor/fixture-ds/helpers/index.ts --bundle --platform=node --format=esm --outfile=vendor/fixture-ds/dist/helpers.js && esbuild vendor/fixture-skin/helpers/index.ts --bundle --platform=node --format=esm --outfile=vendor/fixture-skin/dist/helpers.js",
+    "dev": "node ../packages/cli/dist/index.js dev",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint test vendor/fixture-ds/helpers vendor/fixture-ds/scripts vendor/fixture-skin/helpers",
+    "lint:css": "stylelint 'vendor/*/styles/**/*.scss' 'vendor/*/themes/**/*.scss'",
+    "e2e": "playwright test --config e2e/playwright.config.ts"
+  }
+}

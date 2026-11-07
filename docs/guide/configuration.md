@@ -114,8 +114,8 @@ documentBase: ["00-base", "03-organisms/hero"],
 
 | Option | Type | Description |
 |---|---|---|
-| `dataDir` | string | Every `*.json` in this folder is merged into one global data object, beneath each component's own data. Read once at startup: restart `pd dev` after changing it |
-| `helpers` | string | A Handlebars helper module or a folder of them. A module either exports a function that receives `Handlebars` and registers helpers (the PatternLab form), or exports named functions. Read once at startup |
+| `dataDir` | string | Every `*.json` in this folder is merged into one global data object, beneath each component's own data. Reloaded while `pd dev` runs |
+| `helpers` | string | A Handlebars helper module or a folder of them. A module either exports a function that receives `Handlebars` and registers helpers (the PatternLab form), or exports named functions. A changed helper module reloads while `pd dev` runs; a change to a file it imports asks for a restart |
 
 ### Workbench
 
@@ -163,5 +163,9 @@ in [storefront.md](storefront.md).
 
 ## When changes take effect
 
-`pd dev` picks up edits to components, docs, styles, themes and scripts while it runs. Restart it after
-changing `pattern-dump.config.ts`, anything in `dataDir` or `helpers`, or an installed pattern package.
+`pd dev` picks up edits to components, docs, styles, themes, scripts, global data, assets and helper modules
+while it runs, in the project and in linked pattern packages. Restart it after changing
+`pattern-dump.config.ts`, a file a helper module imports, or an installed pattern package. When a data or
+helper file fails to load, the last good version stays in use, and the problem is shown in the terminal and
+on the open pages until the file is fixed. The full list is in
+[pattern-packages.md](pattern-packages.md#what-reloads-and-what-needs-a-restart).

@@ -62,6 +62,9 @@ test.describe("Diagnostics tab — per-render diagnostics panel (M4.9 finalise)"
     await expect(item).toBeAttached();
     await expect(item).toHaveAttribute("data-severity", "error");
     await expect(item).toContainText("data-invalid.json");
+    // Named by its path in the project, never by an absolute path.
+    await expect(item).toContainText("(at src/patterns/atoms/data-invalid/data-invalid.json:");
+    expect(await item.textContent()).not.toMatch(/\(at \//);
     await expect(page.frameLocator("#preview-frame").locator(".tb-data-invalid")).toHaveText("label: []");
   });
 

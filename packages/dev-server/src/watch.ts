@@ -23,6 +23,7 @@ import type { FSWatcher } from "chokidar";
 import { componentCssUrl } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { compileSassFile } from "@pattern-dump/build";
+import { dryRunHelperRegistrar } from "@pattern-dump/renderer";
 import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
@@ -32,39 +33,70 @@ import { buildCompositionRegistry } from "./composition.js";
 import {
   computeCssClosure, linkableClosure, recomputeComponentCss, withRenderedClassOwners,
 } from "./css-closure.js";
-import { buildAllStyleData, documentBaseMatcher, patchClassOwnerIndex, resolveScssToComponent } from "./style-index.js";
+import { buildAllStyleData, patchClassOwnerIndex } from "./style-index.js";
+import { rootMatchers, watchedRoots, within, type WatchedRoots } from "./watch-roots.js";
 import { auditComponent } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
 import { readPages, routeFor } from "./storefront/pages.js";
+import { readGlobalData, readHelperRegistrars, type LoadProblem } from "./project-loaders.js";
+import { createDisplayPath } from "./display-path.js";
+import type { HelperRegistrar, RenderingHandle } from "./rendering.js";
 
 /** Everything the watcher needs, handed in explicitly rather than captured from a closure. */
 export interface WatchContext {
   readonly cfg: ResolvedConfig;
   readonly state: ServerState;
   readonly render: ReturnType<typeof import("@pattern-dump/renderer").createRenderer>;
+  /** The renderer, global data and helpers in use, replaced together when data or a helper reloads. */
+  readonly rendering: RenderingHandle;
   readonly tracker: Awaited<ReturnType<typeof import("@pattern-dump/build").createSassDependencyTracker>>;
   readonly hotreloader: HotReloader;
 }
 
 /** Start watching the project. Returns the chokidar watcher so the caller owns teardown. */
 export function startWatching(ctx: WatchContext): FSWatcher {
-  const { cfg, state, render, tracker, hotreloader } = ctx;
+  const { cfg, state, render, rendering, tracker, hotreloader } = ctx;
   // Destructured so the body below reads exactly as it did inside startDevServer.
-  const { patternsDir, stylesDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
-  // Only the PROJECT's own files are watched. Pattern packages live in node_modules: read-only
-  // library code that changes by reinstalling, not by editing — so their themes and scripts are
-  // not watched either.
-  const themesDir = cfg.config.themes?.dir ? cfg.themesDir : null;
-  const scriptsDir = cfg.config.scriptsDir ? cfg.scriptsDirs[0] ?? null : null;
-  // The project's documentBase: a listed file's rules live in the base layer (see buildAllStyleData).
-  const inProjectBase = documentBaseMatcher(stylesDir, cfg.config.documentBase);
+  const { patternsDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
+  // The source roots watched, by kind: the project's, and every linked package's (watch-roots.ts). Each
+  // handler works from the root a file is in (its folder, and for stylesheets the root's own base
+  // layer), never from the project's folders by name.
+  const watched: WatchedRoots = watchedRoots(cfg);
+  const { patternRootOf, styleRootOf, themeDirOf, scriptDirOf, dataDirOf, assetRootOf, helperOf, inBase, componentOfScss } = rootMatchers(watched);
+  /** A file as messages name it: never an absolute path. */
+  const shown = createDisplayPath(cwd, cfg.packages);
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
 const pagesDir = cfg.storefront?.pagesDir ?? null;
-const watchDirs = [patternsDir, stylesDir, ...(themesDir ? [themesDir] : []), ...(scriptsDir ? [scriptsDir] : []), ...(pagesDir ? [pagesDir] : [])];
+const watchDirs = [
+  ...watched.patterns, ...watched.styles.map(r => r.dir), ...watched.themes, ...watched.scripts,
+  ...watched.data, ...watched.assets, ...watched.helpers.map(h => h.scope), ...(pagesDir ? [pagesDir] : []),
+];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
+// after each watcher event's handler has finished, with the number of handlers still running. Tests
+// use it as a barrier ("every event so far has been handled") instead of waiting for quiet; a file named
+// `.__testOnly_barrier`, which a test puts in every watched folder, is reported but never handled. Unset,
+// it costs a counter and a name check. Not exported, not part of any contract.
+type TestOnlyEventHandled = (event: string, path: string, stillRunning: number) => void;
+let running = 0;
+function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
+  watcher.on(event, (path: string) => {
+    running++;
+    const done = () => {
+      running--;
+      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, running);
+    };
+    if (basename(path) === ".__testOnly_barrier") { done(); return; }
+    // The handler starts synchronously, as chokidar called it before; only its end is observed.
+    let result: unknown;
+    try { result = handler(path); } catch (e) { done(); throw e; }
+    void Promise.resolve(result).finally(done);
+  });
+}
 
 // Single source of truth for link-set membership: a component is linkable iff it has
 // non-empty compiled CSS. Applied identically by the render path and the HMR reconcile
@@ -109,18 +141,19 @@ async function handleComponentScss(filePath: string): Promise<void> {
   // edited base partial) can change any component's CSS and the base layer, which the per-component
   // recompute below cannot see. So can an edit to a file documentBase lists, whose rules are base-layer
   // CSS even when it belongs to a component. Rebuild all style data instead and broadcast what changed.
-  if (inProjectBase(resolve(filePath)) ||
-      effectiveFiles.some(f => inProjectBase(resolve(f)) || !resolveScssToComponent(resolve(f), stylesDir, allIds))) {
+  if (inBase(resolve(filePath)) ||
+      effectiveFiles.some(f => inBase(resolve(f)) || !componentOfScss(resolve(f), allIds))) {
     await restyleAll(allIds, timestamp, effectiveFiles, compileErrors.length > 0);
     return;
   }
 
   const pending: Array<{ type: "css-link-swap"; componentId: string; href: string }> = [];
   for (const recompiledFile of effectiveFiles) {
-    const compId = resolveScssToComponent(resolve(recompiledFile), stylesDir, allIds);
-    if (compId) {
+    const compId = componentOfScss(resolve(recompiledFile), allIds);
+    const root = styleRootOf(resolve(recompiledFile));
+    if (compId && root) {
       // Recompile with source map to get updated per-origin CSS for this component.
-      const newCss = await recomputeComponentCss(recompiledFile, compId, stylesDir, allIds, inProjectBase);
+      const newCss = await recomputeComponentCss(recompiledFile, compId, root.dir, allIds, root.inBase);
       if (newCss !== null) {
         state.perComponentCss.set(compId, newCss);
         pending.push({
@@ -139,10 +172,11 @@ async function handleComponentScss(filePath: string): Promise<void> {
   if (state.classOwnerIndex) {
     if (verboseTiming) console.time("[dev-server:timing] classOwnerIndex patch");
     for (const recompiledFile of effectiveFiles) {
-      const compId = resolveScssToComponent(resolve(recompiledFile), stylesDir, allIds);
-      if (compId) {
+      const compId = componentOfScss(resolve(recompiledFile), allIds);
+      const root = styleRootOf(resolve(recompiledFile));
+      if (compId && root) {
         await patchClassOwnerIndex(
-          resolve(recompiledFile), compId, stylesDir, allIds, state.classOwnerIndex
+          resolve(recompiledFile), compId, root.dir, allIds, state.classOwnerIndex
         );
       }
     }
@@ -178,9 +212,7 @@ async function restyleAll(
   }
   // Every storefront page links the base layer, so every page changed. Said page by page: the
   // workbench's reload above names the component on screen, and there may be none.
-  if (changes.baseChanged && pagesDir) {
-    for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
-  }
+  if (changes.baseChanged) await everyPageChanged();
   const what = [
     `${changes.changedComponents.length} component(s)`,
     ...(changes.baseChanged ? ["base layer"] : []),
@@ -219,7 +251,7 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
     }
     return undefined;
   };
-  const rel = relative(patternsDir, filePath);
+  const rel = relative(patternRootOf(filePath) ?? patternsDir, filePath);
   // An .hbs/.json edit drops the cached discovery (routes rebuild it lazily); the owner lookup needs one.
   if (event === "change") state.discoveryResult ??= await buildDiscoveryMap(patternRoots);
   // An unlinked file is only in the map from BEFORE the rebuild; an added one only in the map after.
@@ -236,12 +268,79 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
   }
 }
 
+// Global data, helpers and assets. Data and helpers are part of what pd dev renders with: a change reloads
+// them and replaces the renderer (rendering.ts), all at once, then reloads what is open. A reload that fails
+// (a file that does not parse, a helper module that throws) keeps the last good ones, and says so in the
+// terminal and on the open pages (the `error` message); the next good save recovers. A helper's own
+// imports are not reloaded (Node keeps modules once imported), so a change to any other file in a helper's
+// folder asks for a restart instead. Assets are served from disk per request: a change only reloads.
+let reloads = 0;
+
+async function reloadedOpenPages(label: string): Promise<void> {
+  if (state.lastComponentId) hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
+  await everyPageChanged();
+  console.log(`[dev-server] ${label} → reloaded`);
+}
+
+function reloadFailed(filePath: string, what: string, problems: LoadProblem[]): void {
+  const message = `${shown(filePath)}: ${what} not reloaded, the last good ones are still in use: `
+    + problems.map(p => `${shown(p.file)}: ${p.message}`).join("; ");
+  hotreloader.push({ type: "error", scope: "build", message });
+  console.error(`[dev-server] ${message}`);
+}
+
+async function reloadData(filePath: string): Promise<void> {
+  const { data, problems } = await readGlobalData(cfg.dataDirs);
+  const failed = problems.filter(p => !p.missing);
+  if (failed.length) { reloadFailed(filePath, "global data", failed); return; }
+  rendering.replace({ globalData: cfg.dataDirs.length ? data : undefined });
+  await reloadedOpenPages(`Global data changed: ${shown(filePath)}`);
+}
+
+async function reloadHelpers(filePath: string): Promise<void> {
+  const bust = ++reloads;
+  const registrars: HelperRegistrar[] = [];
+  const failed: LoadProblem[] = [];
+  for (const path of cfg.helperPaths) {
+    const r = await readHelperRegistrars(path, { bust });
+    registrars.push(...r.registrars);
+    failed.push(...r.problems.filter(p => !p.missing));
+    // A module that imports cleanly can still throw when it registers: run each once on a fresh
+    // environment, as a render would, before any page renders with it.
+    r.registrars.forEach((register, i) => {
+      const message = dryRunHelperRegistrar(register);
+      if (message !== null) failed.push({ file: r.files[i], message });
+    });
+  }
+  if (failed.length) { reloadFailed(filePath, "helpers", failed); return; }
+  rendering.replace({ registrars });
+  await reloadedOpenPages(`Helper changed: ${shown(filePath)}`);
+}
+
+/** Data, helper and asset files; true when the file was one of them. */
+async function handleReloadable(filePath: string, event: "change" | "add" | "unlink"): Promise<boolean> {
+  const helper = helperOf(filePath);
+  if (helper === "entry") { await reloadHelpers(filePath); return true; }
+  if (helper === "other") {
+    const message = `${shown(filePath)} changed: restart pd dev to load it (a helper's own imports are not reloaded)`;
+    hotreloader.push({ type: "error", scope: "build", message });
+    console.error(`[dev-server] ${message}`);
+    return true;
+  }
+  if (dataDirOf(filePath)) {
+    if (extname(filePath) === ".json") await reloadData(filePath);
+    return true;
+  }
+  if (assetRootOf(filePath)) { await reloadedOpenPages(`Asset ${event === "change" ? "changed" : event === "add" ? "added" : "removed"}: ${shown(filePath)}`); return true; }
+  return false;
+}
+
 // Storefront pages. Nothing is cached server-side — every page request reads the folder — so all a
 // change needs is a reload of the pages it touches: an edited page reloads itself; a file or folder
 // added or removed can change the nav (or the folder's problems), so every page reloads. Dotfiles are
 // not pages and change nothing. Checked first, with a folder boundary, because the other handlers
 // match on a path prefix.
-const inPages = (p: string): boolean => pagesDir !== null && (p === pagesDir || p.startsWith(pagesDir + sep));
+const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p);
 function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): boolean {
   if (!inPages(filePath)) return false;
   const rel = relative(pagesDir!, filePath).split(sep).join("/");
@@ -252,19 +351,21 @@ function handlePages(filePath: string, event: "change" | "add" | "unlink" | "add
   return true;
 }
 
-watcher.on("addDir", (dirPath) => { handlePages(dirPath, "addDir"); });
+on("addDir", (dirPath) => { handlePages(dirPath, "addDir"); });
 
-watcher.on("change", async (filePath) => {
+on("change", async (filePath) => {
   if (handlePages(filePath, "change")) return;
+  if (await handleReloadable(filePath, "change")) return;
   const ext = extname(filePath);
 
-  if (ext === ".md" && filePath.startsWith(patternsDir)) {
+  if (ext === ".md" && patternRootOf(filePath)) {
     await handleMarkdown(filePath, "change");
     return;
   }
 
+  const themesDir = themeDirOf(filePath);
   if (ext === ".scss") {
-    if (themesDir && filePath.startsWith(themesDir)) {
+    if (themesDir) {
       // Theme SCSS changed → recompile theme, push content-swap so iframe picks up new link.
       const themeName = basename(filePath, ".theme.scss");
       try {
@@ -318,7 +419,7 @@ watcher.on("change", async (filePath) => {
       if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
     }
 
-  } else if (ext === ".ts" && scriptsDir && filePath.startsWith(scriptsDir)) {
+  } else if (ext === ".ts" && scriptDirOf(filePath)) {
     // Script changed → invalidate cache + dispatch content-swap so the client re-renders
     // the srcdoc with a fresh ?v=<mtime> on the script src (busting the browser cache).
     const scriptId = basename(filePath, ".ts");
@@ -326,6 +427,9 @@ watcher.on("change", async (filePath) => {
     if (state.lastComponentId) {
       hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
     }
+    // Storefront pages load scripts (their own, and their embedded previews'), whether or not a workbench
+    // has a component open: each page is told, as for a base-layer change.
+    await everyPageChanged();
     console.log(`[dev-server] Script changed: ${scriptId} → srcdoc reload dispatched`);
   }
 });
@@ -355,36 +459,48 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   const reg = await buildCompositionRegistry(patternDirs, dr.handleMap, dr.discoveryMap);
   await surfaceFlattening(dr.discoveryMap, reg, cwd);
   hotreloader.push({ type: "tree-changed" });
+  // A storefront page may embed the component that arrived or left: every page reloads and is checked again.
+  await everyPageChanged();
   console.log(`[dev-server] ${label} → tree-changed`);
 }
 
-watcher.on("add", async (filePath) => {
+/** Every storefront page changed: one page-changed per page (none without a storefront). */
+async function everyPageChanged(): Promise<void> {
+  if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
+}
+
+on("add", async (filePath) => {
   if (handlePages(filePath, "add")) return;
+  if (await handleReloadable(filePath, "add")) return;
   const ext = extname(filePath);
-  if (ext === ".scss" && !(themesDir && filePath.startsWith(themesDir))) {
+  const patternRoot = patternRootOf(filePath);
+  if (ext === ".scss" && !themeDirOf(filePath)) {
     await handleComponentScss(filePath);
-  } else if (ext === ".hbs" && filePath.startsWith(patternsDir)) {
-    await rebuildAndSignalTree(`Pattern added: ${relative(patternsDir, filePath)}`);
-  } else if (ext === ".md" && filePath.startsWith(patternsDir)) {
+  } else if (ext === ".hbs" && patternRoot) {
+    await rebuildAndSignalTree(`Pattern added: ${relative(patternRoot, filePath)}`);
+  } else if (ext === ".md" && patternRoot) {
     await handleMarkdown(filePath, "add");
   }
 });
 
 // Component template removed — rebuild discovery and signal nav rebuild.
-watcher.on("unlink", async (filePath) => {
+on("unlink", async (filePath) => {
   if (handlePages(filePath, "unlink")) return;
-  if (extname(filePath) === ".hbs" && filePath.startsWith(patternsDir)) {
-    await rebuildAndSignalTree(`Pattern removed: ${relative(patternsDir, filePath)}`);
-  } else if (extname(filePath) === ".md" && filePath.startsWith(patternsDir)) {
+  if (await handleReloadable(filePath, "unlink")) return;
+  const patternRoot = patternRootOf(filePath);
+  if (extname(filePath) === ".hbs" && patternRoot) {
+    await rebuildAndSignalTree(`Pattern removed: ${relative(patternRoot, filePath)}`);
+  } else if (extname(filePath) === ".md" && patternRoot) {
     await handleMarkdown(filePath, "unlink");
   }
 });
 
 // Component directory removed — covers the case where the entire component folder is deleted.
-watcher.on("unlinkDir", async (dirPath) => {
+on("unlinkDir", async (dirPath) => {
   if (handlePages(dirPath, "unlinkDir")) return;
-  if (dirPath.startsWith(patternsDir) && dirPath !== patternsDir) {
-    await rebuildAndSignalTree(`Pattern dir removed: ${relative(patternsDir, dirPath)}`);
+  const patternRoot = patternRootOf(dirPath);
+  if (patternRoot && dirPath !== patternRoot) {
+    await rebuildAndSignalTree(`Pattern dir removed: ${relative(patternRoot, dirPath)}`);
   }
 });
 

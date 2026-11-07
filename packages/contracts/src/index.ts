@@ -176,6 +176,13 @@ export interface RendererOptions {
    * the real M6 file-as-component walk, never the old collectComponents folder-per-component walk.
    */
   discoveryMap?: DiscoveryMap;
+  /**
+   * How a diagnostic names a source file (`location.file`): project-relative, or prefixed with its
+   * package's name (see `Diagnostic` in dev-protocol). The dev-server supplies it, since only it knows
+   * the project root and each package's folder. Without it, or when it returns an absolute path, the
+   * renderer names the file relative to its pattern root. A diagnostic never carries an absolute path.
+   */
+  displayPath?: (absPath: string) => string;
 }
 
 /** Factory: a configured renderer closes over its source root, keeping `render()` pure. */

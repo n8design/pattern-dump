@@ -48,6 +48,8 @@ pattern-dump/
 ├── skins/
 │   └── experimental/       # @pattern-dump/skin-experimental  a storefront skin as a pattern package,
 │                           #   with a demo site and its own tests
+├── package-bench/          # pattern packages consumed as a git submodule is: vendor/ folders linked through
+│                           #   relative file: dependencies; its E2E fixture for watching and reloading
 ├── scripts/                # verify-install, dev-server freshness check
 ├── storefront-bench/       # the storefront's sandbox: markdown pages and a wireframe skin; its E2E fixture
 └── test-bench/             # the sandbox design system the tool runs against; the E2E fixture
@@ -109,6 +111,29 @@ the preview height fitter (content-fit height and its loop guard). The workbench
 without a bundle inline its factory's source, which is why the factory references nothing outside its
 own body (pinned by `iframe-fit.spec.ts`).
 
+### Pattern packages, watching and reloading
+
+- **One path per file.** `packages.ts` resolves each package once, to its real folder (`realpathSync`), and
+  records whether it is linked (a `file:` dependency or a workspace, its real folder outside `node_modules`)
+  or an installed copy. Discovery, styles, the watcher, esbuild and Node's imports then all name a file the
+  same way, whichever path an edit went through.
+- **One watch list.** `watch-roots.ts` (`watchedRoots`) lists what `pd dev` watches, by kind: the project's
+  roots and every linked package's, never an installed copy. The watcher watches exactly that list; the
+  startup line that calls a package "not watched" is derived from it too. Each handler works from the root
+  a file is in (`rootMatchers`), matched by folder boundary, never from the project's folders by name.
+- **One rendering.** `rendering.ts` holds the renderer, the global data it was built with and the helpers
+  as one object, replaced in one assignment when data or a helper module reloads. A request takes it once.
+  A reload that fails keeps the last good one and sends an `error` message.
+- **Helpers.** A package's helpers must be compiled `.js` (Node does not strip types under `node_modules`),
+  checked at startup. A changed helper module is imported afresh (a new query, and its CommonJS cache entry
+  dropped); the modules it imports are not, so a change to one asks for a restart.
+- **Diagnostics name files without absolute paths.** `display-path.ts` gives the renderer's `displayPath`:
+  project-relative, or `<package name>/<path in the package>`.
+- **Test-only, not features.** The watcher calls `globalThis.__testOnly_onEventHandled`, when a test sets
+  it, after each event's handler finishes, and reports a file named `.__testOnly_barrier` without handling
+  it. `test/watch-harness.ts` uses both to wait on events instead of waiting for quiet. Unset, they cost a
+  counter and a name check.
+
 ---
 
 ## Nx targets
@@ -122,8 +147,8 @@ Every package exposes the same cacheable targets:
 | `lint` | ESLint |
 | `typecheck` | `tsc --noEmit` |
 
-`dev-ui`, `storefront-bench` and `skin-experimental` additionally have `lint:css` (Stylelint) and `e2e`
-(Playwright). Nx infers targets from each
+`dev-ui`, `storefront-bench`, `skin-experimental` and `package-bench` additionally have `lint:css`
+(Stylelint) and `e2e` (Playwright). Nx infers targets from each
 project's `package.json` scripts, so check `nx show project <name>` rather than `project.json` alone.
 
 ---

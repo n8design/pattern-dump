@@ -12,7 +12,7 @@ import type {
 import { HtmlValidate } from "html-validate";
 import Handlebars from "handlebars";
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, isAbsolute, relative, sep } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 
 // Fragment-scoped HTML content-model validator (M4.9 finalise).
@@ -62,7 +62,7 @@ function jsonErrorPosition(reason: string, text: string): { line?: number; colum
  * not parse is no data plus a DATA_INVALID diagnostic, so the dropped data shows up on the Console
  * instead of the component silently rendering without it.
  */
-async function readDataFile(path: string): Promise<{ data?: Record<string, unknown>; diagnostic?: Diagnostic }> {
+async function readDataFile(path: string, display: (absPath: string) => string): Promise<{ data?: Record<string, unknown>; diagnostic?: Diagnostic }> {
   let text: string;
   try { text = await readFile(path, "utf-8"); } catch { return {}; }
   try {
@@ -73,7 +73,7 @@ async function readDataFile(path: string): Promise<{ data?: Record<string, unkno
       diagnostic: {
         kind: "DATA_INVALID", source: "render", severity: "error",
         message: `${basename(path)} is not valid JSON (${reason}); its data was not used`,
-        location: { file: path, ...jsonErrorPosition(reason, text) },
+        location: { file: display(path), ...jsonErrorPosition(reason, text) },
       },
     };
   }
@@ -149,7 +149,64 @@ function registerHelpers(
   }
 }
 
+/**
+ * A template called a helper that is not registered. It names the helper, and the template that called
+ * it: the innermost template the error passes through stamps itself on it, so a helper missing in a
+ * partial is reported against the partial, not the page that included it. `location` is a diagnostic's.
+ */
+export class MissingHelperError extends Error {
+  template?: string;
+  file?: string;
+  constructor(readonly helper: string, readonly line?: number, readonly column?: number) {
+    super(`Missing helper "${helper}"`);
+    this.name = "MissingHelperError";
+  }
+  /** Stamp the template running when the error passed through, if none has yet: the one that called it. */
+  stamp(template: string, file: string | undefined): void {
+    if (this.template !== undefined) return;
+    this.template = template;
+    this.file = file;
+    const at = this.line !== undefined ? ` (line ${this.line}${this.column !== undefined ? `, column ${this.column + 1}` : ""})` : "";
+    this.message = `Missing helper "${this.helper}", called by ${template}${at}`;
+  }
+  get location(): { file?: string; line?: number; column?: number } {
+    return { ...(this.file ? { file: this.file } : {}), ...(this.line !== undefined ? { line: this.line } : {}), ...(this.column !== undefined ? { column: this.column + 1 } : {}) };
+  }
+}
+
+/**
+ * How a diagnostic names a file: the caller's `displayPath`, else the path relative to the pattern root
+ * that holds it, else its base name. Never an absolute path: one the caller returns falls back too.
+ */
+function makeDisplayPath(roots: readonly string[], displayPath?: (absPath: string) => string): (absPath: string) => string {
+  const underRoot = (absPath: string): string => {
+    for (const root of roots) {
+      const rel = relative(root, absPath);
+      if (rel && !rel.startsWith("..") && !isAbsolute(rel)) return rel.split(sep).join("/");
+    }
+    return basename(absPath);
+  };
+  return absPath => {
+    const named = displayPath?.(absPath);
+    return named && !isAbsolute(named) ? named : underRoot(absPath);
+  };
+}
+
+/**
+ * Run one helper registrar on a fresh Handlebars environment, as a render would, and say why it failed:
+ * its message, or null when it registers cleanly. A reload checks each module this way before using it.
+ */
+export function dryRunHelperRegistrar(register: (handlebars: unknown) => void): string | null {
+  try {
+    register(Handlebars.create());
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
 export const createRenderer: CreateRenderer = (options: RendererOptions) => {
+  const display = makeDisplayPath((options.patternRoots ?? []).map(r => r.dir).concat(options.patternsDir), options.displayPath);
   return async (input) => {
     const { patternsDir } = options;
 
@@ -201,7 +258,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // variant's, and those of partials this render actually includes.
     const dataDiagnostics = new Map<string, Diagnostic>();
     const readData = async (path: string): Promise<Record<string, unknown> | undefined> => {
-      const { data, diagnostic } = await readDataFile(path);
+      const { data, diagnostic } = await readDataFile(path, display);
       if (diagnostic) dataDiagnostics.set(path, diagnostic);
       return data;
     };
@@ -252,6 +309,14 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // invocationCounters: "flatName:parentBase" → count of invocations so far
     const invocationCounters = new Map<string, number>();
 
+    // A helper the templates call but nobody registered: stock Handlebars throws a bare `Missing helper`.
+    // This one says which template called it (MissingHelperError). A `{{name}}` with no arguments is not
+    // a helper call and renders nothing, as stock. Registered first, so a project may still replace it.
+    env.registerHelper("helperMissing", function (...args: unknown[]) {
+      if (args.length === 1) return undefined;
+      const opts = args[args.length - 1] as { name: string; loc?: { start?: { line: number; column: number } } };
+      throw new MissingHelperError(opts.name, opts.loc?.start?.line, opts.loc?.start?.column);
+    });
     registerHelpers(env, mintId, () => lastMintedId, options.helpers, options.helperRegistrars);
 
     // Register every discovered component as a cascade-aware, base-seeded partial.
@@ -264,13 +329,13 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
 
         // Every discovered component is registered, but only one this render includes reports its
         // invalid data: the diagnostic is added when the partial runs, below.
-        const childData = compEntry.jsonPath ? await readDataFile(compEntry.jsonPath) : {};
+        const childData = compEntry.jsonPath ? await readDataFile(compEntry.jsonPath, display) : {};
         const childDataPath = compEntry.jsonPath;
         // A variant included by its handle (`{{> "atoms-chip~danger"}}`) gets its base's data beneath
         // its own, exactly as the variant renders on its own page.
         const variantTilde = compId.indexOf("~");
         const baseJsonPath = variantTilde > 0 ? discoveryMap.get(compId.slice(0, variantTilde))?.jsonPath : undefined;
-        const baseData = baseJsonPath ? await readDataFile(baseJsonPath) : {};
+        const baseData = baseJsonPath ? await readDataFile(baseJsonPath, display) : {};
         const childDefaults: Record<string, unknown> = deepMerge(structuredClone(baseData.data ?? {}), childData.data);
 
         const childTemplate = env.compile(partialSrc);
@@ -331,9 +396,15 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
             const runtime: Handlebars.RuntimeOptions = opts?.fn
               ? { data, partials: { ...env.partials, "@partial-block": opts.fn as unknown as Handlebars.TemplateDelegate } }
               : { data };
-            const result = childTemplate(merged, runtime);
-
-            currentBase = savedBase;
+            let result: string;
+            try {
+              result = childTemplate(merged, runtime);
+            } catch (e) {
+              if (e instanceof MissingHelperError) e.stamp(compId, display(compEntry.hbsPath));
+              throw e;
+            } finally {
+              currentBase = savedBase;
+            }
             return result;
           } as unknown as string
         );
@@ -345,9 +416,15 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // A no-op `@partial-block` for the top-level render: a block partial viewed standalone (e.g.
     // dialog-content, whose template has `{{> @partial-block}}`) has no enclosing block, so it must
     // render an empty block rather than throw. Block invocations override this with the real body.
-    const html = env.compile(templateSrc)(data, {
-      partials: { ...env.partials, "@partial-block": () => "" },
-    });
+    let html: string;
+    try {
+      html = env.compile(templateSrc)(data, {
+        partials: { ...env.partials, "@partial-block": () => "" },
+      });
+    } catch (e) {
+      if (e instanceof MissingHelperError) e.stamp(input.component, templateHbsPath ? display(templateHbsPath) : undefined);
+      throw e;
+    }
 
     // ---- Diagnostics (M4.9 / M4.9-finalise) ----
     const diagnostics: Diagnostic[] = [...dataDiagnostics.values()];

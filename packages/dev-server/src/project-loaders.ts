@@ -10,6 +10,7 @@
 // either caller.
 
 import { readdir, readFile, stat } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { deepMerge } from "@pattern-dump/renderer";
@@ -25,7 +26,27 @@ import { deepMerge } from "@pattern-dump/renderer";
  * helper file never sinks the whole set.
  */
 export async function loadHelperRegistrars(helpersPath: string): Promise<Array<(hb: unknown) => void>> {
+  const { registrars, problems } = await readHelperRegistrars(helpersPath);
+  for (const p of problems) console.warn(p.missing ? `[dev-server] helpers path not found: ${p.file}` : `[dev-server] skipped helper module ${p.file}: ${p.message}`);
+  return registrars;
+}
+
+/** A helper module or data file that did not load, and why: one readable line. */
+export interface LoadProblem { file: string; message: string; missing?: boolean }
+
+const require = createRequire(import.meta.url);
+
+/**
+ * The helper registrars at a path, and every module that failed to load, as problems rather than
+ * warnings. With `bust`, each module is imported afresh (a new query, and its CommonJS cache entry
+ * dropped: Node keys CommonJS by file name alone), so an edited helper loads its new code; the modules
+ * it imports itself are not reloaded.
+ */
+export async function readHelperRegistrars(helpersPath: string, opts: { bust?: number } = {}): Promise<{ registrars: Array<(hb: unknown) => void>; files: string[]; problems: LoadProblem[] }> {
   const registrars: Array<(hb: unknown) => void> = [];
+  /** The file each registrar came from, by index. */
+  const sources: string[] = [];
+  const problems: LoadProblem[] = [];
   let files: string[] = [];
   try {
     const st = await stat(helpersPath);
@@ -39,19 +60,26 @@ export async function loadHelperRegistrars(helpersPath: string): Promise<Array<(
       files = [helpersPath];
     }
   } catch {
-    console.warn(`[dev-server] helpers path not found: ${helpersPath}`);
-    return registrars;
+    problems.push({ file: helpersPath, message: "not found", missing: true });
+    return { registrars, files: sources, problems };
   }
   for (const file of files) {
     try {
-      const mod = await import(pathToFileURL(file).href) as Record<string, unknown>;
+      let href = pathToFileURL(file).href;
+      if (opts.bust !== undefined) {
+        delete require.cache[file];
+        href += `?pd-reload=${opts.bust}`;
+      }
+      const mod = await import(href) as Record<string, unknown>;
       const def = (mod["default"] ?? mod) as unknown;
       if (typeof def === "function") {
         registrars.push(def as (hb: unknown) => void);
+        sources.push(file);
       } else if (def && typeof def === "object") {
         const named = Object.entries(def as Record<string, unknown>)
           .filter(([, v]) => typeof v === "function") as Array<[string, (...a: unknown[]) => unknown]>;
         if (named.length) {
+          sources.push(file);
           registrars.push((hb: unknown) => {
             const h = hb as { registerHelper(n: string, f: (...a: unknown[]) => unknown): void };
             for (const [name, fn] of named) h.registerHelper(name, fn);
@@ -59,10 +87,10 @@ export async function loadHelperRegistrars(helpersPath: string): Promise<Array<(
         }
       }
     } catch (e) {
-      console.warn(`[dev-server] skipped helper module ${file}: ${oneLine(e)}`);
+      problems.push({ file, message: oneLine(e) });
     }
   }
-  return registrars;
+  return { registrars, files: sources, problems };
 }
 
 /** An error as one readable line — never a stack trace for a bad project file. */
@@ -79,7 +107,15 @@ function oneLine(e: unknown): string {
  * beneath component data.
  */
 export async function loadGlobalData(dataDirs: string | string[]): Promise<Record<string, unknown>> {
+  const { data, problems } = await readGlobalData(dataDirs);
+  for (const p of problems) console.warn(p.missing ? `[dev-server] dataDir not found: ${p.file}` : `[dev-server] skipped _data file ${p.file.split(/[\\/]/).pop()}: ${p.message}`);
+  return data;
+}
+
+/** Global data, and every file that did not load, as problems rather than warnings. */
+export async function readGlobalData(dataDirs: string | string[]): Promise<{ data: Record<string, unknown>; problems: LoadProblem[] }> {
   const merged: Record<string, unknown> = {};
+  const problems: LoadProblem[] = [];
   for (const dataDir of Array.isArray(dataDirs) ? dataDirs : [dataDirs]) {
     let files: string[] = [];
     try {
@@ -87,7 +123,7 @@ export async function loadGlobalData(dataDirs: string | string[]): Promise<Recor
       files = entries.filter(e => e.isFile() && e.name.endsWith(".json") && !e.name.startsWith("."))
         .map(e => e.name).sort();
     } catch {
-      console.warn(`[dev-server] dataDir not found: ${dataDir}`);
+      problems.push({ file: dataDir, message: "not found", missing: true });
       continue;
     }
     for (const name of files) {
@@ -97,10 +133,9 @@ export async function loadGlobalData(dataDirs: string | string[]): Promise<Recor
           deepMerge(merged, obj as Record<string, unknown>);
         }
       } catch (e) {
-        const reason = e instanceof SyntaxError ? `invalid JSON (${oneLine(e)})` : oneLine(e);
-        console.warn(`[dev-server] skipped _data file ${name}: ${reason}`);
+        problems.push({ file: join(dataDir, name), message: e instanceof SyntaxError ? `invalid JSON (${oneLine(e)})` : oneLine(e) });
       }
     }
   }
-  return merged;
+  return { data: merged, problems };
 }

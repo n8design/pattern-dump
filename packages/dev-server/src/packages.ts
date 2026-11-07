@@ -7,17 +7,27 @@
 // Resolution walks node_modules folders upward from the project root, the way Node resolves a
 // package, rather than using require.resolve: a package's `exports` map need not expose
 // ./package.json, and the manifest lives there.
+//
+// A package is used from its real folder, resolved once here: a `file:` dependency or a workspace is a
+// link in node_modules to a folder elsewhere, and everything downstream (discovery, styles, the watcher,
+// esbuild, Node's own imports) must agree on one path for each file. A package whose real folder is
+// itself inside a node_modules folder is an installed copy, not a link.
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, join, sep } from "node:path";
 import type { PackageReference } from "@pattern-dump/config";
 import type { PackageManifest } from "@pattern-dump/contracts";
 
 export interface ResolvedPackage {
   name: string;
   version: string;
-  /** Absolute package folder — every manifest path resolves against it. */
+  /** The package's real folder (links resolved): every manifest path resolves against it. */
   dir: string;
+  /** Where it was found, in node_modules: the link, or the copy itself. */
+  via: string;
+  /** A link to a folder outside node_modules (a `file:` dependency, a workspace), as opposed to a copy
+   *  installed into node_modules. Only linked packages are watched by pd dev. */
+  linked: boolean;
   manifest: PackageManifest;
   /** Manifest excludes plus the config's own for this package. */
   exclude: string[];
@@ -46,17 +56,49 @@ interface PackageJson {
   peerDependencies?: Record<string, string>;
 }
 
+const TS = /\.[mc]?ts$/;
+const JS = /\.[mc]?js$/;
+
+/**
+ * A package's helpers must be JavaScript: Node does not strip types from files under node_modules, so
+ * TypeScript helpers would load from a link and fail from an installed copy, every page then failing on a
+ * missing helper. A package ships `.js` built from its TypeScript source, and its manifest names that.
+ * Checked at startup and named, rather than skipped one helper module at a time.
+ */
+function checkHelpers(name: string, dir: string, helpers: string | undefined): void {
+  if (!helpers) return;
+  const path = join(dir, helpers);
+  const fix = `Ship compiled helpers: build .js from the TypeScript source and name the .js in "patternDump.helpers".`;
+  if (TS.test(path)) {
+    throw new Error(`pattern package "${name}": its helpers are TypeScript (${helpers}), which Node does not load from an installed package. ${fix}`);
+  }
+  let files: string[];
+  try {
+    if (!statSync(path).isDirectory()) return;
+    files = readdirSync(path);
+  } catch {
+    return; // a missing helpers path is reported where helpers load
+  }
+  const ts = files.filter(f => TS.test(f)).sort();
+  if (ts.length && !files.some(f => JS.test(f))) {
+    throw new Error(`pattern package "${name}": its helpers folder (${helpers}) holds TypeScript and no .js, which Node does not load from an installed package. ${fix}`);
+  }
+  // Beside compiled helpers, TypeScript files are sources: only the .js load. Said, not skipped silently.
+  if (ts.length) console.warn(`[dev-server] pattern package "${name}": helpers folder ${helpers} loads its .js files; skipped TypeScript: ${ts.join(", ")}`);
+}
+
 export function loadPatternPackages(references: PackageReference[] | undefined, root: string): ResolvedPackage[] {
   const out: ResolvedPackage[] = [];
   const seen = new Set<string>();
 
   const visit = (name: string, direct: boolean, from: string): void => {
     if (seen.has(name)) return;
-    const dir = findPackageDir(name, from);
-    if (!dir) {
+    const via = findPackageDir(name, from);
+    if (!via) {
       if (!direct) return; // an uninstalled peer is npm's concern, not a PD startup error
       throw new Error(`pattern package "${name}" is not installed — run: npm install --save-dev ${name}`);
     }
+    const dir = realpathSync(via);
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as PackageJson;
     if (!pkg.patternDump) {
       if (!direct) return; // a peer without a manifest contributes nothing to PD
@@ -65,17 +107,22 @@ export function loadPatternPackages(references: PackageReference[] | undefined, 
         "patterns, styles and themes are. See PackageManifest in @pattern-dump/contracts.",
       );
     }
+    checkHelpers(name, dir, pkg.patternDump.helpers);
     seen.add(name);
     out.push({
       name,
       version: pkg.version ?? "0.0.0",
       dir,
+      via,
+      linked: !dir.split(sep).includes("node_modules"),
       manifest: pkg.patternDump,
       exclude: [...(pkg.patternDump.exclude ?? []), ...(options.get(name)?.exclude ?? [])],
       direct,
       styles: options.get(name)?.styles ?? true,
     });
-    for (const peer of Object.keys(pkg.peerDependencies ?? {})) visit(peer, false, dir);
+    // Peers from where the package was found, as before: a link's real folder may sit outside the
+    // project, away from the node_modules its peers were installed into.
+    for (const peer of Object.keys(pkg.peerDependencies ?? {})) visit(peer, false, via);
   };
 
   // Options by package name, applied however the package is reached — a package named in the config

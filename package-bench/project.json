@@ -1,0 +1,53 @@
+{
+  "name": "package-bench",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "outputs": [
+        "{projectRoot}/vendor/fixture-ds/dist",
+        "{projectRoot}/vendor/fixture-skin/dist"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "build",
+        {
+          "projects": [
+            "cli",
+            "dev-server"
+          ],
+          "target": "build"
+        }
+      ]
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run dev",
+        "cwd": "package-bench"
+      },
+      "dependsOn": [
+        "build"
+      ]
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run e2e",
+        "cwd": "package-bench"
+      },
+      "dependsOn": [
+        "build",
+        {
+          "projects": [
+            "cli",
+            "dev-ui"
+          ],
+          "target": "build"
+        }
+      ],
+      "cache": false
+    }
+  }
+}

@@ -30,6 +30,7 @@
     "apps/*",
     "test-bench",
     "storefront-bench",
+    "package-bench",
     "skins/*"
   ],
   "scripts": {
@@ -39,6 +40,7 @@
     "typecheck": "nx run-many -t typecheck",
     "e2e": "nx run dev-ui:e2e",
     "e2e:storefront": "nx run storefront-bench:e2e",
+    "e2e:package-bench": "nx run package-bench:e2e",
     "dev:check": "node scripts/check-server-fresh.mjs",
     "pack:pd": "npm run build && node packages/cli/scripts/pack.mjs",
     "verify:install": "node scripts/verify-install.mjs",

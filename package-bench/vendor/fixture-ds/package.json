@@ -1,0 +1,15 @@
+{
+  "name": "pd-fixture-ds",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Package bench fixture: a small design system consumed as a pattern package through a file: link.",
+  "type": "module",
+  "patternDump": {
+    "patterns": "patterns",
+    "styles": { "dir": "styles", "documentBase": ["base"] },
+    "themes": { "dir": "themes", "default": "light" },
+    "helpers": "dist/helpers.js",
+    "scripts": "scripts",
+    "assets": ["assets/pd-fixture-ds"]
+  }
+}

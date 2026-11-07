@@ -18,6 +18,7 @@
 //   /source/:id/data             — Shiki-highlighted JSON data fragment
 //   *                            — SPA shell
 import type { PatternDumpConfig } from "@pattern-dump/config";
+import type { Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 // Re-exported so the export/CLI orchestration (core) can key its report on the SAME handle derivation
 // as discovery/export, without core depending on discovery directly.
@@ -38,7 +39,7 @@ const SILENT_RELOADER: HotReloader = {
 };
 import { createServer } from "node:http";
 import { stat } from "node:fs/promises";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 // HTTP/HTML leaf helpers. Kept in their own module because `escapeHtml` is shared by the Markdown
 // renderer, the preview-document composer and the shell builder — a shared leaf, so extracting any
@@ -76,6 +77,9 @@ import { resolveDevUiDist } from "./assets.js";
 import { describeBindError } from "./ports.js";
 export { PortInUseError } from "./ports.js";
 import { loadPatternPackages } from "./packages.js";
+import { createDisplayPath } from "./display-path.js";
+import { createRenderingHandle, type BuildRenderer } from "./rendering.js";
+import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching } from "./watch.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
@@ -148,8 +152,12 @@ export async function startDevServer(
     themesDir, defaultTheme,
     swatchSlots,
   } = cfg;
+  // Said from what the watcher will watch (watch-roots.ts), so the line cannot claim what it does not do.
+  const watchedFolders = Object.values(watchedRoots(cfg)).flat().map(r => typeof r === "string" ? r : "dir" in r ? r.dir : r.scope);
   for (const p of cfg.packages) {
-    console.log(`[dev-server] pattern package ${p.name}@${p.version}${p.direct ? "" : " (peer)"}`);
+    const watched = watchedFolders.some(d => d === p.dir || d.startsWith(p.dir + sep));
+    const note = watched || opts.live === false ? "" : p.linked ? ": linked, nothing in it to watch" : ": an installed copy, not watched";
+    console.log(`[dev-server] pattern package ${p.name}@${p.version}${p.direct ? "" : " (peer)"}${note}`);
   }
 
   await initHighlighter();
@@ -163,11 +171,17 @@ export async function startDevServer(
   // Global data (config.dataDir, and each package's) merged beneath component data; packages
   // first, so the project's own data wins.
   const globalData = cfg.dataDirs.length ? await loadGlobalData(cfg.dataDirs) : undefined;
-  const render      = createRenderer({
-    patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme,
-    ...(helperRegistrars && helperRegistrars.length ? { helperRegistrars } : {}),
-    ...(globalData ? { globalData } : {}),
+  // One rendering for everything that renders: the renderer, the global data it was built with, and its
+  // helpers, replaced together in one assignment when a helper or data file is reloaded (rendering.ts).
+  // A request takes `rendering.current` once; `render` always calls the current renderer.
+  const displayPath = createDisplayPath(cwd, cfg.packages);
+  const buildRenderer: BuildRenderer = (registrars, data) => createRenderer({
+    patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme, displayPath,
+    ...(registrars.length ? { helperRegistrars: [...registrars] } : {}),
+    ...(data ? { globalData: data } : {}),
   });
+  const rendering = createRenderingHandle(buildRenderer, helperRegistrars, globalData);
+  const render: Render = input => rendering.current.render(input);
   const live = opts.live !== false;
   const hotreloader: HotReloader = live ? createHotReloader(wsPort) : SILENT_RELOADER;
   // Fail here, before compiling anything, if live reload's port is taken.
@@ -177,7 +191,13 @@ export async function startDevServer(
   });
 
   // Main tracker: component styles only (no themes — those are served as separate linked files).
-  const tracker = await createSassDependencyTracker([stylesDir]);
+  // Every watched style root: the project's, and each linked package's. A package root that compiles
+  // only declared entries is tracked through those (as buildAllStyleData compiles it).
+  const linkedStyleRoots = styleRoots.filter(r => r.source !== undefined && cfg.packages.some(p => p.linked && p.name === r.source));
+  const tracker = await createSassDependencyTracker(
+    [stylesDir, ...linkedStyleRoots.filter(r => !r.entries).map(r => r.dir)],
+    linkedStyleRoots.flatMap(r => r.entries ?? []),
+  );
   console.log("[dev-server] SCSS compiled (dependency tracker ready)");
 
   // All mutable server state in one object, shared by reference with the route handlers and the
@@ -246,7 +266,7 @@ export async function startDevServer(
   };
 
   const routeCtx: RouteContext = {
-    cfg, state, render, tracker, globalData, devUiDist, boot, now, live,
+    cfg, state, rendering, tracker, devUiDist, boot, now, live,
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
   };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
@@ -265,7 +285,7 @@ export async function startDevServer(
 
   // ---- File watcher ----
 
-  const watcher = live ? startWatching({ cfg, state, render, tracker, hotreloader }) : null;
+  const watcher = live ? startWatching({ cfg, state, render, rendering, tracker, hotreloader }) : null;
   // Resolve only once chokidar has finished its initial scan. Until "ready", a file written into a
   // directory it has not reached yet produces no event — so an edit made right after startup (or a
   // test writing a fixture straight after startDevServer resolves) was silently missed under load.

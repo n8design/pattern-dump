@@ -7,9 +7,8 @@ examples on specimen plates. Display type is Montserrat, text is Source Serif 4,
 ## Using it
 
 The package is private to this repository for now: inside it, a site names it in `packages` (npm
-workspaces link it) and gives the storefront a `site`. It is not ready to install from a registry: its
-helpers are TypeScript, and Node does not strip types from files under `node_modules`, so an installed
-copy would load no helpers.
+workspaces link it) and gives the storefront a `site`. Its helpers ship compiled (`dist/helpers/skin.js`,
+built from `helpers/skin.ts` by `npm run build`), so an installed copy can load them too.
 
 ```ts
 export default defineConfig({
@@ -39,14 +38,17 @@ the skin's:
 |---|---|
 | `patterns/` | The layouts (`page`, `article`, `home`) and partials (`base`, `header`, `nav`, `marquee`, `rows`, `footer`) |
 | `styles/` | Their stylesheets; `styles/site/` is the base layer (tokens, fonts, document, prose, print) |
-| `helpers/skin.ts` | Handlebars helpers that derive a page's chapters, sections, index and next page |
+| `helpers/skin.ts` | Handlebars helpers that derive a page's chapters, sections, index and next page; built to `dist/helpers/skin.js`, which the manifest names |
 | `scripts/` | The variant switcher for live examples (pages work without it) |
 | `assets/skin-experimental/` | The fonts, with their licences and provenance, and the film grain; served at `/assets/skin-experimental/` |
 
 ## Developing it
 
-`demo/` is a site that uses the skin the way any site would, by package name. `npm run dev` serves it;
-`npm test` and `npm run e2e` are the skin's own checks (colours only from tokens, the rebrand, accessibility
-in light and dark, reduced motion, print).
+`demo/` is a site that uses the skin the way any site would, by package name. `npm run dev` builds the
+helpers and serves it; `npm test` and `npm run e2e` are the skin's own checks (colours only from tokens,
+the rebrand, accessibility in light and dark, reduced motion, print).
 
-Pattern packages are not watched by `pd dev`: after editing the skin, restart the demo's server.
+`npm run build` compiles the helpers into `dist/` (not committed); `npm run watch:helpers` keeps
+recompiling them while you edit `helpers/skin.ts`. The demo uses the skin through its workspace link, so
+`pd dev` watches it: edits to its layouts, partials, styles and script reload the open page, and so does
+each rebuild of its helpers by `watch:helpers`.

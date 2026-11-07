@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "required": ["site"],
+  "properties": {
+    "site": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string", "description": "The site's name" },
+        "footer": { "type": "string", "description": "The line at the bottom" }
+      }
+    }
+  }
+}

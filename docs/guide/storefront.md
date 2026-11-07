@@ -143,8 +143,10 @@ export default defineConfig({
 ```
 
 A skin's package can carry everything a skin needs: patterns, styles with their base layer, helpers,
-behaviour scripts and assets such as fonts. `pd dev` does not watch installed packages: restart it after
-changing one.
+behaviour scripts and assets such as fonts. `pd dev` watches a linked package (a `file:` dependency or a
+workspace) like the project's own files, so edits to a linked skin's layouts, partials and styles reload
+the open page, and so do its helpers when their module is rebuilt. A copy installed from a registry is not
+watched.
 
 ### Writing a skin
 
@@ -192,8 +194,10 @@ One `pd dev` serves both front ends, telling them apart by the host name:
 | `http://pd.localhost:<port>/` | The workbench |
 | `http://localhost:<port>/` | The workbench, as without a storefront |
 
-Edits to pages, layouts, partials and styles reload the open page. Restart after changing the config or a
-helper.
+Edits to pages, layouts, partials, styles, global data, assets and helper modules reload the open page.
+Restart after changing the config. A problem that stops a reload (data that is not valid JSON, a helper
+that does not load or register) is listed in a notice on the open page and in the terminal; the page keeps the last good
+version until the file is fixed.
 
 ### Browsers
 
