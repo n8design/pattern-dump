@@ -165,9 +165,13 @@ test.describe("Audit facet — corpus diagnostics", () => {
   test("an HMR content change while the facet is open refetches the rollup", async ({ page }) => {
     test.setTimeout(60_000);
     let calls = 0;
-    await page.route("**/api/audit", async (route) => {
+    // Counts each request and hands it on in one call. Fetching and then fulfilling left a window in
+    // which the route could be settled while the fetch was in flight, and the fulfill then threw
+    // "Route is already handled" (seen once on CI). The test only counts requests, so it never needs
+    // the response in hand.
+    await page.route("**/api/audit", (route) => {
       calls++;
-      await route.fulfill({ response: await route.fetch() });
+      return route.continue();
     });
 
     await gotoComponent(page, "atoms/button");
@@ -192,8 +196,7 @@ test.describe("Audit facet — corpus diagnostics", () => {
         .poll(async () => page.locator("#preview-frame").getAttribute("srcdoc"), { timeout: 10_000 })
         .not.toContain("audited");
       // The restore also refetches the rollup. End the intercept only once that request's handler has
-      // finished: a handler still awaiting route.fetch() when the page closes fails the test after the
-      // fact ("Fetch response has been disposed"), whatever the assertions above found.
+      // finished, so no handler is still running when the page closes.
       await page.unrouteAll({ behavior: "wait" });
     }
   });
