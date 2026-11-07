@@ -26,10 +26,26 @@ let waiters: Array<() => void> = [];
     const ws = waiters; waiters = []; ws.forEach(w => w());
   };
 
-/** Resolve when `test` holds over the handled events, checked on each new one. */
-export function whenHandled(test: () => boolean): Promise<void> {
-  return new Promise(resolve => {
-    const check = () => { if (test()) resolve(); else waiters.push(check); };
+/** How long a latch waits before it fails, saying what it waited for: well under a test's timeout. */
+export const LATCH_MS = 5_000;
+
+/**
+ * Resolve when `test` holds over the handled events, checked on each new one. Rejects after `LATCH_MS`
+ * with `what()`: what it waited for and what arrived instead.
+ */
+export function whenHandled(test: () => boolean, what: () => string = () => "the expected events"): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      waiters = waiters.filter(w => w !== check);
+      reject(new Error(`latch: not handled within ${LATCH_MS} ms: ${what()}`));
+    }, LATCH_MS);
+    const check = () => {
+      if (done) return;
+      if (test()) { done = true; clearTimeout(timer); resolve(); } else waiters.push(check);
+    };
     check();
   });
 }
@@ -107,8 +123,12 @@ export class Bench {
       const after = handled.slice(from);
       const at = after.findIndex(h => h.path === this.at(SENTINEL));
       return at >= 0 && after.slice(at).some(h => mine(h) && h.stillRunning === 0);
+    }, () => `barrier: the sentinel's change, then no handler still running; handled since: ${JSON.stringify(handled.slice(from).filter(mine).map(h => [h.event, this.rel(h.path), h.stillRunning]))}`);
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`latch: no pong within ${LATCH_MS} ms`)), LATCH_MS);
+      this.ws.once("pong", () => { clearTimeout(timer); resolve(); });
+      this.ws.ping();
     });
-    await new Promise<void>(resolve => { this.ws.once("pong", () => resolve()); this.ws.ping(); });
   }
 
   /** Act, wait for its declared events to be handled, then the barrier; its messages and events. */
@@ -118,7 +138,10 @@ export class Bench {
     const from = this.messages.length;
     const hFrom = handled.length;
     await act();
-    await whenHandled(() => events.every(([event, rel]) => handled.slice(hFrom).some(h => h.event === event && this.owns(h.path) && this.rel(h.path) === rel)));
+    await whenHandled(
+      () => events.every(([event, rel]) => handled.slice(hFrom).some(h => h.event === event && this.owns(h.path) && this.rel(h.path) === rel)),
+      () => `expected ${JSON.stringify(events)}; handled: ${JSON.stringify(this.handledSince(hFrom))}`,
+    );
     await this.barrier();
     const messages = this.messages.slice(from).filter(m => !m.startsWith('{"type":"hello"')).sort();
     return { messages, events: this.handledSince(hFrom) };
