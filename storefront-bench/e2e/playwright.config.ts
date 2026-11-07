@@ -21,6 +21,9 @@ export default defineConfig({
   // broadcasts every reload to every page.
   workers: 1,
   retries: process.env["CI"] ? 2 : 0,
+  // On CI a test that passes only on retry fails the run: retries keep the trace of the first failure,
+  // they do not make a flaky test green.
+  failOnFlakyTests: !!process.env["CI"],
   reporter: process.env["CI"] ? [["github"], ["list"]] : [["list"]],
   use: { trace: "on-first-retry", video: "retain-on-failure" },
   projects: [
