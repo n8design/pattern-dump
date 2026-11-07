@@ -389,10 +389,11 @@ on("change", async (filePath) => {
     }
 
   } else if (ext === ".hbs" || ext === ".json") {
-    // Resolve using the current map BEFORE clearing it (file was in the previous discovery pass).
-    const componentId = state.discoveryResult
-      ? resolveComponentForFile(filePath, state.discoveryResult)
-      : null;
+    // Resolve using the current map BEFORE clearing it (file was in the previous discovery pass). A
+    // second edit before any request has rebuilt it (a quick second save) finds none: build it, as the
+    // SCSS path does, or that edit would reload nothing.
+    if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
+    const componentId = resolveComponentForFile(filePath, state.discoveryResult);
     // Invalidate caches so next request rebuilds with the new file state.
     state.discoveryResult = null;
     state.compositionRegistry = null;
