@@ -86,6 +86,8 @@ export class Bench {
     await new Promise<void>((resolve, reject) => { this.ws.once("open", () => resolve()); this.ws.once("error", reject); });
   }
 
+  /** The server's address, for requests a spec makes itself. */
+  get origin(): string { return `http://127.0.0.1:${this.port}`; }
   at(rel: string): string { return join(this.root, rel); }
   /** Whether a watched path is in this project, by either form of its folder: a linked package is watched
    *  from its real path, and the folder may itself sit behind a link (macOS's /var → /private/var). */

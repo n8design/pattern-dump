@@ -72,8 +72,10 @@ Starts the workbench with live reload.
 
 If a port is taken, `pd dev` says which one and exits; pick another with `--port`.
 
-Restart `pd dev` after changing the config, the data or helpers folders, or an installed pattern
-package. Everything else reloads while it runs.
+Restart `pd dev` after changing the config, a file a helper module imports (only the module itself
+reloads), or an installed pattern package. Everything else reloads while it runs, global data and helpers
+included; if a data or helper file fails to load, the last good version stays in use and the problem is
+shown.
 
 ---
 

@@ -108,7 +108,8 @@ Leave `dist/` out of version control and build it before packing (a `prepack` sc
 
 **Authoring a package's helpers next to a site** takes two processes: in the package,
 `npm run watch:helpers` rebuilds `dist/` on every save of the TypeScript; in the site, `pd dev` serves it.
-`pd dev` reads helpers when it starts, so restart it to load a rebuilt helper.
+`pd dev` reloads a rebuilt helper in place. A change to a file that a helper module imports needs a restart,
+which `pd dev` asks for; a bundled helper (one file, as above) never imports one.
 
 An asset folder is served under its own name, `/assets/<folder name>/…`, and a project's folder of the same
 name hides a package's. Give a package's asset folder a name of its own, such as the package's

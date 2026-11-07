@@ -39,30 +39,40 @@ import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
 import { readPages, routeFor } from "./storefront/pages.js";
+import { readGlobalData, readHelperRegistrars, type LoadProblem } from "./project-loaders.js";
+import { createDisplayPath } from "./display-path.js";
+import type { HelperRegistrar, RenderingHandle } from "./rendering.js";
 
 /** Everything the watcher needs, handed in explicitly rather than captured from a closure. */
 export interface WatchContext {
   readonly cfg: ResolvedConfig;
   readonly state: ServerState;
   readonly render: ReturnType<typeof import("@pattern-dump/renderer").createRenderer>;
+  /** The renderer, global data and helpers in use, replaced together when data or a helper reloads. */
+  readonly rendering: RenderingHandle;
   readonly tracker: Awaited<ReturnType<typeof import("@pattern-dump/build").createSassDependencyTracker>>;
   readonly hotreloader: HotReloader;
 }
 
 /** Start watching the project. Returns the chokidar watcher so the caller owns teardown. */
 export function startWatching(ctx: WatchContext): FSWatcher {
-  const { cfg, state, render, tracker, hotreloader } = ctx;
+  const { cfg, state, render, rendering, tracker, hotreloader } = ctx;
   // Destructured so the body below reads exactly as it did inside startDevServer.
   const { patternsDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
   // The source roots watched, by kind: the project's, and every linked package's (watch-roots.ts). Each
   // handler works from the root a file is in (its folder, and for stylesheets the root's own base
   // layer), never from the project's folders by name.
   const watched: WatchedRoots = watchedRoots(cfg);
-  const { patternRootOf, styleRootOf, themeDirOf, scriptDirOf, inBase, componentOfScss } = rootMatchers(watched);
+  const { patternRootOf, styleRootOf, themeDirOf, scriptDirOf, dataDirOf, assetRootOf, helperOf, inBase, componentOfScss } = rootMatchers(watched);
+  /** A file as messages name it: never an absolute path. */
+  const shown = createDisplayPath(cwd, cfg.packages);
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
 const pagesDir = cfg.storefront?.pagesDir ?? null;
-const watchDirs = [...watched.patterns, ...watched.styles.map(r => r.dir), ...watched.themes, ...watched.scripts, ...(pagesDir ? [pagesDir] : [])];
+const watchDirs = [
+  ...watched.patterns, ...watched.styles.map(r => r.dir), ...watched.themes, ...watched.scripts,
+  ...watched.data, ...watched.assets, ...watched.helpers.map(h => h.scope), ...(pagesDir ? [pagesDir] : []),
+];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
 
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
@@ -257,6 +267,67 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
   }
 }
 
+// Global data, helpers and assets. Data and helpers are part of what pd dev renders with: a change reloads
+// them and replaces the renderer (rendering.ts), all at once, then reloads what is open. A reload that fails
+// (a file that does not parse, a helper module that throws) keeps the last good ones, and says so in the
+// terminal and on the open pages (the `error` message); the next good save recovers. A helper's own
+// imports are not reloaded (Node keeps modules once imported), so a change to any other file in a helper's
+// folder asks for a restart instead. Assets are served from disk per request: a change only reloads.
+let reloads = 0;
+
+async function reloadedOpenPages(label: string): Promise<void> {
+  if (state.lastComponentId) hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
+  if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
+  console.log(`[dev-server] ${label} → reloaded`);
+}
+
+function reloadFailed(filePath: string, what: string, problems: LoadProblem[]): void {
+  const message = `${shown(filePath)}: ${what} not reloaded, the last good ones are still in use — `
+    + problems.map(p => `${shown(p.file)}: ${p.message}`).join("; ");
+  hotreloader.push({ type: "error", scope: "build", message });
+  console.error(`[dev-server] ${message}`);
+}
+
+async function reloadData(filePath: string): Promise<void> {
+  const { data, problems } = await readGlobalData(cfg.dataDirs);
+  const failed = problems.filter(p => !p.missing);
+  if (failed.length) { reloadFailed(filePath, "global data", failed); return; }
+  rendering.replace({ globalData: cfg.dataDirs.length ? data : undefined });
+  await reloadedOpenPages(`Global data changed: ${shown(filePath)}`);
+}
+
+async function reloadHelpers(filePath: string): Promise<void> {
+  const bust = ++reloads;
+  const registrars: HelperRegistrar[] = [];
+  const failed: LoadProblem[] = [];
+  for (const path of cfg.helperPaths) {
+    const r = await readHelperRegistrars(path, { bust });
+    registrars.push(...r.registrars);
+    failed.push(...r.problems.filter(p => !p.missing));
+  }
+  if (failed.length) { reloadFailed(filePath, "helpers", failed); return; }
+  rendering.replace({ registrars });
+  await reloadedOpenPages(`Helper changed: ${shown(filePath)}`);
+}
+
+/** Data, helper and asset files; true when the file was one of them. */
+async function handleReloadable(filePath: string, event: "change" | "add" | "unlink"): Promise<boolean> {
+  const helper = helperOf(filePath);
+  if (helper === "entry") { await reloadHelpers(filePath); return true; }
+  if (helper === "other") {
+    const message = `${shown(filePath)} changed: restart pd dev to load it (a helper's own imports are not reloaded)`;
+    hotreloader.push({ type: "error", scope: "build", message });
+    console.error(`[dev-server] ${message}`);
+    return true;
+  }
+  if (dataDirOf(filePath)) {
+    if (extname(filePath) === ".json") await reloadData(filePath);
+    return true;
+  }
+  if (assetRootOf(filePath)) { await reloadedOpenPages(`Asset ${event === "change" ? "changed" : event === "add" ? "added" : "removed"}: ${shown(filePath)}`); return true; }
+  return false;
+}
+
 // Storefront pages. Nothing is cached server-side — every page request reads the folder — so all a
 // change needs is a reload of the pages it touches: an edited page reloads itself; a file or folder
 // added or removed can change the nav (or the folder's problems), so every page reloads. Dotfiles are
@@ -277,6 +348,7 @@ on("addDir", (dirPath) => { handlePages(dirPath, "addDir"); });
 
 on("change", async (filePath) => {
   if (handlePages(filePath, "change")) return;
+  if (await handleReloadable(filePath, "change")) return;
   const ext = extname(filePath);
 
   if (ext === ".md" && patternRootOf(filePath)) {
@@ -382,6 +454,7 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
 
 on("add", async (filePath) => {
   if (handlePages(filePath, "add")) return;
+  if (await handleReloadable(filePath, "add")) return;
   const ext = extname(filePath);
   const patternRoot = patternRootOf(filePath);
   if (ext === ".scss" && !themeDirOf(filePath)) {
@@ -396,6 +469,7 @@ on("add", async (filePath) => {
 // Component template removed — rebuild discovery and signal nav rebuild.
 on("unlink", async (filePath) => {
   if (handlePages(filePath, "unlink")) return;
+  if (await handleReloadable(filePath, "unlink")) return;
   const patternRoot = patternRootOf(filePath);
   if (extname(filePath) === ".hbs" && patternRoot) {
     await rebuildAndSignalTree(`Pattern removed: ${relative(patternRoot, filePath)}`);

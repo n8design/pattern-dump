@@ -14,6 +14,7 @@ const m = rootMatchers({
   ],
   themes: [join(pkg, "themes")],
   scripts: [join(project, "scripts")],
+  data: [], assets: [], helpers: [],
 });
 
 describe("within", () => {

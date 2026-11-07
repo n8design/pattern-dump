@@ -57,11 +57,20 @@ export function fitterScript(): string {
     + `})();</script>`;
 }
 
-/** `pd dev` only: reload when this page or the nav changes, or a component or stylesheet does. */
+/**
+ * `pd dev` only: reload when this page or the nav changes, or a component or stylesheet does; list a
+ * build problem (a reload that failed, a restart that is needed) in a notice on the page, which the next
+ * reload clears. On the storefront's own page, never inside a preview.
+ */
 export function liveScript(wsPort: number): string {
   return `<script data-pd-live>(function(){var ws=new WebSocket("ws://"+location.hostname+":${wsPort}");`
     + `ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}`
-    + `if((m.type==="page-changed"&&(m.route===null||m.route===location.pathname))||m.type==="content-swap"||m.type==="css-link-swap")location.reload();};`
+    + `if((m.type==="page-changed"&&(m.route===null||m.route===location.pathname))||m.type==="content-swap"||m.type==="css-link-swap")location.reload();`
+    + `else if(m.type==="error"){var n=document.querySelector("[data-pd-live-notice]");`
+    + `if(!n){n=document.createElement("div");n.setAttribute("data-pd-live-notice","");n.setAttribute("role","alert");`
+    + `n.style.cssText="position:fixed;left:1rem;right:1rem;bottom:1rem;z-index:2147483647;padding:.75rem 1rem;background:#fff;color:#000;border:2px solid #b00020;font:14px/1.4 system-ui,sans-serif";`
+    + `n.appendChild(document.createElement("ul"));document.body.appendChild(n);}`
+    + `var li=document.createElement("li");li.textContent=String(m.message);n.firstChild.appendChild(li);}};`
     + `})();</script>`;
 }
 

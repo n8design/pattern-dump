@@ -2,7 +2,8 @@
 // its root's own base layer. Matched by folder boundary, never by a bare prefix, so `src/patterns-site`
 // is not inside `src/patterns`.
 
-import { join, sep } from "node:path";
+import { statSync } from "node:fs";
+import { dirname, extname, join, resolve, sep } from "node:path";
 import type { ResolvedConfig } from "./server-config.js";
 import { documentBaseMatcher, resolveScssToComponent } from "./style-index.js";
 
@@ -11,6 +12,24 @@ export interface WatchedRoots {
   styles: Array<{ dir: string; inBase: (absPath: string) => boolean }>;
   themes: string[];
   scripts: string[];
+  /** Global data folders: their .json is read into one context at startup, and again on a change. */
+  data: string[];
+  /** Asset folders: served from disk per request, so a change only needs the pages that use them reloaded. */
+  assets: string[];
+  /** Helpers: `scope` is the folder watched (a helpers folder, or the folder of a single helper file);
+   *  `isEntry` names the modules pd dev imports itself, which reload in place. */
+  helpers: Array<{ scope: string; isEntry: (absPath: string) => boolean }>;
+}
+
+const MODULE = /\.[mc]?js$/;
+
+/** A helpers path as watched: a folder's own modules are its entries; a single file is its own. */
+function helperScope(path: string): { scope: string; isEntry: (absPath: string) => boolean } {
+  let isDir = false;
+  try { isDir = statSync(path).isDirectory(); } catch { /* a missing path: watched as a file's folder */ }
+  return isDir
+    ? { scope: path, isEntry: p => dirname(p) === path && MODULE.test(extname(p)) && !p.slice(path.length + 1).startsWith(".") }
+    : { scope: dirname(path), isEntry: p => p === path };
 }
 
 /**
@@ -33,6 +52,18 @@ export function watchedRoots(cfg: ResolvedConfig): WatchedRoots {
       ...(cfg.config.scriptsDir && cfg.scriptsDirs[0] ? [cfg.scriptsDirs[0]] : []),
       ...[...linked.values()].filter(p => p.manifest.scripts).map(p => join(p.dir, p.manifest.scripts!)),
     ],
+    data: [
+      ...(cfg.config.dataDir ? [resolve(cfg.cwd, cfg.config.dataDir)] : []),
+      ...[...linked.values()].filter(p => p.manifest.data).map(p => join(p.dir, p.manifest.data!)),
+    ],
+    assets: [
+      ...[cfg.config.assets?.dir ?? []].flat().map(d => resolve(cfg.cwd, d)),
+      ...[...linked.values()].flatMap(p => (p.manifest.assets ?? []).map(a => join(p.dir, a))),
+    ],
+    helpers: [
+      ...(cfg.config.helpers ? [resolve(cfg.cwd, cfg.config.helpers)] : []),
+      ...[...linked.values()].filter(p => p.manifest.helpers).map(p => join(p.dir, p.manifest.helpers!)),
+    ].map(helperScope),
   };
 }
 
@@ -46,6 +77,14 @@ export function rootMatchers(watched: WatchedRoots) {
     styleRootOf,
     themeDirOf: (p: string): string | undefined => watched.themes.find(d => within(d, p)),
     scriptDirOf: (p: string): string | undefined => watched.scripts.find(d => within(d, p)),
+    dataDirOf: (p: string): string | undefined => watched.data.find(d => within(d, p)),
+    assetRootOf: (p: string): string | undefined => watched.assets.find(d => within(d, p)),
+    /** A helper file: an entry pd dev reloads in place, or another file in a helper's folder. */
+    helperOf: (p: string): "entry" | "other" | undefined => {
+      const h = watched.helpers.filter(x => within(x.scope, p));
+      if (!h.length) return undefined;
+      return h.some(x => x.isEntry(p)) ? "entry" : "other";
+    },
     /** A stylesheet's rules are base-layer CSS: its root's documentBase lists it. */
     inBase: (p: string): boolean => styleRootOf(p)?.inBase(p) ?? false,
     /** The component a stylesheet belongs to, resolved against its own style root. */

@@ -50,14 +50,15 @@ import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages } from "./storefront/pages.js";
 import { assemblePage } from "./storefront/page.js";
 import { pageStylesheets } from "./storefront/page-head.js";
+import type { RenderingHandle } from "./rendering.js";
 
 /** Everything the routes need, handed in explicitly rather than captured from a closure. */
 export interface RouteContext {
   readonly cfg: ResolvedConfig;
   readonly state: ServerState;
-  readonly render: ReturnType<typeof import("@pattern-dump/renderer").createRenderer>;
+  /** The renderer and the global data it was built with: one object, taken once per request. */
+  readonly rendering: RenderingHandle;
   readonly tracker: Awaited<ReturnType<typeof import("@pattern-dump/build").createSassDependencyTracker>>;
-  readonly globalData: Record<string, unknown> | undefined;
   /** Resolved in index.ts — the path literal is relative to that module's location, so it is
    *  passed in rather than recomputed here at a different depth. */
   readonly devUiDist: string;
@@ -80,7 +81,9 @@ export async function handleRequest(
   res: ServerResponse,
   ctx: RouteContext,
 ): Promise<void> {
-  const { cfg, state, render, tracker, globalData, devUiDist } = ctx;
+  const { cfg, state, tracker, devUiDist } = ctx;
+  // One rendering for the whole request: a reload replacing it meanwhile does not mix its parts.
+  const { render, globalData } = ctx.rendering.current;
   // Destructured so the chain below reads exactly as it did inside startDevServer — this move
   // changes where the handler lives, not a line of its logic.
   const {

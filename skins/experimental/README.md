@@ -50,5 +50,5 @@ the rebrand, accessibility in light and dark, reduced motion, print).
 
 `npm run build` compiles the helpers into `dist/` (not committed); `npm run watch:helpers` keeps
 recompiling them while you edit `helpers/skin.ts`. The demo uses the skin through its workspace link, so
-`pd dev` watches it: edits to its layouts, partials, styles and script reload the open page. Its helpers are
-read when the server starts: after `watch:helpers` rebuilds them, restart the demo's server.
+`pd dev` watches it: edits to its layouts, partials, styles and script reload the open page, and so does
+each rebuild of its helpers by `watch:helpers`.

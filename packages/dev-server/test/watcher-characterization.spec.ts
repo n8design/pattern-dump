@@ -154,9 +154,19 @@ describe("the watcher on test-bench", () => {
       "{\"type\":\"collision\",\"handle\":\"atoms-baseless-2\",\"incumbentPath\":\"<root>/src/patterns/atoms/baseless-2/baseless-2.hbs\",\"quarantinedPath\":\"<root>/src/patterns/atoms/baseless/baseless-2.hbs\"}",
       "{\"type\":\"tree-changed\"}",
     ]],
-    ["global data", b => b.edit("src/_data/tb.json", "\n"), [], []],
-    ["a helper", b => b.edit("src/helpers/hbs.cjs", "\n"), [], []],
-    ["an asset", b => b.create("assets/images/zz-char.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n"), [], []],
+    // Changed with data, helpers and assets reloading: global data is read again and the open component
+    // reloads (before, nothing was sent).
+    ["global data", b => b.edit("src/_data/tb.json", "\n"), [["change", "src/_data/tb.json"]], [
+      "{\"type\":\"content-swap\",\"componentId\":\"atoms/button\"}",
+    ]],
+    // Changed likewise: a helper module reloads in place, and the open component with it.
+    ["a helper", b => b.edit("src/helpers/hbs.cjs", "\n"), [["change", "src/helpers/hbs.cjs"]], [
+      "{\"type\":\"content-swap\",\"componentId\":\"atoms/button\"}",
+    ]],
+    // Changed likewise: an asset reloads the open component.
+    ["an asset", b => b.create("assets/images/zz-char.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n"), [["add", "assets/images/zz-char.svg"]], [
+      "{\"type\":\"content-swap\",\"componentId\":\"atoms/button\"}",
+    ]],
     // Changed with linked packages being watched: pd-fixture-ui is a `file:` link, so its files reload
     // like the project's (before, nothing was sent).
     ["a package template", b => b.edit("packages/pd-fixture-ui/patterns/atoms/fixture-chip/fixture-chip.hbs", "\n"), [["change", "packages/pd-fixture-ui/patterns/atoms/fixture-chip/fixture-chip.hbs"]], [

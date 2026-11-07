@@ -78,6 +78,7 @@ import { describeBindError } from "./ports.js";
 export { PortInUseError } from "./ports.js";
 import { loadPatternPackages } from "./packages.js";
 import { createDisplayPath } from "./display-path.js";
+import { createRenderingHandle, type BuildRenderer } from "./rendering.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching } from "./watch.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
@@ -165,18 +166,17 @@ export async function startDevServer(
   // Global data (config.dataDir, and each package's) merged beneath component data; packages
   // first, so the project's own data wins.
   const globalData = cfg.dataDirs.length ? await loadGlobalData(cfg.dataDirs) : undefined;
-  // One renderer handle for everything that renders: the routes, the watcher, the storefront and the
-  // audit all call `render`, which calls the renderer in `renderer.current`. Replacing that between
-  // renders (a reloaded helper or global data) reaches every caller at once; no caller holds the old one.
-  const renderer = {
-    current: createRenderer({
-      patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme,
-      displayPath: createDisplayPath(cwd, cfg.packages),
-      ...(helperRegistrars && helperRegistrars.length ? { helperRegistrars } : {}),
-      ...(globalData ? { globalData } : {}),
-    }),
-  };
-  const render: Render = input => renderer.current(input);
+  // One rendering for everything that renders: the renderer, the global data it was built with, and its
+  // helpers, replaced together in one assignment when a helper or data file is reloaded (rendering.ts).
+  // A request takes `rendering.current` once; `render` always calls the current renderer.
+  const displayPath = createDisplayPath(cwd, cfg.packages);
+  const buildRenderer: BuildRenderer = (registrars, data) => createRenderer({
+    patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme, displayPath,
+    ...(registrars.length ? { helperRegistrars: [...registrars] } : {}),
+    ...(data ? { globalData: data } : {}),
+  });
+  const rendering = createRenderingHandle(buildRenderer, helperRegistrars, globalData);
+  const render: Render = input => rendering.current.render(input);
   const live = opts.live !== false;
   const hotreloader: HotReloader = live ? createHotReloader(wsPort) : SILENT_RELOADER;
   // Fail here, before compiling anything, if live reload's port is taken.
@@ -261,7 +261,7 @@ export async function startDevServer(
   };
 
   const routeCtx: RouteContext = {
-    cfg, state, render, tracker, globalData, devUiDist, boot, now, live,
+    cfg, state, rendering, tracker, devUiDist, boot, now, live,
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
   };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
@@ -280,7 +280,7 @@ export async function startDevServer(
 
   // ---- File watcher ----
 
-  const watcher = live ? startWatching({ cfg, state, render, tracker, hotreloader }) : null;
+  const watcher = live ? startWatching({ cfg, state, render, rendering, tracker, hotreloader }) : null;
   // Resolve only once chokidar has finished its initial scan. Until "ready", a file written into a
   // directory it has not reached yet produces no event — so an edit made right after startup (or a
   // test writing a fixture straight after startDevServer resolves) was silently missed under load.
