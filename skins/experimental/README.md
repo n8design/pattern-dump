@@ -6,7 +6,10 @@ examples on specimen plates. Display type is Montserrat, text is Source Serif 4,
 
 ## Using it
 
-Install the package, name it in `packages`, and give the storefront a `site`:
+The package is private to this repository for now: inside it, a site names it in `packages` (npm
+workspaces link it) and gives the storefront a `site`. It is not ready to install from a registry: its
+helpers are TypeScript, and Node does not strip types from files under `node_modules`, so an installed
+copy would load no helpers.
 
 ```ts
 export default defineConfig({
@@ -23,7 +26,8 @@ skin's layouts, partials, helpers, behaviour script, fonts and base layer all co
 
 ## Rebranding
 
-Every colour derives from one token. Set it in your own base layer:
+Every colour derives from one token. Set it in your own base layer (`documentBase`), which comes after
+the skin's:
 
 ```css
 :root { --sk-accent: #0a7cff; }
