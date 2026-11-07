@@ -461,6 +461,27 @@ test.describe("motion and print", () => {
     })).toEqual([true, "normal", "none"]);
   });
 
+  test("prints every chapter, the hero at a sheet's size, and the footer kept with what comes before it", async ({ page }) => {
+    await page.emulateMedia({ media: "print" });
+    await page.goto("/guides/setup/");
+    await page.evaluate(() => document.fonts.ready);
+    const printed = await page.evaluate(() => {
+      const cs = (s: string) => getComputedStyle(document.querySelector(s)!);
+      const closed = document.querySelector("details.chapter:not([open]) .chapter-body")!;
+      return {
+        closedChapterShows: closed.checkVisibility(),
+        hero: parseFloat(cs(".hero-title").fontSize),
+        flow: [cs(".site").display, cs(".site-main").display, cs(".site-footer").display],
+        keep: [cs(".site-main").breakAfter, cs(".site-footer").breakBefore, cs(".site-footer").breakInside],
+        hidden: [cs(".next-chapter").display, cs(".doc-example-variants").display],
+      };
+    });
+    expect(printed).toEqual({
+      closedChapterShows: true, hero: 72,
+      flow: ["block", "block", "block"], keep: ["avoid", "avoid", "avoid"], hidden: ["none", "none"],
+    });
+  });
+
   test("prints in the light scheme, without the site navigation or cards, with other sites' addresses written out", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark", media: "print" });
     await page.goto("/");

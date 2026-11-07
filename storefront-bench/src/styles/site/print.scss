@@ -23,6 +23,43 @@
     display: none;
   }
 
+  // Every chapter's content: on paper there is no row to open. (A browser without ::details-content
+  // prints a closed row closed.)
+  .chapter::details-content {
+    content-visibility: visible;
+  }
+
+  .site .chapter-title::after {
+    display: none;
+  }
+
+  // On paper the page is one column of block flow: a sheet is narrow, and the browser keeps a block with
+  // the one before it (as the footer asks) far more reliably in block flow than across grid items.
+  body .site,
+  .site .site-main,
+  .site .site-main > article,
+  .site :is(.page-body, .article-body, .chapter-body),
+  .site .site-footer {
+    display: block;
+    min-block-size: 0;
+  }
+
+  // The footer stays with what comes before it, never alone on a sheet; the next chapter, a way to move
+  // on screen, and the variant toggles are left out.
+  .site .site-main {
+    break-after: avoid;
+  }
+
+  .site .site-footer {
+    break-before: avoid;
+    break-inside: avoid;
+  }
+
+  .site .next-chapter,
+  .site .doc-example-variants {
+    display: none;
+  }
+
   .site-nav,
   .site-rows {
     display: none;
