@@ -144,6 +144,18 @@ test.describe("the skin", () => {
     });
   }
 
+  test("puts the footer straight after the main column, and at the bottom of a short page", async ({ page }) => {
+    for (const route of ["/", "/about/", "/guides/", "/guides/setup/"]) {
+      await page.goto(route);
+      const gap = await page.evaluate(() => {
+        const main = document.querySelector(".site-main")!.getBoundingClientRect(), footer = document.querySelector(".site-footer")!.getBoundingClientRect();
+        const rowGap = parseFloat(getComputedStyle(document.querySelector(".site")!).rowGap);
+        return { between: Math.round(footer.top - main.bottom - rowGap), atBottom: Math.abs(footer.bottom - Math.max(innerHeight, document.documentElement.scrollHeight)) < 1 };
+      });
+      expect(gap, route).toEqual({ between: 0, atBottom: true });
+    }
+  });
+
   test("puts the sections' rows edge to edge", async ({ page }) => {
     await page.goto("/");
     const rows = await page.locator(".site-rows .row").evaluateAll(rs => rs.map(r => {

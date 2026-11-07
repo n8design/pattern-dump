@@ -9,7 +9,9 @@
   container: sk-page / inline-size;
   display: grid;
   grid-template-columns: var(--sk-columns);
-  grid-template-rows: auto auto 1fr auto;
+
+  // Header, main, footer: the main row takes the slack, so a short page keeps its footer at the bottom.
+  grid-template-rows: auto 1fr auto;
   row-gap: var(--sk-space-6);
   min-block-size: 100dvh;
 }
