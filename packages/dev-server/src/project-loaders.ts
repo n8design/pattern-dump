@@ -42,8 +42,10 @@ const require = createRequire(import.meta.url);
  * dropped: Node keys CommonJS by file name alone), so an edited helper loads its new code; the modules
  * it imports itself are not reloaded.
  */
-export async function readHelperRegistrars(helpersPath: string, opts: { bust?: number } = {}): Promise<{ registrars: Array<(hb: unknown) => void>; problems: LoadProblem[] }> {
+export async function readHelperRegistrars(helpersPath: string, opts: { bust?: number } = {}): Promise<{ registrars: Array<(hb: unknown) => void>; files: string[]; problems: LoadProblem[] }> {
   const registrars: Array<(hb: unknown) => void> = [];
+  /** The file each registrar came from, by index. */
+  const sources: string[] = [];
   const problems: LoadProblem[] = [];
   let files: string[] = [];
   try {
@@ -59,7 +61,7 @@ export async function readHelperRegistrars(helpersPath: string, opts: { bust?: n
     }
   } catch {
     problems.push({ file: helpersPath, message: "not found", missing: true });
-    return { registrars, problems };
+    return { registrars, files: sources, problems };
   }
   for (const file of files) {
     try {
@@ -72,10 +74,12 @@ export async function readHelperRegistrars(helpersPath: string, opts: { bust?: n
       const def = (mod["default"] ?? mod) as unknown;
       if (typeof def === "function") {
         registrars.push(def as (hb: unknown) => void);
+        sources.push(file);
       } else if (def && typeof def === "object") {
         const named = Object.entries(def as Record<string, unknown>)
           .filter(([, v]) => typeof v === "function") as Array<[string, (...a: unknown[]) => unknown]>;
         if (named.length) {
+          sources.push(file);
           registrars.push((hb: unknown) => {
             const h = hb as { registerHelper(n: string, f: (...a: unknown[]) => unknown): void };
             for (const [name, fn] of named) h.registerHelper(name, fn);
@@ -86,7 +90,7 @@ export async function readHelperRegistrars(helpersPath: string, opts: { bust?: n
       problems.push({ file, message: oneLine(e) });
     }
   }
-  return { registrars, problems };
+  return { registrars, files: sources, problems };
 }
 
 /** An error as one readable line — never a stack trace for a bad project file. */

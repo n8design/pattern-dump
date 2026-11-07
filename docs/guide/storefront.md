@@ -196,7 +196,7 @@ One `pd dev` serves both front ends, telling them apart by the host name:
 
 Edits to pages, layouts, partials, styles, global data, assets and helper modules reload the open page.
 Restart after changing the config. A problem that stops a reload (data that is not valid JSON, a helper
-that does not load) is listed in a notice on the open page and in the terminal; the page keeps the last good
+that does not load or register) is listed in a notice on the open page and in the terminal; the page keeps the last good
 version until the file is fixed.
 
 ### Browsers

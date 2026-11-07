@@ -75,7 +75,7 @@ The same for the project and for every linked package, while `pd dev` runs:
 | A component added or removed | Updates the workbench's tree, and reloads storefront pages |
 | A helper module (your own, or a package's compiled `.js`) | Reloads it in place, and the open pages |
 | A file a helper module imports | Asks for a restart: a helper's own imports are not reloaded |
-| A data or helper file that does not load (invalid JSON, a syntax error, a module that throws) | Keeps the last good version, and lists the problem in the terminal, the workbench's Console and a notice on storefront pages, until you fix it |
+| A data or helper file that does not load (invalid JSON, a syntax error, a module that throws when it loads or when it registers its helpers) | Keeps the last good version, and lists the problem in the terminal, the workbench's Console and a notice on storefront pages, until you fix it |
 | `pattern-dump.config.ts`, a package installed, updated or added, or a file in an installed copy | Needs a restart |
 
 ## How sources combine

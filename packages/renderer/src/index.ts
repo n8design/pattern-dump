@@ -192,6 +192,19 @@ function makeDisplayPath(roots: readonly string[], displayPath?: (absPath: strin
   };
 }
 
+/**
+ * Run one helper registrar on a fresh Handlebars environment, as a render would, and say why it failed:
+ * its message, or null when it registers cleanly. A reload checks each module this way before using it.
+ */
+export function dryRunHelperRegistrar(register: (handlebars: unknown) => void): string | null {
+  try {
+    register(Handlebars.create());
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
 export const createRenderer: CreateRenderer = (options: RendererOptions) => {
   const display = makeDisplayPath((options.patternRoots ?? []).map(r => r.dir).concat(options.patternsDir), options.displayPath);
   return async (input) => {

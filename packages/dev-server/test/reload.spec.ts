@@ -180,6 +180,10 @@ describe("a reload that fails keeps the last good state, and the next good save 
       "src/helpers/shout.js: ", `export function shout(s) { return "fixed:" + s; }\n`, "fixed:quiet data-1"],
     ["a helper module that throws", "src/helpers/shout.js", "helpers", `throw new Error("helper broke");\n`,
       "src/helpers/shout.js: helper broke", `export function shout(s) { return "back:" + s; }\n`, "back:quiet data-1"],
+    // It imports, but throws when it registers: found by registering it once on a fresh environment.
+    ["a helper whose registration throws", "src/helpers/shout.js", "helpers",
+      `export default function register(hb) { throw new Error("registration broke"); }\n`,
+      "src/helpers/shout.js: registration broke", `export function shout(s) { return "again:" + s; }\n`, "again:quiet data-1"],
   ];
   for (const [name, file, what, broken, problem, fixed, after] of CASES) {
     it(name, async () => {

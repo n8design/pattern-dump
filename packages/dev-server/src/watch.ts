@@ -23,6 +23,7 @@ import type { FSWatcher } from "chokidar";
 import { componentCssUrl } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { compileSassFile } from "@pattern-dump/build";
+import { dryRunHelperRegistrar } from "@pattern-dump/renderer";
 import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
@@ -304,6 +305,12 @@ async function reloadHelpers(filePath: string): Promise<void> {
     const r = await readHelperRegistrars(path, { bust });
     registrars.push(...r.registrars);
     failed.push(...r.problems.filter(p => !p.missing));
+    // A module that imports cleanly can still throw when it registers: run each once on a fresh
+    // environment, as a render would, before any page renders with it.
+    r.registrars.forEach((register, i) => {
+      const message = dryRunHelperRegistrar(register);
+      if (message !== null) failed.push({ file: r.files[i], message });
+    });
   }
   if (failed.length) { reloadFailed(filePath, "helpers", failed); return; }
   rendering.replace({ registrars });
