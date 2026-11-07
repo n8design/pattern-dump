@@ -150,7 +150,7 @@ export async function startDevServer(
     swatchSlots,
   } = cfg;
   for (const p of cfg.packages) {
-    console.log(`[dev-server] pattern package ${p.name}@${p.version}${p.direct ? "" : " (peer)"}`);
+    console.log(`[dev-server] pattern package ${p.name}@${p.version}${p.direct ? "" : " (peer)"}${p.linked || opts.live === false ? "" : ": an installed copy, not watched"}`);
   }
 
   await initHighlighter();
