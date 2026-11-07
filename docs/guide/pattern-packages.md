@@ -25,7 +25,10 @@ packages: ["@acme/design-system"],
 are still used. It works for a package that another package brings in as a peer, too: name the peer
 with the option.
 
-Restart `pd dev` after installing, updating or adding a package.
+Restart `pd dev` after installing, updating or adding a package. A linked package (a `file:` dependency
+or a workspace, such as a git submodule linked by npm) is watched like the project's own files: edits to its
+templates, their data and docs, its styles, themes and scripts reload while `pd dev` runs. A copy installed
+from a registry is not watched: it changes by reinstalling.
 
 Include a package component exactly as the package itself does, by its handle:
 

@@ -143,8 +143,10 @@ export default defineConfig({
 ```
 
 A skin's package can carry everything a skin needs: patterns, styles with their base layer, helpers,
-behaviour scripts and assets such as fonts. `pd dev` does not watch installed packages: restart it after
-changing one.
+behaviour scripts and assets such as fonts. `pd dev` watches a linked package (a `file:` dependency or a
+workspace) like the project's own files, so edits to a linked skin's layouts, partials and styles reload
+the open page. A copy installed from a registry is not watched. Restart `pd dev` after changing a package's
+helpers.
 
 ### Writing a skin
 

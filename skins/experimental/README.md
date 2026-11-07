@@ -49,5 +49,6 @@ helpers and serves it; `npm test` and `npm run e2e` are the skin's own checks (c
 the rebrand, accessibility in light and dark, reduced motion, print).
 
 `npm run build` compiles the helpers into `dist/` (not committed); `npm run watch:helpers` keeps
-recompiling them while you edit `helpers/skin.ts`. Pattern packages are not watched by `pd dev` yet:
-after editing the skin, restart the demo's server.
+recompiling them while you edit `helpers/skin.ts`. The demo uses the skin through its workspace link, so
+`pd dev` watches it: edits to its layouts, partials, styles and script reload the open page. Its helpers are
+read when the server starts: after `watch:helpers` rebuilds them, restart the demo's server.
