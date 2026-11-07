@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import { guard } from "./guard.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const bench = path.resolve(__dirname, "..");
@@ -14,6 +15,9 @@ const DEV_PORT = process.env["PB_DEV_PORT"] ?? "4800";
 const WS_PORT = process.env["PB_WS_PORT"] ?? "4801";
 const STATIC_PORT = process.env["PB_STATIC_PORT"] ?? "4900";
 const WORKBENCH_OUT = path.join(os.tmpdir(), "pd-e2e-package-bench-workbench");
+
+// Before any server starts: vendor/ and pages/ must be as committed (guard.ts).
+guard();
 
 export default defineConfig({
   testDir: ".",
