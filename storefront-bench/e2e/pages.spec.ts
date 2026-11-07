@@ -1,5 +1,6 @@
 // Every storefront page, rendered in a browser — from pd dev, and from the built root on a static host.
 import { expect, test } from "@playwright/test";
+import { openChapters } from "./helpers.js";
 
 // route, document title, heading, the header label that is the page itself, the one that is its section.
 const PAGES: Array<[route: string, title: string, heading: string, page: string | null, section: string | null]> = [
@@ -74,6 +75,7 @@ test.describe("live examples", () => {
   for (const [route, id] of [["/", "components/callout"], ["/guides/setup/", "components/callout~warning"]] as const) {
     test(`${route}: the ${id} frame fits its preview's height and fills the column's width`, async ({ page }) => {
       await page.goto(route);
+      await openChapters(page);
       const frame = page.locator(`figure.doc-example iframe[src="/preview/${id}"]`);
       await expect(frame).toHaveCount(1);
       // Height: the frame follows the height its preview document posts (shorter than the UA's 150px).

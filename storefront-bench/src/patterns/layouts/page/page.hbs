@@ -10,7 +10,19 @@
   </dl>
   {{> partials-marquee }}
   {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
-  <div class="page-body">{{{body}}}</div>
+  {{#with (skinChapters body)}}
+  <div class="page-body">
+    {{{intro}}}
+    {{#each chapters}}
+    <details class="chapter"{{#if @first}} open{{/if}}>
+      <summary><h2 class="chapter-title"><span class="chapter-number">({{number}})</span> {{title}}</h2></summary>
+      <div class="chapter-body">
+        {{{html}}}
+      </div>
+    </details>
+    {{/each}}
+  </div>
+  {{/with}}
   {{> partials-cards }}
 </article>
 {{/partials-base}}

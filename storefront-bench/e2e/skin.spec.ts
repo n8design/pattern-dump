@@ -2,13 +2,15 @@
 // its colour schemes, its one brand token, its cards, and no accessibility violations in light or dark.
 import { expect, test, type Page } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
+import { openChapters } from "./helpers.js";
 
 const ROUTES = ["/", "/about/", "/guides/", "/guides/setup/"];
 
-/** Wait until every live example's frame has been fitted and every font face in use has loaded. */
+/** Wait until every live example on screen has been fitted (one in a closed chapter is not loaded) and
+ *  every font face in use has loaded. */
 async function settle(page: Page): Promise<void> {
   await page.waitForFunction(() => [...document.querySelectorAll<HTMLIFrameElement>("figure.doc-example iframe")]
-    .every(f => f.style.height !== "" && f.style.height !== "1px"));
+    .filter(f => f.checkVisibility()).every(f => f.style.height !== "" && f.style.height !== "1px"));
   await page.evaluate(() => document.fonts.ready);
 }
 
@@ -39,6 +41,7 @@ test.describe("the skin", () => {
 
   test("sets its micro labels (section numbers, metadata, captions) in the mono, uppercase and widely tracked", async ({ page }) => {
     await page.goto("/guides/setup/");
+    await openChapters(page);
     await settle(page);
     const label = (el: Element) => {
       const cs = getComputedStyle(el);
@@ -123,6 +126,7 @@ test.describe("the skin", () => {
     test(`keeps a ${tone}'s wash on the accent's hue in the dark scheme, not a purple-grey`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: "dark" });
       await page.goto(route);
+      await openChapters(page);
       await settle(page);
       const hues = await page.locator("figure.doc-example iframe").evaluate((f: HTMLIFrameElement) => {
         const w = f.contentWindow!, d = f.contentDocument!;
@@ -166,6 +170,7 @@ test.describe("the skin", () => {
   for (const route of ["/", "/guides/setup/"]) {
     test(`${route}: shows its live example as a specimen plate: the frame on a bone mat, the caption plate with the workbench link inside it`, async ({ page }) => {
       await page.goto(route);
+      await openChapters(page);
       await settle(page);
       const plate = await page.locator("figure.doc-example").evaluate(fig => {
         const probe = document.createElement("i");
@@ -295,6 +300,45 @@ test.describe("the skin", () => {
   }
 });
 
+test.describe("chapters", () => {
+  test("turns each section into a full-width row, numbered, that inverts on hover", async ({ page }) => {
+    await page.goto("/guides/setup/");
+    const rows = await page.locator("details.chapter").evaluateAll(ds => ds.map(d => {
+      const r = d.getBoundingClientRect();
+      return { full: r.left === 0 && Math.abs(r.width - document.documentElement.clientWidth) < 1, title: d.querySelector("summary h2")!.textContent };
+    }));
+    expect(rows).toEqual([{ full: true, title: "(01) Pages" }, { full: true, title: "(02) Layouts" }]);
+    const summary = page.locator("details.chapter").nth(1).locator("summary");
+    const colours = () => summary.evaluate(s => {
+      const probe = document.createElement("i");
+      probe.style.cssText = "color: var(--sk-ink); background: var(--sk-paper)";
+      document.body.append(probe);
+      const ink = getComputedStyle(probe).color, paper = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      const cs = getComputedStyle(s);
+      return { inverted: cs.backgroundColor === ink && cs.color === paper };
+    });
+    expect(await colours()).toEqual({ inverted: false });
+    await summary.hover();
+    expect(await colours()).toEqual({ inverted: true });
+  });
+
+  for (const [route, selector] of [["/guides/setup/", ".article-lede"], ["/about/", ".page-description"]] as const) {
+    test(`${route}: sets its lede as a large serif statement, two-thirds to the right`, async ({ page }) => {
+      await page.goto(route);
+      const lede = await page.locator(selector).evaluate(el => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        const text = r.getBoundingClientRect(), box = el.getBoundingClientRect(), cs = getComputedStyle(el);
+        return { offset: (text.left - box.left) / box.width, family: cs.fontFamily.split(",")[0], size: parseFloat(cs.fontSize) };
+      });
+      expect(lede.offset).toBeCloseTo(1 / 3, 2);
+      expect(lede.family).toBe('"Source Serif 4"');
+      expect(lede.size).toBeGreaterThan(28);
+    });
+  }
+});
+
 test.describe("the marquee", () => {
   /** The marquee as a reader and a screen reader meet it. */
   const marquee = (page: Page) => page.locator(".marquee").evaluate(m => {
@@ -406,6 +450,7 @@ test.describe("accessibility (axe)", () => {
       test(`${route} in ${scheme}: no violations, live examples included`, async ({ page }) => {
         await page.emulateMedia({ colorScheme: scheme });
         await page.goto(route);
+        await openChapters(page);
         await settle(page);
         const { violations } = await new AxeBuilder({ page }).analyze();
         const summary = violations.map(v => `[${v.impact}] ${v.id}: ${v.nodes.map(n => n.target.join(" ")).join(", ")}`).join("\n");

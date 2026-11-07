@@ -65,6 +65,17 @@
   --sk-space-8: 6rem;
 
   --sk-measure: 38rem;
+
+  // The page's columns, named: full (edge to edge, with a gutter), wide (at most --sk-page) and content
+  // (the reading measure). The content column is a fixed track, so on a narrow screen the wide margins
+  // give way first. The page grid and anything that lays out on the page's columns use this.
+  --sk-columns:
+    [full-start] minmax(var(--sk-gutter), 1fr)
+    [wide-start] minmax(0, calc((var(--sk-page) - var(--sk-measure)) / 2))
+    [content-start] min(var(--sk-measure), 100% - 2 * var(--sk-gutter))
+    [content-end] minmax(0, calc((var(--sk-page) - var(--sk-measure)) / 2))
+    [wide-end] minmax(var(--sk-gutter), 1fr)
+    [full-end];
   --sk-gutter: clamp(1rem, 5vw, 3rem);
   --sk-page: 76rem;
   --sk-corner: 1.75rem;

@@ -89,6 +89,17 @@ describe("assemblePage — the bench's pages", () => {
     }
   });
 
+  it("turns an article's sections into chapters: one <details> per h2, the first open, its heading in the summary", async () => {
+    const html = parse((await build("/guides/setup/", join(bench, "pages"))).html);
+    const chapters = html.querySelectorAll("details.chapter");
+    expect(chapters.map(d => [d.hasAttribute("open"), d.querySelector("summary > h2.chapter-title")?.text])).toEqual([
+      [true, "(01) Pages"], [false, "(02) Layouts"],
+    ]);
+    expect(chapters[1].querySelector(".chapter-body figure.doc-example iframe")?.getAttribute("src")).toBe("/preview/components/callout~warning");
+    // Every h2 of the body is a chapter's heading: none is left in the running text.
+    expect(html.querySelectorAll(".article-body h2:not(.chapter-title)")).toHaveLength(0);
+  });
+
   it("renders an article with its lede, and marks it current in the nav", async () => {
     const page = await build("/guides/setup/", join(bench, "pages"));
     expect(page.status).toBe(200);
@@ -198,7 +209,13 @@ describe("the skin's templates", () => {
     };
     await walk(join(patterns, "layouts"));
     await walk(join(patterns, "partials"));
-    expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}"]);
+    // A page's body, or the two slices of it the chapters helper cuts (its intro, a chapter's HTML):
+    // the markdown renderer's output, which escapes everything an author writes.
+    expect(found).toEqual([
+      "layouts/article/article.hbs: {{{intro}}}", "layouts/article/article.hbs: {{{html}}}",
+      "layouts/home/home.hbs: {{{body}}}",
+      "layouts/page/page.hbs: {{{intro}}}", "layouts/page/page.hbs: {{{html}}}",
+    ]);
   });
 });
 

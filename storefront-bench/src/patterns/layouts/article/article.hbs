@@ -10,6 +10,18 @@
   </dl>
   {{> partials-marquee }}
   {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
-  <div class="article-body">{{{body}}}</div>
+  {{#with (skinChapters body)}}
+  <div class="article-body">
+    {{{intro}}}
+    {{#each chapters}}
+    <details class="chapter"{{#if @first}} open{{/if}}>
+      <summary><h2 class="chapter-title"><span class="chapter-number">({{number}})</span> {{title}}</h2></summary>
+      <div class="chapter-body">
+        {{{html}}}
+      </div>
+    </details>
+    {{/each}}
+  </div>
+  {{/with}}
 </article>
 {{/partials-base}}

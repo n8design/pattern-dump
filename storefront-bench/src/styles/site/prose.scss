@@ -7,7 +7,7 @@
   align-content: start;
 }
 
-:where(.page-body, .article-body) > * {
+:where(.page-body, .article-body, .chapter-body) > * {
   grid-column: content;
   margin-block: 0 var(--sk-space-4);
 }
@@ -45,17 +45,17 @@
 
 // A paragraph that holds only an image is a large image: it takes the wide column. Without :has() it
 // stays in the content column.
-:is(.page-body, .article-body) > p:has(> img:only-child) {
+:is(.page-body, .article-body, .chapter-body) > p:has(> img:only-child) {
   grid-column: wide;
   margin-block: var(--sk-space-5) var(--sk-space-6);
 }
 
-:is(.page-body, .article-body) > .doc-example {
+:is(.page-body, .article-body, .chapter-body) > .doc-example {
   margin-block: var(--sk-space-5) var(--sk-space-6);
   margin-inline: 0;
 }
 
 // The body's own top margin already separates it from what is above.
-:is(.page-body, .article-body) > :first-child {
+:is(.page-body, .article-body, .chapter-body) > :first-child {
   margin-block-start: 0;
 }

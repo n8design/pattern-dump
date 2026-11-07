@@ -8,13 +8,7 @@
   // The page is a size container: its parts lay themselves out by the page's width.
   container: sk-page / inline-size;
   display: grid;
-  grid-template-columns:
-    [full-start] minmax(var(--sk-gutter), 1fr)
-    [wide-start] minmax(0, calc((var(--sk-page) - var(--sk-measure)) / 2))
-    [content-start] min(var(--sk-measure), 100% - 2 * var(--sk-gutter))
-    [content-end] minmax(0, calc((var(--sk-page) - var(--sk-measure)) / 2))
-    [wide-end] minmax(var(--sk-gutter), 1fr)
-    [full-end];
+  grid-template-columns: var(--sk-columns);
   grid-template-rows: auto auto 1fr auto;
   row-gap: var(--sk-space-6);
   min-block-size: 100dvh;
