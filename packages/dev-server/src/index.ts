@@ -39,7 +39,7 @@ const SILENT_RELOADER: HotReloader = {
 };
 import { createServer } from "node:http";
 import { stat } from "node:fs/promises";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 // HTTP/HTML leaf helpers. Kept in their own module because `escapeHtml` is shared by the Markdown
 // renderer, the preview-document composer and the shell builder — a shared leaf, so extracting any
@@ -79,6 +79,7 @@ export { PortInUseError } from "./ports.js";
 import { loadPatternPackages } from "./packages.js";
 import { createDisplayPath } from "./display-path.js";
 import { createRenderingHandle, type BuildRenderer } from "./rendering.js";
+import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching } from "./watch.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
@@ -151,8 +152,12 @@ export async function startDevServer(
     themesDir, defaultTheme,
     swatchSlots,
   } = cfg;
+  // Said from what the watcher will watch (watch-roots.ts), so the line cannot claim what it does not do.
+  const watchedFolders = Object.values(watchedRoots(cfg)).flat().map(r => typeof r === "string" ? r : "dir" in r ? r.dir : r.scope);
   for (const p of cfg.packages) {
-    console.log(`[dev-server] pattern package ${p.name}@${p.version}${p.direct ? "" : " (peer)"}${p.linked || opts.live === false ? "" : ": an installed copy, not watched"}`);
+    const watched = watchedFolders.some(d => d === p.dir || d.startsWith(p.dir + sep));
+    const note = watched || opts.live === false ? "" : p.linked ? ": linked, nothing in it to watch" : ": an installed copy, not watched";
+    console.log(`[dev-server] pattern package ${p.name}@${p.version}${p.direct ? "" : " (peer)"}${note}`);
   }
 
   await initHighlighter();

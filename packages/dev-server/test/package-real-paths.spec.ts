@@ -65,7 +65,7 @@ describe("a linked package", () => {
 });
 
 describe("startup", () => {
-  it("says a package is an installed copy, and says nothing more of a linked one", async () => {
+  it("says a package is an installed copy, and says nothing more of a linked one it watches", async () => {
     const copy = join(tmp, "copy-site");
     const copied = join(copy, "node_modules", "@acme", "ds");
     await write(join(copied, "package.json"), JSON.stringify({ name: "@acme/ds", version: "1.0.0", patternDump: { patterns: "patterns" } }));
@@ -86,5 +86,24 @@ describe("startup", () => {
       "[dev-server] pattern package @acme/ds@1.0.0: an installed copy, not watched",
       "[dev-server] pattern package @acme/ds@1.0.0",
     ]);
+  }, 60_000);
+
+  it("says a linked package with nothing to watch is not watched, without calling it a copy", async () => {
+    const site = join(tmp, "empty-linked-site");
+    const real = join(site, "vendor", "empty");
+    await write(join(real, "package.json"), JSON.stringify({ name: "@acme/empty", version: "1.0.0", patternDump: {} }));
+    await mkdir(join(site, "node_modules", "@acme"), { recursive: true });
+    await symlink(join("..", "..", "vendor", "empty"), join(site, "node_modules", "@acme", "empty"));
+    await mkdir(join(site, "src", "patterns"), { recursive: true });
+    await mkdir(join(site, "src", "styles"), { recursive: true });
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { lines.push(a.join(" ")); });
+    try {
+      const server = await startDevServer(validateConfig({ ...config, packages: ["@acme/empty"] }, "site"), site, { port: 0, wsPort: 0 });
+      await server.close();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(lines.filter(l => l.includes("pattern package"))).toEqual(["[dev-server] pattern package @acme/empty@1.0.0: linked, nothing in it to watch"]);
   }, 60_000);
 });
