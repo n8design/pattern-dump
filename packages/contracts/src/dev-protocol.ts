@@ -120,7 +120,10 @@ interface DiagnosticBase {
   ruleId?: string;
   /** JSON Schema / data pointer, e.g. "#/properties/label" — schema kinds only. */
   path?: string;
-  /** Source-file position — RENDER_ERROR and DATA_INVALID, best-effort. */
+  /** Source-file position — RENDER_ERROR and DATA_INVALID, best-effort. `file` is never an absolute
+   *  path: relative to the project root for the project's own files (`src/patterns/atoms/x/x.json`),
+   *  `<package name>/<path in the package>` for a pattern package's (`@acme/ds/patterns/atoms/x/x.json`).
+   *  Output built anywhere names a file the same way, and names no folder of the machine it ran on. */
   location?: { file?: string; line?: number; column?: number };
 }
 

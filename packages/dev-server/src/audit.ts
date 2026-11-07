@@ -22,6 +22,7 @@ import { surfaceFlattening } from "./surfacing.js";
 import { refreshDiagnosticsGraph, graphArtifactPath, type CheckRenderer } from "./diagnostics.js";
 import { resolveServerConfig } from "./server-config.js";
 import { loadPatternPackages } from "./packages.js";
+import { createDisplayPath } from "./display-path.js";
 
 /**
  * Headless `pd audit` — build (or hash-refresh) the diagnostics graph WITHOUT starting the HTTP server.
@@ -39,6 +40,7 @@ export async function runDiagnosticsAudit(
   const globalData = cfg.dataDirs.length ? await loadGlobalData(cfg.dataDirs) : undefined;
   const render = createRenderer({
     patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme,
+    displayPath: createDisplayPath(cwd, cfg.packages),
     ...(helperRegistrars.length ? { helperRegistrars } : {}),
     ...(globalData ? { globalData } : {}),
   }) as CheckRenderer;

@@ -12,7 +12,7 @@ import type {
 import { HtmlValidate } from "html-validate";
 import Handlebars from "handlebars";
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, isAbsolute, relative, sep } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 
 // Fragment-scoped HTML content-model validator (M4.9 finalise).
@@ -62,7 +62,7 @@ function jsonErrorPosition(reason: string, text: string): { line?: number; colum
  * not parse is no data plus a DATA_INVALID diagnostic, so the dropped data shows up on the Console
  * instead of the component silently rendering without it.
  */
-async function readDataFile(path: string): Promise<{ data?: Record<string, unknown>; diagnostic?: Diagnostic }> {
+async function readDataFile(path: string, display: (absPath: string) => string): Promise<{ data?: Record<string, unknown>; diagnostic?: Diagnostic }> {
   let text: string;
   try { text = await readFile(path, "utf-8"); } catch { return {}; }
   try {
@@ -73,7 +73,7 @@ async function readDataFile(path: string): Promise<{ data?: Record<string, unkno
       diagnostic: {
         kind: "DATA_INVALID", source: "render", severity: "error",
         message: `${basename(path)} is not valid JSON (${reason}); its data was not used`,
-        location: { file: path, ...jsonErrorPosition(reason, text) },
+        location: { file: display(path), ...jsonErrorPosition(reason, text) },
       },
     };
   }
@@ -149,7 +149,26 @@ function registerHelpers(
   }
 }
 
+/**
+ * How a diagnostic names a file: the caller's `displayPath`, else the path relative to the pattern root
+ * that holds it, else its base name. Never an absolute path: one the caller returns falls back too.
+ */
+function makeDisplayPath(roots: readonly string[], displayPath?: (absPath: string) => string): (absPath: string) => string {
+  const underRoot = (absPath: string): string => {
+    for (const root of roots) {
+      const rel = relative(root, absPath);
+      if (rel && !rel.startsWith("..") && !isAbsolute(rel)) return rel.split(sep).join("/");
+    }
+    return basename(absPath);
+  };
+  return absPath => {
+    const named = displayPath?.(absPath);
+    return named && !isAbsolute(named) ? named : underRoot(absPath);
+  };
+}
+
 export const createRenderer: CreateRenderer = (options: RendererOptions) => {
+  const display = makeDisplayPath((options.patternRoots ?? []).map(r => r.dir).concat(options.patternsDir), options.displayPath);
   return async (input) => {
     const { patternsDir } = options;
 
@@ -201,7 +220,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // variant's, and those of partials this render actually includes.
     const dataDiagnostics = new Map<string, Diagnostic>();
     const readData = async (path: string): Promise<Record<string, unknown> | undefined> => {
-      const { data, diagnostic } = await readDataFile(path);
+      const { data, diagnostic } = await readDataFile(path, display);
       if (diagnostic) dataDiagnostics.set(path, diagnostic);
       return data;
     };
@@ -264,13 +283,13 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
 
         // Every discovered component is registered, but only one this render includes reports its
         // invalid data: the diagnostic is added when the partial runs, below.
-        const childData = compEntry.jsonPath ? await readDataFile(compEntry.jsonPath) : {};
+        const childData = compEntry.jsonPath ? await readDataFile(compEntry.jsonPath, display) : {};
         const childDataPath = compEntry.jsonPath;
         // A variant included by its handle (`{{> "atoms-chip~danger"}}`) gets its base's data beneath
         // its own, exactly as the variant renders on its own page.
         const variantTilde = compId.indexOf("~");
         const baseJsonPath = variantTilde > 0 ? discoveryMap.get(compId.slice(0, variantTilde))?.jsonPath : undefined;
-        const baseData = baseJsonPath ? await readDataFile(baseJsonPath) : {};
+        const baseData = baseJsonPath ? await readDataFile(baseJsonPath, display) : {};
         const childDefaults: Record<string, unknown> = deepMerge(structuredClone(baseData.data ?? {}), childData.data);
 
         const childTemplate = env.compile(partialSrc);

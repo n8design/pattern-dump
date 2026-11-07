@@ -76,6 +76,7 @@ import { resolveDevUiDist } from "./assets.js";
 import { describeBindError } from "./ports.js";
 export { PortInUseError } from "./ports.js";
 import { loadPatternPackages } from "./packages.js";
+import { createDisplayPath } from "./display-path.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching } from "./watch.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
@@ -165,6 +166,7 @@ export async function startDevServer(
   const globalData = cfg.dataDirs.length ? await loadGlobalData(cfg.dataDirs) : undefined;
   const render      = createRenderer({
     patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme,
+    displayPath: createDisplayPath(cwd, cfg.packages),
     ...(helperRegistrars && helperRegistrars.length ? { helperRegistrars } : {}),
     ...(globalData ? { globalData } : {}),
   });

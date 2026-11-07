@@ -164,6 +164,8 @@ export function renderDiagnostics(diagnostics: Diagnostic[]): void {
         let text = d.message;
         if (d.path) text += ` (path: ${d.path})`;
         if (d.location) {
+          // The file as the server names it: project-relative, or `<package name>/<path>` for a
+          // package's file; never an absolute path (Diagnostic.location in contracts).
           const loc = [d.location.file, d.location.line, d.location.column]
             .filter(v => v !== undefined).join(":");
           if (loc) text += ` (at ${loc})`;
