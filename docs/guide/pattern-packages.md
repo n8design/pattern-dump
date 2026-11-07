@@ -25,10 +25,10 @@ packages: ["@acme/design-system"],
 are still used. It works for a package that another package brings in as a peer, too: name the peer
 with the option.
 
-Restart `pd dev` after installing, updating or adding a package. A linked package (a `file:` dependency
-or a workspace, such as a git submodule linked by npm) is watched like the project's own files: edits to its
-templates, their data and docs, its styles, themes and scripts reload while `pd dev` runs. A copy installed
-from a registry is not watched: it changes by reinstalling.
+Restart `pd dev` after installing, updating or adding a package. A package installed from a registry is a
+copy in `node_modules`: `pd dev` does not watch it, since it changes only by reinstalling, and says so when
+it starts (`pattern package @acme/design-system@1.4.0: an installed copy, not watched`). A linked package is
+watched like your own files: see below.
 
 Include a package component exactly as the package itself does, by its handle:
 
@@ -39,6 +39,45 @@ Include a package component exactly as the package itself does, by its handle:
 `exclude: [...]` in your own config (not inside `packages`) leaves out some of your own templates, with
 globs relative to `patternsDir`.
 
+## A package you edit: a git submodule, or any folder of your own
+
+When the design system is a repository of its own that you change while you build the site (a shared
+styleguide, a skin, a theme set), keep it in a folder of the site and link it, rather than install a copy.
+The setup this is made for is a git submodule consumed through a relative `file:` dependency:
+
+```bash
+git submodule add https://github.com/acme/styleguide.git vendor/styleguide
+npm install --save-dev ./vendor/styleguide
+```
+
+npm writes `"@acme/styleguide": "file:vendor/styleguide"` into `package.json` and links the folder into
+`node_modules` (npm 9 and later link a `file:` dependency rather than copying it). The submodule's commit
+pins the version; `git submodule update --remote` moves it. Name it in the config as any package:
+
+```ts
+packages: ["@acme/styleguide"],
+```
+
+`pd dev` uses a linked package from its real folder, `vendor/styleguide`, and watches it like the project's
+own files. An edit there, or through `node_modules/@acme/styleguide`, which is the same file, reloads the
+open workbench preview and storefront pages. A workspace package in a monorepo is linked the same way.
+
+If the package's helpers are TypeScript, run its `watch:helpers` beside `pd dev` (see
+[Helpers ship compiled](#helpers-ship-compiled)).
+
+## What reloads, and what needs a restart
+
+The same for the project and for every linked package, while `pd dev` runs:
+
+| You change | `pd dev` |
+|---|---|
+| A template, its data or docs, a stylesheet (the base layer too), a theme, a behaviour script, an asset, global data | Reloads the open workbench preview and storefront pages |
+| A component added or removed | Updates the workbench's tree, and reloads storefront pages |
+| A helper module (your own, or a package's compiled `.js`) | Reloads it in place, and the open pages |
+| A file a helper module imports | Asks for a restart: a helper's own imports are not reloaded |
+| A data or helper file that does not load (invalid JSON, a syntax error, a module that throws) | Keeps the last good version, and lists the problem in the terminal, the workbench's Console and a notice on storefront pages, until you fix it |
+| `pattern-dump.config.ts`, a package installed, updated or added, or a file in an installed copy | Needs a restart |
+
 ## How sources combine
 
 | | Rule |
@@ -48,7 +87,7 @@ globs relative to `patternsDir`.
 | Styles | Each source's styles are attributed to its own components; your styles win class ownership. In the shared base layer, packages come first, so your base rules win the cascade. |
 | Themes | Themes come from every source; your theme wins a name clash. |
 | Data, helpers, scripts | Packages first, your project last, so your own data, helper or script with the same name wins. |
-| Watching | Package files are library code: they are not watched, and `pd export` leaves them out. They are included in the audit. |
+| Watching | A linked package is watched like your own files; an installed copy is not. `pd export` leaves package files out; the audit includes them. |
 | Nav Rail | Package components are marked with their package; **Hide packages** removes them from the tree and from folder galleries. |
 
 ## Making a package
@@ -63,7 +102,7 @@ the package folder, and every field is optional:
     "patterns": "patterns",                      // Handlebars components
     "data": "data",                              // global data, merged beneath the project's
     "helpers": "dist/helpers.js",                // compiled Handlebars helpers, a module or folder
-    "assets": ["images", "fonts"],               // served at /assets/images/…, /assets/fonts/…
+    "assets": ["assets/acme-design-system"],     // served at /assets/acme-design-system/…
     "styles": {
       "dir": "scss",
       "entry": "main.scss",                      // compile only this bundle

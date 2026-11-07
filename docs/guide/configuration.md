@@ -167,4 +167,5 @@ in [storefront.md](storefront.md).
 while it runs, in the project and in linked pattern packages. Restart it after changing
 `pattern-dump.config.ts`, a file a helper module imports, or an installed pattern package. When a data or
 helper file fails to load, the last good version stays in use, and the problem is shown in the terminal and
-on the open pages until the file is fixed.
+on the open pages until the file is fixed. The full list is in
+[pattern-packages.md](pattern-packages.md#what-reloads-and-what-needs-a-restart).
