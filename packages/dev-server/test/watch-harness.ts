@@ -91,8 +91,17 @@ export class Bench {
     ].filter(d => existsSync(d));
     this.barriers = [...new Set(folders)].map(d => join(d, BARRIER));
     for (const file of this.barriers) await writeFile(file, "");
-    const wsPort = await freePort();
-    const server = await startDevServer(cfg, this.root, { port: 0, wsPort });
+    // A free port can be taken by another test file between finding it and binding it: try a fresh one.
+    let server: DevServer | undefined;
+    let wsPort = 0;
+    for (let attempt = 1; !server; attempt++) {
+      wsPort = await freePort();
+      try {
+        server = await startDevServer(cfg, this.root, { port: 0, wsPort });
+      } catch (e) {
+        if (!(e instanceof Error && e.name === "PortInUseError") || attempt >= 5) throw e;
+      }
+    }
     servers.push(server);
     this.port = server.port;
     this.ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
