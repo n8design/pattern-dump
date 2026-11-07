@@ -14,10 +14,12 @@
 // --base /demo/` writes a snapshot that a plain file server serves, links included; the starter's
 // TypeScript (installed by init) type-checks and compiles its behaviour scripts, which pd dev and
 // pd build both serve. Last, a storefront: its page on live.localhost and the workbench on
-// pd.localhost, the page's inlined height fitter run on its own, and pd build's storefront folder.
+// pd.localhost, the page's inlined height fitter run on its own, and pd build's storefront folder. Then a
+// packed pattern package installed as a real copy: its compiled helpers render a page, pd dev does not
+// watch it, and a TypeScript helper path stops pd dev with the named error.
 
-import { execFileSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { existsSync, lstatSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { createServer } from "node:net";
@@ -26,6 +28,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { createContext, runInContext } from "node:vm";
+import WebSocket from "ws";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const { values } = parseArgs({ options: { keep: { type: "boolean" }, project: { type: "string" } } });
@@ -246,6 +249,88 @@ if (failures.length === 0) {
   const built = existsSync(join(project, "storefront/index.html")) ? await readFile(join(project, "storefront/index.html"), "utf8") : "";
   check(built.includes('href="https://workbench.example.test/atoms/button"') && !built.includes("data-pd-live"),
     "the built page links to storefront.workbenchUrl, with no live client");
+}
+
+// A packed pattern package, installed as a real copy (as from a registry) into a second project outside
+// the repo: the package bench's skin, with its compiled helpers. A storefront page renders with them;
+// pd dev says the package is an installed copy and does not watch it; and the same package naming a
+// TypeScript helper stops pd dev at startup with the named error.
+if (failures.length === 0 && tmp) {
+  execFileSync("npm", ["run", "build"], { cwd: join(repo, "package-bench"), stdio: "pipe" });
+  execFileSync("npm", ["pack", "--pack-destination", tmp], { cwd: join(repo, "package-bench", "vendor", "fixture-skin"), stdio: "pipe" });
+  const site = join(tmp, "pkgsite");
+  await mkdir(join(site, "src", "patterns"), { recursive: true });
+  await mkdir(join(site, "src", "styles"), { recursive: true });
+  await mkdir(join(site, "pages"), { recursive: true });
+  await writeFile(join(site, "package.json"), JSON.stringify({ name: "pkgsite", private: true, type: "module" }));
+  await writeFile(join(site, "pattern-dump.config.json"), JSON.stringify({
+    sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
+    styles: { strategy: "parallel", dir: "./src/styles" }, packages: ["pd-fixture-skin"],
+    storefront: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "https://workbench.example.test/", site: { title: "Installed", footer: "From a packed package." } },
+  }));
+  await writeFile(join(site, "pages", "index.md"), "---\ntitle: Installed site\n---\n\nA page in the installed skin.\n");
+  execFileSync("npm", ["install", "--no-audit", "--no-fund", join(tmp, "pd-fixture-skin-1.0.0.tgz")], { cwd: site, stdio: "pipe" });
+  const installed = join(site, "node_modules", "pd-fixture-skin");
+  check(existsSync(join(installed, "dist", "helpers.js")) && !lstatSync(installed).isSymbolicLink(),
+    "the packed skin is installed as a real copy, with its compiled helpers");
+
+  const port = await freePort();
+  const wsPort = await freePort();
+  const dev = spawn(pd, ["dev", "--port", String(port), "--ws-port", String(wsPort)], { cwd: site, stdio: ["ignore", "pipe", "pipe"] });
+  let log = "";
+  dev.stderr.on("data", d => { log += d; });
+  const ready = new Promise(resolve => {
+    dev.stdout.on("data", d => { log += d; if (log.includes("[dev-server] Ready in")) resolve(true); });
+    dev.once("exit", () => resolve(false));
+  });
+  check(await ready, "pd dev starts on the installed copy", log.slice(-1500));
+  check(log.includes("[dev-server] pattern package pd-fixture-skin@1.0.0: an installed copy, not watched"),
+    "pd dev says the installed copy is not watched", log.slice(-1500));
+  const page = await new Promise(resolve => {
+    request({ host: "127.0.0.1", port, path: "/", headers: { host: `live.localhost:${port}` } }, res => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", c => { body += c; });
+      res.on("end", () => resolve({ status: res.statusCode, body }));
+    }).on("error", e => resolve({ status: 0, body: String(e) })).end();
+  });
+  check(page.status === 200 && page.body.includes(`<h1 class="sk-title">INSTALLED SITE</h1>`),
+    "a storefront page renders with the installed package's compiled helper", `${page.status} ${page.body.slice(0, 300)}`);
+
+  // An edit to the installed copy sends nothing: the copy is not watched. An edit to the project's page,
+  // after it, sends its page-changed; that is then the only message. Across processes there is no barrier,
+  // and events in two folders are not ordered, so this cannot catch a late message: the line above (said
+  // from the watch list) and test/package-watch.spec.ts (in process, with the watcher's hook) prove it.
+  const ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
+  const messages = [];
+  ws.on("message", d => messages.push(String(d)));
+  await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
+  const pageChanged = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no page-changed within 5000 ms; got ${JSON.stringify(messages)}`)), 5_000);
+    ws.on("message", d => { if (String(d).includes(`"page-changed"`)) { clearTimeout(timer); resolve(); } });
+  });
+  await writeFile(join(installed, "patterns", "layouts", "page", "page.hbs"), "<!-- edited in node_modules -->\n", { flag: "a" });
+  await writeFile(join(site, "pages", "index.md"), "\nEdited.\n", { flag: "a" });
+  try {
+    await pageChanged;
+    const sent = messages.filter(m => !m.startsWith(`{"type":"hello"`));
+    check(JSON.stringify(sent) === JSON.stringify([`{"type":"page-changed","route":"/"}`]),
+      "an edit to the installed copy sends nothing", JSON.stringify(sent));
+  } catch (e) {
+    check(false, "an edit to the installed copy sends nothing", String(e));
+  }
+  ws.close();
+  dev.kill();
+
+  // The same package naming its TypeScript helper source instead.
+  const manifestFile = join(installed, "package.json");
+  const manifest = JSON.parse(await readFile(manifestFile, "utf8"));
+  manifest.patternDump.helpers = "helpers/index.ts";
+  await writeFile(manifestFile, JSON.stringify(manifest, null, 2));
+  const failed = spawnSync(pd, ["dev", "--port", String(await freePort()), "--ws-port", String(await freePort())], { cwd: site, encoding: "utf8", timeout: 30_000 });
+  const named = `pattern package "pd-fixture-skin": its helpers are TypeScript (helpers/index.ts), which Node does not load from an installed package. Ship compiled helpers`;
+  check(failed.status !== 0 && `${failed.stdout}${failed.stderr}`.includes(named),
+    "a TypeScript helper path stops pd dev at startup with the named error", `${failed.status} ${(failed.stderr ?? "").slice(0, 500)}`);
 }
 
 if (tmp && !values.keep) await rm(tmp, { recursive: true, force: true });
