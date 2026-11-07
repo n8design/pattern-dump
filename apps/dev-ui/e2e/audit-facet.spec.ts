@@ -56,11 +56,15 @@ test.describe("Audit facet — corpus diagnostics", () => {
   });
 
   test("shows the loading placeholder while the rollup is in flight", async ({ page }) => {
-    // Delay the response so the transient state is observable rather than raced.
+    // Hold the first request so the transient state is observable rather than raced, then hand it on;
+    // any later one goes straight through. No fetched response is held, so nothing can be fulfilled
+    // after its route was settled (the "Route is already handled" race).
+    let held = false;
     await page.route("**/api/audit", async (route) => {
-      const res = await route.fetch();
+      if (held) return route.continue();
+      held = true;
       await new Promise((r) => setTimeout(r, 1_500));
-      await route.fulfill({ response: res });
+      return route.continue();
     });
 
     await gotoComponent(page, "atoms/button");
@@ -94,10 +98,10 @@ test.describe("Audit facet — corpus diagnostics", () => {
   test("reopening the tab after an error retries the fetch", async ({ page }) => {
     let calls = 0;
     let failing = true;
-    await page.route("**/api/audit", async (route) => {
+    // Counts each request and settles it in one call: a 500 while failing, else handed on.
+    await page.route("**/api/audit", (route) => {
       calls++;
-      if (failing) return route.fulfill({ status: 500, body: "nope" });
-      return route.fulfill({ response: await route.fetch() });
+      return failing ? route.fulfill({ status: 500, body: "nope" }) : route.continue();
     });
 
     await gotoComponent(page, "atoms/button");
