@@ -62,7 +62,7 @@ async function project(): Promise<Bench & { preview(): Promise<string> }> {
 
 const OPEN = [`{"type":"content-swap","componentId":"atoms/loud"}`];
 /** The error message a failed reload sends, up to its problems. */
-const failed = (file: string, what: string) => `{"type":"error","scope":"build","message":"${file}: ${what} not reloaded, the last good ones are still in use — `;
+const failed = (file: string, what: string) => `{"type":"error","scope":"build","message":"${file}: ${what} not reloaded, the last good ones are still in use: `;
 
 beforeAll(async () => { tmp = await mkdtemp(join(tmpdir(), "pd-reload-")); });
 afterAll(async () => {

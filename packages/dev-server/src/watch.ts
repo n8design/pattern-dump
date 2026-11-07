@@ -282,7 +282,7 @@ async function reloadedOpenPages(label: string): Promise<void> {
 }
 
 function reloadFailed(filePath: string, what: string, problems: LoadProblem[]): void {
-  const message = `${shown(filePath)}: ${what} not reloaded, the last good ones are still in use — `
+  const message = `${shown(filePath)}: ${what} not reloaded, the last good ones are still in use: `
     + problems.map(p => `${shown(p.file)}: ${p.message}`).join("; ");
   hotreloader.push({ type: "error", scope: "build", message });
   console.error(`[dev-server] ${message}`);
