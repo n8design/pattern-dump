@@ -25,7 +25,10 @@ jobs:
         run: npm install
 
       - name: Lint CSS
-        run: npm run lint:css --workspace @pattern-dump/dev-ui
+        run: |
+          npm run lint:css --workspace @pattern-dump/dev-ui
+          npm run lint:css --workspace storefront-bench
+          npm run lint:css --workspace @pattern-dump/skin-experimental
 
       - name: Lint JS/TS
         run: npm run lint
@@ -47,6 +50,12 @@ jobs:
       - name: Run E2E tests
         run: npm run e2e --workspace @pattern-dump/dev-ui
 
+      - name: Run storefront E2E tests
+        run: npm run e2e:storefront
+
+      - name: Run experimental skin E2E tests
+        run: npm run e2e:skin-experimental
+
       - name: Upload Playwright traces and videos on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -55,4 +64,6 @@ jobs:
           path: |
             apps/dev-ui/test-results/
             apps/dev-ui/playwright-report/
+            storefront-bench/test-results/
+            skins/experimental/test-results/
           retention-days: 7
