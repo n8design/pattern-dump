@@ -155,6 +155,8 @@ describe("the watcher on test-bench", () => {
   }, 120_000);
 
   const CASES: Case[] = [
+    // Pins a known bug, see follow-up; change this case when the bug is fixed. (A template shared by
+    // data-overlay variants sends content-swap only for the last variant using it.)
     ["a template", () => b.edit("src/patterns/atoms/button/button.hbs", "\n"), [["change", "src/patterns/atoms/button/button.hbs"]], [
       "{\"type\":\"content-swap\",\"componentId\":\"atoms/button~secondary\"}",
     ]],
