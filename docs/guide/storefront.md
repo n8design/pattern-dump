@@ -192,8 +192,25 @@ One `pd dev` serves both front ends, telling them apart by the host name:
 | `http://pd.localhost:<port>/` | The workbench |
 | `http://localhost:<port>/` | The workbench, as without a storefront |
 
-Browsers resolve every `*.localhost` name to your own machine. Edits to pages, layouts, partials and
-styles reload the open page. Restart after changing the config or a helper.
+Edits to pages, layouts, partials and styles reload the open page. Restart after changing the config or a
+helper.
+
+### Browsers
+
+`pd dev` listens on `127.0.0.1` only, and the two host names have to reach it there. Checked so far:
+Chromium and Playwright's WebKit 26.4 reach all three addresses. Installed Firefox and Safari have not
+been checked by hand yet.
+
+The known risk is Safari. Chromium and Firefox resolve `*.localhost` names themselves; Safari asks the
+system, and macOS answers `live.localhost` with the IPv6 address `::1` first. If Safari does not fall back
+to `127.0.0.1`, the storefront address does not load. The workaround is an entry in `/etc/hosts`:
+
+```
+127.0.0.1  live.localhost pd.localhost
+```
+
+(with your `storefront.host` in place of `live.localhost` if you set one). This concerns `pd dev` only: a
+built site is plain files on a host of its own, with no `*.localhost` name involved.
 
 ---
 
