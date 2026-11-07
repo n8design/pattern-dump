@@ -23,7 +23,7 @@ Pattern Dump is laid out, see the [authoring guide](../guide/authoring.md).
 
 ```
 pattern-dump/
-├── package.json            # workspace root: packages/*, apps/*, test-bench
+├── package.json            # workspace root: packages/*, apps/*, skins/*, the two benches
 ├── nx.json                 # local cache + task graph
 ├── tsconfig.base.json      # ESM, path aliases for @pattern-dump/*
 ├── vitest.workspace.ts     # Vitest across all packages
@@ -45,9 +45,32 @@ pattern-dump/
 │   └── cli/                # @pattern-dump/cli         the `pd` binary and the distributable
 ├── apps/
 │   └── dev-ui/             # the workbench shell (browser bundle); Playwright suite in e2e/
+├── skins/
+│   └── experimental/       # @pattern-dump/skin-experimental  a storefront skin as a pattern package,
+│                           #   with a demo site and its own tests
 ├── scripts/                # verify-install, dev-server freshness check
+├── storefront-bench/       # the storefront's sandbox: markdown pages and a wireframe skin; its E2E fixture
 └── test-bench/             # the sandbox design system the tool runs against; the E2E fixture
 ```
+
+### The storefront
+
+The storefront lives in `dev-server`, in `src/storefront/`, because it needs what only dev-server has:
+`renderDoc`, the document stylesheet layers and the snapshot writer. It adds no second render path and no
+second writer:
+
+- **Pages** (`pages.ts`) are read from `storefront.pagesDir`: routes, the navigation and the page files.
+- **Frontmatter** is read with the strict mode of the one frontmatter reader and checked against the
+  layout's declared schema (`frontmatter-contract.ts`, `declared-values.ts`); `site.ts` checks
+  `storefront.site` against `partials/base`'s schema, and `sample-data.ts` keeps layout samples off pages.
+- **Assembly** (`page.ts`) renders the page's markdown with `renderDoc` in frame mode, then the layout
+  through `render()`. The `<head>` (`page-head.ts`) uses `document-layers.ts`, the same stylesheet
+  layering as preview documents. The height fitter is `contracts`' `createHeightFitter`, inlined.
+- **Serving** is one branch in `routes.ts`, chosen by the `Host` header (`PD_HOSTS`); it never changes
+  `state.lastComponentId`, so the workbench's own reload target is untouched. The watcher sends
+  `page-changed` for edited pages and for changes that reach every page.
+- **Building** (`crawl.ts`) crawls the whole storefront in memory first, so any problem fails the build
+  before either root is written, then writes it through its own `createSnapshotWriter`.
 
 ---
 
@@ -62,7 +85,7 @@ pattern-dump/
 | `discovery` | Filesystem → components: `buildDiscoveryMap` returns `{ discoveryMap, handleMap, collisions }`, plus `collapseComponentId`. Every derived graph keys on it; nothing else reconstructs a component's file path. | contracts |
 | `renderer` | Handlebars → HTML, Shiki highlighting, data cascade. | contracts, discovery |
 | `a11y` | axe-core integration: the rule-tier classifier and the structural a11y producer. | contracts |
-| `dev-server` | Serves preview documents and the data API, wires watch → derived graphs → HMR. Also hosts the audit engine, the static build (`src/static-build.ts`) and `pd export` (`src/export.ts`, `src/flattening.ts`). | contracts, config, discovery, build, hotreloader, renderer, a11y |
+| `dev-server` | Serves preview documents and the data API, wires watch → derived graphs → HMR. Also hosts the audit engine, the static build (`src/static-build.ts`), `pd export` (`src/export.ts`, `src/flattening.ts`) and the storefront (`src/storefront/`). | contracts, config, discovery, build, hotreloader, renderer, a11y |
 | `core` | Orchestration: `runDev`, `runAudit`, `runBuild`, `runExport`, and config loading. | contracts, config, dev-server |
 | `cli` | The `pd` binary (`init`, `dev`, `audit`, `build`, `export`) and the distributable (`npm run pack:pd`). | core, contracts, dev-server |
 | `dev-ui` (app) | The workbench shell: Nav Rail, Stage, Inspector, Console. Talks to the dev-server over HTTP and the HMR socket. **Build-time dependency: `contracts` only.** | contracts (build time); dev-server (runtime) |
@@ -99,7 +122,8 @@ Every package exposes the same cacheable targets:
 | `lint` | ESLint |
 | `typecheck` | `tsc --noEmit` |
 
-`dev-ui` additionally has `lint:css` (Stylelint) and `e2e` (Playwright). Nx infers targets from each
+`dev-ui`, `storefront-bench` and `skin-experimental` additionally have `lint:css` (Stylelint) and `e2e`
+(Playwright). Nx infers targets from each
 project's `package.json` scripts, so check `nx show project <name>` rather than `project.json` alone.
 
 ---

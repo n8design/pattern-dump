@@ -150,7 +150,8 @@ A website of real HTML pages, written from markdown, beside the workbench. `pd d
 host and the workbench on `pd.localhost`, both from `/`; `pd build` writes it to its own folder. A page
 renders with the layout `layouts/<name>` from your patterns (`layout:` in its frontmatter, `page` when
 it has none). `storefront.pagesDir`, `patternsDir` and `storefront.outDir` must be three separate folders:
-none of them is another, and none is inside another.
+none of them is another, and none is inside another. Pages, frontmatter, skins and building are described
+in [storefront.md](storefront.md).
 
 | Option | Type | Default | Description |
 |---|---|---|---|

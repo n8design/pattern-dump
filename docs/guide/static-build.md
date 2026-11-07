@@ -185,6 +185,23 @@ assets are all included, and **Hide packages** works in the static site.
 
 ---
 
+## With a storefront
+
+A project with a [storefront](storefront.md) gets a second folder from the same build,
+`storefront.outDir`, with one page per markdown file and its own copy of everything those pages use. The
+workbench snapshot is written exactly as it would be without one. Deploy each folder to its own host:
+
+```
+[pd build] 8 components → 69 files, 1.0 MB in 983 ms
+[pd build] /path/to/dist  (served from /)
+[pd build] storefront: 4 pages → 14 files in /path/to/site  (served from /)
+```
+
+The storefront is always served from the root of its host. Unlike a component that fails to render in the
+workbench, a problem on a storefront page fails the build, and then neither folder is written.
+
+---
+
 ## How it works
 
 `pd build` starts the dev server internally — without live reload or a file watcher — requests every
