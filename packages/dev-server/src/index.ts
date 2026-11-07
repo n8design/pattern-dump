@@ -18,6 +18,7 @@
 //   /source/:id/data             — Shiki-highlighted JSON data fragment
 //   *                            — SPA shell
 import type { PatternDumpConfig } from "@pattern-dump/config";
+import type { Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 // Re-exported so the export/CLI orchestration (core) can key its report on the SAME handle derivation
 // as discovery/export, without core depending on discovery directly.
@@ -164,12 +165,18 @@ export async function startDevServer(
   // Global data (config.dataDir, and each package's) merged beneath component data; packages
   // first, so the project's own data wins.
   const globalData = cfg.dataDirs.length ? await loadGlobalData(cfg.dataDirs) : undefined;
-  const render      = createRenderer({
-    patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme,
-    displayPath: createDisplayPath(cwd, cfg.packages),
-    ...(helperRegistrars && helperRegistrars.length ? { helperRegistrars } : {}),
-    ...(globalData ? { globalData } : {}),
-  });
+  // One renderer handle for everything that renders: the routes, the watcher, the storefront and the
+  // audit all call `render`, which calls the renderer in `renderer.current`. Replacing that between
+  // renders (a reloaded helper or global data) reaches every caller at once; no caller holds the old one.
+  const renderer = {
+    current: createRenderer({
+      patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme,
+      displayPath: createDisplayPath(cwd, cfg.packages),
+      ...(helperRegistrars && helperRegistrars.length ? { helperRegistrars } : {}),
+      ...(globalData ? { globalData } : {}),
+    }),
+  };
+  const render: Render = input => renderer.current(input);
   const live = opts.live !== false;
   const hotreloader: HotReloader = live ? createHotReloader(wsPort) : SILENT_RELOADER;
   // Fail here, before compiling anything, if live reload's port is taken.
