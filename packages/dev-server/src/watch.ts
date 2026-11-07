@@ -20,14 +20,15 @@
 import { statSync } from "node:fs";
 import { basename, extname, relative, resolve, sep } from "node:path";
 import chokidar from "chokidar";
-import { componentCssUrl } from "@pattern-dump/contracts";
-import { buildDiscoveryMap } from "@pattern-dump/discovery";
+import { componentCssUrl, type DiscoveryResult } from "@pattern-dump/contracts";
 import { compileSassFile } from "@pattern-dump/build";
 import { dryRunHelperRegistrar } from "@pattern-dump/renderer";
 import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
-import { applyStyleData, type ServerState } from "./server-state.js";
+import {
+  applyStyleData, cachedDiscovery, currentDiscovery, invalidateDiscovery, startDiscovery, type ServerState,
+} from "./server-state.js";
 import { baseComponentIds, resolveComponentForFile } from "./discovery-index.js";
 import { buildCompositionRegistry } from "./composition.js";
 import {
@@ -226,8 +227,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
     });
   }
   state.scssGraphDirty = true;
-  if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-  const allIds = baseComponentIds(state.discoveryResult);
+  const allIds = baseComponentIds(await currentDiscovery(state, patternRoots));
   const timestamp = Date.now();
 
   // If tracker returned no files (new file not yet registered in perFileCss),
@@ -321,11 +321,12 @@ async function restyleAll(
 // newly-populated entry is included. Filtered to non-empty CSS: the preview head never links
 // zero-CSS components.
 async function closureHrefs(timestamp: number): Promise<string[] | undefined> {
-  if (!state.lastComponentId || !state.discoveryResult || !state.compositionRegistry) return undefined;
+  const discovery = await cachedDiscovery(state);
+  if (!state.lastComponentId || !discovery || !state.compositionRegistry) return undefined;
   // Must match the render path, rendered-class owners included — this list REPLACES the preview's
   // links, so anything the render path added and this one lacked would be stripped on every save.
   const staticClosure = await computeCssClosure(
-    state.lastComponentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), state.discoveryResult.discoveryMap
+    state.lastComponentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), discovery.discoveryMap
   );
   const renderedHtml = await render({ component: state.lastComponentId }).then(r => r.html, () => "");
   const closureIds = withRenderedClassOwners(staticClosure, renderedHtml, state.classOwnerIndex ?? new Map());
@@ -342,7 +343,7 @@ async function closureHrefs(timestamp: number): Promise<string[] | undefined> {
 async function handleMarkdown(filePath: string, event: "change" | "add" | "unlink"): Promise<void> {
   const abs = resolve(filePath);
   /** The base component documented by this file, if any — looked up by discovery's mdPath. */
-  const ownerIn = (dr: ServerState["discoveryResult"]): string | undefined => {
+  const ownerIn = (dr: DiscoveryResult | null): string | undefined => {
     for (const [id, entry] of dr?.discoveryMap ?? []) {
       if (entry.mdPath && resolve(entry.mdPath) === abs) return id.split("~")[0];
     }
@@ -350,15 +351,14 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
   };
   const rel = relative(patternRootOf(filePath) ?? patternsDir, filePath);
   // An .hbs/.json edit drops the cached discovery (routes rebuild it lazily); the owner lookup needs one.
-  if (event === "change") state.discoveryResult ??= await buildDiscoveryMap(patternRoots);
   // An unlinked file is only in the map from BEFORE the rebuild; an added one only in the map after.
-  let owner = ownerIn(state.discoveryResult);
+  let owner = ownerIn(event === "change" ? await currentDiscovery(state, patternRoots) : await cachedDiscovery(state));
   if (event === "change") {
     hotreloader.push({ type: "tree-changed" });
     console.log(`[dev-server] Docs changed: ${rel} → tree-changed`);
   } else {
     await rebuildAndSignalTree(`Docs ${event === "add" ? "added" : "removed"}: ${rel}`);
-    owner ??= ownerIn(state.discoveryResult);
+    owner ??= ownerIn(await cachedDiscovery(state));
   }
   for (const componentId of new Set([owner, state.lastComponentId])) {
     if (componentId) hotreloader.push({ type: "content-swap", componentId });
@@ -489,11 +489,9 @@ on("change", async (filePath) => {
     // Resolve using the current map BEFORE clearing it (file was in the previous discovery pass). A
     // second edit before any request has rebuilt it (a quick second save) finds none: build it, as the
     // SCSS path does, or that edit would reload nothing.
-    if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-    const componentId = resolveComponentForFile(filePath, state.discoveryResult);
+    const componentId = resolveComponentForFile(filePath, await currentDiscovery(state, patternRoots));
     // Invalidate caches so next request rebuilds with the new file state.
-    state.discoveryResult = null;
-    state.compositionRegistry = null;
+    invalidateDiscovery(state);
     if (!componentId) {
       console.warn(`[dev-server] Could not resolve component for: ${filePath}`);
       return;
@@ -536,10 +534,11 @@ on("change", async (filePath) => {
 // from firing at startup. Theme additions are ignored here (rare; handled on next nav).
 // Helper: rebuild discovery, surface any collisions, then push tree-changed.
 async function rebuildAndSignalTree(label: string): Promise<void> {
-  const before = state.discoveryResult ? baseComponentIds(state.discoveryResult) : null;
-  const dr = await buildDiscoveryMap(patternRoots);
-  state.discoveryResult = dr;
+  const previous = await cachedDiscovery(state);
+  const before = previous ? baseComponentIds(previous) : null;
+  // Current at once, before it runs: an invalidation during the build is not overwritten by its result.
   state.compositionRegistry = null;
+  const dr = await startDiscovery(state, patternRoots);
   // A component that arrived (or left) changes who owns which stylesheet: a stylesheet saved before its
   // template was filed under the base layer, and now belongs to the component. Restyle against the new
   // set, so its CSS moves without a restart.

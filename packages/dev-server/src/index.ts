@@ -68,7 +68,7 @@ export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // All mutable server state in one typed object — the seam that lets routes and the watcher
 // stop sharing lexical scope. Its header documents the three hazards.
 import { reportUnresolvableScripts } from "./requires.js";
-import { applyStyleData, createServerState } from "./server-state.js";
+import { applyStyleData, cachedDiscovery, createServerState, setDiscovery } from "./server-state.js";
 // Resolved paths + flags, derived once from PatternDumpConfig against the ONE resolution base.
 import { resolveServerConfig } from "./server-config.js";
 // HTTP route handling — takes an explicit RouteContext instead of closing over this scope.
@@ -230,7 +230,7 @@ export async function startDevServer(
   // Initial index build: one compile pass per SCSS file produces all style data.
   {
     const dr = await buildDiscoveryMap(patternRoots);
-    state.discoveryResult = dr;
+    setDiscovery(state, dr);
     await surfaceCollisions(dr.collisions, cwd, hotreloader);
     for (const o of dr.overrides) {
       console.log(`[dev-server] ${o.id} overrides ${o.shadowedSource}'s component of the same handle ("${o.handle}")`);
@@ -280,7 +280,8 @@ export async function startDevServer(
   });
   const actualPort = (httpServer.address() as import("node:net").AddressInfo).port;
   console.log(`[dev-server] Listening at http://127.0.0.1:${actualPort}`);
-  const componentCount = state.discoveryResult ? [...state.discoveryResult.discoveryMap.keys()].filter(id => !id.includes("~")).length : 0;
+  const startupDiscovery = await cachedDiscovery(state);
+  const componentCount = startupDiscovery ? [...startupDiscovery.discoveryMap.keys()].filter(id => !id.includes("~")).length : 0;
   console.log(`[dev-server] Ready in ${Math.round(performance.now() - startTime)}ms — ${componentCount} components`);
 
   // ---- File watcher ----
