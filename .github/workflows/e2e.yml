@@ -7,7 +7,9 @@ on:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which the Playwright in use (1.60) cannot install browsers
+    # on. Moving off the pin goes with a Playwright upgrade and a re-recorded E2E baseline.
+    runs-on: ubuntu-24.04
     # Raised from 20: this job now also runs lint, typecheck and unit tests on top of installing
     # browsers and running the serial E2E suites (workers:1, required while HMR specs mutate
     # test-bench in place).
