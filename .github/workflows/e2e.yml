@@ -41,6 +41,14 @@ jobs:
       - name: Build packages
         run: npm run build
 
+      # The runner's file-watching limits, on record: pd dev's watcher fails startup by name when it
+      # cannot watch, and these are the first thing to check when it does.
+      - name: Show inotify limits
+        run: |
+          echo "max_user_watches:   $(cat /proc/sys/fs/inotify/max_user_watches)"
+          echo "max_user_instances: $(cat /proc/sys/fs/inotify/max_user_instances)"
+          echo "max_queued_events:  $(cat /proc/sys/fs/inotify/max_queued_events)"
+
       # After the build: dev-server's test target dependsOn renderer:build.
       - name: Unit tests
         run: npm test
