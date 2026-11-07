@@ -32,7 +32,8 @@ import { buildCompositionRegistry } from "./composition.js";
 import {
   computeCssClosure, linkableClosure, recomputeComponentCss, withRenderedClassOwners,
 } from "./css-closure.js";
-import { buildAllStyleData, documentBaseMatcher, patchClassOwnerIndex, resolveScssToComponent } from "./style-index.js";
+import { buildAllStyleData, documentBaseMatcher, patchClassOwnerIndex } from "./style-index.js";
+import { rootMatchers, within, type WatchedRoots } from "./watch-roots.js";
 import { auditComponent } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
@@ -53,17 +54,20 @@ export function startWatching(ctx: WatchContext): FSWatcher {
   const { cfg, state, render, tracker, hotreloader } = ctx;
   // Destructured so the body below reads exactly as it did inside startDevServer.
   const { patternsDir, stylesDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
-  // Only the PROJECT's own files are watched. Pattern packages live in node_modules: read-only
-  // library code that changes by reinstalling, not by editing — so their themes and scripts are
-  // not watched either.
-  const themesDir = cfg.config.themes?.dir ? cfg.themesDir : null;
-  const scriptsDir = cfg.config.scriptsDir ? cfg.scriptsDirs[0] ?? null : null;
-  // The project's documentBase: a listed file's rules live in the base layer (see buildAllStyleData).
-  const inProjectBase = documentBaseMatcher(stylesDir, cfg.config.documentBase);
+  // The source roots watched, by kind. Each handler works from the root a file is in (its folder, and for
+  // stylesheets the root's own base layer), never from the project's folders by name. Only the
+  // PROJECT's own roots are watched here.
+  const watched: WatchedRoots = {
+    patterns: [patternsDir],
+    styles: [{ dir: stylesDir, inBase: documentBaseMatcher(stylesDir, cfg.config.documentBase) }],
+    themes: cfg.config.themes?.dir ? [cfg.themesDir!] : [],
+    scripts: cfg.config.scriptsDir && cfg.scriptsDirs[0] ? [cfg.scriptsDirs[0]] : [],
+  };
+  const { patternRootOf, styleRootOf, themeDirOf, scriptDirOf, inBase, componentOfScss } = rootMatchers(watched);
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
 const pagesDir = cfg.storefront?.pagesDir ?? null;
-const watchDirs = [patternsDir, stylesDir, ...(themesDir ? [themesDir] : []), ...(scriptsDir ? [scriptsDir] : []), ...(pagesDir ? [pagesDir] : [])];
+const watchDirs = [...watched.patterns, ...watched.styles.map(r => r.dir), ...watched.themes, ...watched.scripts, ...(pagesDir ? [pagesDir] : [])];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
 
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
@@ -129,18 +133,19 @@ async function handleComponentScss(filePath: string): Promise<void> {
   // edited base partial) can change any component's CSS and the base layer, which the per-component
   // recompute below cannot see. So can an edit to a file documentBase lists, whose rules are base-layer
   // CSS even when it belongs to a component. Rebuild all style data instead and broadcast what changed.
-  if (inProjectBase(resolve(filePath)) ||
-      effectiveFiles.some(f => inProjectBase(resolve(f)) || !resolveScssToComponent(resolve(f), stylesDir, allIds))) {
+  if (inBase(resolve(filePath)) ||
+      effectiveFiles.some(f => inBase(resolve(f)) || !componentOfScss(resolve(f), allIds))) {
     await restyleAll(allIds, timestamp, effectiveFiles, compileErrors.length > 0);
     return;
   }
 
   const pending: Array<{ type: "css-link-swap"; componentId: string; href: string }> = [];
   for (const recompiledFile of effectiveFiles) {
-    const compId = resolveScssToComponent(resolve(recompiledFile), stylesDir, allIds);
-    if (compId) {
+    const compId = componentOfScss(resolve(recompiledFile), allIds);
+    const root = styleRootOf(resolve(recompiledFile));
+    if (compId && root) {
       // Recompile with source map to get updated per-origin CSS for this component.
-      const newCss = await recomputeComponentCss(recompiledFile, compId, stylesDir, allIds, inProjectBase);
+      const newCss = await recomputeComponentCss(recompiledFile, compId, root.dir, allIds, root.inBase);
       if (newCss !== null) {
         state.perComponentCss.set(compId, newCss);
         pending.push({
@@ -159,10 +164,11 @@ async function handleComponentScss(filePath: string): Promise<void> {
   if (state.classOwnerIndex) {
     if (verboseTiming) console.time("[dev-server:timing] classOwnerIndex patch");
     for (const recompiledFile of effectiveFiles) {
-      const compId = resolveScssToComponent(resolve(recompiledFile), stylesDir, allIds);
-      if (compId) {
+      const compId = componentOfScss(resolve(recompiledFile), allIds);
+      const root = styleRootOf(resolve(recompiledFile));
+      if (compId && root) {
         await patchClassOwnerIndex(
-          resolve(recompiledFile), compId, stylesDir, allIds, state.classOwnerIndex
+          resolve(recompiledFile), compId, root.dir, allIds, state.classOwnerIndex
         );
       }
     }
@@ -239,7 +245,7 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
     }
     return undefined;
   };
-  const rel = relative(patternsDir, filePath);
+  const rel = relative(patternRootOf(filePath) ?? patternsDir, filePath);
   // An .hbs/.json edit drops the cached discovery (routes rebuild it lazily); the owner lookup needs one.
   if (event === "change") state.discoveryResult ??= await buildDiscoveryMap(patternRoots);
   // An unlinked file is only in the map from BEFORE the rebuild; an added one only in the map after.
@@ -261,7 +267,7 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
 // added or removed can change the nav (or the folder's problems), so every page reloads. Dotfiles are
 // not pages and change nothing. Checked first, with a folder boundary, because the other handlers
 // match on a path prefix.
-const inPages = (p: string): boolean => pagesDir !== null && (p === pagesDir || p.startsWith(pagesDir + sep));
+const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p);
 function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): boolean {
   if (!inPages(filePath)) return false;
   const rel = relative(pagesDir!, filePath).split(sep).join("/");
@@ -278,13 +284,14 @@ on("change", async (filePath) => {
   if (handlePages(filePath, "change")) return;
   const ext = extname(filePath);
 
-  if (ext === ".md" && filePath.startsWith(patternsDir)) {
+  if (ext === ".md" && patternRootOf(filePath)) {
     await handleMarkdown(filePath, "change");
     return;
   }
 
+  const themesDir = themeDirOf(filePath);
   if (ext === ".scss") {
-    if (themesDir && filePath.startsWith(themesDir)) {
+    if (themesDir) {
       // Theme SCSS changed → recompile theme, push content-swap so iframe picks up new link.
       const themeName = basename(filePath, ".theme.scss");
       try {
@@ -338,7 +345,7 @@ on("change", async (filePath) => {
       if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
     }
 
-  } else if (ext === ".ts" && scriptsDir && filePath.startsWith(scriptsDir)) {
+  } else if (ext === ".ts" && scriptDirOf(filePath)) {
     // Script changed → invalidate cache + dispatch content-swap so the client re-renders
     // the srcdoc with a fresh ?v=<mtime> on the script src (busting the browser cache).
     const scriptId = basename(filePath, ".ts");
@@ -381,11 +388,12 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
 on("add", async (filePath) => {
   if (handlePages(filePath, "add")) return;
   const ext = extname(filePath);
-  if (ext === ".scss" && !(themesDir && filePath.startsWith(themesDir))) {
+  const patternRoot = patternRootOf(filePath);
+  if (ext === ".scss" && !themeDirOf(filePath)) {
     await handleComponentScss(filePath);
-  } else if (ext === ".hbs" && filePath.startsWith(patternsDir)) {
-    await rebuildAndSignalTree(`Pattern added: ${relative(patternsDir, filePath)}`);
-  } else if (ext === ".md" && filePath.startsWith(patternsDir)) {
+  } else if (ext === ".hbs" && patternRoot) {
+    await rebuildAndSignalTree(`Pattern added: ${relative(patternRoot, filePath)}`);
+  } else if (ext === ".md" && patternRoot) {
     await handleMarkdown(filePath, "add");
   }
 });
@@ -393,9 +401,10 @@ on("add", async (filePath) => {
 // Component template removed — rebuild discovery and signal nav rebuild.
 on("unlink", async (filePath) => {
   if (handlePages(filePath, "unlink")) return;
-  if (extname(filePath) === ".hbs" && filePath.startsWith(patternsDir)) {
-    await rebuildAndSignalTree(`Pattern removed: ${relative(patternsDir, filePath)}`);
-  } else if (extname(filePath) === ".md" && filePath.startsWith(patternsDir)) {
+  const patternRoot = patternRootOf(filePath);
+  if (extname(filePath) === ".hbs" && patternRoot) {
+    await rebuildAndSignalTree(`Pattern removed: ${relative(patternRoot, filePath)}`);
+  } else if (extname(filePath) === ".md" && patternRoot) {
     await handleMarkdown(filePath, "unlink");
   }
 });
@@ -403,8 +412,9 @@ on("unlink", async (filePath) => {
 // Component directory removed — covers the case where the entire component folder is deleted.
 on("unlinkDir", async (dirPath) => {
   if (handlePages(dirPath, "unlinkDir")) return;
-  if (dirPath.startsWith(patternsDir) && dirPath !== patternsDir) {
-    await rebuildAndSignalTree(`Pattern dir removed: ${relative(patternsDir, dirPath)}`);
+  const patternRoot = patternRootOf(dirPath);
+  if (patternRoot && dirPath !== patternRoot) {
+    await rebuildAndSignalTree(`Pattern dir removed: ${relative(patternRoot, dirPath)}`);
   }
 });
 
