@@ -66,6 +66,26 @@ const pagesDir = cfg.storefront?.pagesDir ?? null;
 const watchDirs = [patternsDir, stylesDir, ...(themesDir ? [themesDir] : []), ...(scriptsDir ? [scriptsDir] : []), ...(pagesDir ? [pagesDir] : [])];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
+// after each watcher event's handler has finished, with the number of handlers still running. Tests
+// use it as a barrier ("every event so far has been handled") instead of waiting for quiet. Unset, it
+// costs a counter. Not exported, not part of any contract.
+type TestOnlyEventHandled = (event: string, path: string, stillRunning: number) => void;
+let running = 0;
+function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
+  watcher.on(event, (path: string) => {
+    running++;
+    const done = () => {
+      running--;
+      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, running);
+    };
+    // The handler starts synchronously, as chokidar called it before; only its end is observed.
+    let result: unknown;
+    try { result = handler(path); } catch (e) { done(); throw e; }
+    void Promise.resolve(result).finally(done);
+  });
+}
+
 // Single source of truth for link-set membership: a component is linkable iff it has
 // non-empty compiled CSS. Applied identically by the render path and the HMR reconcile
 // so the preview head's link set is always computed by one rule. No CSS = no <link>.
@@ -252,9 +272,9 @@ function handlePages(filePath: string, event: "change" | "add" | "unlink" | "add
   return true;
 }
 
-watcher.on("addDir", (dirPath) => { handlePages(dirPath, "addDir"); });
+on("addDir", (dirPath) => { handlePages(dirPath, "addDir"); });
 
-watcher.on("change", async (filePath) => {
+on("change", async (filePath) => {
   if (handlePages(filePath, "change")) return;
   const ext = extname(filePath);
 
@@ -358,7 +378,7 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   console.log(`[dev-server] ${label} → tree-changed`);
 }
 
-watcher.on("add", async (filePath) => {
+on("add", async (filePath) => {
   if (handlePages(filePath, "add")) return;
   const ext = extname(filePath);
   if (ext === ".scss" && !(themesDir && filePath.startsWith(themesDir))) {
@@ -371,7 +391,7 @@ watcher.on("add", async (filePath) => {
 });
 
 // Component template removed — rebuild discovery and signal nav rebuild.
-watcher.on("unlink", async (filePath) => {
+on("unlink", async (filePath) => {
   if (handlePages(filePath, "unlink")) return;
   if (extname(filePath) === ".hbs" && filePath.startsWith(patternsDir)) {
     await rebuildAndSignalTree(`Pattern removed: ${relative(patternsDir, filePath)}`);
@@ -381,7 +401,7 @@ watcher.on("unlink", async (filePath) => {
 });
 
 // Component directory removed — covers the case where the entire component folder is deleted.
-watcher.on("unlinkDir", async (dirPath) => {
+on("unlinkDir", async (dirPath) => {
   if (handlePages(dirPath, "unlinkDir")) return;
   if (dirPath.startsWith(patternsDir) && dirPath !== patternsDir) {
     await rebuildAndSignalTree(`Pattern dir removed: ${relative(patternsDir, dirPath)}`);
