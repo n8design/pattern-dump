@@ -1,3 +1,4 @@
 npm run lint:css --workspace @pattern-dump/dev-ui
 npm run lint:css --workspace storefront-bench
 npm run lint:css --workspace @pattern-dump/skin-experimental
+npm run lint:css --workspace package-bench

@@ -15,6 +15,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint test vendor/fixture-ds/helpers vendor/fixture-ds/scripts vendor/fixture-skin/helpers",
-    "lint:css": "stylelint 'vendor/*/styles/**/*.scss' 'vendor/*/themes/**/*.scss'"
+    "lint:css": "stylelint 'vendor/*/styles/**/*.scss' 'vendor/*/themes/**/*.scss'",
+    "e2e": "playwright test --config e2e/playwright.config.ts"
   }
 }

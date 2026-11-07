@@ -29,6 +29,7 @@ jobs:
           npm run lint:css --workspace @pattern-dump/dev-ui
           npm run lint:css --workspace storefront-bench
           npm run lint:css --workspace @pattern-dump/skin-experimental
+          npm run lint:css --workspace package-bench
 
       - name: Lint JS/TS
         run: npm run lint
@@ -56,6 +57,9 @@ jobs:
       - name: Run experimental skin E2E tests
         run: npm run e2e:skin-experimental
 
+      - name: Run package bench E2E tests
+        run: npm run e2e:package-bench
+
       - name: Upload Playwright traces and videos on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -66,4 +70,5 @@ jobs:
             apps/dev-ui/playwright-report/
             storefront-bench/test-results/
             skins/experimental/test-results/
+            package-bench/test-results/
           retention-days: 7
