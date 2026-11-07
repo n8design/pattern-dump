@@ -1,6 +1,7 @@
-// A live example as a specimen plate: the frame on a slate mat, with the skin's corner, and beneath it
-// a caption plate in the mono that names the component and links to it in the workbench. The frame
-// fills the plate's width; its height is the preview's own (the storefront's height fitter).
+// A live example as a specimen plate: the frame on a bone mat, with the skin's corner. Beneath it the
+// component's variants, when it has any, then a caption plate in the mono: (LIVE) and the component's
+// id, and the link into the workbench. The frame fills the plate's width; its height is the preview's
+// own (the storefront's height fitter).
 .doc-example {
   display: grid;
   gap: var(--sk-space-3);
@@ -35,4 +36,37 @@
 
 .doc-example :focus-visible {
   outline-color: currentcolor;
+}
+
+.doc-example-id::before {
+  content: "(LIVE) ";
+}
+
+// The variants: a row of toggles, in the mono. Links without scripting, buttons with it; the one shown is
+// filled.
+.doc-example-variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sk-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-example-variants :is(a, button) {
+  display: inline-block;
+  padding: var(--sk-space-1) var(--sk-space-3);
+  border: 1px solid currentcolor;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.doc-example-variants :is(a[aria-current="true"], button[aria-pressed="true"]) {
+  background: var(--sk-coal);
+  color: var(--sk-bone);
 }

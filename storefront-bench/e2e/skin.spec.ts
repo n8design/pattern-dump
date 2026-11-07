@@ -300,6 +300,35 @@ test.describe("the skin", () => {
   }
 });
 
+test.describe("a live example's variants", () => {
+  test("with scripting, switch the frame in place: one button each, pressed for the one shown", async ({ page }) => {
+    await page.goto("/");
+    await settle(page);
+    const plate = page.locator("figure.doc-example");
+    const state = () => plate.evaluate(fig => ({
+      buttons: [...fig.querySelectorAll(".doc-example-variants button")].map(b => [b.textContent, b.getAttribute("aria-pressed")]),
+      links: fig.querySelectorAll(".doc-example-variants a").length,
+      src: fig.querySelector("iframe")!.getAttribute("src"),
+      id: fig.querySelector(".doc-example-id")!.textContent,
+      workbench: fig.querySelector<HTMLAnchorElement>("figcaption a")!.href,
+    }));
+    const before = await state();
+    expect(before).toMatchObject({ buttons: [["default", "true"], ["warning", "false"]], links: 0, src: "/preview/components/callout", id: "components/callout" });
+    const url = page.url();
+    await plate.getByRole("button", { name: "warning" }).click();
+    const after = await state();
+    expect(after).toMatchObject({ buttons: [["default", "false"], ["warning", "true"]], src: "/preview/components/callout~warning", id: "components/callout~warning" });
+    expect(after.workbench).toBe(`${before.workbench}#warning`);
+    expect(page.url()).toBe(url);
+    await expect(page.frameLocator("figure.doc-example iframe").locator(".callout-title")).toHaveText("Careful");
+  });
+
+  test("label the plate: (LIVE) and the component's id, in the mono", async ({ page }) => {
+    await page.goto("/");
+    expect(await page.locator(".doc-example-id").evaluate(el => [getComputedStyle(el, "::before").content, el.textContent])).toEqual(['"(LIVE) "', "components/callout"]);
+  });
+});
+
 test.describe("chapters", () => {
   test("turns each section into a full-width row, numbered, that inverts on hover", async ({ page }) => {
     await page.goto("/guides/setup/");

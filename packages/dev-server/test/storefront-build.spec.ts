@@ -74,6 +74,7 @@ describe("pd build — the storefront root", () => {
       "_pd/components/partials/header.css",
       "_pd/components/partials/marquee.css",
       "_pd/components/partials/nav.css",
+      "_pd/scripts/variant-switcher.js",
       "about/index.html",
       "assets/fonts/ibm-plex-mono-medium.woff2",
       "assets/fonts/ibm-plex-mono-regular.woff2",
@@ -89,7 +90,7 @@ describe("pd build — the storefront root", () => {
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 26, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 27, bytes: expect.any(Number) });
   });
 
   it("resolves every reference inside it to a file it holds", () => {
@@ -137,11 +138,12 @@ describe("pd build — the storefront root", () => {
   }, 60_000);
 
   it("leaves the workbench snapshot exactly as a build without a storefront makes it", async () => {
-    const without = await benchCopy();
+    // From the same copy: a compiled script's banner names its source path, so two copies' builds would
+    // differ by where they are, whatever the storefront does.
     const { storefront: _sf, ...noStorefront } = benchConfig;
-    await buildStaticSite(validateConfig(noStorefront, "test"), without, { outDir: join(without, "..", "wb-none"), pdVersion: "0.0.0-test", now: NOW });
+    await buildStaticSite(validateConfig(noStorefront, "test"), root, { outDir: join(root, "..", "wb-none"), pdVersion: "0.0.0-test", now: NOW });
     const a = await tree(join(root, "..", "wb-good"));
-    const b = await tree(join(without, "..", "wb-none"));
+    const b = await tree(join(root, "..", "wb-none"));
     expect([...a.keys()].sort()).toEqual([...b.keys()].sort());
     const differing = [...a].filter(([k, v]) => !v.bytes.equals(b.get(k)!.bytes)).map(([k]) => k);
     expect(differing).toEqual([]);

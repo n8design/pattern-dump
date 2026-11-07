@@ -13,6 +13,8 @@ export default defineConfig({
   assets: { dir: "./src/assets" },
   // The skin's helpers: a page's chapters, sections, index and next page, derived from its body and the nav.
   helpers: "./src/helpers/skin.ts",
+  // The skin's behaviour scripts, compiled by pd dev and linked from its templates.
+  scriptsDir: "./src/scripts",
   storefront: {
     pagesDir: "./pages",
     outDir: "./.out/storefront",
