@@ -94,7 +94,10 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
     const other = files.get(route);
     if (other) { problems.push(`${other.path} and ${path} are both the page at ${route}`); continue; }
     const file = join(pagesDir, ...path.split("/"));
-    files.set(route, { route, file, path, frontmatter: readFrontmatterStrict(await readFile(file, "utf8")) });
+    // Listed, but deleted before it could be read: no longer a page.
+    const text = await readFile(file, "utf8").catch((e: NodeJS.ErrnoException) => { if (e.code === "ENOENT") return null; throw e; });
+    if (text === null) continue;
+    files.set(route, { route, file, path, frontmatter: readFrontmatterStrict(text) });
   }
 
   const pageOf = (f: PageFile): StorefrontPage => ({

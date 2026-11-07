@@ -115,9 +115,18 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   // The pages folder as a whole: a problem there is a problem for every page.
   if (model.problems.length) return fail(model.problems);
 
+  const notFound = (): AssembledPage =>
+    ({ status: 404, html: errorDocument(route, [`there is no page at ${route}`], a.live), problems: [`there is no page at ${route}`] });
   const page = model.files.get(route);
-  if (!page) {
-    return { status: 404, html: errorDocument(route, [`there is no page at ${route}`], a.live), problems: [`there is no page at ${route}`] };
+  if (!page) return notFound();
+  // A page the folder listed can be gone by now (deleted between reading the folder and this request):
+  // then there is no page at this route.
+  let source: string;
+  try {
+    source = await readFile(page.file, "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return notFound();
+    throw e;
   }
 
   const problems: string[] = [];
@@ -128,7 +137,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
 
   const docProblems: string[] = [];
   const body = await renderDoc(
-    frontmatterBody(await readFile(page.file, "utf8")),
+    frontmatterBody(source),
     (id, variant) => a.render({ component: id, variant }).then(r => r.html),
     a.discoveryMap,
     { embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems },
