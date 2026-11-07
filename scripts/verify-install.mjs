@@ -13,16 +13,19 @@
 // `pd audit --format json`, read through a real pipe, parses and reports zero defects; `pd build
 // --base /demo/` writes a snapshot that a plain file server serves, links included; the starter's
 // TypeScript (installed by init) type-checks and compiles its behaviour scripts, which pd dev and
-// pd build both serve.
+// pd build both serve. Last, a storefront: its page on live.localhost and the workbench on
+// pd.localhost, the page's inlined height fitter run on its own, and pd build's storefront folder.
 
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { request } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { createContext, runInContext } from "node:vm";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const { values } = parseArgs({ options: { keep: { type: "boolean" }, project: { type: "string" } } });
@@ -169,6 +172,80 @@ if (failures.length === 0) {
     check(preview.includes('href="/demo/_pd/components/atoms/button.css"'), "preview links carry the base path");
   }
   fileServer.kill();
+}
+
+// A storefront, from the installed package: one page with a live example, on its own host in pd dev,
+// and as its own folder from pd build. The page's height fitter is inlined from the packed bundle, so it
+// is run on its own here, in an empty context, the way a browser runs the page's script. Added last,
+// because the layout it adds would change the starter tree checked above.
+if (failures.length === 0) {
+  const configFile = join(project, "pattern-dump.config.ts");
+  const config = await readFile(configFile, "utf8");
+  await writeFile(configFile, config.replace("  shell: {",
+    `  storefront: { pagesDir: "./pages", outDir: "./storefront", workbenchUrl: "https://workbench.example.test/" },\n\n  shell: {`));
+  await mkdir(join(project, "src/patterns/layouts/page"), { recursive: true });
+  await writeFile(join(project, "src/patterns/layouts/page/page.hbs"), "<main><h1>{{title}}</h1>{{{body}}}</main>\n");
+  await writeFile(join(project, "src/patterns/layouts/page/page.schema.json"),
+    JSON.stringify({ type: "object", required: ["title"], properties: { title: { type: "string" } } }));
+  await mkdir(join(project, "pages"), { recursive: true });
+  await writeFile(join(project, "pages/index.md"), "---\ntitle: Home\n---\n\nThe home page.\n\n```pattern atoms/button\n```\n");
+
+  const port = await freePort();
+  const wsPort = await freePort();
+  const dev = spawn(pd, ["dev", "--port", String(port), "--ws-port", String(wsPort)], { cwd: project, stdio: ["ignore", "pipe", "pipe"] });
+  let log = "";
+  dev.stdout.on("data", d => { log += d; });
+  dev.stderr.on("data", d => { log += d; });
+  // fetch() ignores an overridden Host header, so the storefront host is asked for through node:http.
+  const onHost = (host, path) => new Promise(resolve => {
+    request({ host: "127.0.0.1", port, path, headers: { host: `${host}:${port}` } }, res => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", c => { body += c; });
+      res.on("end", () => resolve({ status: res.statusCode, body }));
+    }).on("error", e => resolve({ status: 0, body: String(e) })).end();
+  });
+  let page = { status: 0, body: "" };
+  for (let i = 0; i < 120 && page.status !== 200; i++) {
+    page = await onHost("live.localhost", "/");
+    if (page.status !== 200) await new Promise(r => setTimeout(r, 500));
+  }
+  check(page.status === 200 && page.body.includes("<h1>Home</h1>"), "pd dev serves the storefront page on live.localhost", `${page.status} ${log.slice(-1500)}`);
+  check(page.body.includes('<iframe src="/preview/atoms/button"') && page.body.includes(`href="http://pd.localhost:${port}/atoms/button"`),
+    "the page's live example is a frame with a workbench link");
+  const workbench = await onHost("pd.localhost", "/");
+  check(workbench.status === 200 && workbench.body.includes('<div id="app"'), "pd dev serves the workbench on pd.localhost");
+
+  // The inlined fitter, run alone: accept, park at the steady height, ignore, start over after reset.
+  const start = page.body.indexOf("var createHeightFitter=(") + "var createHeightFitter=(".length;
+  const end = page.body.indexOf(");var fitter=", start);
+  try {
+    const factory = runInContext(`(${page.body.slice(start, end)})`, createContext({ WeakMap, WeakSet }));
+    const writes = [];
+    const fit = factory({ write: (_f, h) => writes.push(h) });
+    const frame = {};
+    const accepted = [200, 900, 900, 1800, 3600, 7200].map(h => fit.accept(frame, h));
+    fit.reset(frame);
+    accepted.push(fit.accept(frame, 300));
+    check(start > 23 && JSON.stringify({ writes, accepted }) === JSON.stringify({ writes: [200, 900, 900, 1800, 900, 300], accepted: [true, true, true, true, true, false, true] }),
+      "the page's inlined height fitter runs on its own", JSON.stringify({ writes, accepted }));
+  } catch (e) {
+    check(false, "the page's inlined height fitter runs on its own", String(e).slice(0, 500));
+  }
+  dev.kill();
+
+  try {
+    execFileSync(pd, ["build", "--out", "site"], { cwd: project, stdio: "pipe" });
+    check(true, "pd build with a storefront");
+  } catch (e) {
+    check(false, "pd build with a storefront", String(e.stderr ?? e).slice(0, 800));
+  }
+  for (const file of ["index.html", "preview/atoms/button/index.html", "_pd/components/atoms/button.css"]) {
+    check(existsSync(join(project, "storefront", file)), `storefront ${file}`);
+  }
+  const built = existsSync(join(project, "storefront/index.html")) ? await readFile(join(project, "storefront/index.html"), "utf8") : "";
+  check(built.includes('href="https://workbench.example.test/atoms/button"') && !built.includes("data-pd-live"),
+    "the built page links to storefront.workbenchUrl, with no live client");
 }
 
 if (tmp && !values.keep) await rm(tmp, { recursive: true, force: true });
