@@ -1,7 +1,7 @@
 // The storefront bench skin's helpers: what a page shows about its own structure, derived from its
 // rendered body and the nav.
 import { describe, expect, it } from "vitest";
-import { skinChapters, skinIndex, skinLongestWord, skinMarquee, skinNext, skinSections } from "../../../storefront-bench/src/helpers/skin.js";
+import { skinChapters, skinIndex, skinMarquee, skinNext, skinSections, skinTitleEm } from "../../../storefront-bench/src/helpers/skin.js";
 
 /** The bench's nav as the storefront gives it to a page, with `current` on the given route. */
 const nav = (current: string) => [
@@ -63,12 +63,15 @@ describe("skinNext", () => {
   });
 });
 
-describe("skinLongestWord", () => {
-  it("is the length of a title's longest word, in characters, and at least 1", () => {
-    expect(skinLongestWord("Storefront bench")).toBe(10);
-    expect(skinLongestWord("  A  bé  ")).toBe(2);
-    expect(skinLongestWord("")).toBe(1);
-    expect(skinLongestWord(undefined)).toBe(1);
+describe("skinTitleEm", () => {
+  it("is the width of a title's longest word in the display face, in em, its tracking included", () => {
+    // Storefront: its letters' advances (5.626em) and ten letters of -0.06em tracking.
+    expect(skinTitleEm("Storefront bench")).toBe(5.026);
+    expect(skinTitleEm("About")).toBe(3.042);
+    // A letter the table does not have counts as an average one (0.6em).
+    expect(skinTitleEm("é")).toBe(0.54);
+    expect(skinTitleEm("")).toBe(1);
+    expect(skinTitleEm(undefined)).toBe(1);
   });
 });
 

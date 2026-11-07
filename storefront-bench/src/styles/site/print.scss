@@ -24,7 +24,7 @@
   }
 
   .site-nav,
-  .site-cards {
+  .site-rows {
     display: none;
   }
 
@@ -35,7 +35,7 @@
   // Printers drop background colours, so a colour field would leave its light text on white paper.
   // On paper the fields are plain ink on paper. (Scoped under .site to outrank each section's own rule,
   // which comes after the base layer.)
-  .site :is(.home-cover, .hero, .site-footer, .doc-example) {
+  .site :is(.hero, .site-footer, .doc-example) {
     background: none;
     color: var(--sk-ink);
   }

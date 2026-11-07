@@ -50,10 +50,25 @@ export function skinSections(nav: unknown): Array<NavEntry & { number: string; i
   }));
 }
 
-/** The length of a title's longest word: a poster title is sized so that word fills its column. */
-export function skinLongestWord(title: unknown): number {
+// The advance width of each printable ASCII character in Montserrat 900 (the skin's display face), in
+// thousandths of an em, measured from the bench's own font file. With it a title's width is known before
+// any browser lays it out, so its size can make it fill its column.
+const MONTSERRAT_900: Record<string, number> = { "0": 692, "1": 418, "2": 608, "3": 614, "4": 712, "5": 619, "6": 661, "7": 645, "8": 678, "9": 661, "!": 314, "\"": 489, "#": 740, "$": 657, "%": 917, "&": 777, "'": 254, "(": 381, ")": 381, "*": 473, "+": 620, ",": 304, "-": 390, ".": 304, "/": 440, ":": 304, ";": 304, "<": 620, "=": 620, ">": 620, "?": 606, "@": 1037, "A": 806, "B": 773, "C": 737, "D": 826, "E": 673, "F": 644, "G": 769, "H": 804, "I": 350, "J": 574, "K": 765, "L": 617, "M": 954, "N": 804, "O": 848, "P": 743, "Q": 848, "R": 745, "S": 657, "T": 654, "U": 784, "V": 786, "W": 1206, "X": 762, "Y": 710, "Z": 687, "[": 410, "\\": 440, "]": 410, "^": 620, "_": 500, "`": 600, "a": 639, "b": 700, "c": 615, "d": 705, "e": 653, "f": 426, "g": 711, "h": 702, "i": 326, "j": 334, "k": 701, "l": 326, "m": 1040, "n": 702, "o": 678, "p": 700, "q": 700, "r": 456, "s": 565, "t": 460, "u": 698, "v": 644, "w": 977, "x": 645, "y": 644, "z": 570, "{": 438, "|": 320, "}": 438, "~": 620 };
+/** A character the table does not have counts as an average one. */
+const AVERAGE_ADVANCE = 600;
+/** The display titles' tracking, in em per letter (--sk-title-tracking). */
+const TITLE_TRACKING = -0.06;
+
+/**
+ * How wide a title's longest word is set in the display face, in em, tracking included: a poster
+ * title is sized so that word fills its column (font-size = the column's width / this).
+ */
+export function skinTitleEm(title: unknown): number {
   const words = (typeof title === "string" ? title : "").split(/\s+/).filter(Boolean);
-  return Math.max(1, ...words.map(w => [...w].length));
+  const width = (word: string) => [...word].reduce((sum, ch) => sum + (MONTSERRAT_900[ch] ?? AVERAGE_ADVANCE), 0) / 1000
+    + [...word].length * TITLE_TRACKING;
+  const widest = Math.max(0, ...words.map(width));
+  return widest > 0 ? Math.round(widest * 1000) / 1000 : 1;
 }
 
 /** What a page's marquee scrolls: its sections' headings, or on the home page the site's sections. */
@@ -64,6 +79,12 @@ export function skinMarquee(body: unknown, nav: unknown): string[] {
 /** Whether the page is the home page. */
 export function skinAtHome(nav: unknown): boolean {
   return isNav(nav) && nav.some(e => e.route === "/" && !!e.current);
+}
+
+/** On a folder's own page, the folder's pages, numbered from 01 (with their descriptions); elsewhere none. */
+export function skinSectionPages(nav: unknown): Array<NavEntry & { number: string }> {
+  const section = skinSections(nav).find(s => s.current);
+  return (section?.children ?? []).map((c, i) => ({ ...c, number: two(i + 1) }));
 }
 
 /** The page's place in the nav: "00" for the home page, "01" for a section, "01.1" for its first page. */

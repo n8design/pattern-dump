@@ -1,38 +1,6 @@
-// The front page: a cover on the accent's field, edge to edge, with the skin's corner, holding the site's heading.
-.home-cover {
-  display: grid;
-  grid-column: full;
-  grid-template-columns: subgrid;
-  row-gap: var(--sk-space-5);
-  padding-block: var(--sk-space-7);
-  background: var(--sk-accent);
-  color: var(--sk-on-accent);
-  border-end-start-radius: calc(2 * var(--sk-corner));
-}
-
-.home-cover > * {
-  grid-column: wide;
-}
-
-.home-title {
-  margin: 0;
-  font-family: var(--sk-font-display);
-  font-size: var(--sk-step-poster);
-  font-weight: 900;
-  line-height: var(--sk-title-leading);
-  letter-spacing: var(--sk-title-tracking);
-  text-wrap: balance;
-  overflow-wrap: break-word;
-}
-
-.home-description {
-  max-inline-size: var(--sk-measure);
-  margin: 0;
-  font-size: var(--sk-step-2);
-  line-height: 1.3;
-  text-wrap: pretty;
-}
-
+// The front page: the hero with the site's name, the marquee of its sections, its description and
+// body, then a chapter row for each section (partials/rows). The hero, meta row and description are
+// shared with the other layouts.
 .home .page-body {
   margin-block-start: var(--sk-space-6);
 }

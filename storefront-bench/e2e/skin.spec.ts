@@ -62,7 +62,7 @@ test.describe("the skin", () => {
   });
 
   for (const width of [1440, 390]) {
-    test(`sets titles at poster scale at ${width}px: the home title at 15vw, a page's hero title filling its column up to 25vw`, async ({ page }) => {
+    test(`sets titles at poster scale at ${width}px: every hero title's longest word filling its column, up to 25vw`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       const title = () => page.locator("h1").evaluate(h => {
         const range = document.createRange();
@@ -70,23 +70,21 @@ test.describe("the skin", () => {
         const text = range.getBoundingClientRect(), cs = getComputedStyle(h), size = parseFloat(cs.fontSize);
         // What follows the title: in a hero, the meta row after it; elsewhere the next element.
         const next = (h.closest(".hero")?.nextElementSibling ?? h.nextElementSibling)?.getBoundingClientRect();
-        return { size, fill: text.width / h.getBoundingClientRect().width, overflow: h.scrollWidth > h.clientWidth + 1,
+        // The widest line: for a title of several words, its longest word's.
+        const widest = Math.max(...[...range.getClientRects()].map(r => r.width));
+        return { size, fill: widest / h.getBoundingClientRect().width, overflow: h.scrollWidth > h.clientWidth + 1,
           clearsNext: !next || text.bottom <= next.top + 1,
           // Lines by the text's line boxes: at solid leading its content area is taller than a line height.
           lines: new Set([...range.getClientRects()].map(r => Math.round(r.top))).size,
           tracking: parseFloat(cs.letterSpacing) / size, leading: parseFloat(cs.lineHeight) / size };
       });
-      await page.goto("/");
-      await page.evaluate(() => document.fonts.ready);
-      const home = await title();
-      expect(home.size).toBeCloseTo(width * 0.15, 0);
-      expect(home.overflow).toBe(false);
-      for (const route of ["/about/", "/guides/", "/guides/setup/"]) {
+      for (const route of ["/", "/about/", "/guides/", "/guides/setup/"]) {
         await page.goto(route);
         await page.evaluate(() => document.fonts.ready);
         const t = await title();
         // Solid leading, but the descenders still clear what follows the title.
-        expect(t, route).toMatchObject({ overflow: false, lines: 1, clearsNext: true });
+        // "Storefront bench" breaks between its words; the others are one word.
+        expect(t, route).toMatchObject({ overflow: false, lines: route === "/" ? 2 : 1, clearsNext: true });
         // Up to 25vw: a title at the cap is as large as the hero allows; any other fills its column.
         expect(t.size, route).toBeLessThanOrEqual(width * 0.25 + 0.5);
         if (Math.abs(t.size - width * 0.25) > 0.5) expect(t.fill, route).toBeGreaterThan(0.85);
@@ -144,7 +142,7 @@ test.describe("the skin", () => {
     });
   }
 
-  test("puts each section on a field of the palette, edge to edge, and each card on a field of its own", async ({ page }) => {
+  test("puts the footer on an ink band and the sections' rows edge to edge", async ({ page }) => {
     /** Each element's background next to the token it should be, both resolved on the page; and whether it spans the viewport. */
     const field = (selector: string, token: string) => page.locator(selector).first().evaluate((el, t) => {
       const probe = document.createElement("i");
@@ -161,10 +159,12 @@ test.describe("the skin", () => {
       if (edgeToEdge) expect(f.edgeToEdge, `${selector} edge to edge`).toBe(true);
     };
     await page.goto("/");
-    await expectField(".home-cover", "--sk-accent");
     await expectField(".site-footer", "--sk-ink");
-    await expectField(".card:nth-child(1)", "--sk-accent", false);
-    await expectField(".card:nth-child(2)", "--sk-bone", false);
+    const rows = await page.locator(".site-rows .row").evaluateAll(rs => rs.map(r => {
+      const b = r.getBoundingClientRect();
+      return b.left === 0 && Math.abs(b.width - document.documentElement.clientWidth) < 1;
+    }));
+    expect(rows).toEqual([true, true]);
   });
 
   for (const route of ["/", "/guides/setup/"]) {
@@ -254,8 +254,9 @@ test.describe("the skin", () => {
       document.body.append(probe);
       const accentText = getComputedStyle(probe).color;
       probe.remove();
-      const cover = getComputedStyle(document.querySelector(".home-cover")!);
-      return { accentText, cover: cover.backgroundColor, onCover: cover.color,
+      // The hero's block is the accent; the marquee's text sits on the accent.
+      return { accentText, cover: getComputedStyle(document.querySelector(".hero")!, "::before").backgroundColor,
+        onCover: getComputedStyle(document.querySelector(".marquee-track")!).color,
         current: getComputedStyle(document.querySelector('.site-header [aria-current="page"]')!).color };
     });
     const before = await read();
@@ -264,7 +265,7 @@ test.describe("the skin", () => {
     // The current page's label is the accent as text, which follows the accent.
     expect(after.current).toBe(after.accentText);
     expect(after.current).not.toBe(before.current);
-    // The cover is the accent's field, and the text on it follows the accent's lightness.
+    // The hero's block is the accent, and the text on the accent follows the accent's lightness.
     expect(after.cover).toBe("rgb(0, 110, 70)");
     expect(after.cover).not.toBe(before.cover);
     await page.addStyleTag({ content: ":root { --sk-accent: rgb(250, 220, 120); }" });
@@ -274,30 +275,20 @@ test.describe("the skin", () => {
   });
 
 
-  for (const [name, width, beside] of [["a wide card", 1440, true], ["a narrow card", 390, false]] as const) {
-    test(`${name} sets a folder's pages ${beside ? "beside" : "beneath"} its title`, async ({ page }) => {
+  for (const [name, width, beside] of [["a wide row", 1440, true], ["a narrow row", 390, false]] as const) {
+    test(`${name} sets a section's title, description and pages ${beside ? "side by side" : "one beneath the other"}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/");
-      const card = page.locator(".card", { has: page.locator('.card-title[href="/guides/"]') });
-      const box = await card.evaluate(c => {
-        const body = c.querySelector(".card-body")!, cs = getComputedStyle(body);
-        const t = c.querySelector(".card-title")!.getBoundingClientRect(), p = c.querySelector(".card-pages")!.getBoundingClientRect();
-        const content = Math.max(t.bottom, p.bottom) - Math.min(t.top, p.top);
-        return { titleTop: t.top, titleRight: t.right, titleBottom: t.bottom, pagesLeft: p.left, pagesTop: p.top, pagesBottom: p.bottom,
-          slack: body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - content };
+      const row = page.locator(".row", { has: page.locator('.row-title[href="/guides/"]') });
+      const box = await row.evaluate(r => {
+        const b = (s: string) => r.querySelector(s)!.getBoundingClientRect();
+        const t = b(".row-title"), d = b(".row-description"), p = b(".row-pages");
+        return { side: d.left >= t.right && p.left >= d.right, stacked: d.top >= t.bottom - 1 && p.top >= d.bottom - 1 };
       });
-      if (beside) {
-        expect(box.pagesLeft).toBeGreaterThan(box.titleRight);
-        // Low beside the title: the list's middle in the title's lower half, not up at the card's top.
-        expect((box.pagesTop + box.pagesBottom) / 2).toBeGreaterThan((box.titleTop + box.titleBottom) / 2);
-        expect(box.pagesBottom).toBeLessThanOrEqual(box.titleBottom + 2);
-      } else {
-        expect(box.pagesTop).toBeGreaterThanOrEqual(box.titleBottom);
-      }
-      // No empty space: the card is as tall as what it holds.
-      expect(box.slack).toBeLessThan(1);
+      expect(beside ? box.side : box.stacked).toBe(true);
     });
   }
+
 });
 
 test.describe("a live example's variants", () => {
@@ -436,7 +427,7 @@ test.describe("motion and print", () => {
 
   test("prints its colour fields as ink on paper, since printers drop background colours", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark", media: "print" });
-    for (const [route, selector] of [["/", ".home-cover"], ["/about/", ".hero"], ["/guides/setup/", ".hero"], ["/", ".site-footer"], ["/", "figure.doc-example"]] as const) {
+    for (const [route, selector] of [["/", ".hero"], ["/about/", ".hero"], ["/guides/setup/", ".hero"], ["/", ".site-footer"], ["/", "figure.doc-example"]] as const) {
       await page.goto(route);
       const printed = await page.locator(selector).evaluate(el => {
         const cs = getComputedStyle(el);
@@ -461,7 +452,7 @@ test.describe("motion and print", () => {
       return {
         paper: getComputedStyle(document.body).backgroundColor,
         nav: getComputedStyle(document.querySelector(".site-nav")!).display,
-        cards: getComputedStyle(document.querySelector(".site-cards")!).display,
+        cards: getComputedStyle(document.querySelector(".site-rows")!).display,
         after: getComputedStyle(link, "::after").content,
         href: link.href,
       };

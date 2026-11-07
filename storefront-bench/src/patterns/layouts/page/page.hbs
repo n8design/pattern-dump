@@ -1,7 +1,7 @@
 {{#> partials-base }}
 <article class="page">
   <header class="hero">
-    <h1 class="hero-title page-title" style="--sk-chars: {{skinLongestWord title}}">{{title}}</h1>
+    <h1 class="hero-title page-title" style="--sk-title-em: {{skinTitleEm title}}">{{title}}</h1>
   </header>
   <dl class="hero-meta">
     <div><dt>Index</dt><dd>{{skinIndex nav}}</dd></div>
@@ -23,6 +23,6 @@
     {{/each}}
   </div>
   {{/with}}
-  {{> partials-cards }}
+  {{> partials-rows }}
 </article>
 {{/partials-base}}

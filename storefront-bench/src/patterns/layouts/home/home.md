@@ -1,6 +1,6 @@
 ---
 title: Home
-description: The front page — a cover with the site's heading, the page's body, and a card for each part of the site.
+description: The front page — the hero with the site's name, the marquee of its sections, the page's body, and a chapter row for each section.
 ---
 
 For the site's own `index.md`: set `layout: home` in its frontmatter.
@@ -10,5 +10,5 @@ For the site's own `index.md`: set `layout: home` in its frontmatter.
 | `title` | string | required |
 | `description` | string | optional |
 
-The cards come from the navigation: one for every top-level page or folder other than the home page,
-with a folder's pages listed on its card.
+The rows come from the navigation: one for every top-level page or folder other than the home page, with
+its description and a folder's pages.

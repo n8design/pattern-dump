@@ -65,27 +65,29 @@ describe("assemblePage — the bench's pages", () => {
     expect(html).toContain("<title>Storefront bench</title>");
     expect(html).toContain(`<meta name="description" content="A small website rendered from markdown, with the bench's own skin.">`);
     expect(html).toContain(`<link rel="stylesheet" href="/_pd/head-for/layouts/home">`);
-    expect(html).toContain(`<h1 class="home-title">Storefront bench</h1>`);
+    expect(html).toContain(`<h1 class="hero-title home-title" style="--sk-title-em: 5.026">Storefront bench</h1>`);
     expect(html).toContain(`<a class="site-title" href="/" aria-current="page">Storefront bench</a>`);
     expect(html).toContain(`<a href="/guides/">(01) Guides</a>`);
     expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>`);
     expect(html).toContain(`<a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a>`);
     expect(html).toContain("<p>Built with Pattern Dump from the storefront bench.</p>");
-    // A card for every other part of the site, none for the home page itself; a folder's card lists its pages.
-    const cards = parse(html).querySelectorAll(`nav.site-cards[aria-label="Sections"] .card`);
-    expect(cards.map(c => c.querySelector(".card-title")?.getAttribute("href"))).toEqual(["/guides/", "/about/"]);
-    expect(cards[0].querySelectorAll(".card-pages a").map(a => [a.getAttribute("href"), a.text])).toEqual([["/guides/setup/", "Setup"]]);
+    // A row for every other part of the site, none for the home page itself, each with its description;
+    // a folder's row lists its pages.
+    const rows = parse(html).querySelectorAll(`nav.site-rows[aria-label="Sections"] .row`);
+    expect(rows.map(r => [r.querySelector(".row-title")?.getAttribute("href"), r.querySelector(".row-title")?.text, r.querySelector(".row-description")?.text]))
+      .toEqual([["/guides/", "(01) Guides", "Longer texts about the bench."], ["/about/", "(02) About", "What the bench is for."]]);
+    expect(rows[0].querySelectorAll(".row-pages a").map(a => [a.getAttribute("href"), a.text])).toEqual([["/guides/setup/", "Setup"]]);
     // The layout's sample body never shows.
     expect(html).not.toContain("This is the body of a page");
     expect(html).not.toContain("data-pd-live");
   });
 
-  it("shows a folder's pages as cards on the folder's own page, and no cards on a page without pages", async () => {
+  it("shows a folder's pages as rows on the folder's own page, with their descriptions, and none on a page without pages", async () => {
     const guides = parse((await build("/guides/", join(bench, "pages"))).html);
-    expect(guides.querySelectorAll(`nav.site-cards[aria-label="In this section"] .card-title`).map(a => [a.getAttribute("href"), a.text]))
-      .toEqual([["/guides/setup/", "Setup"]]);
+    expect(guides.querySelectorAll(`nav.site-rows[aria-label="In this section"] .row`).map(r => [r.querySelector(".row-title")?.getAttribute("href"), r.querySelector(".row-title")?.text, r.querySelector(".row-description")?.text]))
+      .toEqual([["/guides/setup/", "(01) Setup", "How the bench is put together."]]);
     for (const route of ["/about/", "/guides/setup/"]) {
-      expect(parse((await build(route, join(bench, "pages"))).html).querySelectorAll(".site-cards"), route).toHaveLength(0);
+      expect(parse((await build(route, join(bench, "pages"))).html).querySelectorAll(".site-rows"), route).toHaveLength(0);
     }
   });
 

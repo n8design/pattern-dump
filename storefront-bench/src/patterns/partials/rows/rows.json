@@ -11,13 +11,16 @@
       "children": [
         {
           "route": "/guides/setup/",
-          "title": "Setup"
+          "title": "Setup",
+          "description": "How the bench is put together."
         },
         {
           "route": "/guides/writing/",
-          "title": "Writing pages"
+          "title": "Writing pages",
+          "description": "Frontmatter, layouts and live examples."
         }
-      ]
+      ],
+      "description": "Longer texts about the bench."
     },
     {
       "route": "/about/",
