@@ -7,15 +7,24 @@
   "license": "MIT",
   "patternDump": {
     "patterns": "patterns",
-    "helpers": "helpers/skin.ts",
+    "helpers": "dist/helpers/skin.js",
     "scripts": "scripts",
-    "assets": ["assets/skin-experimental"],
-    "styles": { "dir": "styles", "documentBase": ["site"] }
+    "assets": [
+      "assets/skin-experimental"
+    ],
+    "styles": {
+      "dir": "styles",
+      "documentBase": [
+        "site"
+      ]
+    }
   },
   "devDependencies": {
     "@pattern-dump/cli": "*"
   },
   "scripts": {
+    "build": "esbuild helpers/skin.ts --bundle --platform=node --format=esm --outfile=dist/helpers/skin.js",
+    "watch:helpers": "esbuild helpers/skin.ts --bundle --platform=node --format=esm --outfile=dist/helpers/skin.js --watch",
     "dev": "cd demo && node ../../../packages/cli/dist/index.js dev",
     "e2e": "playwright test --config e2e/playwright.config.ts",
     "test": "vitest run",
