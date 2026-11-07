@@ -7,7 +7,9 @@ on:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which the Playwright in use (1.60) cannot install browsers
+    # on. Moving off the pin goes with a Playwright upgrade and a re-recorded E2E baseline.
+    runs-on: ubuntu-24.04
     # Raised from 20: this job now also runs lint, typecheck and unit tests on top of installing
     # browsers and running the serial E2E suites (workers:1, required while HMR specs mutate
     # test-bench in place).
@@ -40,6 +42,14 @@ jobs:
 
       - name: Build packages
         run: npm run build
+
+      # The runner's file-watching limits, on record: pd dev's watcher fails startup by name when it
+      # cannot watch, and these are the first thing to check when it does.
+      - name: Show inotify limits
+        run: |
+          echo "max_user_watches:   $(cat /proc/sys/fs/inotify/max_user_watches)"
+          echo "max_user_instances: $(cat /proc/sys/fs/inotify/max_user_instances)"
+          echo "max_queued_events:  $(cat /proc/sys/fs/inotify/max_queued_events)"
 
       # After the build: dev-server's test target dependsOn renderer:build.
       - name: Unit tests
