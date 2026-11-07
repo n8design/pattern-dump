@@ -77,8 +77,9 @@ export class Bench {
   private port = 0;
   /** One barrier file per watched folder. */
   private barriers: string[] = [];
-  /** `staging`: a folder outside every watched one, where new files are written before they're moved in. */
-  constructor(readonly root: string, private readonly component: string, private readonly staging: string) {}
+  /** `component`: the one the workbench has open, or null for no workbench at all. `staging`: a folder
+   *  outside every watched one, where new files are written before they're moved in. */
+  constructor(readonly root: string, private readonly component: string | null, private readonly staging: string) {}
 
   async start(cfg: PatternDumpConfig): Promise<void> {
     // The folders the watcher will watch, as it finds them.
@@ -121,8 +122,10 @@ export class Bench {
     await rename(file, this.at(rel));
   }
 
-  /** The workbench asks for its component again, as it does after every reload. */
-  async reopen(): Promise<void> { await fetch(`http://127.0.0.1:${this.port}/api/component/${this.component}`); }
+  /** The workbench asks for its component again, as it does after every reload (with none open, nothing). */
+  async reopen(): Promise<void> {
+    if (this.component !== null) await fetch(`http://127.0.0.1:${this.port}/api/component/${this.component}`);
+  }
 
   /** The events handled for this project since `from`, as [event, path in the project], the sentinel's left out. */
   handledSince(from: number): string[][] {

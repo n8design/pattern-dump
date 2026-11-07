@@ -12,6 +12,7 @@ import WebSocket from "ws";
 import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
+import { Bench, closeAll } from "./watch-harness.js";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const config = validateConfig(benchConfig, "storefront-bench");
@@ -141,4 +142,35 @@ describe("a pages folder beside the patterns, with a name that starts the same",
     const sent = await after(messages, () => appendFile(join(root, "src", "patterns-site", "about.md"), "\nMore.\n"), m => pageChanged(m) || m.type === "tree-changed");
     expect(sent).toEqual([{ type: "page-changed", route: "/about/" }]);
   }, 120_000);
+});
+
+describe("script edits and new components, with no workbench open", () => {
+  // Storefront pages load scripts and embed components whether or not a workbench is open, so each page
+  // is told, page by page (watch-harness.ts: no waiting for quiet).
+  afterAll(closeAll);
+  const everyPage = ["/", "/about/", "/guides/", "/guides/setup/"].map(route => JSON.stringify({ type: "page-changed", route })).sort();
+  async function bench(name: string): Promise<Bench> {
+    const root = await benchCopy(name);
+    await mkdir(join(root, "src", "scripts"), { recursive: true });
+    await writeFile(join(root, "src", "scripts", "zz-tick.ts"), "document.body.dataset.tick = \"1\";\n");
+    const b = new Bench(root, null, join(tmp, "staging"));
+    await b.start(validateConfig({ ...benchConfig, scriptsDir: "./src/scripts" }, name));
+    return b;
+  }
+
+  it("reloads every page when a script is edited", async () => {
+    const b = await bench("script-edit");
+    const r = await b.step(() => b.edit("src/scripts/zz-tick.ts", "\n"), [["change", "src/scripts/zz-tick.ts"]]);
+    expect(r.messages).toEqual(everyPage);
+  }, 60_000);
+
+  it("reloads every page when a component is added, and when it is removed", async () => {
+    const b = await bench("component-added");
+    const added = await b.step(() => b.create("src/patterns/components/zz-badge/zz-badge.hbs", "<b>badge</b>\n"),
+      [["addDir", "src/patterns/components/zz-badge"], ["add", "src/patterns/components/zz-badge/zz-badge.hbs"]]);
+    expect(added.messages).toEqual([...everyPage, JSON.stringify({ type: "tree-changed" })].sort());
+    const removed = await b.step(() => b.remove("src/patterns/components/zz-badge/zz-badge.hbs"),
+      [["unlink", "src/patterns/components/zz-badge/zz-badge.hbs"]]);
+    expect(removed.messages).toEqual([...everyPage, JSON.stringify({ type: "tree-changed" })].sort());
+  }, 60_000);
 });

@@ -211,9 +211,7 @@ async function restyleAll(
   }
   // Every storefront page links the base layer, so every page changed. Said page by page: the
   // workbench's reload above names the component on screen, and there may be none.
-  if (changes.baseChanged && pagesDir) {
-    for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
-  }
+  if (changes.baseChanged) await everyPageChanged();
   const what = [
     `${changes.changedComponents.length} component(s)`,
     ...(changes.baseChanged ? ["base layer"] : []),
@@ -279,7 +277,7 @@ let reloads = 0;
 
 async function reloadedOpenPages(label: string): Promise<void> {
   if (state.lastComponentId) hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
-  if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
+  await everyPageChanged();
   console.log(`[dev-server] ${label} → reloaded`);
 }
 
@@ -422,6 +420,9 @@ on("change", async (filePath) => {
     if (state.lastComponentId) {
       hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
     }
+    // Storefront pages load scripts (their own, and their embedded previews'), whether or not a workbench
+    // has a component open: each page is told, as for a base-layer change.
+    await everyPageChanged();
     console.log(`[dev-server] Script changed: ${scriptId} → srcdoc reload dispatched`);
   }
 });
@@ -451,7 +452,14 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   const reg = await buildCompositionRegistry(patternDirs, dr.handleMap, dr.discoveryMap);
   await surfaceFlattening(dr.discoveryMap, reg, cwd);
   hotreloader.push({ type: "tree-changed" });
+  // A storefront page may embed the component that arrived or left: every page reloads and is checked again.
+  await everyPageChanged();
   console.log(`[dev-server] ${label} → tree-changed`);
+}
+
+/** Every storefront page changed: one page-changed per page (none without a storefront). */
+async function everyPageChanged(): Promise<void> {
+  if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
 }
 
 on("add", async (filePath) => {
