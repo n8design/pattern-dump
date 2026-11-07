@@ -200,9 +200,14 @@ export async function createSassDependencyTracker(
 
 // ---- Script compilation (for requireScript in dev-server) ----
 
-/** Compile a TypeScript/JavaScript entry point to an ESM browser bundle. */
+/**
+ * Compile a TypeScript/JavaScript entry point to an ESM browser bundle. esbuild heads each module's code
+ * with a comment naming its file, relative to the working directory: from the entry's own folder, so the
+ * output reads `// toggle.ts` from any checkout or working directory and names no folder of the machine.
+ */
 export async function compileScriptFile(entryPoint: string): Promise<string> {
   const result = await esbuildBuild({
+    absWorkingDir: dirname(resolve(entryPoint)),
     entryPoints: [entryPoint],
     bundle: true,
     format: "esm",
