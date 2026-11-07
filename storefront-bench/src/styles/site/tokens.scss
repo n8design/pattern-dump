@@ -28,6 +28,7 @@
   --sk-accent-wash-strong: light-dark(oklch(from var(--sk-accent) 87% 0.08 h), oklch(from var(--sk-accent) 30% 0.09 h));
 
   --sk-font-display: "Montserrat", "Helvetica Neue", arial, sans-serif;
+  --sk-font-outline: "Montserrat Black", "Montserrat", "Helvetica Neue", arial, sans-serif;
   --sk-font-body: "Source Serif 4", georgia, serif;
   --sk-font-mono: "IBM Plex Mono", ui-monospace, menlo, monospace;
 
@@ -46,7 +47,7 @@
 
   // Poster titles, sized to fill the wide column and never past 25vw: a layout sets --sk-title-em on the
   // title (its longest word's width in em, from the skin's helpers); the size is the column over that.
-  --sk-step-poster: max(3rem, 15vw);
+  --sk-step-next: 15vw;
   --sk-wide: min(var(--sk-page), 100vw - 2 * var(--sk-gutter));
   --sk-title-tracking: -0.06em;
   --sk-title-leading: 0.78;

@@ -70,7 +70,7 @@ describe("assemblePage — the bench's pages", () => {
     expect(html).toContain(`<a href="/guides/">(01) Guides</a>`);
     expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>`);
     expect(html).toContain(`<a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a>`);
-    expect(html).toContain("<p>Built with Pattern Dump from the storefront bench.</p>");
+    expect(html).toContain(`<p class="site-footer-line">Built with Pattern Dump from the storefront bench.</p>`);
     // A row for every other part of the site, none for the home page itself, each with its description;
     // a folder's row lists its pages.
     const rows = parse(html).querySelectorAll(`nav.site-rows[aria-label="Sections"] .row`);

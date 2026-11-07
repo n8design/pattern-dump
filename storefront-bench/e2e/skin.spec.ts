@@ -23,8 +23,9 @@ test.describe("the skin", () => {
       title: getComputedStyle(document.querySelector("h1")!).fontFamily,
       text: getComputedStyle(document.querySelector(".article-body p")!).fontFamily,
     }));
-    // Every face this page uses: the mono's two weights for its labels, Montserrat's italic for its marquee.
-    expect(fonts.loaded).toEqual(["IBM Plex Mono normal", "IBM Plex Mono normal", "Montserrat italic", "Montserrat normal", "Source Serif 4 normal"]);
+    // Every face this page uses: the mono's two weights for its labels, Montserrat's italic for its
+    // marquee, its static Black for the footer's outlined title.
+    expect(fonts.loaded).toEqual(["IBM Plex Mono normal", "IBM Plex Mono normal", "Montserrat italic", "Montserrat normal", "Montserrat Black normal", "Source Serif 4 normal"].sort());
     expect(fonts.title).toMatch(/^"?Montserrat"?,/);
     expect(fonts.text).toMatch(/^"Source Serif 4",/);
   });
@@ -49,7 +50,8 @@ test.describe("the skin", () => {
     };
     const mono = ['"IBM Plex Mono"', "uppercase", true];
     expect(await page.locator(".site-tagline").evaluate(label)).toEqual(mono);
-    expect(await page.locator(".site-footer").evaluate(label)).toEqual(mono);
+    expect(await page.locator(".site-footer-line").evaluate(label)).toEqual(mono);
+    expect(await page.locator(".next-label").evaluate(label)).toEqual(mono);
     expect(await page.locator(".site-nav-list > li > a").nth(1).evaluate(el => {
       const cs = getComputedStyle(el, "::before");
       return [cs.fontFamily.split(",")[0], cs.textTransform, parseFloat(cs.letterSpacing) / parseFloat(cs.fontSize) > 0.15];
@@ -142,24 +144,8 @@ test.describe("the skin", () => {
     });
   }
 
-  test("puts the footer on an ink band and the sections' rows edge to edge", async ({ page }) => {
-    /** Each element's background next to the token it should be, both resolved on the page; and whether it spans the viewport. */
-    const field = (selector: string, token: string) => page.locator(selector).first().evaluate((el, t) => {
-      const probe = document.createElement("i");
-      probe.style.backgroundColor = `var(${t})`;
-      document.body.append(probe);
-      const want = getComputedStyle(probe).backgroundColor;
-      probe.remove();
-      const r = el.getBoundingClientRect();
-      return { got: getComputedStyle(el).backgroundColor, want, edgeToEdge: r.left === 0 && Math.abs(r.width - document.documentElement.clientWidth) < 1 };
-    }, token);
-    const expectField = async (selector: string, token: string, edgeToEdge = true) => {
-      const f = await field(selector, token);
-      expect(f.got, `${selector} on ${token}`).toBe(f.want);
-      if (edgeToEdge) expect(f.edgeToEdge, `${selector} edge to edge`).toBe(true);
-    };
+  test("puts the sections' rows edge to edge", async ({ page }) => {
     await page.goto("/");
-    await expectField(".site-footer", "--sk-ink");
     const rows = await page.locator(".site-rows .row").evaluateAll(rs => rs.map(r => {
       const b = r.getBoundingClientRect();
       return b.left === 0 && Math.abs(b.width - document.documentElement.clientWidth) < 1;
@@ -317,6 +303,38 @@ test.describe("a live example's variants", () => {
   test("label the plate: (LIVE) and the component's id, in the mono", async ({ page }) => {
     await page.goto("/");
     expect(await page.locator(".doc-example-id").evaluate(el => [getComputedStyle(el, "::before").content, el.textContent])).toEqual(['"(LIVE) "', "components/callout"]);
+  });
+});
+
+test.describe("the footer", () => {
+  for (const [route, next, title] of [["/", "/guides/", "Guides"], ["/guides/", "/guides/setup/", "Setup"], ["/guides/setup/", "/about/", "About"], ["/about/", "/", "Storefront bench"]] as const) {
+    test(`${route}: leads to the next chapter, ${title}, the last page wrapping to the first`, async ({ page }) => {
+      await page.goto(route);
+      const link = page.locator(".site-footer .next-chapter");
+      await expect(link).toHaveAttribute("href", next);
+      await expect(link.locator(".next-label")).toHaveText("Next chapter");
+      await expect(link.locator(".next-title")).toHaveText(title);
+    });
+  }
+
+  test("sets the next chapter as a giant outlined title, filled with the accent on hover", async ({ page }) => {
+    await page.goto("/about/");
+    await page.evaluate(() => document.fonts.ready);
+    const title = page.locator(".next-title");
+    const look = () => title.evaluate(t => {
+      const cs = getComputedStyle(t);
+      const probe = document.createElement("i");
+      probe.style.color = "var(--sk-accent)";
+      document.body.append(probe);
+      const accent = getComputedStyle(probe).color;
+      probe.remove();
+      return { family: cs.fontFamily.split(",")[0], size: parseFloat(cs.fontSize) / innerWidth, stroke: parseFloat(cs.webkitTextStrokeWidth) > 0,
+        fill: cs.color === "rgba(0, 0, 0, 0)" ? "none" : cs.color === accent ? "accent" : cs.color };
+    });
+    expect(await look()).toMatchObject({ family: '"Montserrat Black"', stroke: true, fill: "none" });
+    expect((await look()).size).toBeCloseTo(0.15, 2);
+    await page.locator(".next-chapter").hover();
+    await expect.poll(async () => (await look()).fill).toBe("accent");
   });
 });
 

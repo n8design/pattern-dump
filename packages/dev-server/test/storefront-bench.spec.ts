@@ -51,8 +51,8 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
     ["(01) Guides", "(02) About"]],
   ["partials/marquee", "Marquee", "A band in the accent that scrolls a page's section headings, or the site's sections on the home page.", "centered",
     ["Pages", "Layouts", "Components"]],
-  ["partials/footer", "Footer", "The line at the bottom of every page.", "centered",
-    ["Built with Pattern Dump from the storefront bench."]],
+  ["partials/footer", "Footer", "The next chapter, as a giant outlined link, then the line at the bottom of every page.", "centered",
+    ["Next chapter", "About", "Built with Pattern Dump from the storefront bench."]],
   ["components/callout", "Callout", "A short note set apart from the text around it.", "centered",
     ["Good to know", "A callout sets a short note apart"]],
 ];

@@ -46,3 +46,13 @@
   font-display: swap;
   src: url("/assets/fonts/ibm-plex-mono-medium.woff2") format("woff2");
 }
+
+// Montserrat Black as a static face, for outlined type: a variable face's contours overlap (so its
+// weights can interpolate), and a text stroke would draw the overlaps inside each letter.
+@font-face {
+  font-family: "Montserrat Black";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("/assets/fonts/montserrat-black.woff2") format("woff2");
+}

@@ -1,14 +1,41 @@
-// The footer: the site's line in the mono, on the deep ink field, edge to edge.
+// The footer: the next chapter, the page after this one, as a giant outlined title that fills with the
+// accent on hover; then the site's line in the mono.
 .site-footer {
   display: grid;
   grid-column: full;
-  grid-template-columns: subgrid;
-  padding-block: var(--sk-space-6);
-  background: var(--sk-ink);
-  color: var(--sk-paper);
+  grid-template-columns: var(--sk-columns);
+  row-gap: var(--sk-space-5);
+  padding-block: var(--sk-space-7) var(--sk-space-6);
+  border-block-start: 1px solid var(--sk-rule);
 }
 
-.site-footer p {
+.next-chapter {
+  display: grid;
+  grid-column: wide;
+  gap: var(--sk-space-3);
+  text-decoration: none;
+}
+
+.next-title {
+  color: transparent;
+  font-family: var(--sk-font-outline);
+  font-size: var(--sk-step-next);
+  font-weight: 900;
+  letter-spacing: var(--sk-title-tracking);
+  line-height: 0.85;
+  overflow-wrap: break-word;
+  -webkit-text-stroke: 0.015em var(--sk-ink);
+  transition: color 0.2s, -webkit-text-stroke-color 0.2s;
+}
+
+.next-chapter:hover .next-title,
+.next-chapter:focus-visible .next-title {
+  color: var(--sk-accent);
+  -webkit-text-stroke-color: var(--sk-accent);
+}
+
+.site-footer-line {
   grid-column: wide;
   margin: 0;
+  color: var(--sk-muted);
 }
