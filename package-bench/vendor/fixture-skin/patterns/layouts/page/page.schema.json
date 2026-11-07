@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "title": { "type": "string", "description": "The page's heading" },
+    "description": { "type": "string", "description": "One sentence under the heading" }
+  }
+}

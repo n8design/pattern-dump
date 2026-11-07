@@ -1,0 +1,12 @@
+{
+  "name": "pd-fixture-skin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Package bench fixture: a small storefront skin consumed as a pattern package through a file: link.",
+  "type": "module",
+  "patternDump": {
+    "patterns": "patterns",
+    "styles": { "dir": "styles" },
+    "helpers": "dist/helpers.js"
+  }
+}

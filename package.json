@@ -30,6 +30,7 @@
     "apps/*",
     "test-bench",
     "storefront-bench",
+    "package-bench",
     "skins/*"
   ],
   "scripts": {
