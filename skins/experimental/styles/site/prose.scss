@@ -1,0 +1,61 @@
+// Text that comes from a page's markdown: the body of every layout.
+.page-body,
+.article-body {
+  display: grid;
+  grid-column: full;
+  grid-template-columns: subgrid;
+  align-content: start;
+}
+
+:where(.page-body, .article-body, .chapter-body) > * {
+  grid-column: content;
+  margin-block: 0 var(--sk-space-4);
+}
+
+:is(.page-body, .article-body) :is(h2, h3) {
+  margin-block: var(--sk-space-6) var(--sk-space-3);
+  font-family: var(--sk-font-display);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+:is(.page-body, .article-body) h2 {
+  font-size: var(--sk-step-2);
+}
+
+:is(.page-body, .article-body) h3 {
+  font-size: var(--sk-step-1);
+}
+
+:is(.page-body, .article-body) code {
+  padding-inline: 0.2em;
+  background: var(--sk-accent-wash);
+  font-family: ui-monospace, "SF Mono", menlo, consolas, monospace;
+  font-size: 0.85em;
+}
+
+:is(.page-body, .article-body) img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  border-end-start-radius: var(--sk-corner);
+}
+
+// A paragraph that holds only an image is a large image: it takes the wide column. Without :has() it
+// stays in the content column.
+:is(.page-body, .article-body, .chapter-body) > p:has(> img:only-child) {
+  grid-column: wide;
+  margin-block: var(--sk-space-5) var(--sk-space-6);
+}
+
+:is(.page-body, .article-body, .chapter-body) > .doc-example {
+  margin-block: var(--sk-space-5) var(--sk-space-6);
+  margin-inline: 0;
+}
+
+// The body's own top margin already separates it from what is above.
+:is(.page-body, .article-body, .chapter-body) > :first-child {
+  margin-block-start: 0;
+}

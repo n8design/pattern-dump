@@ -29,7 +29,8 @@
     "packages/*",
     "apps/*",
     "test-bench",
-    "storefront-bench"
+    "storefront-bench",
+    "skins/*"
   ],
   "scripts": {
     "build": "nx run-many -t build",
@@ -44,7 +45,8 @@
     "graph": "nx graph",
     "affected": "nx affected -t build test lint typecheck",
     "dev": "npm run dev --workspace test-bench",
-    "prepare": "husky"
+    "prepare": "husky",
+    "e2e:skin-experimental": "nx run skin-experimental:e2e"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",

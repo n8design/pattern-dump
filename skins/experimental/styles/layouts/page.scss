@@ -1,0 +1,15 @@
+// The default layout: the hero and its meta row (site/hero.scss), the description, then the body.
+// The description as the page's lede: a large serif statement, offset to the right two-thirds of the
+// wide column.
+.page-description {
+  grid-column: wide;
+  margin-block: var(--sk-space-6) 0;
+  padding-inline-start: calc(100% / 3);
+  font-size: var(--sk-step-3);
+  line-height: 1.15;
+  text-wrap: pretty;
+}
+
+.page-body {
+  margin-block-start: var(--sk-space-6);
+}

@@ -1,0 +1,14 @@
+// A longer text: the hero and its meta row (site/hero.scss), the lede, then the body.
+// The lede: a large serif statement, offset to the right two-thirds of the wide column.
+.article-lede {
+  grid-column: wide;
+  margin-block: var(--sk-space-6) 0;
+  padding-inline-start: calc(100% / 3);
+  font-size: var(--sk-step-3);
+  line-height: 1.15;
+  text-wrap: pretty;
+}
+
+.article-body {
+  margin-block-start: var(--sk-space-6);
+}

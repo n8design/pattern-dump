@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Article layout",
+  "description": "The frontmatter a page using layout: article may set, besides layout and order.",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "title":       { "type": "string", "description": "The article's heading, and its title in the nav" },
+    "description": { "type": "string", "description": "The page's meta description" },
+    "lede":        { "type": "string", "description": "An opening paragraph, set larger than the body" }
+  }
+}

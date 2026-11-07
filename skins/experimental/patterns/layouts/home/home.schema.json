@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Home layout",
+  "description": "The frontmatter a page using layout: home may set, besides layout and order.",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "title":       { "type": "string", "description": "The site's heading on its cover, and the home page's title in the nav" },
+    "description": { "type": "string", "description": "One sentence on the cover, and the page's meta description" }
+  }
+}

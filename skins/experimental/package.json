@@ -1,0 +1,26 @@
+{
+  "name": "@pattern-dump/skin-experimental",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Experimental: a storefront skin for Pattern Dump, as a pattern package. Ink, bone and vermilion, poster titles, chapter rows and specimen plates.",
+  "type": "module",
+  "license": "MIT",
+  "patternDump": {
+    "patterns": "patterns",
+    "helpers": "helpers/skin.ts",
+    "scripts": "scripts",
+    "assets": ["assets/skin-experimental"],
+    "styles": { "dir": "styles", "documentBase": ["site"] }
+  },
+  "devDependencies": {
+    "@pattern-dump/cli": "*"
+  },
+  "scripts": {
+    "dev": "cd demo && node ../../../packages/cli/dist/index.js dev",
+    "e2e": "playwright test --config e2e/playwright.config.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint helpers scripts test e2e",
+    "lint:css": "stylelint 'styles/**/*.scss' 'demo/src/styles/**/*.scss'"
+  }
+}

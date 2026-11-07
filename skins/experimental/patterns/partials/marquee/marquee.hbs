@@ -1,0 +1,12 @@
+{{#with (skinMarquee body nav)}}{{#if length}}
+<div class="marquee">
+  <div class="marquee-band">
+    <div class="marquee-track">
+      <p class="marquee-run">{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}<span aria-hidden="true">{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}</span></p>
+      <p class="marquee-run" aria-hidden="true">{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}<span aria-hidden="true">{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}</span></p>
+      <p class="marquee-run" aria-hidden="true">{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}<span aria-hidden="true">{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}</span></p>
+      <p class="marquee-run" aria-hidden="true">{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}<span aria-hidden="true">{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}{{#each this}}<span class="marquee-item">{{this}}</span> <span class="marquee-sep" aria-hidden="true">✳</span> {{/each}}</span></p>
+    </div>
+  </div>
+</div>
+{{/if}}{{/with}}

@@ -1,0 +1,28 @@
+{{#> partials-base }}
+<article class="page">
+  <header class="hero">
+    <h1 class="hero-title page-title" style="--sk-title-em: {{skinTitleEm title}}">{{title}}</h1>
+  </header>
+  <dl class="hero-meta">
+    <div><dt>Index</dt><dd>{{skinIndex nav}}</dd></div>
+    <div><dt>Layout</dt><dd>page</dd></div>
+    <div><dt>Sections</dt><dd>{{#with (skinChapters body)}}{{count}}{{/with}}</dd></div>
+  </dl>
+  {{> partials-marquee }}
+  {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
+  {{#with (skinChapters body)}}
+  <div class="page-body">
+    {{{intro}}}
+    {{#each chapters}}
+    <details class="chapter"{{#if @first}} open{{/if}}>
+      <summary><h2 class="chapter-title"><span class="chapter-number">({{number}})</span> {{title}}</h2></summary>
+      <div class="chapter-body">
+        {{{html}}}
+      </div>
+    </details>
+    {{/each}}
+  </div>
+  {{/with}}
+  {{> partials-rows }}
+</article>
+{{/partials-base}}

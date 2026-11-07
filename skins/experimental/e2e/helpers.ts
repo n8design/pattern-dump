@@ -1,0 +1,23 @@
+import type { Page, TestInfo } from "@playwright/test";
+
+export const DEV_PORT = process.env["SKIN_DEV_PORT"] ?? "4600";
+export const DEV = `http://live.localhost:${DEV_PORT}`;
+export const WORKBENCH = `http://pd.localhost:${DEV_PORT}`;
+export const STATIC = `http://127.0.0.1:${process.env["SKIN_STATIC_PORT"] ?? "4700"}`;
+/** storefront.workbenchUrl in the bench's config: what built pages link to. */
+export const BUILD_WORKBENCH_URL = "https://workbench.example.test/";
+
+/** Whether this test runs against pd dev (true) or the built root on a static host (false). */
+export const isDev = (info: TestInfo): boolean => info.project.name === "skin";
+
+/** Open every chapter row on the page (each is a <details>; only the first starts open), as a reader would. */
+export async function openChapters(page: Page): Promise<void> {
+  for (const summary of await page.locator("details.chapter:not([open]) > summary").all()) await summary.click();
+}
+
+/** The page's DOM as markup, without pd dev's live-reload client. */
+export const domWithoutLiveClient = (page: Page): Promise<string> => page.evaluate(() => {
+  const d = document.documentElement.cloneNode(true) as HTMLElement;
+  d.querySelectorAll("script[data-pd-live]").forEach(s => s.remove());
+  return d.outerHTML;
+});
