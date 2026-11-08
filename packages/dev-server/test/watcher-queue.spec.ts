@@ -4,11 +4,12 @@
 // `__testOnly_holdHandler`; events are delivered as chokidar would with `__testOnly_onWatchStarted`, so
 // what is waiting is known without timing.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 type Deliver = (event: "change", path: string) => void;
 const hooks = globalThis as {
@@ -29,12 +30,12 @@ async function project(): Promise<{ b: Bench; deliver: Deliver }> {
   const root = join(tmp, `site-${n++}`);
   for (const [rel, text] of [[A, "<p>a</p>\n"], [B, "<p>b</p>\n"]]) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), text);
+    await save(join(root, rel), text);
   }
   await mkdir(join(root, "src/styles"), { recursive: true });
   let deliver: Deliver | undefined;
   hooks.__testOnly_onWatchStarted = d => { deliver = d; };
-  const b = new Bench(root, null, join(tmp, "staging"));
+  const b = new Bench(root, null);
   await b.start(config);
   delete hooks.__testOnly_onWatchStarted;
   if (!deliver) throw new Error("the watcher did not hand over its deliver function");
@@ -70,11 +71,11 @@ describe("watcher events", () => {
     const hold = holdOne(b, A);
     const fromMsg = b.messages.length;
     const from = handled.length;
-    await writeFile(b.at(A), "<p>a, saved</p>\n");
+    await save(b.at(A), "<p>a, saved</p>\n");
     await hold.held;
     // While A's handler is held, B's change arrives. Delivery queues it at once, so had it not waited, its
     // handler would have started inside deliver().
-    await writeFile(b.at(B), "<p>b, saved</p>\n");
+    await save(b.at(B), "<p>b, saved</p>\n");
     deliver("change", b.at(B));
     expect(hold.starts).toEqual([`change ${A}`]);
 
@@ -90,10 +91,10 @@ describe("watcher events", () => {
     const { b, deliver } = await project();
     const hold = holdOne(b, A);
     const from = handled.length;
-    await writeFile(b.at(A), "<p>a, saved</p>\n");
+    await save(b.at(A), "<p>a, saved</p>\n");
     await hold.held;
     // Three reports of B's change while A's handler is held: one waits.
-    await writeFile(b.at(B), "<p>b, saved</p>\n");
+    await save(b.at(B), "<p>b, saved</p>\n");
     for (let i = 0; i < 3; i++) deliver("change", b.at(B));
     hold.release();
     // When A's handler finishes, the hook reports what is still waiting: B's change, once. (The skip for

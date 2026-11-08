@@ -22,11 +22,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { writeFile, cp, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { startDevServer } from "@pattern-dump/dev-server";
 import { defineConfig } from "@pattern-dump/config";
+import { save } from "../../../test-support/save.js";
 
 const here      = dirname(fileURLToPath(import.meta.url));
 const testBench = join(here, "../../../test-bench");
@@ -227,7 +228,7 @@ describe("docs security — validateLink allowlist", () => {
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), "pd-docs-sec-"));
     await cp(testBench, dir, { recursive: true });
-    await writeFile(
+    await save(
       join(dir, "src/patterns/atoms/chip/chip.md"),
       [
         "---", "title: Chip", "status: draft", "---", "",
@@ -241,7 +242,6 @@ describe("docs security — validateLink allowlist", () => {
         "<img src=x onerror=alert(1)>",
         "",
       ].join("\n"),
-      "utf-8",
     );
     server = await startDevServer(config, dir, { port: 0, wsPort: 0 });
     const res = await fetch(`http://127.0.0.1:${server.port}/api/component/atoms/chip`);

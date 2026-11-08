@@ -1,12 +1,13 @@
 // Project and package stylesheets can load an installed package by its bare name
 // (`@use '@scope/pkg/...'`), found through node_modules from the stylesheet upward, as in Node.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { compileSassFile } from "@pattern-dump/build";
 import { buildAllStyleData } from "../src/style-index.js";
 import { recomputeComponentCss } from "../src/css-closure.js";
+import { save } from "../../../test-support/save.js";
 
 let root = "";
 const ids = new Set(["atoms/tile"]);
@@ -24,7 +25,7 @@ beforeAll(async () => {
   };
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), text);
+    await save(join(root, rel), text);
   }
 });
 afterAll(async () => { if (root) await rm(root, { recursive: true, force: true }); });

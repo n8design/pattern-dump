@@ -5,7 +5,7 @@
 // here on throwaway fixtures — test-bench's own order is a demo corpus, not a specification.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { TreeNode } from "@pattern-dump/contracts";
@@ -14,6 +14,7 @@ import { buildComponentTree, folderTitle } from "../src/component-tree.js";
 import { buildFolderOverview } from "../src/overview.js";
 import { readFrontmatter } from "../src/frontmatter.js";
 import { orderSiblings, parseOrder, REST } from "../src/tree-order.js";
+import { save } from "../../../test-support/save.js";
 
 // ─── frontmatter ─────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ async function corpus(files: Record<string, string>): Promise<string> {
   for (const [rel, body] of Object.entries(files)) {
     const abs = join(root, rel);
     await mkdir(dirname(abs), { recursive: true });
-    await writeFile(abs, body);
+    await save(abs, body);
   }
   return root;
 }

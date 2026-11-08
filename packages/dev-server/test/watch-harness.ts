@@ -4,12 +4,13 @@
 // for its barrier: a `.__testOnly_barrier` file (a dotfile, which every reader of a folder skips) in every watched folder (the project's and each linked
 // package's), all edited, all handled (the watcher reports them and handles nothing), and then no handler
 // still running. The OS orders events within a folder, not across folders, hence one per folder. Then a
-// socket ping: frames on one socket arrive in order, so every message sent so far has arrived. New files
-// are written beside the project and renamed into place, so each appears in one event.
-import { appendFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
+// socket ping: frames on one socket arrive in order, so every message sent so far has arrived. Files are
+// written with save() (test-support/save.ts), so each save appears in one event. A barrier file is edited
+// with a one-character append: no truncate, so no emptied file in between, and always a change.
+import { appendFile, readFile, rm } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { existsSync } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import WebSocket from "ws";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import type { DevServer } from "@pattern-dump/dev-server";
@@ -17,6 +18,7 @@ import { startOnFreeWsPort } from "./free-ports.js";
 import { loadPatternPackages } from "../src/packages.js";
 import { resolveServerConfig } from "../src/server-config.js";
 import { watchedRoots } from "../src/watch-roots.js";
+import { save } from "../../../test-support/save.js";
 
 /** The barrier's file: in every watched folder, reported by the watcher and never handled. */
 const BARRIER = ".__testOnly_barrier";
@@ -64,8 +66,6 @@ export async function closeAll(): Promise<void> {
   delete (globalThis as { __testOnly_onEventHandled?: unknown }).__testOnly_onEventHandled;
 }
 
-
-let staged = 0;
 /** A served project: its socket's messages, and the acts a case can take on it. */
 export class Bench {
   messages: string[] = [];
@@ -75,9 +75,8 @@ export class Bench {
   private server: DevServer | undefined;
   /** One barrier file per watched folder. */
   private barriers: string[] = [];
-  /** `component`: the one the workbench has open, or null for no workbench at all. `staging`: a folder
-   *  outside every watched one, where new files are written before they're moved in. */
-  constructor(readonly root: string, private readonly component: string | null, private readonly staging: string) {}
+  /** `component`: the one the workbench has open, or null for no workbench at all. */
+  constructor(readonly root: string, private readonly component: string | null) {}
 
   async start(cfg: PatternDumpConfig): Promise<void> {
     // The folders the watcher will watch, as it finds them.
@@ -88,7 +87,7 @@ export class Bench {
       ...w.helpers.map(h => h.scope), ...(rc.storefront?.pagesDir ? [rc.storefront.pagesDir] : []),
     ].filter(d => existsSync(d));
     this.barriers = [...new Set(folders)].map(d => join(d, BARRIER));
-    for (const file of this.barriers) await writeFile(file, "");
+    for (const file of this.barriers) await save(file, "");
     const { server, wsPort } = await startOnFreeWsPort(cfg, this.root);
     this.live = wsPort;
     this.server = server;
@@ -127,16 +126,11 @@ export class Bench {
   rel(path: string): string { return relative(this.forms().find(f => path.startsWith(f + "/"))!, path); }
   private forms(): string[] { return [this.root, realpathSync(this.root)]; }
 
-  edit(rel: string, text: string): Promise<void> { return appendFile(this.at(rel), text); }
+  /** `text` appended to a file, as one save of the whole file. */
+  async edit(rel: string, text: string): Promise<void> { await save(this.at(rel), `${await readFile(this.at(rel), "utf8")}${text}`); }
   remove(rel: string): Promise<void> { return rm(this.at(rel), { recursive: true }); }
-  /** A new file, written outside the project and renamed into place, so it appears complete, in one event. */
-  async create(rel: string, text: string): Promise<void> {
-    const file = join(this.staging, String(staged++));
-    await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, text);
-    await mkdir(dirname(this.at(rel)), { recursive: true });
-    await rename(file, this.at(rel));
-  }
+  /** A new file, saved in one step, so it appears complete, in one event. */
+  create(rel: string, text: string): Promise<void> { return save(this.at(rel), text); }
 
   /** The workbench asks for its component again, as it does after every reload (with none open, nothing). */
   async reopen(): Promise<void> {

@@ -6,13 +6,14 @@
 //   seed is stored (the documented deviation from lazy.ts's "never stored").
 // The moment during the seed is the test-only hook `__testOnly_onLazy("audit-seed", "built")`.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { startDevServer } from "@pattern-dump/dev-server";
 import { pdScratchDir } from "../src/scratch.js";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 type LazyHook = (name: string, phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
 const hooks = globalThis as { __testOnly_onLazy?: LazyHook };
@@ -35,8 +36,8 @@ async function site(): Promise<string> {
   const root = join(tmp, `site-${n++}`);
   roots.push(root);
   await mkdir(dirname(join(root, FILE)), { recursive: true });
-  await writeFile(join(root, FILE), DEFECT);
-  await writeFile(join(root, "src/patterns/atoms/y.hbs"), `<p>other</p>\n`);
+  await save(join(root, FILE), DEFECT);
+  await save(join(root, "src/patterns/atoms/y.hbs"), `<p>other</p>\n`);
   await mkdir(join(root, "src/styles"), { recursive: true });
   return root;
 }
@@ -57,7 +58,7 @@ describe("the persisted audit", () => {
     try {
       const audit = async () => (await fetch(`http://127.0.0.1:${first.port}/api/audit`)).json() as Promise<Audit>;
       expect(findings(await audit())).toContain("element-permitted-content");
-      await writeFile(join(root, FILE), CLEAN);
+      await save(join(root, FILE), CLEAN);
       // Warm: assembled from memory, and persisted.
       expect(findings(await audit())).toContain("element-permitted-content");
     } finally {
@@ -78,7 +79,7 @@ describe("the persisted audit", () => {
 describe("a seed", () => {
   it("is shared by requests during it, and audits a component saved during it again before it is stored", async () => {
     const root = await site();
-    const b = new Bench(root, null, join(tmp, "staging"));
+    const b = new Bench(root, null);
     await b.start(config);
 
     let seeds = 0;
@@ -88,7 +89,7 @@ describe("a seed", () => {
       if (seeds > 1) return;
       // The seed has audited the defect; now the component is saved, and the watcher handles the save.
       const from = handled.length;
-      await writeFile(b.at(FILE), CLEAN);
+      await save(b.at(FILE), CLEAN);
       await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === FILE && h.event === "change"));
     };
     const [one, two] = await Promise.all([

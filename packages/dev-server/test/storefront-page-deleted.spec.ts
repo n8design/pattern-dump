@@ -1,11 +1,12 @@
 // A storefront page deleted after the pages folder was read for a request is a 404, never an unhandled
 // error: a real page in a temp folder, read, then deleted before the request. No mock.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readPages } from "../src/storefront/pages.js";
 import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let dir = "";
@@ -16,8 +17,8 @@ beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "pd-page-deleted-"));
   dir = join(tmp, "pages");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "index.md"), "---\ntitle: Home\n---\n\nHome.\n");
-  await writeFile(join(dir, "about.md"), "---\ntitle: About\n---\n\nAbout.\n");
+  await save(join(dir, "index.md"), "---\ntitle: Home\n---\n\nHome.\n");
+  await save(join(dir, "about.md"), "---\ntitle: About\n---\n\nAbout.\n");
 });
 afterAll(async () => {
   if (tmp) await rm(tmp, { recursive: true, force: true });

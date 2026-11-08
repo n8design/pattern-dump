@@ -5,7 +5,7 @@
 // Live cases run through watch-harness.ts (no waiting for quiet), each on a fresh project.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +17,7 @@ import { createRenderingHandle } from "../src/rendering.js";
 import { liveScript } from "../src/storefront/page.js";
 import { freePort } from "./free-ports.js";
 import { Bench, closeAll } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let n = 0;
@@ -24,7 +25,7 @@ const cli = fileURLToPath(new URL("../../cli/dist/index.js", import.meta.url));
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, text);
+  await save(path, text);
 }
 
 const config = validateConfig(defineConfig({
@@ -46,7 +47,7 @@ const FILES: Record<string, string> = {
 async function project(): Promise<Bench & { preview(): Promise<string> }> {
   const root = join(tmp, `site-${n++}`);
   for (const [rel, text] of Object.entries(FILES)) await write(join(root, rel), text);
-  const b = new Bench(root, "atoms/loud", join(tmp, "staging"));
+  const b = new Bench(root, "atoms/loud");
   await b.start(config);
   return Object.assign(b, {
     preview: async () => {
@@ -154,8 +155,7 @@ describe("pd dev reloads data, helpers and assets", () => {
       const loud = async () => /<p class="loud">([^<]*)</.exec(await get("/preview/atoms/loud"))?.[1];
       expect(await loud()).toBe("cjs-1:quiet");
       const reloaded = new Promise<void>(resolve => ws.on("message", (d: Buffer) => { if (String(d).includes(`"content-swap"`)) resolve(); }));
-      await writeFile(join(tmp, "staged-cjs"), `module.exports = { shout: s => "cjs-2:" + s };\n`);
-      await rename(join(tmp, "staged-cjs"), join(root, "src/helpers/shout.cjs"));
+      await save(join(root, "src/helpers/shout.cjs"), `module.exports = { shout: s => "cjs-2:" + s };\n`);
       await reloaded;
       expect(await loud()).toBe("cjs-2:quiet");
       ws.close();

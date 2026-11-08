@@ -2,11 +2,12 @@
 // exists. The workbench asks /api/component/<path> for any route its tree does not know; that 404 must not
 // redirect the next reload away from the component that is open.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { Bench, closeAll } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 const config = defineConfig({
   sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
@@ -28,16 +29,16 @@ describe("a request for a component that does not exist", () => {
       ["src/_data/site.json", `{ "site": "one" }\n`],
     ]) {
       await mkdir(dirname(join(root, rel)), { recursive: true });
-      await writeFile(join(root, rel), text);
+      await save(join(root, rel), text);
     }
     await mkdir(join(root, "src/styles"), { recursive: true });
-    const b = new Bench(root, "atoms/btn", join(tmp, "staging"));
+    const b = new Bench(root, "atoms/btn");
     await b.start(config);
 
     const r = await b.step(async () => {
       const probe = await fetch(`${b.origin}/api/component/atoms/no-such-thing`);
       expect(probe.status).toBe(404);
-      await writeFile(b.at("src/_data/site.json"), `{ "site": "two" }\n`);
+      await save(b.at("src/_data/site.json"), `{ "site": "two" }\n`);
     }, [["change", "src/_data/site.json"]]);
     expect(r.messages).toEqual([`{"type":"content-swap","componentId":"atoms/btn"}`]);
   }, 60_000);

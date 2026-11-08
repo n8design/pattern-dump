@@ -6,13 +6,17 @@
 // helper module in the same folder (the OS reports one folder's changes in order) and the step waits for
 // that one's reload message; whatever the barrier's edit caused would come before it.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import WebSocket from "ws";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import type { DevServer } from "@pattern-dump/dev-server";
 import { startOnFreeWsPort } from "./free-ports.js";
+import { save } from "../../../test-support/save.js";
+
+/** Append `text` to `path`, as one save of the whole file. */
+const append = async (path: string, text: string) => save(path, `${await readFile(path, "utf8")}${text}`);
 
 let tmp = "";
 let server: DevServer;
@@ -21,7 +25,7 @@ const messages: string[] = [];
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, text);
+  await save(path, text);
 }
 /** Resolve on the next message matching `test`, or fail after 5 s naming what arrived. */
 const next = (test: (m: string) => boolean): Promise<void> => new Promise((resolve, reject) => {
@@ -65,8 +69,8 @@ describe("the barrier file, with no test hook set", () => {
       for (let round = 0; round < 2; round++) {
         const from = messages.length;
         const reloaded = next(m => m.includes(`"content-swap"`));
-        await appendFile(join(tmp, "site/src/helpers/.__testOnly_barrier"), ".");
-        await appendFile(join(tmp, "site/src/helpers/shout.js"), "\n");
+        await append(join(tmp, "site/src/helpers/.__testOnly_barrier"), ".");
+        await append(join(tmp, "site/src/helpers/shout.js"), "\n");
         await reloaded;
         expect(messages.slice(from).filter(m => !m.startsWith('{"type":"hello"'))).toEqual([`{"type":"content-swap","componentId":"atoms/loud"}`]);
       }

@@ -5,11 +5,12 @@
 // .theme.json sidecar showed empty swatches. Both spellings are the same selector.
 
 import { describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileSassFile } from "@pattern-dump/build";
 import { extractThemeTokens } from "../src/themes.js";
+import { save } from "../../../test-support/save.js";
 
 const slots = ["--surface", "--primary", "--missing"];
 
@@ -18,7 +19,7 @@ describe("extractThemeTokens — compiled CSS, no sidecar", () => {
     const dir = await mkdtemp(join(tmpdir(), "pd-theme-tokens-"));
     try {
       const scss = join(dir, "dark.theme.scss");
-      await writeFile(scss, '[data-theme="dark"] {\n  --surface: #16181d;\n  --primary: #7ab8ff;\n}\n');
+      await save(scss, '[data-theme="dark"] {\n  --surface: #16181d;\n  --primary: #7ab8ff;\n}\n');
       const css = await compileSassFile(scss);
       expect(css).toContain("[data-theme=dark]");
       expect(await extractThemeTokens("dark", css, slots, dir))

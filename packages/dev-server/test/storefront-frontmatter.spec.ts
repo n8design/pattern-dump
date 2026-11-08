@@ -2,7 +2,7 @@
 // page can be wrong, each with its exact message and line, and the coercions a declared type allows.
 // Nothing is inferred — not from the layout's sample data, not from the values themselves.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,7 @@ import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { readFrontmatterStrict } from "../src/frontmatter.js";
 import { readPages, type PageFile } from "../src/storefront/pages.js";
 import { checkPageFrontmatter, layoutNames } from "../src/storefront/frontmatter-contract.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let map: DiscoveryMap;
@@ -52,7 +53,7 @@ beforeAll(async () => {
   for (const [path, body] of Object.entries(files)) {
     const file = join(tmp, "patterns", ...path.split("/"));
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, body);
+    await save(file, body);
   }
   map = (await buildDiscoveryMap(join(tmp, "patterns"))).discoveryMap;
 });

@@ -7,12 +7,13 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { join } from "node:path";
-import { readFile, writeFile, mkdir, rm, mkdtemp } from "node:fs/promises";
+import { mkdir, rm, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import WebSocket from "ws";
 
 import { startDevServer } from "@pattern-dump/dev-server";
 import { defineConfig } from "@pattern-dump/config";
+import { save } from "../../../test-support/save.js";
 
 const WS_PORT = 47_312;
 
@@ -34,7 +35,7 @@ describe("file watcher — full restyle for an entry bundle and the base layer",
   const received: HmrMessage[] = [];
 
   const get = async (p: string) => (await fetch(`http://127.0.0.1:${server.port}${p}`)).text();
-  const write = (rel: string, text: string) => writeFile(join(dir, rel), text, "utf-8");
+  const write = (rel: string, text: string) => save(join(dir, rel), text);
   const waitFor = async (pred: (m: HmrMessage) => boolean, label: string): Promise<HmrMessage> => {
     const deadline = Date.now() + 45_000;
     while (Date.now() < deadline) {
@@ -122,7 +123,7 @@ describe("file watcher — a component file listed in documentBase", () => {
   let ws: WebSocket;
   const received: HmrMessage[] = [];
   const get = async (p: string) => (await fetch(`http://127.0.0.1:${server.port}${p}`)).text();
-  const write = (rel: string, text: string) => writeFile(join(dir, rel), text, "utf-8");
+  const write = (rel: string, text: string) => save(join(dir, rel), text);
 
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), "pd-restyle-listed-"));

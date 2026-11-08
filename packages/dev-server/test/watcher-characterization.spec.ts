@@ -17,7 +17,7 @@
 // after a change that is not meant to alter it.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +25,7 @@ import { validateConfig } from "@pattern-dump/config";
 import testBenchConfig from "../../../test-bench/pattern-dump.config.js";
 import storefrontConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { saveInTwoSteps } from "../../../test-support/save.js";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 let tmp = "";
@@ -52,7 +53,7 @@ type Case = [name: string, act: Act, events: string[][], messages: string[]];
 let copies = 0;
 /** A fresh copy of test-bench, its pattern package linked as npm links a `file:` dependency, served. */
 async function testBench(setup?: Act): Promise<Bench> {
-  const b = new Bench(await copyOf("test-bench", `test-bench-${copies++}`), "atoms/button", join(tmp, "staging"));
+  const b = new Bench(await copyOf("test-bench", `test-bench-${copies++}`), "atoms/button");
   await mkdir(b.at("node_modules"), { recursive: true });
   await symlink(join("..", "packages", "pd-fixture-ui"), b.at("node_modules/pd-fixture-ui"));
   await b.start(validateConfig(testBenchConfig, "test-bench"));
@@ -61,7 +62,7 @@ async function testBench(setup?: Act): Promise<Bench> {
 }
 /** A fresh copy of the storefront bench, served. */
 async function storefrontBench(setup?: Act): Promise<Bench> {
-  const b = new Bench(await copyOf("storefront-bench", `storefront-bench-${copies++}`), "components/callout", join(tmp, "staging"));
+  const b = new Bench(await copyOf("storefront-bench", `storefront-bench-${copies++}`), "components/callout");
   await b.start(validateConfig(storefrontConfig, "storefront-bench"));
   if (setup) { await setup(b); await b.barrier(); }
   return b;
@@ -201,9 +202,9 @@ describe("the watcher on test-bench", () => {
       const result = await b.step(async () => {
         const from = handled.length;
         await mkdir(b.at("src/patterns/atoms/zz-split"), { recursive: true });
-        await writeFile(b.at(rel), "");
+        await saveInTwoSteps(b.at(rel), "");
         await whenHandled(() => handled.slice(from).some(h => h.event === "add" && h.path === b.at(rel)));
-        await writeFile(b.at(rel), "<p>split</p>\n");
+        await saveInTwoSteps(b.at(rel), "<p>split</p>\n");
       }, [["addDir", "src/patterns/atoms/zz-split"], ["add", rel], ["change", rel]]);
       expect(result.events).toEqual([["addDir", "src/patterns/atoms/zz-split"], ["add", rel], ["change", rel]]);
       // The change is handled, not dropped: its content-swap names the new component. (Changed with linked

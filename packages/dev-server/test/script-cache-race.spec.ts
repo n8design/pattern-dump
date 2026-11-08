@@ -3,11 +3,12 @@
 // `__testOnly_onLazy` at the moment the first compile finishes, on a server with no watcher, so the only
 // invalidation is the one the test makes.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import { save } from "../../../test-support/save.js";
 
 type LazyHook = (name: string, phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
 const hooks = globalThis as { __testOnly_onLazy?: LazyHook };
@@ -19,7 +20,7 @@ const get = async () => (await fetch(`http://127.0.0.1:${server.port}/_pd/script
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, text);
+  await save(path, text);
 }
 
 beforeAll(async () => {
@@ -45,7 +46,7 @@ describe("a script saved while it compiles", () => {
     hooks.__testOnly_onLazy = async (name, phase, invalidate) => {
       if (name !== "script:toggle" || phase !== "built" || saved) return;
       saved = true;
-      await writeFile(script(), `console.log("after the save");\n`);
+      await save(script(), `console.log("after the save");\n`);
       invalidate();
     };
     const during = await get();

@@ -3,13 +3,14 @@
 // The wait is bounded: a handler that never settles is named in the terminal and pd dev closes anyway.
 // A handler is held with the test-only hook `__testOnly_holdHandler`.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdir, mkdtemp, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { pdScratchDir } from "../src/scratch.js";
 import { CLOSE_DRAIN_MS } from "../src/watch.js";
 import { startOnFreeWsPort } from "./free-ports.js";
+import { save } from "../../../test-support/save.js";
 
 const hooks = globalThis as {
   __testOnly_holdHandler?: (event: string, path: string) => Promise<void> | undefined;
@@ -27,17 +28,14 @@ async function site(): Promise<string> {
   const root = join(tmp, `site-${n++}`);
   roots.push(root);
   await mkdir(join(root, "src/patterns/atoms/btn"), { recursive: true });
-  await writeFile(join(root, "src/patterns/atoms/btn/btn.hbs"), `<button>Hi</button>\n`);
+  await save(join(root, "src/patterns/atoms/btn/btn.hbs"), `<button>Hi</button>\n`);
   await mkdir(join(root, "src/styles"), { recursive: true });
   return root;
 }
-/** A new template, written beside the project and moved in, so it arrives as one add. */
+/** A new template, saved in one step, so it arrives as one add. */
 async function addTemplate(root: string): Promise<string> {
   const file = join(root, "src/patterns/atoms/zz/zz.hbs");
-  const staged = join(tmp, `staged-${n++}`);
-  await writeFile(staged, "<p>zz</p>\n");
-  await mkdir(dirname(file), { recursive: true });
-  await rename(staged, file);
+  await save(file, "<p>zz</p>\n");
   return file;
 }
 /** Hold the handler of the add of `file`: resolves once it is held, with its release. */

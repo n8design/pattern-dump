@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ import { defineConfig, validateConfig, type PatternDumpConfig } from "@pattern-d
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import { startOnFreeWsPort } from "./free-ports.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
+import { save } from "../../../test-support/save.js";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const bench = join(repo, "storefront-bench");
@@ -130,7 +131,7 @@ describe("no preview theme layer in a page's head", () => {
   it("links no theme on a page, while the same project's preview does", async () => {
     const root = await benchCopy("themed");
     await mkdir(join(root, "themes"), { recursive: true });
-    await writeFile(join(root, "themes", "light.theme.scss"), ":root { --tone: #222; }\n");
+    await save(join(root, "themes", "light.theme.scss"), ":root { --tone: #222; }\n");
     const { port } = await serve(root, { ...config, themes: { dir: "./themes", default: "light" } });
     const preview = await get(port, "pd.localhost", "/preview/components/callout");
     expect(preview.body).toContain(`href="/_pd/themes/light.css"`);
@@ -145,7 +146,7 @@ describe("pages with problems, in pd dev", () => {
   let port = 0;
   beforeAll(async () => {
     root = await benchCopy("problems");
-    await writeFile(join(root, "pages", "about.md"), "---\ntitle: About\nbogus: <b>x</b>\n---\n\n```pattern components/nope\n```\n");
+    await save(join(root, "pages", "about.md"), "---\ntitle: About\nbogus: <b>x</b>\n---\n\n```pattern components/nope\n```\n");
     ({ port } = await serve(root, config, true));
   }, 120_000);
 
@@ -171,7 +172,7 @@ describe("rendering a page leaves the workbench's selection alone (state.lastCom
 
     const editAndWait = async (file: string): Promise<string[]> => {
       swaps.length = 0;
-      await writeFile(file, `${await readFile(file, "utf8")}\n.edited-${Date.now()} { color: red; }\n`);
+      await save(file, `${await readFile(file, "utf8")}\n.edited-${Date.now()} { color: red; }\n`);
       const deadline = Date.now() + 10_000;
       while (!swaps.some(s => s.orderedHrefs) && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
       return (swaps.find(s => s.orderedHrefs)?.orderedHrefs ?? []).map(h => h.replace(/\?v=.*$/, ""));
