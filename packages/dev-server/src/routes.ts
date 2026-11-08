@@ -254,7 +254,6 @@ export async function handleRequest(
     if (pathname.startsWith(PD_ROUTE_PREFIX.component)) {
       const componentId = pathname.slice(PD_ROUTE_PREFIX.component.length);
       const variant = url.searchParams.get("variant") ?? undefined;
-      state.lastComponentId = componentId;
       try {
         // Phase 1: build detail — 404 only for genuinely-missing components. A quarantined component
         // is not in the discovery map but still has a detail (200 + HANDLE_COLLISION, below).
@@ -264,6 +263,9 @@ export async function handleRequest(
           json(res, 404, { error: `No component "${componentId}"` } satisfies ApiError);
           return;
         }
+        // Only a component that exists (a quarantined one has a detail too) is the one on screen: the
+        // workbench probes unknown routes here, and a 404 must not redirect the watcher's next reload.
+        state.lastComponentId = componentId;
         if (state.scssGraphDirty) {
           const ids = baseComponentIds(discovery);
           const styleData = await buildAllStyleData(styleRoots, ids);
