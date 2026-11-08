@@ -4,11 +4,12 @@
 // saved one (server-state.ts, hazard 5). The moment is the test-only hook `__testOnly_onLazy("style",
 // "built")`; the save is handled by the real watcher before the hook returns (watch-harness.ts).
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 type LazyHook = (name: string, phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
 const hooks = globalThis as { __testOnly_onLazy?: LazyHook };
@@ -20,15 +21,6 @@ const config = defineConfig({
 const SCSS = "src/styles/atoms/c.scss";
 
 let tmp = "";
-let staged = 0;
-/** A save in one step: written beside the project and renamed into place. Written in place, a file is
- *  truncated, then written, which Linux can report as two changes; the second, landing after the stored
- *  build, would invalidate it, and the next request would build again. */
-async function save(path: string, text: string): Promise<void> {
-  const staging = join(tmp, `staged-${staged++}`);
-  await writeFile(staging, text);
-  await rename(staging, path);
-}
 beforeAll(async () => { tmp = await mkdtemp(join(tmpdir(), "pd-style-race-")); });
 afterEach(() => { delete hooks.__testOnly_onLazy; });
 afterAll(async () => {
@@ -47,9 +39,9 @@ describe("a stylesheet saved during a request's full style build", () => {
       ["src/styles/base/_tokens.scss", `$ink: rgb(1 2 3);\n`],
     ]) {
       await mkdir(dirname(join(root, rel)), { recursive: true });
-      await writeFile(join(root, rel), text);
+      await save(join(root, rel), text);
     }
-    const b = new Bench(root, "atoms/c", join(tmp, "staging"));
+    const b = new Bench(root, "atoms/c");
     await b.start(config);
     const detail = async () => (await fetch(`${b.origin}/api/component/atoms/c`)).json() as Promise<Detail>;
     const css = async () => (await fetch(`${b.origin}/_pd/components/atoms/c.css`)).text();

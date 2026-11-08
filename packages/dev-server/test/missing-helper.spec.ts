@@ -4,13 +4,14 @@
 // fatal for a storefront page and listed before anything is written.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import type { ComponentDetailResponse } from "@pattern-dump/contracts";
 import { buildStaticSite, startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let root = "";
@@ -18,7 +19,7 @@ const servers: DevServer[] = [];
 
 async function write(rel: string, text: string): Promise<void> {
   await mkdir(dirname(join(root, rel)), { recursive: true });
-  await writeFile(join(root, rel), text);
+  await save(join(root, rel), text);
 }
 
 const config = validateConfig(defineConfig({

@@ -4,9 +4,10 @@
 // generation has moved past the page's), then let through. The spec writes into the bench's stylesheets
 // and restores them after the test.
 import { expect, test } from "@playwright/test";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { PD_GENERATION_HEADER, generationBehind } from "@pattern-dump/contracts";
+import { save, saveInTwoSteps } from "../../test-support/save.js";
 
 const nav = fileURLToPath(new URL("../src/styles/partials/nav.scss", import.meta.url));
 let original = "";
@@ -14,7 +15,7 @@ let original = "";
 test.beforeEach(async () => { original = await readFile(nav, "utf8"); });
 test.afterEach(async ({ page }) => {
   const before = (await page.request.get("/api/version")).headers()[PD_GENERATION_HEADER.toLowerCase()];
-  await writeFile(nav, original);
+  await save(nav, original);
   // Let the restore be handled before the next spec.
   await expect.poll(async () => generationBehind(before, (await page.request.get("/api/version")).headers()[PD_GENERATION_HEADER.toLowerCase()]), { timeout: 10_000 }).toBe(true);
 });
@@ -34,7 +35,7 @@ test("a change sent before the page's socket opened reloads the page once the so
   expect(generation).not.toBe("");
 
   // The change, handled while the socket is held: its reload message reaches no socket of this page.
-  await writeFile(nav, `${original}\n.site-nav-list {\n  color: rgb(9, 8, 7);\n}\n`);
+  await save(nav, `${original}\n.site-nav-list {\n  color: rgb(9, 8, 7);\n}\n`);
   await expect.poll(async () => generationBehind(generation, (await page.request.get("/api/version")).headers()[PD_GENERATION_HEADER.toLowerCase()]), { timeout: 10_000 }).toBe(true);
   await page.waitForTimeout(300);
   await expect(page.locator(".site-nav-list")).not.toHaveCSS("color", "rgb(9, 8, 7)");
@@ -61,18 +62,15 @@ test("one change that sends several reload messages reloads the page once", asyn
   let navigations = 0;
   page.on("framenavigated", f => { if (f === page.mainFrame()) navigations++; });
   try {
-    // One change: written beside the bench (in e2e/, which nothing watches, on the same disk) and moved into
-    // place in one step. A plain writeFile truncates and then writes, which Linux reports as two changes.
-    const staged = fileURLToPath(new URL("./.staged-bench-blocks.svg", import.meta.url));
-    await writeFile(staged, `${before}<!-- changed -->\n`);
-    await rename(staged, svg);
+    // One change, saved in one step (an in-place write can be reported as two changes).
+    await save(svg, `${before}<!-- changed -->\n`);
     await expect.poll(() => navigations, { timeout: 10_000 }).toBeGreaterThan(0);
     await expect(page.locator("h1")).toHaveText("About");
     // Its socket reopened after the reload; hello finds it current: no second reload.
     await page.waitForTimeout(2_000);
     expect(navigations).toBe(1);
   } finally {
-    await writeFile(svg, before);
+    await save(svg, before);
   }
 });
 
@@ -84,10 +82,9 @@ test("a save in two steps (emptied, then written, as an editor does) leaves the 
   let navigations = 0;
   page.on("framenavigated", f => { if (f === page.mainFrame()) navigations++; });
   try {
-    // Two changes on disk: the watcher may handle the empty file, then the full one (two reloads), or only
-    // the full one (one). Not an exact count: what is left must be the final asset, and no more reloads.
-    await writeFile(svg, "");
-    await writeFile(svg, `${before}<!-- two steps -->\n`);
+    // Saved in place: the OS may report the emptied file, then the full one (two reloads), or only the full
+    // one (one). Not an exact count: what is left must be the final asset, and no more reloads.
+    await saveInTwoSteps(svg, `${before}<!-- two steps -->\n`);
     await expect.poll(() => navigations, { timeout: 10_000 }).toBeGreaterThan(0);
     await page.waitForTimeout(2_000);
     expect(navigations).toBeGreaterThanOrEqual(1);
@@ -97,6 +94,6 @@ test("a save in two steps (emptied, then written, as an editor does) leaves the 
     expect(await page.locator(`img[src="/assets/images/bench-blocks.svg"]`).evaluate(img => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     expect(await page.evaluate(() => fetch("/assets/images/bench-blocks.svg").then(r => r.text()))).toContain("<!-- two steps -->");
   } finally {
-    await writeFile(svg, before);
+    await save(svg, before);
   }
 });

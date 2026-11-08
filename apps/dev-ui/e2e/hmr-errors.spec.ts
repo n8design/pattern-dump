@@ -9,9 +9,10 @@
 
 import { test, expect } from "@playwright/test";
 import { gotoComponent } from "./helpers.js";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { save, saveInTwoSteps } from "../../../test-support/save.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testBench = path.resolve(__dirname, "../../../test-bench");
@@ -31,7 +32,7 @@ test.describe("HMR — build errors reach the Console", () => {
     const original = await readFile(scss, "utf8");
     try {
       // Unclosed brace + unknown function: sass cannot compile this.
-      await writeFile(scss, `${original}\n.pd-broken { color: ; `);
+      await save(scss, `${original}\n.pd-broken { color: ; `);
 
       // Scoped to build errors: test-bench carries a real handle collision, which is also an error
       // line on the Console from the moment the page connects (see the startup-collision test).
@@ -40,7 +41,7 @@ test.describe("HMR — build errors reach the Console", () => {
       // The server's formatted message must actually reach the user, not just a generic label.
       await expect(errorLine.first()).toContainText(/SCSS/i);
     } finally {
-      await writeFile(scss, original);
+      await save(scss, original);
       // Let the restore's own watcher event land so it cannot leak into the next spec.
       await page.waitForTimeout(1500);
     }
@@ -70,9 +71,11 @@ test.describe("HMR — build errors reach the Console", () => {
     const flat = path.join(atoms, `${slug}.hbs`);
     const groupDir = path.join(atoms, `${slug}-group`);
     try {
-      await writeFile(flat, `<p>${slug}</p>\n`);
+      await save(flat, `<p>${slug}</p>\n`);
       await mkdir(groupDir, { recursive: true });
-      await writeFile(path.join(groupDir, `${slug}.hbs`), `<p>${slug} nested</p>\n`);
+      // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+      // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+      await saveInTwoSteps(path.join(groupDir, `${slug}.hbs`), `<p>${slug} nested</p>\n`);
 
       const line = page.locator(`${consoleLines}[data-level="error"]`, { hasText: `atoms-${slug}` });
       await expect(line.first()).toBeAttached({ timeout: 20_000 });
@@ -99,13 +102,13 @@ test.describe("HMR — build errors reach the Console", () => {
 
     const original = await readFile(scss, "utf8");
     try {
-      await writeFile(scss, `${original}\n/* harmless marker */\n`);
+      await save(scss, `${original}\n/* harmless marker */\n`);
       // Give the watcher time to process a VALID edit; no error line may appear.
       await page.waitForTimeout(2500);
       await expect(errors).toHaveCount(before);
       await expect(page.locator(consoleLines, { hasText: "Build error" })).toHaveCount(0);
     } finally {
-      await writeFile(scss, original);
+      await save(scss, original);
       await page.waitForTimeout(1500);
     }
   });

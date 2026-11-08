@@ -7,11 +7,12 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { join } from "node:path";
-import { writeFile, mkdir, rm, mkdtemp } from "node:fs/promises";
+import { mkdir, rm, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { startDevServer } from "@pattern-dump/dev-server";
 import { defineConfig } from "@pattern-dump/config";
+import { save } from "../../../test-support/save.js";
 
 const config = defineConfig({
   sourceDir:    "./src",
@@ -28,7 +29,7 @@ describe("file watcher — a component added while it runs", () => {
   const get = async (p: string) => (await fetch(`http://127.0.0.1:${server.port}${p}`)).text();
   const write = async (rel: string, text: string) => {
     await mkdir(join(dir, rel, ".."), { recursive: true });
-    await writeFile(join(dir, rel), text, "utf-8");
+    await save(join(dir, rel), text);
   };
   /** Poll until `pred` holds (or time out), returning the last observation either way. */
   const settle = async <T>(read: () => Promise<T>, pred: (v: T) => boolean): Promise<T> => {

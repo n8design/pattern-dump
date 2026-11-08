@@ -3,12 +3,13 @@
 // fails is reported and the reload still goes out after it. The re-audit is held or failed with the
 // test-only hook `__testOnly_onReaudit`.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { pdScratchDir } from "../src/scratch.js";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 const hooks = globalThis as { __testOnly_onReaudit?: (componentId: string) => Promise<void> | undefined };
 const config = defineConfig({
@@ -26,9 +27,9 @@ async function project(): Promise<Bench> {
   const root = join(tmp, `site-${n++}`);
   roots.push(root);
   await mkdir(dirname(join(root, FILE)), { recursive: true });
-  await writeFile(join(root, FILE), `<button class="x"><div>block inside a button</div></button>\n`);
+  await save(join(root, FILE), `<button class="x"><div>block inside a button</div></button>\n`);
   await mkdir(join(root, "src/styles"), { recursive: true });
-  const b = new Bench(root, "atoms/x", join(tmp, "staging"));
+  const b = new Bench(root, "atoms/x");
   await b.start(config);
   // A warm graph: the watcher re-audits surgically from here on.
   await fetch(`${b.origin}/api/audit`);
@@ -56,7 +57,7 @@ describe("a template save, with the audit graph warm", () => {
 
     const fromMsg = b.messages.length;
     const from = handled.length;
-    await writeFile(b.at(FILE), `<button class="x">fine</button>\n`);
+    await save(b.at(FILE), `<button class="x">fine</button>\n`);
     await held;
     // The re-audit is running: no reload yet.
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -75,7 +76,7 @@ describe("a template save, with the audit graph warm", () => {
     hooks.__testOnly_onReaudit = id => (id === "atoms/x" ? Promise.reject(new Error("forced for a test")) : undefined);
     const fromMsg = b.messages.length;
     const from = handled.length;
-    await writeFile(b.at(FILE), `<button class="x">fine</button>\n`);
+    await save(b.at(FILE), `<button class="x">fine</button>\n`);
     await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === FILE));
     await b.barrier();
     const error = JSON.stringify({ type: "error", scope: "build", message: `${FILE} (change): its audit failed: forced for a test` });

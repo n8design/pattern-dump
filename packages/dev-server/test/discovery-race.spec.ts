@@ -5,13 +5,17 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { appendFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateConfig } from "@pattern-dump/config";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
+import { save } from "../../../test-support/save.js";
+
+/** Append `text` to `path`, as one save of the whole file. */
+const append = async (path: string, text: string) => save(path, `${await readFile(path, "utf8")}${text}`);
 
 type Hook = (phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
 type LazyHook = (name: string, phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
@@ -92,7 +96,7 @@ describe("the discovery a request takes", () => {
       if (phase !== "built" || built) return;
       built = true;
       await mkdir(join(root, "src/patterns/components/zz-late"), { recursive: true });
-      await writeFile(join(root, "src/patterns/components/zz-late/zz-late.hbs"), "<p>late</p>\n");
+      await save(join(root, "src/patterns/components/zz-late/zz-late.hbs"), "<p>late</p>\n");
       invalidate();
     });
     // The request that started the overtaken build waits for the next one, which has seen the change.
@@ -129,7 +133,7 @@ describe("the composition registry a request uses", () => {
       async (name, phase, invalidate) => {
         if (name !== "composition" || phase !== "built" || edited) return;
         edited = true;
-        await appendFile(join(root, "src/patterns/components/callout/callout.hbs"), "{{> partials-nav }}\n");
+        await append(join(root, "src/patterns/components/callout/callout.hbs"), "{{> partials-nav }}\n");
         invalidate();
       };
     // That request keeps the registry of the discovery it took, read before the edit.

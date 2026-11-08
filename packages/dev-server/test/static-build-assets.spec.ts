@@ -2,12 +2,13 @@
 // that folder name, so a later root of the same name is left out (and reported), never copied over
 // the first one's files.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { buildStaticSite, type StaticBuildReport } from "@pattern-dump/dev-server";
 import { shadowedAssetRoots } from "../src/server-config.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let site = "";
@@ -26,7 +27,7 @@ beforeAll(async () => {
   };
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(project, rel)), { recursive: true });
-    await writeFile(join(project, rel), text);
+    await save(join(project, rel), text);
   }
   const config = defineConfig({
     sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",

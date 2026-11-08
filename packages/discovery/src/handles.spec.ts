@@ -1,10 +1,11 @@
 // Handles drop numeric ordering prefixes, as PatternLab's partial names do: `00-atoms/badge` is
 // included as `atoms-badge`. Ids and routes keep the prefix; only the handle loses it.
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildDiscoveryMap, deriveHandle } from "./index.js";
+import { save } from "../../../test-support/save.js";
 
 describe("deriveHandle", () => {
   it("is the first folder plus the component name", () => {
@@ -32,7 +33,7 @@ afterEach(async () => { if (root) await rm(root, { recursive: true, force: true 
 async function files(base: string, paths: Record<string, string>): Promise<void> {
   for (const [p, text] of Object.entries(paths)) {
     await mkdir(dirname(join(base, p)), { recursive: true });
-    await writeFile(join(base, p), text);
+    await save(join(base, p), text);
   }
 }
 

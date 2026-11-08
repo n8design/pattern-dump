@@ -2,15 +2,16 @@
 // called it (a partial, when the call is in a partial), and where in it. A `{{name}}` with no arguments is
 // not a helper call and renders nothing, as in stock Handlebars; a project may still replace the handling.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createRenderer, MissingHelperError } from "../src/index.js";
+import { save } from "../../../test-support/save.js";
 
 let patterns = "";
 async function write(rel: string, text: string): Promise<void> {
   await mkdir(dirname(join(patterns, rel)), { recursive: true });
-  await writeFile(join(patterns, rel), text);
+  await save(join(patterns, rel), text);
 }
 
 beforeAll(async () => {

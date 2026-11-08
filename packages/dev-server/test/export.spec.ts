@@ -11,7 +11,7 @@
 // not silently repair the subject). We assert it survives at the file level AND in the render.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,6 +19,7 @@ import { buildDiscoveryMap, collapseComponentId } from "@pattern-dump/discovery"
 import { createRenderer } from "@pattern-dump/renderer";
 import { detectFlattening, type FlatteningInput } from "../src/flattening.js";
 import { planExport, writeExport, writeThreadedIncluders } from "../src/index.js";
+import { save } from "../../../test-support/save.js";
 
 // Two members, byte-identical except the ROOT class token (` loud`) and their data — lossless shape
 // (a). The `</meuu>` typo is in BOTH, in the shared skeleton.
@@ -33,10 +34,10 @@ beforeAll(async () => {
   outRoot = await mkdtemp(join(tmpdir(), "pd-export-out-"));
   const dir = join(srcRoot, "atoms", "widget");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "widget.hbs"), WIDGET);
-  await writeFile(join(dir, "widget-loud.hbs"), WIDGET_LOUD);
-  await writeFile(join(dir, "widget.json"), JSON.stringify({ label: "Hi" }));
-  await writeFile(join(dir, "widget-loud.json"), JSON.stringify({ label: "Loud!" })); // differs → delta
+  await save(join(dir, "widget.hbs"), WIDGET);
+  await save(join(dir, "widget-loud.hbs"), WIDGET_LOUD);
+  await save(join(dir, "widget.json"), JSON.stringify({ label: "Hi" }));
+  await save(join(dir, "widget-loud.json"), JSON.stringify({ label: "Loud!" })); // differs → delta
 });
 
 afterAll(async () => {
@@ -150,9 +151,9 @@ describe("pd export — threading through the include boundary (slice 2)", () =>
     const barDir  = join(t2SrcRoot, "molecules", "bar");
     await mkdir(chipDir, { recursive: true });
     await mkdir(barDir, { recursive: true });
-    await writeFile(join(chipDir, "chip.hbs"), CHIP);
-    await writeFile(join(chipDir, "chip-loud.hbs"), CHIP_LOUD);
-    await writeFile(join(barDir, "bar.hbs"), BAR);
+    await save(join(chipDir, "chip.hbs"), CHIP);
+    await save(join(chipDir, "chip-loud.hbs"), CHIP_LOUD);
+    await save(join(barDir, "bar.hbs"), BAR);
   });
 
   afterAll(async () => {

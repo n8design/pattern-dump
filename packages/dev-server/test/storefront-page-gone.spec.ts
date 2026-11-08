@@ -2,11 +2,12 @@
 // page. Produced by failing the read of that one file the way the file system does, so it does not depend
 // on timing. A page deleted after the folder was read: storefront-page-deleted.spec.ts, with no mock.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readPages } from "../src/storefront/pages.js";
 import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
+import { save } from "../../../test-support/save.js";
 
 // Files whose read fails with ENOENT, as if deleted after the folder listed them.
 const gone = vi.hoisted(() => new Set<string>());
@@ -30,8 +31,8 @@ beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "pd-page-gone-"));
   dir = join(tmp, "pages");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "index.md"), "---\ntitle: Home\n---\n\nHome.\n");
-  await writeFile(join(dir, "about.md"), "---\ntitle: About\n---\n\nAbout.\n");
+  await save(join(dir, "index.md"), "---\ntitle: Home\n---\n\nHome.\n");
+  await save(join(dir, "about.md"), "---\ntitle: About\n---\n\nAbout.\n");
 });
 afterAll(async () => {
   if (tmp) await rm(tmp, { recursive: true, force: true });

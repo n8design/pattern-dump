@@ -5,7 +5,7 @@
 // state, then pushes again.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,7 @@ import { PD_GENERATION_HEADER, generationBehind, type HmrMessage } from "@patter
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import type { ServerState } from "../src/server-state.js";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 type Api = { push(message: HmrMessage): void; state: ServerState };
 const hooks = globalThis as { __testOnly_handler?: (event: string, path: string, api: Api) => Promise<void> | undefined };
@@ -34,7 +35,7 @@ async function listen(onFrame: (m: Received) => void = () => {}): Promise<{ fram
 }
 const edited = async (rel: string, text: string) => {
   const from = handled.length;
-  await writeFile(b.at(rel), text);
+  await save(b.at(rel), text);
   await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === rel));
   await b.barrier();
 };
@@ -47,7 +48,7 @@ beforeAll(async () => {
     await mkdir(dirname(to), { recursive: true });
     await cp(join(repo, file), to);
   }
-  b = new Bench(root, "components/callout", join(tmp, "staging"));
+  b = new Bench(root, "components/callout");
   await b.start(validateConfig(benchConfig, "storefront-bench"));
 }, 60_000);
 afterEach(() => { delete hooks.__testOnly_handler; });
@@ -97,7 +98,7 @@ describe("one change's reload messages", () => {
       if (m.type === "css-link-swap" && !fetched) fetched = fetch(`${b.origin}${CSS}`).then(r => r.text());
     });
     const from = handled.length;
-    await writeFile(b.at("pages/about.md"), `${await readFile(b.at("pages/about.md"), "utf8")}\nChanged.\n`);
+    await save(b.at("pages/about.md"), `${await readFile(b.at("pages/about.md"))}\nChanged.\n`);
     await inHandler;
     // While the handler holds: a page rendered now, and time for any message that left early to arrive.
     const between = await fetch(`${b.origin}/api/version`);

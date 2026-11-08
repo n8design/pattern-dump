@@ -2,7 +2,7 @@
 // `<package name>/<path in the package>` for a package's, through its node_modules link or its real
 // folder alike. Never an absolute path, checked on test-bench as served.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,7 @@ import type { ComponentDetailResponse } from "@pattern-dump/contracts";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import { createDisplayPath } from "../src/display-path.js";
 import testBenchConfig from "../../../test-bench/pattern-dump.config.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let project = "";
@@ -24,7 +25,7 @@ beforeAll(async () => {
   link = join(project, "node_modules", "@acme", "ds");
   await mkdir(join(vendor, "patterns"), { recursive: true });
   await mkdir(join(project, "node_modules", "@acme"), { recursive: true });
-  await writeFile(join(vendor, "package.json"), "{}");
+  await save(join(vendor, "package.json"), "{}");
   // What npm makes of a `file:` dependency: a link in node_modules to the real folder.
   await symlink(join("..", "..", "vendor", "ds"), link);
 });

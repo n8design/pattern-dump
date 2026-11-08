@@ -1,8 +1,9 @@
 // Adding a markdown file adds a page and a nav entry, with no other change; removing it takes both away.
 // The spec writes into the bench's pages and removes what it added after each test.
 import { expect, test } from "@playwright/test";
-import { rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { save } from "../../test-support/save.js";
 
 const added = fileURLToPath(new URL("../pages/zz-added.md", import.meta.url));
 test.afterEach(async () => { await rm(added, { force: true }); });
@@ -12,7 +13,7 @@ test.describe("adding a page", () => {
     await page.goto("/");
     await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About"]);
 
-    await writeFile(added, "---\ntitle: Added\norder: 9\n---\n\nA page added while the site was open.\n");
+    await save(added, "---\ntitle: Added\norder: 9\n---\n\nA page added while the site was open.\n");
     // The open page reloads (page-changed for every page) and its nav now has the new entry.
     await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About", "Added"], { timeout: 10_000 });
     await page.locator('.site-nav a[href="/zz-added/"]').click();

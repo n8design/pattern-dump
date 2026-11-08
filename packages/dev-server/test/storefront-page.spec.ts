@@ -2,7 +2,7 @@
 // what never does (the layouts' sample data), and every way a page fails, each fatal and listed escaped.
 // The <head>'s stylesheet links are the caller's (stubbed here; served pages are checked over HTTP).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ import { buildCompositionRegistry, type CompositionRegistry } from "../src/compo
 import { frontmatterBody } from "../src/frontmatter.js";
 import { readPages } from "../src/storefront/pages.js";
 import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
+import { save } from "../../../test-support/save.js";
 
 const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
 const patterns = join(bench, "src", "patterns");
@@ -46,7 +47,7 @@ async function pagesOf(files: Record<string, string>): Promise<string> {
   for (const [path, body] of Object.entries(files)) {
     const file = join(dir, ...path.split("/"));
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, body);
+    await save(file, body);
   }
   return dir;
 }

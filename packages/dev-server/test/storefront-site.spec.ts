@@ -2,7 +2,7 @@
 // checker as page frontmatter, coercion off. Declared, not inferred: every way it can be wrong, with its
 // exact message.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,7 @@ import { validateConfig } from "@pattern-dump/config";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { checkSite } from "../src/storefront/site.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 const maps: Record<string, DiscoveryMap> = {};
@@ -48,7 +49,7 @@ beforeAll(async () => {
     for (const [path, body] of Object.entries(files)) {
       const file = join(tmp, name, ...path.split("/"));
       await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, body);
+      await save(file, body);
     }
     maps[name] = (await buildDiscoveryMap(join(tmp, name))).discoveryMap;
   }

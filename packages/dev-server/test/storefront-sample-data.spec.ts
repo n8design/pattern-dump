@@ -3,7 +3,7 @@
 // partials/base declares for it. Anything else would render on every page using the layout, so it is a
 // fatal problem.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,7 @@ import { buildCompositionRegistry, type CompositionRegistry } from "../src/compo
 import { readPages } from "../src/storefront/pages.js";
 import { assemblePage } from "../src/storefront/page.js";
 import { checkSampleData } from "../src/storefront/sample-data.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
@@ -34,7 +35,7 @@ async function project(extra: Record<string, string>): Promise<{ dir: string; ma
   for (const [path, body] of Object.entries({ ...BASE_FILES, ...extra })) {
     const file = join(dir, ...path.split("/"));
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, body);
+    await save(file, body);
   }
   const { discoveryMap, handleMap } = await buildDiscoveryMap(dir);
   return { dir, map: discoveryMap, handleMap, composition: await buildCompositionRegistry(dir, handleMap, discoveryMap) };
@@ -111,7 +112,7 @@ describe("assemblePage — a sample-data problem is fatal", () => {
     const p = await project({ "partials/header/header.json": JSON.stringify({ logo: "x.svg" }) });
     const pagesDir = join(p.dir, "..", `pages-${n++}`);
     await mkdir(pagesDir, { recursive: true });
-    await writeFile(join(pagesDir, "index.md"), "---\ntitle: Home\n---\nHello.\n");
+    await save(join(pagesDir, "index.md"), "---\ntitle: Home\n---\nHello.\n");
     const page = await assemblePage("/", await readPages(pagesDir), {
       discoveryMap: p.map, composition: p.composition, site: undefined, workbenchUrl: "https://wb.example/",
       render: createRenderer({ patternsDir: p.dir, discoveryMap: p.map, handleMap: p.handleMap }),

@@ -4,12 +4,13 @@
 // variant data (`<base>~<variant>.json`) is a variant of its own. Observed over HTTP after the watcher has
 // handled the file (watch-harness.ts), with the messages it sent.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { previewUrl } from "@pattern-dump/contracts";
 import { Bench, closeAll } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let n = 0;
@@ -23,7 +24,7 @@ const config = validateConfig(defineConfig({
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, text);
+  await save(path, text);
 }
 
 /** A fresh project with its own component (atoms/btn) and a linked package's (atoms/chip), neither with any .json. */
@@ -37,7 +38,7 @@ async function project(): Promise<Bench> {
   await mkdir(join(pkg, "styles"), { recursive: true });
   await mkdir(join(root, "node_modules/@acme"), { recursive: true });
   await symlink(join("..", "..", "vendor", "ds"), join(root, "node_modules/@acme/ds"));
-  const b = new Bench(root, null, join(tmp, "staging"));
+  const b = new Bench(root, null);
   await b.start(config);
   return b;
 }

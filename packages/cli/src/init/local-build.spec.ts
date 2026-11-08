@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { detectLocalBuild } from "./local-build.js";
+import { save } from "../../../../test-support/save.js";
 
 let root = "";
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ""; });
 
 async function file(path: string, when?: Date): Promise<void> {
   await mkdir(join(path, ".."), { recursive: true });
-  await writeFile(path, "");
+  await save(path, "");
   if (when) await utimes(path, when, when);
 }
 const cliEntry = (repo: string) => pathToFileURL(join(repo, "packages/cli/dist/index.js")).href;

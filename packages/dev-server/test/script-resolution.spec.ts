@@ -5,13 +5,14 @@
 // path already known to be absent, so the preview embedded a raw ENOENT and nothing was reported at
 // startup. Every other unreadable subject input is isolated and logged once (project-loaders).
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startDevServer } from "@pattern-dump/dev-server";
 import { defineConfig } from "@pattern-dump/config";
 import { reportUnresolvableScripts } from "../src/requires.js";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
+import { save } from "../../../test-support/save.js";
 
 let dir = "";
 let server: { port: number; close: () => Promise<void> };
@@ -20,11 +21,11 @@ const get = (p: string) => fetch(`http://127.0.0.1:${server.port}${p}`);
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "pd-scripts-"));
   for (const d of ["src/patterns/atoms", "src/styles", "src/scripts"]) await mkdir(join(dir, d), { recursive: true });
-  await writeFile(join(dir, "src/patterns/atoms/widget.hbs"), `<div class="widget">w</div>\n`);
+  await save(join(dir, "src/patterns/atoms/widget.hbs"), `<div class="widget">w</div>\n`);
   // The id names a .js file that exists; resolution is .ts-only, so it cannot resolve.
-  await writeFile(join(dir, "src/patterns/atoms/widget.md"), `---\nrequireScript: legacy.js\n---\n`);
-  await writeFile(join(dir, "src/scripts/legacy.js"), `console.log("legacy");\n`);
-  await writeFile(join(dir, "src/scripts/real.ts"), `document.body.dataset.real = "1";\n`);
+  await save(join(dir, "src/patterns/atoms/widget.md"), `---\nrequireScript: legacy.js\n---\n`);
+  await save(join(dir, "src/scripts/legacy.js"), `console.log("legacy");\n`);
+  await save(join(dir, "src/scripts/real.ts"), `document.body.dataset.real = "1";\n`);
   server = await startDevServer(defineConfig({
     sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
     styles: { dir: "./src/styles" }, scriptsDir: "./src/scripts",

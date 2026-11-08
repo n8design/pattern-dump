@@ -5,13 +5,14 @@
 // was compared with its ordering prefix still on it. Fixtures here are throwaway, as in tree-order.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildDiscoveryMap, stripOrderPrefixes } from "@pattern-dump/discovery";
 import { resolveLayoutMode } from "../src/layout-mode.js";
 import { buildFolderOverview } from "../src/overview.js";
 import { buildComponentTree } from "../src/component-tree.js";
+import { save } from "../../../test-support/save.js";
 
 let root = "";
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ""; });
@@ -21,7 +22,7 @@ async function patterns(files: Record<string, string>): Promise<string> {
   root = await mkdtemp(join(tmpdir(), "pd-layout-"));
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), text);
+    await save(join(root, rel), text);
   }
   return root;
 }

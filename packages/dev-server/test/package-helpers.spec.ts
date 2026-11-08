@@ -2,20 +2,21 @@
 // folder holding TypeScript and no .js, stops startup with an error that says so, in pd dev, pd audit
 // and pd build alike. The project's own helpers may still be TypeScript.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { buildStaticSite, runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { loadPatternPackages } from "../src/packages.js";
 import { loadHelperRegistrars } from "../src/project-loaders.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let n = 0;
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(join(path, ".."), { recursive: true });
-  await writeFile(path, text);
+  await save(path, text);
 }
 
 /** A project with one installed package whose manifest names `helpers`, and the files given. */
