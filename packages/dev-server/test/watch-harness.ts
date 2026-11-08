@@ -7,7 +7,7 @@
 // socket ping: frames on one socket arrive in order, so every message sent so far has arrived. Files are
 // written with save() (test-support/save.ts), so each save appears in one event. A barrier file is edited
 // with a one-character append: no truncate, so no emptied file in between, and always a change.
-import { appendFile, readFile, rm } from "node:fs/promises";
+import { appendFile, readFile, rm, stat } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { basename, join, relative } from "node:path";
@@ -18,23 +18,39 @@ import { startOnFreeWsPort } from "./free-ports.js";
 import { loadPatternPackages } from "../src/packages.js";
 import { resolveServerConfig } from "../src/server-config.js";
 import { watchedRoots } from "../src/watch-roots.js";
-import { save } from "../../../test-support/save.js";
+import { observeSaves, save } from "../../../test-support/save.js";
 
 /** The barrier's file: in every watched folder, reported by the watcher and never handled. */
 const BARRIER = ".__testOnly_barrier";
 
 // Every watcher event handled, from every server in this process, as the hook reports it.
-type Handled = { event: string; path: string; stillRunning: number };
+type Handled = { event: string; path: string; stillRunning: number; stamp: string | null };
 export const handled: Handled[] = [];
 let waiters: Array<() => void> = [];
-(globalThis as { __testOnly_onEventHandled?: (event: string, path: string, stillRunning: number) => void })
-  .__testOnly_onEventHandled = (event, path, stillRunning) => {
-    handled.push({ event, path, stillRunning });
+(globalThis as { __testOnly_onEventHandled?: (event: string, path: string, stillRunning: number, stamp: string | null) => void })
+  .__testOnly_onEventHandled = (event, path, stillRunning, stamp) => {
+    handled.push({ event, path, stillRunning, stamp });
     const ws = waiters; waiters = []; ws.forEach(w => w());
   };
 
 /** How long a latch waits before it fails, saying what it waited for: well under a test's timeout. */
 export const LATCH_MS = 5_000;
+
+/** A file's stamp as the watcher reads it (watch.ts, `seenNow`): inode, change and modification times, size.
+ *  Null for a file that is gone. If the watcher's formula changes, the step specs fail on it, by name. */
+export async function diskStamp(path: string): Promise<string | null> {
+  try { const s = await stat(path); return `${s.ino}:${s.ctimeMs}:${s.mtimeMs}:${s.size}`; } catch { return null; }
+}
+
+/**
+ * Whether the last write of a file is handled: the stamp the watcher read at the last handling of it equals
+ * the file's stamp on disk now (both null for a file that is gone). `stamps` are the stamps of its handlings
+ * in order; none yet is not settled. It is not "no later event has come", which is only a sleep in other
+ * words: a later write that has not been reported yet makes the disk's stamp differ, and that is what is waited for.
+ */
+export function isSettled(stamps: Array<string | null>, onDisk: string | null): boolean {
+  return stamps.length > 0 && stamps[stamps.length - 1] === onDisk;
+}
 
 /**
  * Resolve when `test` holds over the handled events, checked on each new one. Rejects after `LATCH_MS`
@@ -75,6 +91,8 @@ export class Bench {
   private server: DevServer | undefined;
   /** One barrier file per watched folder. */
   private barriers: string[] = [];
+  /** The paths the act of the step running has written or removed, while there is one. */
+  private touched: Set<string> | undefined;
   /** `component`: the one the workbench has open, or null for no workbench at all. */
   constructor(readonly root: string, private readonly component: string | null) {}
 
@@ -128,7 +146,7 @@ export class Bench {
 
   /** `text` appended to a file, as one save of the whole file. */
   async edit(rel: string, text: string): Promise<void> { await save(this.at(rel), `${await readFile(this.at(rel), "utf8")}${text}`); }
-  remove(rel: string): Promise<void> { return rm(this.at(rel), { recursive: true }); }
+  async remove(rel: string): Promise<void> { await rm(this.at(rel), { recursive: true }); this.touched?.add(this.at(rel)); }
   /** A new file, saved in one step, so it appears complete, in one event. */
   create(rel: string, text: string): Promise<void> { return save(this.at(rel), text); }
 
@@ -163,16 +181,31 @@ export class Bench {
     });
   }
 
-  /** Act, wait for its declared events to be handled, then the barrier; its messages and events. */
-  async step(act: () => Promise<void>, events: string[][]): Promise<{ messages: string[]; events: string[][] }> {
+  /**
+   * Act, wait until the last write of every file the act touched is handled, then the barrier; its messages
+   * and events. A file is touched by `save` (so by `create` and `edit`), `saveInTwoSteps` and `remove`.
+   * "Handled" is `isSettled`: the stamp the watcher last read of the file is the one it has on disk now.
+   *
+   * `events` is optional. Left out, nothing is declared and nothing can be declared wrongly. Given, the step
+   * waits for those events only, as it always did (so an act that writes where nothing is watched can say
+   * `[]`, and one that makes a folder can name its `addDir`), and the case asserts the events it got.
+   */
+  async step(act: () => Promise<void>, events?: string[][]): Promise<{ messages: string[]; events: string[][] }> {
     await this.reopen();
     await this.barrier();
     const from = this.messages.length;
     const hFrom = handled.length;
-    await act();
+    const touched = new Set<string>();
+    this.touched = touched;
+    const stopObserving = observeSaves(path => { if (this.owns(path)) touched.add(path); });
+    try { await act(); } finally { stopObserving(); this.touched = undefined; }
+    const onDisk = new Map<string, string | null>();
+    if (!events) for (const rel of new Set([...touched].map(p => this.rel(p)))) onDisk.set(rel, await diskStamp(this.at(rel)));
+    const stampsOf = (rel: string) => handled.slice(hFrom).filter(h => this.owns(h.path) && this.rel(h.path) === rel).map(h => h.stamp);
     await whenHandled(
-      () => events.every(([event, rel]) => handled.slice(hFrom).some(h => h.event === event && this.owns(h.path) && this.rel(h.path) === rel)),
-      () => `expected ${JSON.stringify(events)}; handled: ${JSON.stringify(this.handledSince(hFrom))}`,
+      () => (events ?? []).every(([event, rel]) => handled.slice(hFrom).some(h => h.event === event && this.owns(h.path) && this.rel(h.path) === rel))
+        && [...onDisk].every(([rel, stamp]) => isSettled(stampsOf(rel), stamp)),
+      () => `expected ${events ? JSON.stringify(events) : "the last write of each touched file"} handled${events ? "" : `, as on disk now ${JSON.stringify([...onDisk])}`}; handled: ${JSON.stringify(handled.slice(hFrom).filter(h => this.owns(h.path)).map(h => [h.event, this.rel(h.path), h.stamp]))}`,
     );
     await this.barrier();
     const messages = this.messages.slice(from).filter(m => !m.startsWith('{"type":"hello"')).sort();

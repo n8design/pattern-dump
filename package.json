@@ -42,6 +42,8 @@
     "e2e:storefront": "nx run storefront-bench:e2e",
     "e2e:package-bench": "nx run package-bench:e2e",
     "dev:check": "node scripts/check-server-fresh.mjs",
+    "test:scripts": "node --test scripts/ci/burn-in.test.mjs",
+    "burn-in": "node scripts/ci/burn-in.mjs",
     "pack:pd": "npm run build && node packages/cli/scripts/pack.mjs",
     "verify:install": "node scripts/verify-install.mjs",
     "graph": "nx graph",
