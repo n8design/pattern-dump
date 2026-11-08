@@ -34,7 +34,9 @@ const SILENT_RELOADER: HotReloader = {
   port: 0,
   listening: Promise.resolve(),
   push() { /* no clients */ },
+  pushChange() { /* no clients */ },
   retain() { /* no clients */ },
+  generation: () => "",
   close: async () => { /* nothing opened */ },
 };
 import { createServer } from "node:http";
@@ -266,6 +268,7 @@ export async function startDevServer(
 
   const routeCtx: RouteContext = {
     cfg, state, rendering, tracker, devUiDist, boot, now, live,
+    ...(live ? { generation: () => hotreloader.generation() } : {}),
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
   };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });

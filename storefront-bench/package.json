@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@pattern-dump/cli": "*"
+    "@pattern-dump/cli": "*",
+    "@pattern-dump/contracts": "*"
   },
   "scripts": {
     "dev": "node ../packages/cli/dist/index.js dev",

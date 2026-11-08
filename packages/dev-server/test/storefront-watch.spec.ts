@@ -39,7 +39,11 @@ async function watch(root: string, cfg: PatternDumpConfig): Promise<Message[]> {
   const ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
   sockets.push(ws);
   const messages: Message[] = [];
-  ws.on("message", (data: Buffer) => messages.push(JSON.parse(data.toString()) as Message));
+  // Without the live-reload generation, which differs on every run (its own specs check it).
+  ws.on("message", (data: Buffer) => {
+    const { generation: _generation, ...message } = JSON.parse(data.toString()) as Message & { generation?: string };
+    messages.push(message);
+  });
   await new Promise<void>((resolve, reject) => { ws.once("open", () => resolve()); ws.once("error", reject); });
   return messages;
 }

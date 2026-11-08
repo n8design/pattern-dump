@@ -18,7 +18,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
+import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
@@ -71,6 +71,8 @@ export interface RouteContext {
   readonly now: () => Date;
   /** false when headless (`pd build`): there is no live-reload socket, so pages carry no client for it. */
   readonly live: boolean;
+  /** The current live-reload generation (PD_GENERATION_HEADER); absent when headless. */
+  readonly generation?: () => string;
   /** Set by `pd build`: storefront pages link into the workbench at this address. See DevServerOptions. */
   readonly storefrontWorkbenchUrl?: string;
 }
@@ -98,6 +100,11 @@ export async function handleRequest(
 
   // Every response — JSON, assets, previews, the shell — carries the protocol it was produced under.
   res.setHeader(PD_PROTOCOL_HEADER, String(PD_PROTOCOL_VERSION));
+  // And, live, the generation it was rendered from: taken here, before anything is read, so a response
+  // rendered while a change landed carries the generation from before that change, and its client fetches
+  // it again once it hears of a newer one.
+  const generation = ctx.generation?.();
+  if (generation) res.setHeader(PD_GENERATION_HEADER, generation);
 
   try {
     const url      = new URL(req.url ?? "/", "http://x");
@@ -477,7 +484,7 @@ export async function handleRequest(
         discoveryMap, composition: await compositionFor(state, discovery, patternDirs), render, site: cfg.storefront.site,
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
-        ...(ctx.live ? { live: { wsPort } } : {}),
+        ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
       });
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
       res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });

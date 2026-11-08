@@ -33,7 +33,7 @@ describe("createHotReloader — on connect", () => {
     hr.retain([collision("atoms-x"), collision("atoms-y")]);
     const frames = await firstFrames(hr.port, 3);
     expect(frames).toEqual([
-      { type: "hello", protocol: PD_PROTOCOL_VERSION },
+      { type: "hello", protocol: PD_PROTOCOL_VERSION, generation: expect.stringMatching(/^[0-9a-f]{8}\.0$/) },
       collision("atoms-x"),
       collision("atoms-y"),
     ]);
@@ -44,7 +44,48 @@ describe("createHotReloader — on connect", () => {
     hr.retain([collision("atoms-x")]);
     hr.retain([]);
     const frames = await firstFrames(hr.port, 2);
-    expect(frames).toEqual([{ type: "hello", protocol: PD_PROTOCOL_VERSION }]);
+    expect(frames).toEqual([{ type: "hello", protocol: PD_PROTOCOL_VERSION, generation: expect.stringMatching(/^[0-9a-f]{8}\.0$/) }]);
+  });
+});
+
+describe("createHotReloader — the live-reload generation", () => {
+  it("moves on with each reload message, which carries it, and hello tells a later client the current one", async () => {
+    hr = createHotReloader(45_304);
+    await hr.listening;
+    const start = hr.generation();
+    expect(start).toMatch(/^[0-9a-f]{8}\.0$/);
+    const boot = start.split(".")[0];
+    // A reload message moves it; a collision (a standing condition, not a reload) does not.
+    hr.push({ type: "content-swap", componentId: "atoms/x" });
+    hr.push(collision("atoms-x"));
+    hr.push({ type: "page-changed", route: null });
+    expect(hr.generation()).toBe(`${boot}.2`);
+    const frames = await firstFrames(hr.port, 1);
+    expect(frames).toEqual([{ type: "hello", protocol: PD_PROTOCOL_VERSION, generation: `${boot}.2` }]);
+  });
+
+  it("is stamped on the reload messages a connected client receives", async () => {
+    const server = createHotReloader(45_305);
+    hr = server;
+    await server.listening;
+    const boot = server.generation().split(".")[0];
+    const got = new Promise<HmrMessage[]>((resolve, reject) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${server.port}`);
+      const frames: HmrMessage[] = [];
+      ws.on("message", data => {
+        frames.push(JSON.parse(String(data)) as HmrMessage);
+        if (frames.length === 1) {
+          server.push({ type: "css-link-swap", componentId: "atoms/x", href: "/x.css" });
+          server.push({ type: "tree-changed" });
+        }
+        if (frames.length === 3) { ws.close(); resolve(frames); }
+      });
+      ws.on("error", reject);
+    });
+    expect((await got).slice(1)).toEqual([
+      { type: "css-link-swap", componentId: "atoms/x", href: "/x.css", generation: `${boot}.1` },
+      { type: "tree-changed", generation: `${boot}.2` },
+    ]);
   });
 });
 

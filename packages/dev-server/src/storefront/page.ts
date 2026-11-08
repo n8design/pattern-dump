@@ -12,7 +12,7 @@
 // partial declares and the config does not set is too: the sample data stays in the workbench and can
 // never show on a real page.
 
-import { createHeightFitter, type DiscoveryMap, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
+import { createHeightFitter, generationBehind, type DiscoveryMap, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
 import { frontmatterBody } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
 import { renderDoc } from "../markdown.js";
@@ -35,8 +35,8 @@ export interface PageAssembly {
   site: Record<string, unknown> | undefined;
   /** Where links into the workbench start, ending with "/". */
   workbenchUrl: string;
-  /** Set in `pd dev`: the live-reload socket's port. */
-  live?: { wsPort: number };
+  /** Set in `pd dev`: the live-reload socket's port, and the generation the page's request took. */
+  live?: { wsPort: number; generation: string };
 }
 
 export interface AssembledPage {
@@ -61,10 +61,18 @@ export function fitterScript(): string {
  * `pd dev` only: reload when this page or the nav changes, or a component or stylesheet does; list a
  * build problem (a reload that failed, a restart that is needed) in a notice on the page, which the next
  * reload clears. On the storefront's own page, never inside a preview.
+ *
+ * The page carries the generation its request took (PD_GENERATION_HEADER). A change sent while the page
+ * was being rendered, loaded or reloaded reached no socket of it; `hello` says the current generation, and
+ * a page behind it reloads, once: the reloaded page takes the current one. The comparison is contracts'
+ * `generationBehind`, inlined, as the fitter is.
  */
-export function liveScript(wsPort: number): string {
-  return `<script data-pd-live>(function(){var ws=new WebSocket("ws://"+location.hostname+":${wsPort}");`
+export function liveScript(wsPort: number, generation = ""): string {
+  return `<script data-pd-live>(function(){var g=${JSON.stringify(generation)};`
+    + `var behind=(${generationBehind.toString()});`
+    + `var ws=new WebSocket("ws://"+location.hostname+":${wsPort}");`
     + `ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}`
+    + `if(m.type==="hello"){if(behind(g,m.generation))location.reload();return;}`
     + `if((m.type==="page-changed"&&(m.route===null||m.route===location.pathname))||m.type==="content-swap"||m.type==="css-link-swap")location.reload();`
     + `else if(m.type==="error"){var n=document.querySelector("[data-pd-live-notice]");`
     + `if(!n){n=document.createElement("div");n.setAttribute("data-pd-live-notice","");n.setAttribute("role","alert");`
@@ -84,7 +92,7 @@ ${head}
 </head>
 <body>
 ${body}
-${live ? liveScript(live.wsPort) : ""}
+${live ? liveScript(live.wsPort, live.generation) : ""}
 </body>
 </html>`;
 }
