@@ -50,3 +50,24 @@ test("a change sent before the page's socket opened reloads the page once the so
   await page.waitForTimeout(1_500);
   expect(navigations).toBe(1);
 });
+
+test("one change that sends several reload messages reloads the page once", async ({ page }) => {
+  const svg = fileURLToPath(new URL("../src/assets/images/bench-blocks.svg", import.meta.url));
+  const before = await readFile(svg, "utf8");
+  // A component open in the workbench: an asset change then sends its reload too, and one per page.
+  await page.request.get(`http://127.0.0.1:${process.env["SF_DEV_PORT"] ?? "4300"}/api/component/components/callout`);
+  await page.goto("/about/");
+  await expect(page.locator("h1")).toHaveText("About");
+  let navigations = 0;
+  page.on("framenavigated", f => { if (f === page.mainFrame()) navigations++; });
+  try {
+    await writeFile(svg, `${before}<!-- changed -->\n`);
+    await expect.poll(() => navigations, { timeout: 10_000 }).toBeGreaterThan(0);
+    await expect(page.locator("h1")).toHaveText("About");
+    // Its socket reopened after the reload; hello finds it current: no second reload.
+    await page.waitForTimeout(2_000);
+    expect(navigations).toBe(1);
+  } finally {
+    await writeFile(svg, before);
+  }
+});

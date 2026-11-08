@@ -8,6 +8,12 @@ import { PD_PROTOCOL_VERSION, type HmrMessage } from "@pattern-dump/contracts";
 export interface HotReloader {
   push(message: HmrMessage): void;
   /**
+   * Send one change's messages, in order, with one bump of the generation: every reload message among them
+   * carries the same generation. The watcher sends each handler's reload messages this way when the
+   * handler has finished, so all the state it changed is in place before any of them leaves.
+   */
+  pushChange(messages: HmrMessage[]): void;
+  /**
    * Replace the set of STANDING messages every new connection receives right after `hello`.
    *
    * `push` only reaches sockets open at that moment, so a condition detected before the browser
@@ -17,9 +23,10 @@ export interface HotReloader {
    */
   retain(messages: HmrMessage[]): void;
   /**
-   * The current live-reload generation (`PD_GENERATION_HEADER` in contracts): `<boot>.<n>`, `n` the
-   * number of reload messages sent so far. `push` bumps it as it sends one, so it must be called after
-   * the change's state is in place; a request takes it before anything else.
+   * The current live-reload generation (`PD_GENERATION_HEADER` in contracts): `<boot>.<n>`, `n` counting
+   * the changes sent so far: `pushChange` bumps it once for a change's messages, `push` once for a single
+   * reload message. Either must be called after the change's state is in place; a request takes it before
+   * anything else.
    */
   generation(): string;
   readonly port: number;
@@ -48,6 +55,13 @@ export function createHotReloader(port = Number(process.env["PD_WS_PORT"] ?? 400
   const boot = randomUUID().slice(0, 8);
   let sent = 0;
   const generation = (): string => `${boot}.${sent}`;
+  const isReload = (m: HmrMessage): boolean =>
+    m.type === "content-swap" || m.type === "css-link-swap" || m.type === "tree-changed" || m.type === "page-changed";
+  const send = (data: string): void => {
+    for (const client of clients) {
+      if (client.readyState === WebSocket.OPEN) client.send(data);
+    }
+  };
 
   wss.on("connection", (ws) => {
     clients.add(ws);
@@ -64,15 +78,13 @@ export function createHotReloader(port = Number(process.env["PD_WS_PORT"] ?? 400
     listening,
     push(message: HmrMessage) {
       // A reload message moves the generation on, and carries the one it moved it to.
-      const reload = message.type === "content-swap" || message.type === "css-link-swap"
-        || message.type === "tree-changed" || message.type === "page-changed";
+      const reload = isReload(message);
       if (reload) sent++;
-      const data = JSON.stringify(reload ? { ...message, generation: generation() } : message);
-      for (const client of clients) {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(data);
-        }
-      }
+      send(JSON.stringify(reload ? { ...message, generation: generation() } : message));
+    },
+    pushChange(messages: HmrMessage[]) {
+      if (messages.some(isReload)) sent++;
+      for (const m of messages) send(JSON.stringify(isReload(m) ? { ...m, generation: generation() } : m));
     },
     generation,
     retain(messages: HmrMessage[]) {

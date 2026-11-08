@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { basename, extname, relative, resolve, sep } from "node:path";
 import chokidar from "chokidar";
-import { componentCssUrl, type DiscoveryResult } from "@pattern-dump/contracts";
+import { componentCssUrl, type DiscoveryResult, type HmrMessage } from "@pattern-dump/contracts";
 import { compileSassFile } from "@pattern-dump/build";
 import { dryRunHelperRegistrar } from "@pattern-dump/renderer";
 import type { HotReloader } from "@pattern-dump/hotreloader";
@@ -163,6 +163,14 @@ type TestOnlyOnReaudit = (componentId: string) => Promise<void> | undefined;
 const testOnlyReaudit = (): TestOnlyOnReaudit | undefined =>
   (globalThis as { __testOnly_onReaudit?: TestOnlyOnReaudit }).__testOnly_onReaudit;
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_handler`, it is offered each event
+// first; a promise it returns is that event's handler instead of the real one, given the watcher's push and
+// the state, so a test can write a handler that pushes and changes state in an order of its choosing. Not
+// exported, not part of any contract.
+type TestOnlyHandler = (
+  event: string, path: string, api: { push(message: HmrMessage): void; state: ServerState },
+) => Promise<void> | undefined;
+
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_holdHandler`, it is called as each
 // handler's turn comes; a promise it returns holds that handler until it settles, so a test can see what
 // waits behind it. Not exported, not part of any contract.
@@ -192,6 +200,19 @@ const lastHandled = new Map<string, Seen>();
 // still waiting (same event, same file) is not queued again: the waiting one reads the file when it starts.
 // The cost is the wait: an event waits for the handler ahead of it, at worst a full restyle.
 interface Job { readonly event: string; readonly path: string; readonly start: () => Promise<void> }
+
+// The reload messages of the handler running, sent together, with one bump of the generation, when it
+// finishes: so every state it changed is in place before any of its messages leaves, whatever order its
+// pushes are in. Error and collision messages are not held: they go out at once.
+let outbox: HmrMessage[] | null = null;
+const isReload = (m: HmrMessage): boolean =>
+  m.type === "content-swap" || m.type === "css-link-swap" || m.type === "tree-changed" || m.type === "page-changed";
+const hmr = {
+  push(message: HmrMessage): void {
+    if (outbox && isReload(message)) outbox.push(message);
+    else hotreloader.push(message);
+  },
+};
 const queue: Job[] = [];
 let current: Job | null = null;
 // Waiting for the queue to empty (close).
@@ -218,7 +239,7 @@ function enqueue(job: Job): void {
 function reportHandlerFailure(event: string, path: string, e: unknown, step?: string): void {
   const reason = e instanceof Error ? e.message : String(e);
   const message = step ? `${shown(path)} (${event}): ${step} failed: ${reason}` : `${shown(path)} (${event}) was not handled: ${reason}`;
-  hotreloader.push({ type: "error", scope: "build", message });
+  hmr.push({ type: "error", scope: "build", message });
   console.error(`[dev-server] ${message}`);
 }
 
@@ -240,6 +261,9 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       lastHandled.delete(path);
     }
     const done = () => {
+      const sending = outbox;
+      outbox = null;
+      if (sending && sending.length > 0) hotreloader.pushChange(sending);
       // Still to finish after this one: the ones waiting.
       (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, queue.length);
       finish();
@@ -254,6 +278,7 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       }, CHANGE_RECHECK_MS));
     };
     if (basename(path) === ".__testOnly_barrier") { done(); return; }
+    outbox = [];
     // A handler that fails (a file it cannot read, a folder gone mid-walk) is a problem in the terminal and
     // on the open pages, like any other, and pd dev keeps running: nothing is left to reject unhandled.
     const failed = (e: unknown): void => { reportHandlerFailure(event, path, e); };
@@ -262,7 +287,8 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       try {
         const fail = (globalThis as { __testOnly_failHandler?: TestOnlyFailHandler }).__testOnly_failHandler?.(event, path);
         if (fail === "throw") throw new Error("failed for a test");
-        result = fail === "reject" ? Promise.reject(new Error("failed for a test")) : handler(path);
+        const replaced = (globalThis as { __testOnly_handler?: TestOnlyHandler }).__testOnly_handler?.(event, path, { push: m => hmr.push(m), state });
+        result = fail === "reject" ? Promise.reject(new Error("failed for a test")) : replaced ?? handler(path);
       } catch (e) {
         failed(e);
         done();
@@ -287,7 +313,7 @@ const started = new Promise<void>((resolve, reject) => {
   watcher.on("error", (e: unknown) => {
     const message = describeWatchError(e);
     if (!ready) { reject(new WatchStartError(message)); return; }
-    hotreloader.push({ type: "error", scope: "build", message });
+    hmr.push({ type: "error", scope: "build", message });
     console.error(`[dev-server] ${message}`);
   });
 });
@@ -344,7 +370,7 @@ async function patchStyles(filePath: string): Promise<boolean> {
     // Reserved for a tracker-level failure (I/O, a bad dir). A per-file SCSS *syntax* error does NOT
     // land here — the tracker keeps going so one broken file cannot stop every other file's CSS
     // reaching the preview. Those arrive in `errors` and are pushed below.
-    hotreloader.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
+    hmr.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
     console.error("[dev-server] SCSS error:", e);
     return false;
   }
@@ -353,7 +379,7 @@ async function patchStyles(filePath: string): Promise<boolean> {
   // broken .scss produced NOTHING in the workbench — the one place a design-system author looks.
   // Non-fatal by design, so report and carry on rather than returning early.
   for (const { file, message } of compileErrors) {
-    hotreloader.push({
+    hmr.push({
       type: "error",
       scope: "build",
       message: `SCSS ${basename(file)} — ${message.split("\n")[0]}`,
@@ -415,7 +441,7 @@ async function patchStyles(filePath: string): Promise<boolean> {
   }
 
   const orderedHrefs = await closureHrefs(discovery, timestamp);
-  for (const m of pending) hotreloader.push({ ...m, orderedHrefs });
+  for (const m of pending) hmr.push({ ...m, orderedHrefs });
   console.log(`[dev-server] CSS updated (recompiled: ${effectiveFiles.map(f => basename(f)).join(", ")})`);
   return false;
 }
@@ -445,13 +471,13 @@ async function restyleAll(
   const orderedHrefs = await closureHrefs(discovery, timestamp);
   for (const componentId of changes.changedComponents) {
     const cssBecameNonEmpty = (before.get(componentId) ?? "") === "" && (data.componentCssMap.get(componentId) ?? "") !== "";
-    hotreloader.push({
+    hmr.push({
       type: "css-link-swap", componentId, href: componentCssUrl(componentId, timestamp), orderedHrefs,
       ...(cssBecameNonEmpty ? { cssBecameNonEmpty: true as const } : {}),
     });
   }
   if (changes.baseChanged && state.lastComponentId) {
-    hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
+    hmr.push({ type: "content-swap", componentId: state.lastComponentId });
   }
   // Every storefront page links the base layer, so every page changed. Said page by page: the
   // workbench's reload above names the component on screen, and there may be none.
@@ -503,14 +529,14 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
   // An unlinked file is only in the map from BEFORE the rebuild; an added one only in the map after.
   let owner = ownerIn(event === "change" ? await currentDiscovery(state, patternRoots) : await cachedDiscovery(state));
   if (event === "change") {
-    hotreloader.push({ type: "tree-changed" });
+    hmr.push({ type: "tree-changed" });
     console.log(`[dev-server] Docs changed: ${rel} → tree-changed`);
   } else {
     await rebuildAndSignalTree(`Docs ${event === "add" ? "added" : "removed"}: ${rel}`);
     owner ??= ownerIn(await cachedDiscovery(state));
   }
   for (const componentId of new Set([owner, state.lastComponentId])) {
-    if (componentId) hotreloader.push({ type: "content-swap", componentId });
+    if (componentId) hmr.push({ type: "content-swap", componentId });
   }
 }
 
@@ -523,7 +549,7 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
 let reloads = 0;
 
 async function reloadedOpenPages(label: string): Promise<void> {
-  if (state.lastComponentId) hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
+  if (state.lastComponentId) hmr.push({ type: "content-swap", componentId: state.lastComponentId });
   await everyPageChanged();
   console.log(`[dev-server] ${label} → reloaded`);
 }
@@ -531,7 +557,7 @@ async function reloadedOpenPages(label: string): Promise<void> {
 function reloadFailed(filePath: string, what: string, problems: LoadProblem[]): void {
   const message = `${shown(filePath)}: ${what} not reloaded, the last good ones are still in use: `
     + problems.map(p => `${shown(p.file)}: ${p.message}`).join("; ");
-  hotreloader.push({ type: "error", scope: "build", message });
+  hmr.push({ type: "error", scope: "build", message });
   console.error(`[dev-server] ${message}`);
 }
 
@@ -569,7 +595,7 @@ async function handleReloadable(filePath: string, event: "change" | "add" | "unl
   if (helper === "entry") { await reloadHelpers(filePath); return true; }
   if (helper === "other") {
     const message = `${shown(filePath)} changed: restart pd dev to load it (a helper's own imports are not reloaded)`;
-    hotreloader.push({ type: "error", scope: "build", message });
+    hmr.push({ type: "error", scope: "build", message });
     console.error(`[dev-server] ${message}`);
     return true;
   }
@@ -592,7 +618,7 @@ function handlePages(filePath: string, event: "change" | "add" | "unlink" | "add
   const rel = relative(pagesDir!, filePath).split(sep).join("/");
   if (rel.split("/").some(seg => seg.startsWith("."))) return true;
   const route = event === "change" && rel.endsWith(".md") ? routeFor(rel) : null;
-  hotreloader.push({ type: "page-changed", route });
+  hmr.push({ type: "page-changed", route });
   console.log(`[dev-server] Page ${event}: ${rel || "."} → page-changed ${route ?? "(every page)"}`);
   return true;
 }
@@ -618,10 +644,10 @@ on("change", async (filePath) => {
         const css = await compileSassFile(filePath);
         state.themeCss.set(themeName, css);
         state.themeTokens.set(themeName, await extractThemeTokens(themeName, css, swatchSlots, themesDir));
-        hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
+        hmr.push({ type: "content-swap", componentId: state.lastComponentId });
         console.log(`[dev-server] Theme CSS updated: ${themeName}`);
       } catch (e) {
-        hotreloader.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
+        hmr.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
       }
     } else {
       await handleComponentScss(filePath);
@@ -652,7 +678,7 @@ on("change", async (filePath) => {
       rendered = true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      hotreloader.push({ type: "error", scope: "render", componentId, message: msg });
+      hmr.push({ type: "error", scope: "render", componentId, message: msg });
       console.error(`[dev-server] Render error [${componentId}]:`, msg);
     }
     // Diagnostics graph: SURGICAL re-audit of exactly this one component (template/data changed →
@@ -680,7 +706,7 @@ on("change", async (filePath) => {
       reportHandlerFailure("change", filePath, e, "its audit");
     } finally {
       if (rendered) {
-        hotreloader.push({ type: "content-swap", componentId });
+        hmr.push({ type: "content-swap", componentId });
         console.log(`[dev-server] Component changed: ${componentId}`);
       }
     }
@@ -691,7 +717,7 @@ on("change", async (filePath) => {
     const scriptId = basename(filePath, ".ts");
     scriptFor(state, scriptId).invalidate();
     if (state.lastComponentId) {
-      hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
+      hmr.push({ type: "content-swap", componentId: state.lastComponentId });
     }
     // Storefront pages load scripts (their own, and their embedded previews'), whether or not a workbench
     // has a component open: each page is told, as for a base-layer change.
@@ -723,7 +749,7 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   // Re-derive the flattening artifact — the node set changed — from the new discovery's registry, which
   // the next request then reuses.
   await surfaceFlattening(dr.discoveryMap, await compositionFor(state, dr, patternDirs), cwd);
-  hotreloader.push({ type: "tree-changed" });
+  hmr.push({ type: "tree-changed" });
   // A storefront page may embed the component that arrived or left: every page reloads and is checked again.
   await everyPageChanged();
   console.log(`[dev-server] ${label} → tree-changed`);
@@ -750,12 +776,12 @@ async function handleComponentJson(filePath: string, event: "add" | "unlink"): P
   let owner = event === "unlink" ? ownerIn(await cachedDiscovery(state)) : undefined;
   await rebuildAndSignalTree(`Data ${event === "add" ? "added" : "removed"}: ${rel}`);
   owner ??= ownerIn(await cachedDiscovery(state));
-  if (owner) hotreloader.push({ type: "content-swap", componentId: owner });
+  if (owner) hmr.push({ type: "content-swap", componentId: owner });
 }
 
 /** Every storefront page changed: one page-changed per page (none without a storefront). */
 async function everyPageChanged(): Promise<void> {
-  if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
+  if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hmr.push({ type: "page-changed", route });
 }
 
 on("add", async (filePath) => {

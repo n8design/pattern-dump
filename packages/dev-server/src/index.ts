@@ -34,6 +34,7 @@ const SILENT_RELOADER: HotReloader = {
   port: 0,
   listening: Promise.resolve(),
   push() { /* no clients */ },
+  pushChange() { /* no clients */ },
   retain() { /* no clients */ },
   generation: () => "",
   close: async () => { /* nothing opened */ },
