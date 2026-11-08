@@ -4,7 +4,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +11,7 @@ import { runInContext, createContext } from "node:vm";
 import WebSocket from "ws";
 import { defineConfig, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import { startOnFreeWsPort } from "./free-ports.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
@@ -25,10 +25,6 @@ afterAll(async () => {
   if (tmp) await rm(tmp, { recursive: true, force: true });
 });
 
-const freePort = (): Promise<number> => new Promise((resolve, reject) => {
-  const s = createServer().listen(0, "127.0.0.1", () => { const p = (s.address() as { port: number }).port; s.close(() => resolve(p)); });
-  s.on("error", reject);
-});
 
 /** GET with an explicit Host header. */
 function get(port: number, host: string, path: string): Promise<{ status: number; body: string }> {
@@ -45,8 +41,8 @@ function get(port: number, host: string, path: string): Promise<{ status: number
 }
 
 async function serve(root: string, cfg: PatternDumpConfig, live = false): Promise<{ port: number; wsPort: number }> {
-  const wsPort = live ? await freePort() : 0;
-  const server = await startDevServer(cfg, root, { port: 0, live, ...(live ? { wsPort } : {}) });
+  const { server, wsPort } = live ? await startOnFreeWsPort(cfg, root)
+    : { server: await startDevServer(cfg, root, { port: 0, live }), wsPort: 0 };
   servers.push(server);
   return { port: server.port, wsPort };
 }
