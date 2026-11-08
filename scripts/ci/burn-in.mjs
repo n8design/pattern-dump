@@ -4,6 +4,7 @@
 //   node scripts/ci/burn-in.mjs --base origin/main            plan from `git diff`, then run it
 //   node scripts/ci/burn-in.mjs --plan --files a.spec.ts ...  print the plan for these changed files
 //   --runs N      repetitions (default 20)
+//   --runner R    only the jobs of this runner, vitest or playwright (to run the halves in different places)
 //   --load        run one CPU hog (`stress-ng --cpu 1`) beside the repetitions, as a loaded runner would
 //
 // The mapping from changed files to specs is `planBurnIn` below, and its cases are in burn-in.test.mjs.
@@ -100,7 +101,8 @@ async function main(argv) {
     ? argv.slice(filesIdx + 1).filter(a => !a.startsWith("--"))
     : git("diff", "--name-only", "--diff-filter=d", `${opt("--base", "origin/main")}...HEAD`);
   const all = git("ls-files", "--cached", "--others", "--exclude-standard");
-  const jobs = planBurnIn(changed, all);
+  const only = opt("--runner", "");
+  const jobs = planBurnIn(changed, all).filter(j => !only || j.runner === only);
   console.log(JSON.stringify(jobs, null, 2));
   if (argv.includes("--plan")) return 0;
   if (jobs.length === 0) { console.log("burn-in: no spec to repeat"); return 0; }
