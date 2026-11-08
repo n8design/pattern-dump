@@ -28,7 +28,7 @@ import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
 import {
-  applyStyleData, cachedDiscovery, currentDiscovery, invalidateDiscovery, startDiscovery, type ServerState,
+  applyStyleData, cachedDiscovery, currentDiscovery, invalidateDiscovery, rebuildDiscovery, type ServerState,
 } from "./server-state.js";
 import { baseComponentIds, resolveComponentForFile } from "./discovery-index.js";
 import { buildCompositionRegistry } from "./composition.js";
@@ -579,9 +579,8 @@ on("change", async (filePath) => {
 async function rebuildAndSignalTree(label: string): Promise<void> {
   const previous = await cachedDiscovery(state);
   const before = previous ? baseComponentIds(previous) : null;
-  // Current at once, before it runs: an invalidation during the build is not overwritten by its result.
-  state.compositionRegistry = null;
-  const dr = await startDiscovery(state, patternRoots);
+  // A discovery built after this change; one that a later change overtakes is never stored (lazy.ts).
+  const dr = await rebuildDiscovery(state, patternRoots);
   // A component that arrived (or left) changes who owns which stylesheet: a stylesheet saved before its
   // template was filed under the base layer, and now belongs to the component. Restyle against the new
   // set, so its CSS moves without a restart.
