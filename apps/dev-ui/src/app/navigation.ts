@@ -15,6 +15,7 @@
 import type { ComponentDetail, FolderOverview, TreeNode } from "@pattern-dump/contracts";
 import { componentUrl, overviewUrl, previewUrl } from "@pattern-dump/contracts";
 import { dom } from "../core/dom.js";
+import { behindHeard, claim, fetchDetail, generationOf, loadDocument } from "../core/generation.js";
 import { extractHighlightedPre } from "../core/html-util.js";
 import { routeHref } from "../core/runtime.js";
 import { session } from "../core/session.js";
@@ -46,7 +47,7 @@ export function swapWithTransition(fn: () => void): void {
 // the single source of truth: iframe src and rendered-HTML tab both derive from
 // the current route + variant, not from local state.
 
-export async function applyComponent(detail: ComponentDetail, variant?: string): Promise<void> {
+export async function applyComponent(detail: ComponentDetail, variant?: string, generation: string | null = null): Promise<void> {
   session.current = detail;
   session.currentVariant = variant ?? null;
   session.renderedHtmlCache = null;
@@ -87,11 +88,24 @@ export async function applyComponent(detail: ComponentDetail, variant?: string):
 
   // Default variant: use the document carried in the payload (no extra request).
   // Non-default variant: fetch the standalone preview document on demand with theme baked in.
-  const previewDoc = (variant && isKnownVariant)
-    ? await fetch(previewUrl(detail.id, variant, store.local.theme || undefined)).then(r => r.text())
-    : detail.document;
-  const _html = previewDoc ?? "";
-  swapWithTransition(() => { dom.iframe.srcdoc = _html; });
+  // A detail taken before a change the shell has heard of (sent while it was in flight, and ignored then:
+  // this was not yet the current component) is fetched again, preview included (core/generation.ts).
+  claim("detail", detail.id, generation);
+  const key = `${detail.id}~${(variant && isKnownVariant) ? variant : ""}`;
+  const wanted = (): boolean => session.current?.id === detail.id;
+  if (variant && isKnownVariant) {
+    await loadDocument("preview", key, previewUrl(detail.id, variant, store.local.theme || undefined),
+      doc => { swapWithTransition(() => { dom.iframe.srcdoc = doc; }); }, wanted);
+  } else {
+    claim("preview", key, generation);
+    const _html = detail.document ?? "";
+    swapWithTransition(() => { dom.iframe.srcdoc = _html; });
+    if (behindHeard(generation)) {
+      void loadDocument("preview", key, previewUrl(detail.id, undefined, store.local.theme || undefined),
+        doc => { dom.iframe.srcdoc = doc; }, wanted);
+      void fetchDetail(detail.id).then(d => { if (d) { session.current = d; void renderPanel(); } }).catch(() => {});
+    }
+  }
 
   // Reset content-fit height so pd-height can set it fresh for the new component.
   dom.iframe.style.removeProperty("--vp-h");
@@ -151,17 +165,18 @@ export async function swapVariant(componentId: string, variant: string | null): 
   dom.dataBody.innerHTML = "";
   dom.variantSelect.value = variant ?? "";
 
-  const previewDoc = await fetch(previewUrl(componentId, variant ?? undefined, store.local.theme || undefined)).then(r => r.text());
-  swapWithTransition(() => { dom.iframe.srcdoc = previewDoc; });
+  await loadDocument("preview", `${componentId}~${variant ?? ""}`, previewUrl(componentId, variant ?? undefined, store.local.theme || undefined),
+    doc => { swapWithTransition(() => { dom.iframe.srcdoc = doc; }); },
+    () => session.current?.id === componentId && session.currentVariant === variant);
 
   const dock = store.local.dock;
   if (dock.dockTab === "html") await fetchAndShowHtml();
   if (dock.dockTab === "source" && dock.sourceFacet === "data") await fetchAndShowData();
 
   // Re-fetch component detail so diagnostics + relationships stay fresh for the new variant.
-  void fetch(componentUrl(componentId, variant ?? undefined))
-    .then(r => r.ok ? r.json() as Promise<ComponentDetail> : Promise.reject())
+  void fetchDetail(componentId, variant ?? undefined)
     .then(d => {
+      if (!d) return;
       session.current = d;
       session.renderedA11y = [];
       session.scanPending = store.local.dock.dockTab === "diagnostics";
@@ -180,7 +195,7 @@ export async function navigate(componentId: string, variant?: string): Promise<v
     const res = await fetch(componentUrl(componentId, variant));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const detail = await res.json() as ComponentDetail;
-    await applyComponent(detail, variant);
+    await applyComponent(detail, variant, generationOf(res));
   } catch (e) {
     console.error("[pd] Navigate error:", e);
     showStageMessage(`Could not load “${componentId}”: ${e instanceof Error ? e.message : String(e)}`);
@@ -197,7 +212,7 @@ export async function navigate(componentId: string, variant?: string): Promise<v
 export async function navigateUnknown(path: string, variant?: string): Promise<void> {
   const res = await fetch(componentUrl(path, variant)).catch(() => null);
   if (res?.ok) {
-    await applyComponent(await res.json() as ComponentDetail, variant);
+    await applyComponent(await res.json() as ComponentDetail, variant, generationOf(res));
     return;
   }
   showStageMessage(`No component or folder “${path}”.`, closestPaths(path));

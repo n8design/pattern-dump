@@ -16,9 +16,10 @@
 //   - EVERY error is surfaced on the Console, not only component-scoped ones. A SCSS build failure
 //     carries no componentId, and gating on it is how build errors used to vanish entirely.
 
-import type { ComponentDetail, ComponentTree, HmrMessage, TreeNode } from "@pattern-dump/contracts";
-import { componentUrl, PD_ROUTES, previewUrl } from "@pattern-dump/contracts";
+import type { ComponentTree, HmrMessage, TreeNode } from "@pattern-dump/contracts";
+import { PD_ROUTES, previewUrl } from "@pattern-dump/contracts";
 import { dom } from "../core/dom.js";
+import { fetchDetail, heard, loadDocument } from "../core/generation.js";
 import { extractHighlightedPre } from "../core/html-util.js";
 import { reconcilePdLinks } from "../core/pd-links.js";
 import { protocolMismatch } from "../core/protocol.js";
@@ -64,6 +65,8 @@ export function connectHmr(): void {
     try {
       msg = JSON.parse(e.data as string) as HmrMessage;
     } catch { return; }
+    // Every reload message, and hello, says how far the server's changes have got (core/generation.ts).
+    if ("generation" in msg) heard(msg.generation);
 
     // Corpus audit freshness — ANY component's template/render change invalidates the corpus rollup,
     // so refetch when the facet is open, regardless of which component is selected (deliberately
@@ -89,17 +92,21 @@ export function connectHmr(): void {
           const tiles = Array.from(
             dom.variantsGalleryEl.querySelectorAll<HTMLIFrameElement>(".gallery-item iframe")
           );
-          await Promise.all(tiles.map(async f => {
+          // Each tile: never an older document than it shows, fetched again if it predates a change heard.
+          await Promise.all(tiles.map(f => {
             const vp = f.dataset.pdVariant || undefined;
-            const doc = await fetch(previewUrl(componentId, vp, store.local.theme || undefined)).then(r => r.text());
-            f.srcdoc = doc;
-            console.log("%c[pd] srcdoc reloaded", "color:#7ed321;font-weight:bold",
-              `— ${componentId} (${vp ?? "default"})`);
+            return loadDocument(`tile:${vp ?? ""}`, `${componentId}~${vp ?? ""}`, previewUrl(componentId, vp, store.local.theme || undefined), doc => {
+              f.srcdoc = doc;
+              console.log("%c[pd] srcdoc reloaded", "color:#7ed321;font-weight:bold",
+                `— ${componentId} (${vp ?? "default"})`);
+            }, () => f.isConnected && session.current?.id === componentId);
           }));
         } else {
-          const previewDoc = await fetch(previewUrl(componentId, session.currentVariant ?? undefined, store.local.theme || undefined)).then(r => r.text());
-          dom.iframe.srcdoc = previewDoc;
-          console.log("%c[pd] srcdoc reloaded", "color:#7ed321;font-weight:bold", `— ${componentId}`);
+          const variant = session.currentVariant;
+          await loadDocument("preview", `${componentId}~${variant ?? ""}`, previewUrl(componentId, variant ?? undefined, store.local.theme || undefined), doc => {
+            dom.iframe.srcdoc = doc;
+            console.log("%c[pd] srcdoc reloaded", "color:#7ed321;font-weight:bold", `— ${componentId}`);
+          }, () => session.current?.id === componentId && session.currentVariant === variant);
         }
         // Re-render the active view.
         { const d = store.local.dock;
@@ -112,9 +119,9 @@ export function connectHmr(): void {
           }
         }
         // Re-fetch component detail so relationships + source + diagnostics stay fresh.
-        void fetch(componentUrl(componentId, session.currentVariant ?? undefined))
-          .then(r => r.ok ? r.json() as Promise<ComponentDetail> : Promise.reject(r.status))
+        void fetchDetail(componentId, session.currentVariant ?? undefined)
           .then(d => {
+            if (!d) return;
             session.current = d;
             session.renderedA11y = [];
             session.scanPending = store.local.dock.dockTab === "diagnostics";
@@ -181,9 +188,8 @@ export function connectHmr(): void {
 
       // Refresh relationships panel if the swapped file affects the currently-shown component.
       if (store.local.panelTab === "relationships" && session.current) {
-        void fetch(componentUrl(session.current.id))
-          .then(r => r.ok ? r.json() as Promise<ComponentDetail> : Promise.reject(r.status))
-          .then(d => { session.current = d; return renderPanel(); })
+        void fetchDetail(session.current.id)
+          .then(d => { if (d) { session.current = d; return renderPanel(); } })
           .catch(() => { /* ignore */ });
       }
     } else if (msg.type === "error") {
@@ -199,9 +205,9 @@ export function connectHmr(): void {
       const errId = msg.componentId;
       if (errId && errId === session.current?.id) {
         // Server returns 200 + ComponentDetail with RENDER_ERROR diagnostic on render failure.
-        void fetch(componentUrl(errId))
-          .then(r => r.ok ? r.json() as Promise<ComponentDetail> : Promise.reject())
+        void fetchDetail(errId)
           .then(d => {
+            if (!d) return;
             session.current = d;
             session.renderedA11y = [];
             session.scanPending = store.local.dock.dockTab === "diagnostics";
@@ -261,9 +267,8 @@ export function connectHmr(): void {
           // Re-render the relationships facet: usedBy edges may have changed when a
           // component was added or removed. Re-fetch to get the fresh registry, then paint.
           if (session.current?.id && session.componentRegistry.has(session.current.id) && store.local.panelTab === "relationships") {
-            void fetch(componentUrl(session.current.id))
-              .then(r => r.ok ? r.json() as Promise<ComponentDetail> : Promise.reject(r.status))
-              .then(d => { session.current = d; return renderPanel(); })
+            void fetchDetail(session.current.id)
+              .then(d => { if (d) { session.current = d; return renderPanel(); } })
               .catch(() => {});
           }
         })
