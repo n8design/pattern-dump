@@ -156,6 +156,13 @@ type TestOnlyWatchStarted = (deliver: (event: "change", path: string) => void) =
 // what a failing handler does to the server. Not exported, not part of any contract.
 type TestOnlyFailHandler = (event: string, path: string) => "reject" | "throw" | undefined;
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onReaudit`, the watcher's surgical
+// re-audit of a component awaits it first; a promise it returns holds the re-audit, a rejected one fails
+// it. Not exported, not part of any contract.
+type TestOnlyOnReaudit = (componentId: string) => Promise<void> | undefined;
+const testOnlyReaudit = (): TestOnlyOnReaudit | undefined =>
+  (globalThis as { __testOnly_onReaudit?: TestOnlyOnReaudit }).__testOnly_onReaudit;
+
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_holdHandler`, it is called as each
 // handler's turn comes; a promise it returns holds that handler until it settles, so a test can see what
 // waits behind it. Not exported, not part of any contract.
@@ -204,6 +211,17 @@ function enqueue(job: Job): void {
   pump();
 }
 
+/**
+ * A watcher handler that failed, or a step of one (`step`, e.g. "its audit"), as a problem in the terminal
+ * and on the open pages. The one place handler failures are worded.
+ */
+function reportHandlerFailure(event: string, path: string, e: unknown, step?: string): void {
+  const reason = e instanceof Error ? e.message : String(e);
+  const message = step ? `${shown(path)} (${event}): ${step} failed: ${reason}` : `${shown(path)} (${event}) was not handled: ${reason}`;
+  hotreloader.push({ type: "error", scope: "build", message });
+  console.error(`[dev-server] ${message}`);
+}
+
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
   // The event's turn: resolves once its handler has finished (or it was skipped).
   const start = (path: string, fromRecheck: boolean): Promise<void> => new Promise<void>(finish => {
@@ -238,11 +256,7 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
     if (basename(path) === ".__testOnly_barrier") { done(); return; }
     // A handler that fails (a file it cannot read, a folder gone mid-walk) is a problem in the terminal and
     // on the open pages, like any other, and pd dev keeps running: nothing is left to reject unhandled.
-    const failed = (e: unknown): void => {
-      const message = `${shown(path)} (${event}) was not handled: ${e instanceof Error ? e.message : String(e)}`;
-      hotreloader.push({ type: "error", scope: "build", message });
-      console.error(`[dev-server] ${message}`);
-    };
+    const failed = (e: unknown): void => { reportHandlerFailure(event, path, e); };
     const run = (): void => {
       let result: unknown;
       try {
@@ -624,10 +638,10 @@ on("change", async (filePath) => {
       console.warn(`[dev-server] Could not resolve component for: ${filePath}`);
       return;
     }
+    let rendered = false;
     try {
       await render({ component: componentId });
-      hotreloader.push({ type: "content-swap", componentId });
-      console.log(`[dev-server] Component changed: ${componentId}`);
+      rendered = true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       hotreloader.push({ type: "error", scope: "render", componentId, message: msg });
@@ -637,17 +651,29 @@ on("change", async (filePath) => {
     // its static findings may have changed). No full re-hash, no other component touched. A base id
     // from resolveComponentForFile keys straight into the slice map. quarantineEntry is undefined —
     // a live-edited component that renders is not quarantined (collisions come via add/rebuild).
-    if (state.auditSeeding) {
-      // A seed is running: it audits this component again before it is stored (routes.ts).
-      state.auditSeeding.add(componentId);
-    } else {
-      const slices = await state.audit.peek();
-      if (slices) {
-        slices.set(componentId, await auditWithHash(
-          componentId, render, undefined, discovery.discoveryMap, globalDataDigest(rendering.current.globalData),
-        ));
-        state.liveReauditCount += 1;
-        if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
+    // The reload is sent after it, as every reload is sent after the state it reflects (the audit facet
+    // refetches on it), and sent even when the audit fails: a failing audit must not swallow the reload.
+    try {
+      if (state.auditSeeding) {
+        // A seed is running: it audits this component again before it is stored (routes.ts).
+        state.auditSeeding.add(componentId);
+      } else {
+        const slices = await state.audit.peek();
+        if (slices) {
+          await testOnlyReaudit()?.(componentId);
+          slices.set(componentId, await auditWithHash(
+            componentId, render, undefined, discovery.discoveryMap, globalDataDigest(rendering.current.globalData),
+          ));
+          state.liveReauditCount += 1;
+          if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
+        }
+      }
+    } catch (e) {
+      reportHandlerFailure("change", filePath, e, "its audit");
+    } finally {
+      if (rendered) {
+        hotreloader.push({ type: "content-swap", componentId });
+        console.log(`[dev-server] Component changed: ${componentId}`);
       }
     }
 
