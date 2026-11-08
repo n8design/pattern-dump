@@ -95,7 +95,7 @@ export interface WatchHandle {
 }
 
 /** A file as a change is judged by: its stamp (inode, change and modification times, size) and a hash of its content. */
-interface Seen { readonly stamp: string; readonly hash: string }
+interface Seen { readonly stamp: string; readonly hash: string; readonly real: string }
 
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_watchStamp`, a file's stamp is what
 // it returns, given the real one, so a test can give two different writes the same stamp, as a file system
@@ -108,7 +108,7 @@ function seenNow(path: string): Seen | null {
     const s = statSync(path);
     const stamp = `${s.ino}:${s.ctimeMs}:${s.mtimeMs}:${s.size}`;
     const forced = (globalThis as { __testOnly_watchStamp?: TestOnlyWatchStamp }).__testOnly_watchStamp;
-    return { stamp: forced ? forced(path, stamp) : stamp, hash: createHash("sha1").update(readFileSync(path)).digest("hex") };
+    return { stamp: forced ? forced(path, stamp) : stamp, real: stamp, hash: createHash("sha1").update(readFileSync(path)).digest("hex") };
   } catch {
     return null;
   }
@@ -177,11 +177,14 @@ type TestOnlyHandler = (
 type TestOnlyHoldHandler = (event: string, path: string) => Promise<void> | undefined;
 
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
-// after each watcher event's handler has finished, with the number of events still waiting. Tests
+// after each watcher event's handler has finished, with the number of events still waiting, and the stamp
+// (inode, change and modification times, size) of the file as the handler read it: null for a removal and
+// for a folder. A step that must not return before the last write of a file is handled compares it with
+// the file's stamp on disk. Tests
 // use it as a barrier ("every event so far has been handled") instead of waiting for quiet; a file named
 // `.__testOnly_barrier`, which a test puts in every watched folder, is reported but never handled. Unset,
 // it costs a counter and a name check. Not exported, not part of any contract.
-type TestOnlyEventHandled = (event: string, path: string, stillRunning: number) => void;
+type TestOnlyEventHandled = (event: string, path: string, stillRunning: number, stamp: string | null) => void;
 let closed = false;
 // One pending recheck per changed file (CHANGE_RECHECK_MS), by its timer.
 const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
@@ -249,10 +252,13 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
     // A change: the file as the handler is about to read it. A newer event for the same file replaces
     // the pending recheck, since it is handled with whatever the file holds by then.
     let seen: Seen | null = null;
+    // The stamp the hook reports: the file as this handling read it.
+    let readStamp: string | null = null;
     if (event === "change") {
       seen = seenNow(path);
       if (!fromRecheck && unchanged(seen, lastHandled.get(path))) { finish(); return; }
       if (seen) lastHandled.set(path, seen); else lastHandled.delete(path);
+      readStamp = seen?.real ?? null;
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
     } else if (event === "add") {
@@ -260,6 +266,7 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       // (fsevents can report a file moved into place as an add and then a change) is not a second change.
       const added = seenNow(path);
       if (added) lastHandled.set(path, added); else lastHandled.delete(path);
+      readStamp = added?.real ?? null;
     } else if (event === "unlink") {
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
@@ -270,7 +277,7 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       outbox = null;
       if (sending && sending.length > 0) hotreloader.pushChange(sending);
       // Still to finish after this one: the ones waiting.
-      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, queue.length);
+      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, queue.length, readStamp);
       finish();
       if (event !== "change" || closed || seen === null) return;
       rechecks.set(path, setTimeout(() => {
