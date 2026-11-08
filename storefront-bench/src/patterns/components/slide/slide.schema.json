@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "required": [
+    "image",
+    "alt"
+  ],
+  "x-pd-content": "caption",
+  "properties": {
+    "image": {
+      "type": "string"
+    },
+    "alt": {
+      "type": "string"
+    },
+    "caption": {
+      "type": "string",
+      "contentMediaType": "text/markdown"
+    }
+  }
+}
