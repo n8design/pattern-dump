@@ -34,7 +34,7 @@
 //     for the current one. Always go through currentDiscovery / cachedDiscovery / setDiscovery /
 //     invalidateDiscovery / rebuildDiscovery below.
 //
-// `themeCss`, `themeTokens` and `scriptCache` are `readonly` because they are only ever mutated,
+// `themeCss`, `themeTokens` and `scripts` are `readonly` because they are only ever mutated,
 // never replaced — the type records that difference rather than leaving it to convention.
 
 import type { DiscoveryResult } from "@pattern-dump/contracts";
@@ -85,8 +85,9 @@ export interface ServerState {
   readonly themeCss: Map<string, string>;
   /** themeName → { "--slot": value | null }. Populated at startup and on HMR recompile. */
   readonly themeTokens: Map<string, Record<string, string | null>>;
-  /** scriptId → compiled JS. Invalidated on change, compiled on first request. */
-  readonly scriptCache: Map<string, string>;
+  /** scriptId → its compiled JS, a lazy cache per script (lazy.ts): compiled on first request,
+   *  invalidated by the watcher on a change. Through `scriptFor` only. */
+  readonly scripts: Map<string, Lazy<string>>;
 }
 
 /** A ServerState with empty caches and nothing indexed yet. The initial index build fills it. */
@@ -105,7 +106,7 @@ export function createServerState(): ServerState {
     liveReauditCount: 0,
     themeCss: new Map<string, string>(),
     themeTokens: new Map<string, Record<string, string | null>>(),
-    scriptCache: new Map<string, string>(),
+    scripts: new Map<string, Lazy<string>>(),
   };
 }
 
@@ -138,6 +139,16 @@ export function applyStyleData(state: ServerState, data: AllStyleData): StyleDat
   state.baseCss = data.baseCss;
   state.scssGraphDirty = false;
   return { changedComponents: changedComponents.sort(), baseChanged };
+}
+
+/** The compiled script `scriptId`, as a lazy cache: a compile that a save overtook is never stored. */
+export function scriptFor(state: ServerState, scriptId: string): Lazy<string> {
+  let script = state.scripts.get(scriptId);
+  if (!script) {
+    script = createLazy<string>(`script:${scriptId}`);
+    state.scripts.set(scriptId, script);
+  }
+  return script;
 }
 
 /** How long a request waits for discovery before the terminal says why. */

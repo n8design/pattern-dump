@@ -27,7 +27,10 @@ import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import type { ResolvedConfig } from "./server-config.js";
-import { applyStyleData, compositionFor, currentDiscovery, type ServerState } from "./server-state.js";
+import { applyStyleData, compositionFor, currentDiscovery, scriptFor, type ServerState } from "./server-state.js";
+
+/** A script with no entry point: a 404 that names where it was looked for, never stored. */
+class ScriptMissing extends Error {}
 import { buildShellHtml, json, mimeType, serveFile, servesShell } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
 import { buildComponentTree } from "./component-tree.js";
@@ -163,23 +166,23 @@ export async function handleRequest(
       }
       const scriptId = normalizeScriptId(decodeURIComponent(basename(pathname, ".js")));
       try {
-        if (!state.scriptCache.has(scriptId)) {
+        const js = await scriptFor(state, scriptId).get(async () => {
           // The project's scripts first, then each package's — a project script replaces a package's.
           const entryPoint = scriptsDirs.map(d => join(d, `${scriptId}.ts`)).find(f => existsSync(f));
-          if (entryPoint === undefined) {
-            // Say what is missing. Compiling a path we know is absent would report it as an ENOENT
-            // compile error inside the preview, naming neither the id nor where it was looked for.
-            res.writeHead(404, { "Content-Type": "text/plain" });
-            res.end(`No script "${scriptId}": scripts are TypeScript, so ${scriptId}.ts is expected in `
-              + scriptsDirs.map(d => relative(cwd, d) || d).join(" or "));
-            return;
-          }
-          const js = await compileScriptFile(entryPoint);
-          state.scriptCache.set(scriptId, js);
-        }
+          // Say what is missing. Compiling a path we know is absent would report it as an ENOENT
+          // compile error inside the preview, naming neither the id nor where it was looked for.
+          if (entryPoint === undefined) throw new ScriptMissing(scriptId);
+          return compileScriptFile(entryPoint);
+        });
         res.writeHead(200, { "Content-Type": "application/javascript" });
-        res.end(state.scriptCache.get(scriptId));
+        res.end(js);
       } catch (e) {
+        if (e instanceof ScriptMissing) {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end(`No script "${scriptId}": scripts are TypeScript, so ${scriptId}.ts is expected in `
+            + scriptsDirs.map(d => relative(cwd, d) || d).join(" or "));
+          return;
+        }
         res.writeHead(500, { "Content-Type": "text/plain" });
         res.end(`Script compile error: ${String(e)}`);
       }

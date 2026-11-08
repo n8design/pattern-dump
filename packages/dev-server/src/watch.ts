@@ -28,7 +28,7 @@ import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
 import {
-  applyStyleData, cachedDiscovery, compositionFor, currentDiscovery, invalidateDiscovery, rebuildDiscovery, type ServerState,
+  applyStyleData, cachedDiscovery, compositionFor, currentDiscovery, invalidateDiscovery, rebuildDiscovery, scriptFor, type ServerState,
 } from "./server-state.js";
 import { baseComponentIds, resolveComponentForFile } from "./discovery-index.js";
 import {
@@ -565,7 +565,7 @@ on("change", async (filePath) => {
     // Script changed → invalidate cache + dispatch content-swap so the client re-renders
     // the srcdoc with a fresh ?v=<mtime> on the script src (busting the browser cache).
     const scriptId = basename(filePath, ".ts");
-    state.scriptCache.delete(scriptId);
+    scriptFor(state, scriptId).invalidate();
     if (state.lastComponentId) {
       hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
     }
