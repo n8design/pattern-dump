@@ -28,9 +28,19 @@ export interface Lazy<T> {
   set(value: T): void;
   /** Drop the stored value and the build in flight: the next caller builds anew. */
   invalidate(): void;
+  /**
+   * Hold off builds while the value is written in place (a patch). The build in flight is overtaken, and
+   * no build starts until every fence is released; callers wait. Release with `stale: true` when the patch
+   * leaves the stored value incomplete (the next caller then builds, after the patch), `false` when the
+   * holder stored a complete value itself.
+   */
+  fence(): (release: { stale: boolean }) => void;
 }
 
-export interface LazyOptions {
+export interface LazyOptions<T> {
+  /** Called when a build's value is stored (never for an overtaken build, nor for `set`): for a value that
+   *  is installed somewhere when it becomes current. */
+  readonly onStore?: (value: T) => void;
   /** Say in the terminal when a caller has waited longer than `afterMs`; `what` names the value. */
   readonly slow?: { readonly afterMs: number; readonly what: string; readonly log?: (line: string) => void };
 }
@@ -43,10 +53,12 @@ type TestOnlyOnLazy = (name: string, phase: "built" | "taken", invalidate: () =>
 /** The test-only hook, for a value derived from a lazy one (the composition registry). */
 export const testHook = (): TestOnlyOnLazy | undefined => (globalThis as { __testOnly_onLazy?: TestOnlyOnLazy }).__testOnly_onLazy;
 
-export function createLazy<T>(name: string, options: LazyOptions = {}): Lazy<T> {
+export function createLazy<T>(name: string, options: LazyOptions<T> = {}): Lazy<T> {
   let generation = 0;
   let stored: { value: T } | null = null;
   let inflight: { readonly promise: Promise<T>; readonly at: number } | null = null;
+  let fences = 0;
+  let unfenced: { readonly promise: Promise<void>; readonly open: () => void } | null = null;
 
   const invalidate = (): void => {
     generation++;
@@ -65,7 +77,10 @@ export function createLazy<T>(name: string, options: LazyOptions = {}): Lazy<T> 
     // Registered before any caller awaits it, so the value is stored before a caller resumes.
     promise.then(value => {
       if (inflight === entry) inflight = null;
-      if (generation === at) stored = { value };
+      if (generation === at) {
+        stored = { value };
+        options.onStore?.(value);
+      }
     }, () => {
       if (inflight === entry) inflight = null;
     });
@@ -91,6 +106,7 @@ export function createLazy<T>(name: string, options: LazyOptions = {}): Lazy<T> 
             await testHook()?.(name, "taken", invalidate);
             return value;
           }
+          if (unfenced) { await unfenced.promise; continue; }
           const entry = inflight ?? start(build);
           const value = await entry.promise;
           if (generation === entry.at) {
@@ -113,5 +129,24 @@ export function createLazy<T>(name: string, options: LazyOptions = {}): Lazy<T> 
       stored = { value };
     },
     invalidate,
+    fence() {
+      invalidate();
+      if (fences++ === 0) {
+        let open = (): void => {};
+        const promise = new Promise<void>(resolve => { open = resolve; });
+        unfenced = { promise, open };
+      }
+      let released = false;
+      return ({ stale }) => {
+        if (released) return;
+        released = true;
+        if (stale) invalidate();
+        if (--fences === 0) {
+          const fence = unfenced;
+          unfenced = null;
+          fence?.open();
+        }
+      };
+    },
   };
 }

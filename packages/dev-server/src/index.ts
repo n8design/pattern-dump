@@ -238,6 +238,7 @@ export async function startDevServer(
     const allComponentIds = baseComponentIds(dr);
     const styleData = await buildAllStyleData(styleRoots, allComponentIds);
     applyStyleData(state, styleData);
+    state.style.set(styleData);
     await surfaceDocumentBase(styleRoots, styleData.baseOutsideList, cwd);
     surfaceAssetRoots(cfg.assetRoots, cwd);
     await reportUnresolvableScripts(dr.discoveryMap, cfg.scriptsDirs, cfg.globalScripts, cwd);

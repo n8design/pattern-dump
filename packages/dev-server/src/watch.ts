@@ -308,6 +308,20 @@ const close = async (): Promise<void> => {
 // Accumulates css-link-swap messages, then attaches orderedHrefs for state.lastComponentId
 // computed AFTER all cache updates — so a newly-populated entry is visible in the closure.
 async function handleComponentScss(filePath: string): Promise<void> {
+  // From here until the save is written into the style data, no full build is installed or started: one
+  // in flight was built before the save (server-state.ts, hazard 5). Released stale unless a full restyle
+  // below stored a complete build itself, so the next request's full build starts after this save.
+  const release = state.style.fence();
+  let stale = true;
+  try {
+    stale = !(await patchStyles(filePath));
+  } finally {
+    release({ stale });
+  }
+}
+
+/** The save's patch, or a full restyle; true when it stored a complete full build. */
+async function patchStyles(filePath: string): Promise<boolean> {
   let recompiledFiles: string[];
   let compileErrors: Array<{ file: string; message: string }>;
   try {
@@ -318,7 +332,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
     // reaching the preview. Those arrive in `errors` and are pushed below.
     hotreloader.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
     console.error("[dev-server] SCSS error:", e);
-    return;
+    return false;
   }
 
   // Per-file compile failures. Until now these were only console.warn'ed inside the tracker, so a
@@ -331,7 +345,6 @@ async function handleComponentScss(filePath: string): Promise<void> {
       message: `SCSS ${basename(file)} — ${message.split("\n")[0]}`,
     });
   }
-  state.scssGraphDirty = true;
   const discovery = await currentDiscovery(state, patternRoots);
   const allIds = baseComponentIds(discovery);
   const timestamp = Date.now();
@@ -346,8 +359,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
   // CSS even when it belongs to a component. Rebuild all style data instead and broadcast what changed.
   if (inBase(resolve(filePath)) ||
       effectiveFiles.some(f => inBase(resolve(f)) || !componentOfScss(resolve(f), allIds))) {
-    await restyleAll(discovery, timestamp, effectiveFiles, compileErrors.length > 0);
-    return;
+    return restyleAll(discovery, timestamp, effectiveFiles, compileErrors.length > 0);
   }
 
   const pending: Array<{ type: "css-link-swap"; componentId: string; href: string }> = [];
@@ -389,6 +401,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
   const orderedHrefs = await closureHrefs(discovery, timestamp);
   for (const m of pending) hotreloader.push({ ...m, orderedHrefs });
   console.log(`[dev-server] CSS updated (recompiled: ${effectiveFiles.map(f => basename(f)).join(", ")})`);
+  return false;
 }
 
 // The full-restyle path: the same buildAllStyleData pass as boot and the routes' lazy rebuild, then
@@ -397,16 +410,20 @@ async function handleComponentScss(filePath: string): Promise<void> {
 // with the base link at its new ?v= (state.baseCssVersion).
 async function restyleAll(
   discovery: DiscoveryResult, timestamp: number, files: string[], hadCompileErrors: boolean,
-): Promise<void> {
+): Promise<boolean> {
   const allIds = baseComponentIds(discovery);
   const names = files.map(f => basename(f)).join(", ");
   // A file that failed to compile is skipped by buildAllStyleData, which with one entry bundle would
   // empty every component's CSS. Keep the last good CSS on screen; the error is already on the Console.
   if (hadCompileErrors) {
     console.warn(`[dev-server] CSS not updated — compile errors (recompiled: ${names})`);
-    return;
+    return false;
   }
-  const changes = applyStyleData(state, await buildAllStyleData(styleRoots, allIds));
+  // A request's full build in flight started before this change: it is never installed over this one.
+  state.style.invalidate();
+  const data = await buildAllStyleData(styleRoots, allIds);
+  const changes = applyStyleData(state, data);
+  state.style.set(data);
   const orderedHrefs = await closureHrefs(discovery, timestamp);
   for (const componentId of changes.changedComponents) {
     hotreloader.push({ type: "css-link-swap", componentId, href: componentCssUrl(componentId, timestamp), orderedHrefs });
@@ -422,6 +439,7 @@ async function restyleAll(
     ...(changes.baseChanged ? ["base layer"] : []),
   ].join(" + ");
   console.log(`[dev-server] CSS updated: ${what} (recompiled: ${names})`);
+  return true;
 }
 
 // The ordered link set for the component on screen, computed after all cache updates so a

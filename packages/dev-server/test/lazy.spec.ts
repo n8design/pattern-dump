@@ -80,6 +80,42 @@ describe("a lazy cache", () => {
     expect(await lazy.peek()).toBe("given");
   });
 
+  it("fence: a build in flight is never stored, and none starts until the fence is released", async () => {
+    const stores: number[] = [];
+    const lazy = createLazy<number>("t", { onStore: v => stores.push(v) });
+    const { pending, build } = builds<number>();
+    const caller = lazy.get(build);
+    const release = lazy.fence();
+    pending[0].resolve(1);
+    await settle();
+    // Overtaken by the fence: not stored, and its caller does not start another build while fenced.
+    expect(stores).toEqual([]);
+    expect(pending).toHaveLength(1);
+    const during = lazy.get(build);
+    await settle();
+    expect(pending).toHaveLength(1);
+
+    release({ stale: true });
+    await settle();
+    // Released stale: one build, started after the fence, serves both callers and is stored.
+    expect(pending).toHaveLength(2);
+    pending[1].resolve(2);
+    expect(await caller).toBe(2);
+    expect(await during).toBe(2);
+    expect(stores).toEqual([2]);
+  });
+
+  it("fence released not stale keeps what its holder stored", async () => {
+    const lazy = createLazy<number>("t");
+    const { pending, build } = builds<number>();
+    const release = lazy.fence();
+    const caller = lazy.get(build);
+    lazy.set(7);
+    release({ stale: false });
+    expect(await caller).toBe(7);
+    expect(pending).toHaveLength(0);
+  });
+
   it("says in the terminal, with its reason, when a caller has waited long", async () => {
     vi.useFakeTimers();
     try {

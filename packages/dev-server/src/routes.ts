@@ -27,7 +27,7 @@ import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import type { ResolvedConfig } from "./server-config.js";
-import { applyStyleData, compositionFor, currentDiscovery, scriptFor, type ServerState } from "./server-state.js";
+import { compositionFor, currentDiscovery, scriptFor, type ServerState } from "./server-state.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 class ScriptMissing extends Error {}
@@ -286,11 +286,9 @@ export async function handleRequest(
         // Only a component that exists (a quarantined one has a detail too) is the one on screen: the
         // workbench probes unknown routes here, and a 404 must not redirect the watcher's next reload.
         state.lastComponentId = componentId;
-        if (state.scssGraphDirty) {
-          const ids = baseComponentIds(discovery);
-          const styleData = await buildAllStyleData(styleRoots, ids);
-          applyStyleData(state, styleData);
-        }
+        // The full style build, when a save has left it to be redone: installed when stored, never one a
+        // later save overtook (server-state.ts, hazard 5).
+        await state.style.get(() => buildAllStyleData(styleRoots, baseComponentIds(discovery)));
         const compReg = await compositionFor(state, discovery, patternDirs);
         const detail = await buildComponentDetail(
           componentId, patternDirs, render, tracker, defaultTheme, handleMap, compReg,

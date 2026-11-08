@@ -9,7 +9,7 @@
 // from two directions — HTTP requests and filesystem events. Wrapping it in methods would imply an
 // invariant the code does not have. The honest shape is a record whose hazards are documented.
 //
-// THREE HAZARDS, each of which has a real failure mode:
+// FIVE HAZARDS, each of which has a real failure mode:
 //
 //  1. `lastComponentId` is a request→watcher BACK-CHANNEL. A GET handler writes it; the watcher
 //     reads it to decide which component a theme or script edit should refresh. It is why the
@@ -34,6 +34,12 @@
 //     for the current one. Always go through currentDiscovery / cachedDiscovery / setDiscovery /
 //     invalidateDiscovery / rebuildDiscovery below.
 //
+//  5. `style` is the full style build, installed into the state when it is stored. The watcher's
+//     per-save patch writes `perComponentCss` and `classOwnerIndex` directly, and invalidates `style`
+//     when its handler starts (so a build already in flight is never installed over the patch, nor
+//     replaces the map the patch is writing) and again once the patch is written (so the next request's
+//     full build starts after it and has the saved file in its module graph and provenance).
+//
 // `themeCss`, `themeTokens` and `scripts` are `readonly` because they are only ever mutated,
 // never replaced — the type records that difference rather than leaving it to convention.
 
@@ -56,7 +62,10 @@ export interface ServerState {
   /** Base-class provenance: className → shared module that authored it. Same lifecycle as the
    *  module graph — rebuilt on the next full pass (navigation-lag MVP). */
   baseProvenance: BaseProvenanceIndex | null;
-  scssGraphDirty: boolean;
+  /** The full style build the fields above and `perComponentCss`/`baseCss` were installed from, as a lazy
+   *  cache: a build is installed (applyStyleData) only when it is stored, so one that a save overtook is
+   *  never installed over the save's patch. Nothing stored means the next request builds. See hazard 5. */
+  readonly style: Lazy<AllStyleData>;
 
   /** Per-component own-origin CSS: ComponentId → CSS text (origin-bucketed).
    *  Reassigned by the initial index build — see hazard 3. */
@@ -94,12 +103,12 @@ export interface ServerState {
 
 /** A ServerState with empty caches and nothing indexed yet. The initial index build fills it. */
 export function createServerState(): ServerState {
-  return {
+  const state: ServerState = {
     lastComponentId: "",
     scssModuleGraph: null,
     classOwnerIndex: null,
     baseProvenance: null,
-    scssGraphDirty: true,
+
     perComponentCss: new Map<string, string>(),
     baseCss: "",
     baseCssVersion: 0,
@@ -110,7 +119,9 @@ export function createServerState(): ServerState {
     themeCss: new Map<string, string>(),
     themeTokens: new Map<string, Record<string, string | null>>(),
     scripts: new Map<string, Lazy<string>>(),
+    style: createLazy<AllStyleData>("style", { onStore: data => { applyStyleData(state, data); } }),
   };
+  return state;
 }
 
 /** What a full re-index changed, for the HMR path to broadcast. */
@@ -140,7 +151,6 @@ export function applyStyleData(state: ServerState, data: AllStyleData): StyleDat
   state.baseProvenance = data.baseProvenance;
   state.perComponentCss = data.componentCssMap;
   state.baseCss = data.baseCss;
-  state.scssGraphDirty = false;
   return { changedComponents: changedComponents.sort(), baseChanged };
 }
 
