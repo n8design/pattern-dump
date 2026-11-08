@@ -64,7 +64,12 @@ describe("a stylesheet saved right after its template", () => {
       const from = handled.length;
       await saveInTwoSteps(b.at(SCSS), "");
       await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === SCSS));
+      // And the written one handled too: step() waits for a change to the file, which the emptied one already
+      // is. On Linux the write can land in chokidar's 50 ms window and be found by the watcher's recheck, after
+      // the step's barrier.
+      const written = handled.length;
       await saveInTwoSteps(b.at(SCSS), `.btn { color: rgb(9, 8, 7); }\n`);
+      await whenHandled(() => handled.slice(written).some(h => b.owns(h.path) && b.rel(h.path) === SCSS));
     }, [["change", SCSS]]);
     // In the order they were sent (step() sorts its messages): the last is the last handling's.
     const swaps = b.messages.slice(sentFrom).filter(m => m.includes(`"css-link-swap"`)).map(m => JSON.parse(m) as { orderedHrefs?: string[] });
