@@ -29,6 +29,8 @@ export interface HotReloader {
    * anything else.
    */
   generation(): string;
+  /** The port it is bound to, once `listening` has resolved: with 0, the one the system chose. Before that,
+   *  the port it was given. */
   readonly port: number;
   /**
    * Settles once the socket is bound: resolves when listening, rejects with the bind error (e.g.
@@ -74,7 +76,10 @@ export function createHotReloader(port = Number(process.env["PD_WS_PORT"] ?? 400
   });
 
   return {
-    port,
+    get port(): number {
+      const address = wss.address();
+      return address !== null && typeof address === "object" ? address.port : port;
+    },
     listening,
     push(message: HmrMessage) {
       // A reload message moves the generation on, and carries the one it moved it to.

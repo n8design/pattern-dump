@@ -29,7 +29,8 @@ function firstFrames(port: number, count: number): Promise<HmrMessage[]> {
 
 describe("createHotReloader — on connect", () => {
   it("sends hello, then the retained messages, to a client that connects later", async () => {
-    hr = createHotReloader(45_301);
+    hr = createHotReloader(0);
+    await hr.listening;
     hr.retain([collision("atoms-x"), collision("atoms-y")]);
     const frames = await firstFrames(hr.port, 3);
     expect(frames).toEqual([
@@ -40,7 +41,8 @@ describe("createHotReloader — on connect", () => {
   });
 
   it("retain replaces the set — a cleared set replays nothing", async () => {
-    hr = createHotReloader(45_302);
+    hr = createHotReloader(0);
+    await hr.listening;
     hr.retain([collision("atoms-x")]);
     hr.retain([]);
     const frames = await firstFrames(hr.port, 2);
@@ -50,7 +52,7 @@ describe("createHotReloader — on connect", () => {
 
 describe("createHotReloader — the live-reload generation", () => {
   it("moves on with each reload message, which carries it, and hello tells a later client the current one", async () => {
-    hr = createHotReloader(45_304);
+    hr = createHotReloader(0);
     await hr.listening;
     const start = hr.generation();
     expect(start).toMatch(/^[0-9a-f]{8}\.0$/);
@@ -65,7 +67,7 @@ describe("createHotReloader — the live-reload generation", () => {
   });
 
   it("is stamped on the reload messages a connected client receives", async () => {
-    const server = createHotReloader(45_305);
+    const server = createHotReloader(0);
     hr = server;
     await server.listening;
     const boot = server.generation().split(".")[0];
@@ -90,10 +92,17 @@ describe("createHotReloader — the live-reload generation", () => {
 });
 
 describe("createHotReloader — binding", () => {
+  it("reports the port it is bound to: given 0, the one the system chose", async () => {
+    hr = createHotReloader(0);
+    await hr.listening;
+    expect(hr.port).toBeGreaterThan(0);
+    expect((await firstFrames(hr.port, 1))[0]).toMatchObject({ type: "hello" });
+  });
+
   it("resolves listening once bound, and rejects (without crashing) when the port is taken", async () => {
-    hr = createHotReloader(45_303);
+    hr = createHotReloader(0);
     await expect(hr.listening).resolves.toBeUndefined();
-    const second = createHotReloader(45_303);
+    const second = createHotReloader(hr.port);
     await expect(second.listening).rejects.toMatchObject({ code: "EADDRINUSE" });
   });
 });
