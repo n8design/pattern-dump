@@ -45,6 +45,9 @@ export default defineConfig({
   // "Upload Playwright traces" step could only ever collect videos.
   // Local stays at 0 so a flake is visible while developing rather than silently absorbed.
   retries: process.env["CI"] ? 2 : 0,
+  // On CI a test that passes only on retry fails the run: retries keep the trace of the first failure,
+  // they do not make a flaky test green.
+  failOnFlakyTests: !!process.env["CI"],
   reporter: process.env["CI"]
     ? [["github"], ["html", { open: "never" }], ["list"]]
     : [["list"], ["html", { open: "never" }]],

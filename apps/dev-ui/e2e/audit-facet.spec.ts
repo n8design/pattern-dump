@@ -56,11 +56,15 @@ test.describe("Audit facet — corpus diagnostics", () => {
   });
 
   test("shows the loading placeholder while the rollup is in flight", async ({ page }) => {
-    // Delay the response so the transient state is observable rather than raced.
+    // Hold the first request so the transient state is observable rather than raced, then hand it on;
+    // any later one goes straight through. No fetched response is held, so nothing can be fulfilled
+    // after its route was settled (the "Route is already handled" race).
+    let held = false;
     await page.route("**/api/audit", async (route) => {
-      const res = await route.fetch();
+      if (held) return route.continue();
+      held = true;
       await new Promise((r) => setTimeout(r, 1_500));
-      await route.fulfill({ response: res });
+      return route.continue();
     });
 
     await gotoComponent(page, "atoms/button");
@@ -94,10 +98,10 @@ test.describe("Audit facet — corpus diagnostics", () => {
   test("reopening the tab after an error retries the fetch", async ({ page }) => {
     let calls = 0;
     let failing = true;
-    await page.route("**/api/audit", async (route) => {
+    // Counts each request and settles it in one call: a 500 while failing, else handed on.
+    await page.route("**/api/audit", (route) => {
       calls++;
-      if (failing) return route.fulfill({ status: 500, body: "nope" });
-      return route.fulfill({ response: await route.fetch() });
+      return failing ? route.fulfill({ status: 500, body: "nope" }) : route.continue();
     });
 
     await gotoComponent(page, "atoms/button");
@@ -165,9 +169,13 @@ test.describe("Audit facet — corpus diagnostics", () => {
   test("an HMR content change while the facet is open refetches the rollup", async ({ page }) => {
     test.setTimeout(60_000);
     let calls = 0;
-    await page.route("**/api/audit", async (route) => {
+    // Counts each request and hands it on in one call. Fetching and then fulfilling left a window in
+    // which the route could be settled while the fetch was in flight, and the fulfill then threw
+    // "Route is already handled" (seen once on CI). The test only counts requests, so it never needs
+    // the response in hand.
+    await page.route("**/api/audit", (route) => {
       calls++;
-      await route.fulfill({ response: await route.fetch() });
+      return route.continue();
     });
 
     await gotoComponent(page, "atoms/button");
@@ -192,8 +200,7 @@ test.describe("Audit facet — corpus diagnostics", () => {
         .poll(async () => page.locator("#preview-frame").getAttribute("srcdoc"), { timeout: 10_000 })
         .not.toContain("audited");
       // The restore also refetches the rollup. End the intercept only once that request's handler has
-      // finished: a handler still awaiting route.fetch() when the page closes fails the test after the
-      // fact ("Fetch response has been disposed"), whatever the assertions above found.
+      // finished, so no handler is still running when the page closes.
       await page.unrouteAll({ behavior: "wait" });
     }
   });

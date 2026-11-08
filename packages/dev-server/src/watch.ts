@@ -17,17 +17,19 @@
 // Guarded by test/watcher.spec.ts, which asserts both the durable HTTP effects and the broadcasts
 // themselves over a real socket.
 
-import { statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, statSync } from "node:fs";
 import { basename, extname, relative, resolve, sep } from "node:path";
 import chokidar from "chokidar";
-import { componentCssUrl } from "@pattern-dump/contracts";
-import { buildDiscoveryMap } from "@pattern-dump/discovery";
+import { componentCssUrl, type DiscoveryResult } from "@pattern-dump/contracts";
 import { compileSassFile } from "@pattern-dump/build";
 import { dryRunHelperRegistrar } from "@pattern-dump/renderer";
 import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
-import { applyStyleData, type ServerState } from "./server-state.js";
+import {
+  applyStyleData, cachedDiscovery, currentDiscovery, invalidateDiscovery, startDiscovery, type ServerState,
+} from "./server-state.js";
 import { baseComponentIds, resolveComponentForFile } from "./discovery-index.js";
 import { buildCompositionRegistry } from "./composition.js";
 import {
@@ -60,9 +62,9 @@ export interface WatchContext {
  * that comes within 50 ms of the previous one and never reports it later (`_throttle(EV_CHANGE, path,
  * 50)` in its `_emit`). On Linux, where events arrive within a few milliseconds, a quick second save
  * is lost that way, and the page keeps the first one. So after each change is handled the file's
- * modification time and size are compared with what they were when the handler read the file, past
- * that window, and a difference is handled as one more change, again until they hold still. Must stay
- * above chokidar's window: test/watcher-chokidar.spec.ts pins it.
+ * modification time and size, and its content, are compared with what they were when the handler read
+ * the file, past that window, and a difference is handled as one more change, again until they hold
+ * still. Must stay above chokidar's window: test/watcher-chokidar.spec.ts pins it.
  */
 export const CHANGE_RECHECK_MS = 60;
 
@@ -85,15 +87,31 @@ export interface WatchHandle {
   close(): Promise<void>;
 }
 
-/** The file's inode, change and modification times and size, or null when it is gone. */
-function stamp(path: string): string | null {
+/** A file as a change is judged by: its stamp (inode, change and modification times, size) and a hash of its content. */
+interface Seen { readonly stamp: string; readonly hash: string }
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_watchStamp`, a file's stamp is what
+// it returns, given the real one, so a test can give two different writes the same stamp, as a file system
+// with coarse timestamps does. Not exported, not part of any contract.
+type TestOnlyWatchStamp = (path: string, stamp: string) => string;
+
+/** The file as it is now, or null when it is gone. */
+function seenNow(path: string): Seen | null {
   try {
     const s = statSync(path);
-    return `${s.ino}:${s.ctimeMs}:${s.mtimeMs}:${s.size}`;
+    const stamp = `${s.ino}:${s.ctimeMs}:${s.mtimeMs}:${s.size}`;
+    const forced = (globalThis as { __testOnly_watchStamp?: TestOnlyWatchStamp }).__testOnly_watchStamp;
+    return { stamp: forced ? forced(path, stamp) : stamp, hash: createHash("sha1").update(readFileSync(path)).digest("hex") };
   } catch {
     return null;
   }
 }
+
+/** Unchanged: the same stamp and the same content. Either alone is not enough: with timestamps a second
+ *  or two coarse (FAT, some network mounts) a real same-size edit keeps its stamp, and a rewrite of the
+ *  same content (a save with no edit) gets a new one. */
+const unchanged = (now: Seen | null, before: Seen | undefined): boolean =>
+  now !== null && before !== undefined && now.stamp === before.stamp && now.hash === before.hash;
 
 /**
  * Start watching the project. Resolves once chokidar has finished its initial scan (until then a file
@@ -121,6 +139,11 @@ const watchDirs = [
 ];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onWatchStarted`, it is called once
+// the watcher is ready, with a function that delivers an event to the handlers below as chokidar would (a
+// test uses it to deliver one chokidar sends twice). Not exported, not part of any contract.
+type TestOnlyWatchStarted = (deliver: (event: "change", path: string) => void) => void;
+
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
 // after each watcher event's handler has finished, with the number of handlers still running. Tests
 // use it as a barrier ("every event so far has been handled") instead of waiting for quiet; a file named
@@ -131,26 +154,27 @@ let running = 0;
 let closed = false;
 // One pending recheck per changed file (CHANGE_RECHECK_MS), by its timer.
 const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
-// A file a recheck handled, as it was then: chokidar's own event for that same write can still follow
-// (macOS reports writes about 100 ms late, after the recheck), and is not handled a second time.
-const recheckHandled = new Map<string, string>();
+// Each changed file as its last handling saw it. chokidar can report one write twice: its own event for
+// a write a recheck already handled (macOS reports writes about 100 ms late, after the recheck), and on
+// macOS under load one writeFile as two events about 100 ms apart, past its own 50 ms window (fsevents
+// sees the truncate and the write separately). A change to a file that is as it was then is not handled
+// again.
+const lastHandled = new Map<string, Seen>();
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
   const dispatch = (path: string, fromRecheck = false): void => {
     // A change: the file as the handler is about to read it. A newer event for the same file replaces
     // the pending recheck, since it is handled with whatever the file holds by then.
-    let seen: string | null = null;
+    let seen: Seen | null = null;
     if (event === "change") {
-      seen = stamp(path);
-      const already = recheckHandled.get(path);
-      recheckHandled.delete(path);
-      if (!fromRecheck && already !== undefined && already === seen) return;
-      if (fromRecheck && seen !== null) recheckHandled.set(path, seen);
+      seen = seenNow(path);
+      if (!fromRecheck && unchanged(seen, lastHandled.get(path))) return;
+      if (seen) lastHandled.set(path, seen); else lastHandled.delete(path);
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
     } else if (event === "unlink") {
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
-      recheckHandled.delete(path);
+      lastHandled.delete(path);
     }
     running++;
     const done = () => {
@@ -160,10 +184,10 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       rechecks.set(path, setTimeout(() => {
         rechecks.delete(path);
         if (closed) return;
-        const now = stamp(path);
+        const now = seenNow(path);
         // Still as the handler read it: done. Gone: its unlink is on its way. Otherwise a write chokidar
         // dropped, handled as a change (which looks again after it).
-        if (now !== null && now !== seen) dispatch(path, true);
+        if (now !== null && !unchanged(now, seen ?? undefined)) dispatch(path, true);
       }, CHANGE_RECHECK_MS));
     };
     if (basename(path) === ".__testOnly_barrier") { done(); return; }
@@ -191,7 +215,7 @@ const close = async (): Promise<void> => {
   closed = true;
   for (const timer of rechecks.values()) clearTimeout(timer);
   rechecks.clear();
-  recheckHandled.clear();
+  lastHandled.clear();
   await watcher.close();
 };
 
@@ -226,8 +250,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
     });
   }
   state.scssGraphDirty = true;
-  if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-  const allIds = baseComponentIds(state.discoveryResult);
+  const allIds = baseComponentIds(await currentDiscovery(state, patternRoots));
   const timestamp = Date.now();
 
   // If tracker returned no files (new file not yet registered in perFileCss),
@@ -321,11 +344,12 @@ async function restyleAll(
 // newly-populated entry is included. Filtered to non-empty CSS: the preview head never links
 // zero-CSS components.
 async function closureHrefs(timestamp: number): Promise<string[] | undefined> {
-  if (!state.lastComponentId || !state.discoveryResult || !state.compositionRegistry) return undefined;
+  const discovery = await cachedDiscovery(state);
+  if (!state.lastComponentId || !discovery || !state.compositionRegistry) return undefined;
   // Must match the render path, rendered-class owners included — this list REPLACES the preview's
   // links, so anything the render path added and this one lacked would be stripped on every save.
   const staticClosure = await computeCssClosure(
-    state.lastComponentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), state.discoveryResult.discoveryMap
+    state.lastComponentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), discovery.discoveryMap
   );
   const renderedHtml = await render({ component: state.lastComponentId }).then(r => r.html, () => "");
   const closureIds = withRenderedClassOwners(staticClosure, renderedHtml, state.classOwnerIndex ?? new Map());
@@ -342,7 +366,7 @@ async function closureHrefs(timestamp: number): Promise<string[] | undefined> {
 async function handleMarkdown(filePath: string, event: "change" | "add" | "unlink"): Promise<void> {
   const abs = resolve(filePath);
   /** The base component documented by this file, if any — looked up by discovery's mdPath. */
-  const ownerIn = (dr: ServerState["discoveryResult"]): string | undefined => {
+  const ownerIn = (dr: DiscoveryResult | null): string | undefined => {
     for (const [id, entry] of dr?.discoveryMap ?? []) {
       if (entry.mdPath && resolve(entry.mdPath) === abs) return id.split("~")[0];
     }
@@ -350,15 +374,14 @@ async function handleMarkdown(filePath: string, event: "change" | "add" | "unlin
   };
   const rel = relative(patternRootOf(filePath) ?? patternsDir, filePath);
   // An .hbs/.json edit drops the cached discovery (routes rebuild it lazily); the owner lookup needs one.
-  if (event === "change") state.discoveryResult ??= await buildDiscoveryMap(patternRoots);
   // An unlinked file is only in the map from BEFORE the rebuild; an added one only in the map after.
-  let owner = ownerIn(state.discoveryResult);
+  let owner = ownerIn(event === "change" ? await currentDiscovery(state, patternRoots) : await cachedDiscovery(state));
   if (event === "change") {
     hotreloader.push({ type: "tree-changed" });
     console.log(`[dev-server] Docs changed: ${rel} → tree-changed`);
   } else {
     await rebuildAndSignalTree(`Docs ${event === "add" ? "added" : "removed"}: ${rel}`);
-    owner ??= ownerIn(state.discoveryResult);
+    owner ??= ownerIn(await cachedDiscovery(state));
   }
   for (const componentId of new Set([owner, state.lastComponentId])) {
     if (componentId) hotreloader.push({ type: "content-swap", componentId });
@@ -489,11 +512,9 @@ on("change", async (filePath) => {
     // Resolve using the current map BEFORE clearing it (file was in the previous discovery pass). A
     // second edit before any request has rebuilt it (a quick second save) finds none: build it, as the
     // SCSS path does, or that edit would reload nothing.
-    if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-    const componentId = resolveComponentForFile(filePath, state.discoveryResult);
+    const componentId = resolveComponentForFile(filePath, await currentDiscovery(state, patternRoots));
     // Invalidate caches so next request rebuilds with the new file state.
-    state.discoveryResult = null;
-    state.compositionRegistry = null;
+    invalidateDiscovery(state);
     if (!componentId) {
       console.warn(`[dev-server] Could not resolve component for: ${filePath}`);
       return;
@@ -536,10 +557,11 @@ on("change", async (filePath) => {
 // from firing at startup. Theme additions are ignored here (rare; handled on next nav).
 // Helper: rebuild discovery, surface any collisions, then push tree-changed.
 async function rebuildAndSignalTree(label: string): Promise<void> {
-  const before = state.discoveryResult ? baseComponentIds(state.discoveryResult) : null;
-  const dr = await buildDiscoveryMap(patternRoots);
-  state.discoveryResult = dr;
+  const previous = await cachedDiscovery(state);
+  const before = previous ? baseComponentIds(previous) : null;
+  // Current at once, before it runs: an invalidation during the build is not overwritten by its result.
   state.compositionRegistry = null;
+  const dr = await startDiscovery(state, patternRoots);
   // A component that arrived (or left) changes who owns which stylesheet: a stylesheet saved before its
   // template was filed under the base layer, and now belongs to the component. Restyle against the new
   // set, so its CSS moves without a restart.
@@ -562,6 +584,30 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   console.log(`[dev-server] ${label} → tree-changed`);
 }
 
+// A .json in a pattern root, added or removed. Discovery reads three kinds, each by name, once per build:
+// `<stem>.schema.json` is a component's schema (its schemaPath: what the Inspector shows, and what a
+// storefront page's frontmatter is checked against), `<stem>.json` is a component's data (its jsonPath:
+// the defaults it renders with), and `<base>~<variant>.json` is a variant of its own (a data-overlay
+// variant, a node in the tree; beside a `<base>~<variant>.hbs` it is that variant's data). A file that
+// arrives or leaves after the build is none of these until discovery is built again, so every .json in a
+// pattern root rebuilds it: matching the three by name here would repeat discovery's rules, and any other
+// .json rebuilds a discovery that comes out the same. Then the component it belongs to reloads, found in
+// the discovery that has the file (the new one for an add, the one before for a removal).
+async function handleComponentJson(filePath: string, event: "add" | "unlink"): Promise<void> {
+  const abs = resolve(filePath);
+  const ownerIn = (dr: DiscoveryResult | null): string | undefined => {
+    for (const [id, entry] of dr?.discoveryMap ?? []) {
+      if (entry.jsonPath === abs || entry.schemaPath === abs) return id.split("~")[0];
+    }
+    return undefined;
+  };
+  const rel = relative(patternRootOf(filePath) ?? patternsDir, filePath);
+  let owner = event === "unlink" ? ownerIn(await cachedDiscovery(state)) : undefined;
+  await rebuildAndSignalTree(`Data ${event === "add" ? "added" : "removed"}: ${rel}`);
+  owner ??= ownerIn(await cachedDiscovery(state));
+  if (owner) hotreloader.push({ type: "content-swap", componentId: owner });
+}
+
 /** Every storefront page changed: one page-changed per page (none without a storefront). */
 async function everyPageChanged(): Promise<void> {
   if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
@@ -578,10 +624,12 @@ on("add", async (filePath) => {
     await rebuildAndSignalTree(`Pattern added: ${relative(patternRoot, filePath)}`);
   } else if (ext === ".md" && patternRoot) {
     await handleMarkdown(filePath, "add");
+  } else if (ext === ".json" && patternRoot) {
+    await handleComponentJson(filePath, "add");
   }
 });
 
-// Component template removed — rebuild discovery and signal nav rebuild.
+// A component's file removed — rebuild discovery and signal nav rebuild.
 on("unlink", async (filePath) => {
   if (handlePages(filePath, "unlink")) return;
   if (await handleReloadable(filePath, "unlink")) return;
@@ -590,6 +638,8 @@ on("unlink", async (filePath) => {
     await rebuildAndSignalTree(`Pattern removed: ${relative(patternRoot, filePath)}`);
   } else if (extname(filePath) === ".md" && patternRoot) {
     await handleMarkdown(filePath, "unlink");
+  } else if (extname(filePath) === ".json" && patternRoot) {
+    await handleComponentJson(filePath, "unlink");
   }
 });
 
@@ -608,5 +658,8 @@ on("unlinkDir", async (dirPath) => {
     await close();
     throw e;
   }
+  (globalThis as { __testOnly_onWatchStarted?: TestOnlyWatchStarted }).__testOnly_onWatchStarted?.(
+    (event, path) => { watcher.emit(event, path); },
+  );
   return { close };
 }

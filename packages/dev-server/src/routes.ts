@@ -23,12 +23,11 @@ import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
 } from "@pattern-dump/contracts";
-import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import type { ResolvedConfig } from "./server-config.js";
-import { applyStyleData, type ServerState } from "./server-state.js";
+import { applyStyleData, currentDiscovery, type ServerState } from "./server-state.js";
 import { buildShellHtml, json, mimeType, serveFile, servesShell } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
 import { buildCompositionRegistry } from "./composition.js";
@@ -209,8 +208,8 @@ export async function handleRequest(
 
     // --- JSON API ---
     if (pathname === PD_ROUTES.tree) {
-      if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-      const tree = await buildComponentTree(patternDirs, overviewsEnabled, state.discoveryResult.discoveryMap);
+      const discovery = await currentDiscovery(state, patternRoots);
+      const tree = await buildComponentTree(patternDirs, overviewsEnabled, discovery.discoveryMap);
       json(res, 200, tree satisfies ComponentTree);
       return;
     }
@@ -220,14 +219,14 @@ export async function handleRequest(
     // + hash-delta: only components whose content hash changed are re-audited (§3/§4).
     if (pathname === PD_ROUTES.audit) {
       try {
-        if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-        const discoveryMap = state.discoveryResult.discoveryMap;
+        const discovery = await currentDiscovery(state, patternRoots);
+        const discoveryMap = discovery.discoveryMap;
         let graph: DiagnosticsGraph;
         if (!state.auditSlices) {
           // Cold seed: hash-delta vs the disk artifact — re-audit only changed components.
           if (verboseTiming) console.time("[dev-server:timing] diagnostics seed");
           const r = await refreshDiagnosticsGraph(
-            cwd, baseComponentIds(state.discoveryResult), render, state.discoveryResult.quarantineMap, discoveryMap, globalData,
+            cwd, baseComponentIds(discovery), render, discovery.quarantineMap, discoveryMap, globalData,
           );
           state.auditSlices = r.slices;
           graph = r.graph;
@@ -257,37 +256,37 @@ export async function handleRequest(
       try {
         // Phase 1: build detail — 404 only for genuinely-missing components. A quarantined component
         // is not in the discovery map but still has a detail (200 + HANDLE_COLLISION, below).
-        if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-        const { handleMap } = state.discoveryResult;
-        if (!state.discoveryResult.discoveryMap.has(componentId) && !state.discoveryResult.quarantineMap.has(componentId)) {
+        const discovery = await currentDiscovery(state, patternRoots);
+        const { handleMap } = discovery;
+        if (!discovery.discoveryMap.has(componentId) && !discovery.quarantineMap.has(componentId)) {
           json(res, 404, { error: `No component "${componentId}"` } satisfies ApiError);
           return;
         }
         if (state.scssGraphDirty) {
-          const ids = baseComponentIds(state.discoveryResult);
+          const ids = baseComponentIds(discovery);
           const styleData = await buildAllStyleData(styleRoots, ids);
           applyStyleData(state, styleData);
         }
         if (!state.compositionRegistry) {
-          state.compositionRegistry = await buildCompositionRegistry(patternDirs, handleMap, state.discoveryResult.discoveryMap);
+          state.compositionRegistry = await buildCompositionRegistry(patternDirs, handleMap, discovery.discoveryMap);
         }
         const compReg = state.compositionRegistry;
         const detail = await buildComponentDetail(
           componentId, patternDirs, render, tracker, defaultTheme, handleMap, compReg,
           state.scssModuleGraph ?? undefined, state.classOwnerIndex ?? undefined,
-          state.discoveryResult.discoveryMap, state.baseProvenance ?? undefined
+          discovery.discoveryMap, state.baseProvenance ?? undefined
         );
 
         // Phase 2: render + static checks — the single per-component check unit (also driven by
         // the corpus sweep). Quarantined → 200 + HANDLE_COLLISION (no render); render failure →
         // 200 + RENDER_ERROR, not 404.
-        const quarantineEntry = state.discoveryResult.quarantineMap.get(componentId);
+        const quarantineEntry = discovery.quarantineMap.get(componentId);
         const { previewHtml, diagnostics } = await checkComponent(componentId, variant, render, quarantineEntry);
 
         const themeNames = themesDir ? [...state.themeCss.keys()] : [];
         const assets = await resolveDocumentAssets(cfg, state, {
           componentId, html: previewHtml, requireScripts: detail.requireScripts, requireAssets: detail.requireAssets,
-          compositionRegistry: compReg, discoveryMap: state.discoveryResult.discoveryMap,
+          compositionRegistry: compReg, discoveryMap: discovery.discoveryMap,
         });
         const previewDoc = buildPreviewDocument(
           normalizeAssetRefs(previewHtml, assetRootNames), assets.closureIds, detail.layout, themeNames, defaultTheme,
@@ -304,8 +303,8 @@ export async function handleRequest(
     if (pathname.startsWith(PD_ROUTE_PREFIX.overview)) {
       const folderPath = pathname.slice(PD_ROUTE_PREFIX.overview.length);
       try {
-        if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-        const overview = await buildFolderOverview(folderPath, patternDirs, render, state.discoveryResult.discoveryMap);
+        const discovery = await currentDiscovery(state, patternRoots);
+        const overview = await buildFolderOverview(folderPath, patternDirs, render, discovery.discoveryMap);
         json(res, 200, overview satisfies FolderOverview);
       } catch (e) {
         json(res, 404, { error: e instanceof Error ? e.message : String(e) } satisfies ApiError);
@@ -362,8 +361,8 @@ export async function handleRequest(
         ? themeParam
         : defaultTheme;
       try {
-        if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-        const { handleMap: previewHandleMap, discoveryMap: previewDiscoveryMap } = state.discoveryResult;
+        const discovery = await currentDiscovery(state, patternRoots);
+        const { handleMap: previewHandleMap, discoveryMap: previewDiscoveryMap } = discovery;
         // A variant addressed by its own id, /preview/<base>~<variant>, is the base with that variant:
         // the same document as /preview/<base>?variant=<variant>. Resolved here, before anything is
         // looked up, so its layout, its requirements (a base's requireScript) and its CSS closure are
@@ -421,9 +420,9 @@ export async function handleRequest(
       const componentId = pathname.slice(PD_ROUTE_PREFIX.source.length, -"/data".length);
       const variant     = url.searchParams.get("variant") ?? undefined;
       try {
-        if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
+        const discovery = await currentDiscovery(state, patternRoots);
         const lookupId = variant ? `${componentId}~${variant}` : componentId;
-        const jsonFile = state.discoveryResult.discoveryMap.get(lookupId)?.jsonPath;
+        const jsonFile = discovery.discoveryMap.get(lookupId)?.jsonPath;
         if (!jsonFile) throw new Error(`No data file for ${lookupId}`);
         const jsonStr     = await readFile(jsonFile, "utf-8");
         const highlighted = wrapWithCopyButton(highlight(jsonStr, "json"), jsonStr);
@@ -443,8 +442,8 @@ export async function handleRequest(
     // every host is the workbench.
     const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
     if (cfg.storefront && host === cfg.storefront.host) {
-      if (!state.discoveryResult) state.discoveryResult = await buildDiscoveryMap(patternRoots);
-      const discoveryMap = state.discoveryResult.discoveryMap;
+      const discovery = await currentDiscovery(state, patternRoots);
+      const discoveryMap = discovery.discoveryMap;
       const model = await readPages(cfg.storefront.pagesDir);
       if (pathname === PD_ROUTES.pages) {
         if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
@@ -458,12 +457,12 @@ export async function handleRequest(
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
       if (!state.compositionRegistry) {
-        state.compositionRegistry = await buildCompositionRegistry(patternDirs, state.discoveryResult.handleMap, discoveryMap);
+        state.compositionRegistry = await buildCompositionRegistry(patternDirs, discovery.handleMap, discoveryMap);
       }
       const page = await assemblePage(route, model, {
         discoveryMap, composition: state.compositionRegistry, render, site: cfg.storefront.site,
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
-        head: (layoutId, html) => pageStylesheets(cfg, state, discoveryMap, layoutId, html),
+        head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
         ...(ctx.live ? { live: { wsPort } } : {}),
       });
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);

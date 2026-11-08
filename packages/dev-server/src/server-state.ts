@@ -27,10 +27,18 @@
 //     component route, the watcher's full restyle) goes through `applyStyleData`, so nothing
 //     else may hold on to the map.
 //
+//  4. `discoveryPromise` is INVALIDATED by the watcher while requests are using it. A request takes it
+//     once, `const discovery = await currentDiscovery(state, roots)`, and from then on uses only its
+//     local `discovery`, never the state again: across any later await the watcher may have cleared
+//     it. The PROMISE is cached, assigned synchronously before the build runs, so an invalidation that
+//     arrives during a build is never overwritten by that build's (stale) result. Always go through
+//     currentDiscovery / cachedDiscovery / setDiscovery / invalidateDiscovery below.
+//
 // `themeCss`, `themeTokens` and `scriptCache` are `readonly` because they are only ever mutated,
 // never replaced — the type records that difference rather than leaving it to convention.
 
 import type { DiscoveryResult } from "@pattern-dump/contracts";
+import { buildDiscoveryMap, type PatternRoot } from "@pattern-dump/discovery";
 import type { CompositionRegistry } from "./composition.js";
 import type { ComponentAudit } from "./diagnostics.js";
 import type {
@@ -60,8 +68,8 @@ export interface ServerState {
 
   /** Rebuilt on HBS/JSON changes. */
   compositionRegistry: CompositionRegistry | null;
-  /** Rebuilt alongside the composition registry. */
-  discoveryResult: DiscoveryResult | null;
+  /** The current discovery, as the promise of its build; null once invalidated. See hazard 4. */
+  discoveryPromise: Promise<DiscoveryResult> | null;
 
   /** In-memory per-component audit slices.
    *  Seeded on the first /api/audit (hash-delta vs disk), then patched surgically by the watcher:
@@ -94,7 +102,7 @@ export function createServerState(): ServerState {
     baseCss: "",
     baseCssVersion: 0,
     compositionRegistry: null,
-    discoveryResult: null,
+    discoveryPromise: null,
     auditSlices: null,
     liveReauditCount: 0,
     themeCss: new Map<string, string>(),
@@ -132,4 +140,49 @@ export function applyStyleData(state: ServerState, data: AllStyleData): StyleDat
   state.baseCss = data.baseCss;
   state.scssGraphDirty = false;
   return { changedComponents: changedComponents.sort(), baseChanged };
+}
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onDiscovery`, it is called at two
+// moments with a function that invalidates the discovery as the watcher does. "built": a build finished,
+// before anyone has its result. "taken": a caller has its discovery and goes on with it. Tests use it to
+// invalidate at exactly those points. Unset, it costs a property read. Not exported, not a contract.
+type TestOnlyOnDiscovery = (phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
+const testHook = (): TestOnlyOnDiscovery | undefined =>
+  (globalThis as { __testOnly_onDiscovery?: TestOnlyOnDiscovery }).__testOnly_onDiscovery;
+
+/** Drop the discovery (and the composition registry derived from it): the next caller builds anew. */
+export function invalidateDiscovery(state: ServerState): void {
+  state.discoveryPromise = null;
+  state.compositionRegistry = null;
+}
+
+/** Make `dr` the current discovery (startup, a full rebuild that has its result already). */
+export function setDiscovery(state: ServerState, dr: DiscoveryResult): void {
+  state.discoveryPromise = Promise.resolve(dr);
+}
+
+/** Start a build and make it the current discovery at once, before it runs. A build that fails is
+ *  dropped, if it is still the current one, so the next caller tries again. */
+export function startDiscovery(state: ServerState, roots: string | PatternRoot[]): Promise<DiscoveryResult> {
+  const build: Promise<DiscoveryResult> = buildDiscoveryMap(roots).then(async dr => {
+    await testHook()?.("built", () => invalidateDiscovery(state));
+    return dr;
+  });
+  state.discoveryPromise = build;
+  build.catch(() => { if (state.discoveryPromise === build) state.discoveryPromise = null; });
+  return build;
+}
+
+/** The current discovery, building it when there is none. Take it once and use the result. */
+export async function currentDiscovery(state: ServerState, roots: string | PatternRoot[]): Promise<DiscoveryResult> {
+  const discovery = await (state.discoveryPromise ?? startDiscovery(state, roots));
+  await testHook()?.("taken", () => invalidateDiscovery(state));
+  return discovery;
+}
+
+/** The current discovery if there is one (built or building), never starting a build; null otherwise,
+ *  or when that build failed. */
+export async function cachedDiscovery(state: ServerState): Promise<DiscoveryResult | null> {
+  const pending = state.discoveryPromise;
+  return pending ? pending.catch(() => null) : null;
 }

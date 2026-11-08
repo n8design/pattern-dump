@@ -7,22 +7,18 @@
 // that one's reload message; whatever the barrier's edit caused would come before it.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import WebSocket from "ws";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
-import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import type { DevServer } from "@pattern-dump/dev-server";
+import { startOnFreeWsPort } from "./free-ports.js";
 
 let tmp = "";
 let server: DevServer;
 let ws: WebSocket;
 const messages: string[] = [];
 
-const freePort = (): Promise<number> => new Promise((resolve, reject) => {
-  const s = createServer().listen(0, "127.0.0.1", () => { const p = (s.address() as { port: number }).port; s.close(() => resolve(p)); });
-  s.on("error", reject);
-});
 async function write(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, text);
@@ -42,11 +38,12 @@ beforeAll(async () => {
   await mkdir(join(root, "src/styles"), { recursive: true });
   await write(join(root, "src/helpers/shout.js"), `export function shout(s) { return s; }\n`);
   await write(join(root, "src/helpers/.__testOnly_barrier"), "");
-  const wsPort = await freePort();
-  server = await startDevServer(validateConfig(defineConfig({
+  const started = await startOnFreeWsPort(validateConfig(defineConfig({
     sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
     styles: { strategy: "parallel", dir: "./src/styles" }, helpers: "./src/helpers",
-  }), "site"), root, { port: 0, wsPort });
+  }), "site"), root);
+  server = started.server;
+  const wsPort = started.wsPort;
   ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
   ws.on("message", (d: Buffer) => messages.push(String(d)));
   await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });

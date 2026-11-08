@@ -3,17 +3,19 @@
 // theme layer: preview themes theme the component under test, inside its preview, never a page.
 // Nothing here works out a closure or writes a link itself.
 
-import type { DiscoveryMap } from "@pattern-dump/contracts";
+import type { DiscoveryResult } from "@pattern-dump/contracts";
 import { buildCompositionRegistry } from "../composition.js";
 import { resolveDocumentAssets, stylesheetLayers } from "../document-layers.js";
 import type { ResolvedConfig } from "../server-config.js";
 import type { ServerState } from "../server-state.js";
 
 export async function pageStylesheets(
-  cfg: ResolvedConfig, state: ServerState, discoveryMap: DiscoveryMap, layoutId: string, html: string,
+  cfg: ResolvedConfig, state: ServerState, discovery: DiscoveryResult, layoutId: string, html: string,
 ): Promise<string> {
+  // The request's own discovery, taken once by the route: the state's may have been invalidated since.
+  const { discoveryMap } = discovery;
   if (!state.compositionRegistry) {
-    state.compositionRegistry = await buildCompositionRegistry(cfg.patternDirs, state.discoveryResult!.handleMap, discoveryMap);
+    state.compositionRegistry = await buildCompositionRegistry(cfg.patternDirs, discovery.handleMap, discoveryMap);
   }
   const assets = await resolveDocumentAssets(cfg, state, {
     componentId: layoutId, html, requireScripts: undefined, requireAssets: undefined,

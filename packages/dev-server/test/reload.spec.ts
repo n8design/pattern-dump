@@ -4,9 +4,8 @@
 // and the next good save recovers, with no restart. A helper's own imports ask for a restart.
 // Live cases run through watch-harness.ts (no waiting for quiet), each on a fresh project.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,15 +15,12 @@ import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { createRenderer } from "@pattern-dump/renderer";
 import { createRenderingHandle } from "../src/rendering.js";
 import { liveScript } from "../src/storefront/page.js";
+import { freePort } from "./free-ports.js";
 import { Bench, closeAll } from "./watch-harness.js";
 
 let tmp = "";
 let n = 0;
 const cli = fileURLToPath(new URL("../../cli/dist/index.js", import.meta.url));
-const freePort = (): Promise<number> => new Promise((resolve, reject) => {
-  const srv = createServer().listen(0, "127.0.0.1", () => { const p = (srv.address() as { port: number }).port; srv.close(() => resolve(p)); });
-  srv.on("error", reject);
-});
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -132,16 +128,26 @@ describe("pd dev reloads data, helpers and assets", () => {
     await write(join(root, "src/patterns/atoms/loud/loud.hbs"), `<p class="loud">{{shout "quiet"}}</p>\n`);
     await write(join(root, "src/styles/atoms/loud.scss"), ".loud {\n  color: red;\n}\n");
     await write(join(root, "src/helpers/shout.cjs"), `module.exports = { shout: s => "cjs-1:" + s };\n`);
-    const [port, wsPort] = [await freePort(), await freePort()];
-    const pd = spawn(process.execPath, [cli, "dev", "--port", String(port), "--ws-port", String(wsPort)], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    // Started once it says it's ready. A port found free can be taken by another test file before pd dev
+    // binds it: then it exits saying so, and starts again on fresh ones.
+    let port = 0, wsPort = 0;
+    let pd!: ChildProcess;
+    for (let attempt = 1; ; attempt++) {
+      [port, wsPort] = [await freePort(), await freePort()];
+      pd = spawn(process.execPath, [cli, "dev", "--port", String(port), "--ws-port", String(wsPort)], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+      let out = "";
+      const started = await new Promise<boolean>((resolve, reject) => {
+        pd.stdout!.on("data", (d: Buffer) => { out += String(d); if (out.includes("[dev-server] Ready in")) resolve(true); });
+        pd.stderr!.on("data", (d: Buffer) => { out += String(d); });
+        pd.once("exit", code => {
+          if (out.includes("is already in use") && attempt < 5) resolve(false);
+          else reject(new Error(`pd dev exited (${code}): ${out}`));
+        });
+      });
+      if (started) break;
+    }
     try {
       const get = async (path: string) => (await fetch(`http://127.0.0.1:${port}${path}`)).text();
-      // Started once it says it's ready.
-      let out = "";
-      await new Promise<void>((resolve, reject) => {
-        pd.stdout!.on("data", (d: Buffer) => { out += String(d); if (out.includes("[dev-server] Ready in")) resolve(); });
-        pd.once("exit", code => reject(new Error(`pd dev exited (${code}): ${out}`)));
-      });
       const ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
       await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
       await get("/api/component/atoms/loud");

@@ -4,13 +4,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { appendFile, cp, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
-import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import type { DevServer } from "@pattern-dump/dev-server";
+import { startOnFreeWsPort } from "./free-ports.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { Bench, closeAll } from "./watch-harness.js";
 
@@ -20,10 +20,6 @@ const servers: DevServer[] = [];
 const sockets: WebSocket[] = [];
 let tmp = "";
 
-const freePort = (): Promise<number> => new Promise((resolve, reject) => {
-  const s = createServer().listen(0, "127.0.0.1", () => { const p = (s.address() as { port: number }).port; s.close(() => resolve(p)); });
-  s.on("error", reject);
-});
 
 async function benchCopy(name: string): Promise<string> {
   const root = join(tmp, name);
@@ -38,8 +34,8 @@ async function benchCopy(name: string): Promise<string> {
 type Message = { type: string; route?: string | null };
 /** A live server on `root`, and the messages its socket sends. */
 async function watch(root: string, cfg: PatternDumpConfig): Promise<Message[]> {
-  const wsPort = await freePort();
-  servers.push(await startDevServer(cfg, root, { port: 0, wsPort }));
+  const { server, wsPort } = await startOnFreeWsPort(cfg, root);
+  servers.push(server);
   const ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
   sockets.push(ws);
   const messages: Message[] = [];
