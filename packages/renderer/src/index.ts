@@ -6,6 +6,7 @@
 //     When RendererOptions.discoveryMap is absent the renderer calls buildDiscoveryMap(patternsDir)
 //     from @pattern-dump/discovery — never the old walk. No path reconstruction anywhere.
 export { initHighlighter, highlight, getShikiCSS, wrapWithCopyButton } from "./highlight";
+export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
 import type {
   CreateRenderer, RendererOptions, Diagnostic, RenderMeta,
 } from "@pattern-dump/contracts";

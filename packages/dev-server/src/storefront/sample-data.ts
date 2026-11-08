@@ -21,7 +21,7 @@ import { SITE_SCHEMA_OWNER } from "./site.js";
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** The layout and every component it includes, however deep, in a stable order. */
-function includeTree(layoutId: string, composition: CompositionRegistry): string[] {
+export function includeTree(layoutId: string, composition: CompositionRegistry): string[] {
   const seen = new Set<string>([layoutId]);
   const queue = [layoutId];
   while (queue.length) {
