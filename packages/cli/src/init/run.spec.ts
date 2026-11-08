@@ -3,12 +3,13 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dependencySpec, runInit, type InitIO } from "./run.js";
 import { PD_VERSION } from "../distribution.js";
+import { save } from "../../../../test-support/save.js";
 
 const templatesDir = fileURLToPath(new URL("../../templates/", import.meta.url));
 let root = "";
@@ -83,8 +84,8 @@ describe("runInit", () => {
 
   it("adds to an existing project without overwriting its files", async () => {
     root = await mkdtemp(join(tmpdir(), "pd-init-"));
-    await writeFile(join(root, "package.json"), JSON.stringify({ name: "acme-ui", scripts: { dev: "vite" } }));
-    await writeFile(join(root, "README.md"), "# Acme UI\n");
+    await save(join(root, "package.json"), JSON.stringify({ name: "acme-ui", scripts: { dev: "vite" } }));
+    await save(join(root, "README.md"), "# Acme UI\n");
     const { io, logs } = fakeIO();
     expect(await runInit(init(root, { install: false, git: false }), io)).toBe(0);
     expect(await readFile(join(root, "README.md"), "utf8")).toBe("# Acme UI\n");
@@ -97,7 +98,7 @@ describe("runInit", () => {
 
   it("refuses a folder that is already a Pattern Dump project, writing nothing", async () => {
     root = await mkdtemp(join(tmpdir(), "pd-init-"));
-    await writeFile(join(root, "pattern-dump.config.ts"), "export default {}\n");
+    await save(join(root, "pattern-dump.config.ts"), "export default {}\n");
     const { io, logs, calls } = fakeIO();
     expect(await runInit(init(root), io)).toBe(1);
     expect(existsSync(join(root, "package.json"))).toBe(false);
@@ -156,7 +157,7 @@ describe("runInit", () => {
   it("an invalid package.json stops before writing anything", async () => {
     root = await mkdtemp(join(tmpdir(), "pd-init-"));
     await mkdir(join(root, "src"));
-    await writeFile(join(root, "package.json"), "{ nope");
+    await save(join(root, "package.json"), "{ nope");
     const { io } = fakeIO();
     expect(await runInit(init(root), io)).toBe(1);
     expect(existsSync(join(root, "pattern-dump.config.ts"))).toBe(false);
@@ -166,7 +167,7 @@ describe("runInit", () => {
 describe("dependencySpec", () => {
   it("defaults to the registry range, turns an existing file into file:, and unwraps name@range", async () => {
     root = await mkdtemp(join(tmpdir(), "pd-init-"));
-    await writeFile(join(root, "pattern-dump-0.1.0.tgz"), "");
+    await save(join(root, "pattern-dump-0.1.0.tgz"), "");
     expect(dependencySpec(undefined, root)).toBe(`^${PD_VERSION}`);
     expect(dependencySpec("./pattern-dump-0.1.0.tgz", root)).toBe(`file:${join(root, "pattern-dump-0.1.0.tgz")}`);
     expect(dependencySpec("pattern-dump@0.2.0", root)).toBe("0.2.0");
