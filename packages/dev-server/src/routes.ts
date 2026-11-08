@@ -27,10 +27,12 @@ import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import type { ResolvedConfig } from "./server-config.js";
-import { applyStyleData, currentDiscovery, type ServerState } from "./server-state.js";
+import { compositionFor, currentDiscovery, scriptFor, type ServerState } from "./server-state.js";
+
+/** A script with no entry point: a 404 that names where it was looked for, never stored. */
+class ScriptMissing extends Error {}
 import { buildShellHtml, json, mimeType, serveFile, servesShell } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
-import { buildCompositionRegistry } from "./composition.js";
 import { buildComponentTree } from "./component-tree.js";
 import { buildComponentDetail } from "./detail.js";
 import { buildFolderOverview } from "./overview.js";
@@ -41,8 +43,9 @@ import { aggregateRequires, normalizeScriptId } from "./requires.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
-  assembleGraph, checkComponent, persistSlices, refreshDiagnosticsGraph,
+  assembleGraph, auditWithHash, checkComponent, globalDataDigest, persistSlices, refreshDiagnosticsGraph,
 } from "./diagnostics.js";
+import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
@@ -164,23 +167,23 @@ export async function handleRequest(
       }
       const scriptId = normalizeScriptId(decodeURIComponent(basename(pathname, ".js")));
       try {
-        if (!state.scriptCache.has(scriptId)) {
+        const js = await scriptFor(state, scriptId).get(async () => {
           // The project's scripts first, then each package's — a project script replaces a package's.
           const entryPoint = scriptsDirs.map(d => join(d, `${scriptId}.ts`)).find(f => existsSync(f));
-          if (entryPoint === undefined) {
-            // Say what is missing. Compiling a path we know is absent would report it as an ENOENT
-            // compile error inside the preview, naming neither the id nor where it was looked for.
-            res.writeHead(404, { "Content-Type": "text/plain" });
-            res.end(`No script "${scriptId}": scripts are TypeScript, so ${scriptId}.ts is expected in `
-              + scriptsDirs.map(d => relative(cwd, d) || d).join(" or "));
-            return;
-          }
-          const js = await compileScriptFile(entryPoint);
-          state.scriptCache.set(scriptId, js);
-        }
+          // Say what is missing. Compiling a path we know is absent would report it as an ENOENT
+          // compile error inside the preview, naming neither the id nor where it was looked for.
+          if (entryPoint === undefined) throw new ScriptMissing(scriptId);
+          return compileScriptFile(entryPoint);
+        });
         res.writeHead(200, { "Content-Type": "application/javascript" });
-        res.end(state.scriptCache.get(scriptId));
+        res.end(js);
       } catch (e) {
+        if (e instanceof ScriptMissing) {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end(`No script "${scriptId}": scripts are TypeScript, so ${scriptId}.ts is expected in `
+            + scriptsDirs.map(d => relative(cwd, d) || d).join(" or "));
+          return;
+        }
         res.writeHead(500, { "Content-Type": "text/plain" });
         res.end(`Script compile error: ${String(e)}`);
       }
@@ -221,25 +224,44 @@ export async function handleRequest(
       try {
         const discovery = await currentDiscovery(state, patternRoots);
         const discoveryMap = discovery.discoveryMap;
-        let graph: DiagnosticsGraph;
-        if (!state.auditSlices) {
-          // Cold seed: hash-delta vs the disk artifact — re-audit only changed components.
-          if (verboseTiming) console.time("[dev-server:timing] diagnostics seed");
-          const r = await refreshDiagnosticsGraph(
-            cwd, baseComponentIds(discovery), render, discovery.quarantineMap, discoveryMap, globalData,
-          );
-          state.auditSlices = r.slices;
-          graph = r.graph;
-          if (verboseTiming) {
-            console.timeEnd("[dev-server:timing] diagnostics seed");
-            console.log(`[dev-server:timing] diagnostics seed: re-audited ${r.reaudited.length}, reused ${r.reused} (of ${state.auditSlices.size})`);
+        // Cold: seed, a hash-delta vs the disk artifact (only changed components are re-audited); requests
+        // during a seed share it. Warm: the slices the watcher keeps current with surgical re-audits.
+        const slices = await state.audit.get(async () => {
+          const editedDuringSeed = new Set<string>();
+          state.auditSeeding = editedDuringSeed;
+          try {
+            if (verboseTiming) console.time("[dev-server:timing] diagnostics seed");
+            const r = await refreshDiagnosticsGraph(
+              cwd, baseComponentIds(discovery), render, discovery.quarantineMap, discoveryMap, globalData,
+            );
+            await testHook()?.("audit-seed", "built", () => {});
+            // The deviation from lazy.ts's rule that a value an invalidation overtook is never stored: a
+            // seed is long on a large corpus, and a save during every seed would otherwise repeat the whole
+            // sweep. Edits during it do not invalidate it; they are recorded, and those components are
+            // audited again here, each with the hash of what it audited, before the seed is stored.
+            // A structural change (a component added or removed) still invalidates it as usual.
+            const digest = globalDataDigest(globalData);
+            while (editedDuringSeed.size > 0) {
+              const ids = [...editedDuringSeed];
+              editedDuringSeed.clear();
+              for (const id of ids) {
+                if (!r.audited.has(id)) continue;
+                r.audited.set(id, await auditWithHash(id, render, discovery.quarantineMap.get(id), discoveryMap, digest));
+                state.liveReauditCount += 1;
+              }
+            }
+            if (verboseTiming) {
+              console.timeEnd("[dev-server:timing] diagnostics seed");
+              console.log(`[dev-server:timing] diagnostics seed: re-audited ${r.reaudited.length}, reused ${r.reused} (of ${r.audited.size})`);
+            }
+            return r.audited;
+          } finally {
+            if (state.auditSeeding === editedDuringSeed) state.auditSeeding = null;
           }
-        } else {
-          // Warm: the graph is kept current by surgical HMR re-audits — assemble from memory, re-persist
-          // so the disk artifact tracks the live edits (later cold starts stay fast).
-          graph = assembleGraph([...state.auditSlices.values()]);
-          await persistSlices(cwd, state.auditSlices, discoveryMap, globalData);
-        }
+        });
+        const graph: DiagnosticsGraph = assembleGraph([...slices.values()].map(s => s.audit));
+        // Re-persist so the disk artifact tracks the live edits (later cold starts stay fast).
+        await persistSlices(cwd, slices);
         // _liveReaudits: total surgical HMR re-audits since startup — the incremental-proof instrument
         // (rises by exactly 1 per .hbs edit, 0 per .scss edit). Debug envelope field, not the graph.
         json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount } satisfies AuditResponse);
@@ -252,7 +274,6 @@ export async function handleRequest(
     if (pathname.startsWith(PD_ROUTE_PREFIX.component)) {
       const componentId = pathname.slice(PD_ROUTE_PREFIX.component.length);
       const variant = url.searchParams.get("variant") ?? undefined;
-      state.lastComponentId = componentId;
       try {
         // Phase 1: build detail — 404 only for genuinely-missing components. A quarantined component
         // is not in the discovery map but still has a detail (200 + HANDLE_COLLISION, below).
@@ -262,15 +283,13 @@ export async function handleRequest(
           json(res, 404, { error: `No component "${componentId}"` } satisfies ApiError);
           return;
         }
-        if (state.scssGraphDirty) {
-          const ids = baseComponentIds(discovery);
-          const styleData = await buildAllStyleData(styleRoots, ids);
-          applyStyleData(state, styleData);
-        }
-        if (!state.compositionRegistry) {
-          state.compositionRegistry = await buildCompositionRegistry(patternDirs, handleMap, discovery.discoveryMap);
-        }
-        const compReg = state.compositionRegistry;
+        // Only a component that exists (a quarantined one has a detail too) is the one on screen: the
+        // workbench probes unknown routes here, and a 404 must not redirect the watcher's next reload.
+        state.lastComponentId = componentId;
+        // The full style build, when a save has left it to be redone: installed when stored, never one a
+        // later save overtook (server-state.ts, hazard 5).
+        await state.style.get(() => buildAllStyleData(styleRoots, baseComponentIds(discovery)));
+        const compReg = await compositionFor(state, discovery, patternDirs);
         const detail = await buildComponentDetail(
           componentId, patternDirs, render, tracker, defaultTheme, handleMap, compReg,
           state.scssModuleGraph ?? undefined, state.classOwnerIndex ?? undefined,
@@ -377,13 +396,11 @@ export async function handleRequest(
           resolveLayoutMode(componentId, patternDirs, previewDiscoveryMap),
         ]);
         const themeNames  = themesDir ? [...state.themeCss.keys()] : [];
-        if (!state.compositionRegistry) {
-          state.compositionRegistry = await buildCompositionRegistry(patternDirs, previewHandleMap, previewDiscoveryMap);
-        }
+        const previewComposition = await compositionFor(state, discovery, patternDirs);
         const requires    = await aggregateRequires(componentId, patternDirs, previewHandleMap, previewDiscoveryMap);
         const assets = await resolveDocumentAssets(cfg, state, {
           componentId, html, requireScripts: requires.scripts, requireAssets: requires.assets,
-          compositionRegistry: state.compositionRegistry, discoveryMap: previewDiscoveryMap,
+          compositionRegistry: previewComposition, discoveryMap: previewDiscoveryMap,
         });
         const doc = buildPreviewDocument(
           normalizeAssetRefs(html, assetRootNames), assets.closureIds, layout, themeNames, effectiveTheme,
@@ -456,11 +473,8 @@ export async function handleRequest(
       // In pd dev a page links to the workbench of this same process, whatever the config's build-time
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
-      if (!state.compositionRegistry) {
-        state.compositionRegistry = await buildCompositionRegistry(patternDirs, discovery.handleMap, discoveryMap);
-      }
       const page = await assemblePage(route, model, {
-        discoveryMap, composition: state.compositionRegistry, render, site: cfg.storefront.site,
+        discoveryMap, composition: await compositionFor(state, discovery, patternDirs), render, site: cfg.storefront.site,
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
         ...(ctx.live ? { live: { wsPort } } : {}),

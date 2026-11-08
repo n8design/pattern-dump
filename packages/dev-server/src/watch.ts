@@ -28,16 +28,15 @@ import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
 import {
-  applyStyleData, cachedDiscovery, currentDiscovery, invalidateDiscovery, startDiscovery, type ServerState,
+  applyStyleData, cachedDiscovery, compositionFor, currentDiscovery, invalidateDiscovery, rebuildDiscovery, scriptFor, type ServerState,
 } from "./server-state.js";
 import { baseComponentIds, resolveComponentForFile } from "./discovery-index.js";
-import { buildCompositionRegistry } from "./composition.js";
 import {
   computeCssClosure, linkableClosure, recomputeComponentCss, withRenderedClassOwners,
 } from "./css-closure.js";
 import { buildAllStyleData, patchClassOwnerIndex } from "./style-index.js";
 import { rootMatchers, watchedRoots, within, type WatchedRoots } from "./watch-roots.js";
-import { auditComponent } from "./diagnostics.js";
+import { auditWithHash, globalDataDigest } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
@@ -82,7 +81,15 @@ export function describeWatchError(e: unknown): string {
   return what;
 }
 
-/** A running watcher. `close` stops it and every recheck still pending. */
+/**
+ * How long `close` waits for the handler running and the events waiting before it closes anyway, saying
+ * which handler it left. Long enough for any handler on a large corpus (a full restyle is well under a
+ * second there), short enough that a handler that never settles cannot hold pd dev open.
+ */
+export const CLOSE_DRAIN_MS = 3_000;
+
+/** A running watcher. `close` lets the handlers already queued finish (up to CLOSE_DRAIN_MS), then stops it
+ *  and every recheck still pending. */
 export interface WatchHandle {
   close(): Promise<void>;
 }
@@ -144,13 +151,22 @@ const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: t
 // test uses it to deliver one chokidar sends twice). Not exported, not part of any contract.
 type TestOnlyWatchStarted = (deliver: (event: "change", path: string) => void) => void;
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_failHandler`, it is asked before each
+// handler runs; "reject" or "throw" makes that handler fail that way instead of running, so a test can see
+// what a failing handler does to the server. Not exported, not part of any contract.
+type TestOnlyFailHandler = (event: string, path: string) => "reject" | "throw" | undefined;
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_holdHandler`, it is called as each
+// handler's turn comes; a promise it returns holds that handler until it settles, so a test can see what
+// waits behind it. Not exported, not part of any contract.
+type TestOnlyHoldHandler = (event: string, path: string) => Promise<void> | undefined;
+
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
-// after each watcher event's handler has finished, with the number of handlers still running. Tests
+// after each watcher event's handler has finished, with the number of events still waiting. Tests
 // use it as a barrier ("every event so far has been handled") instead of waiting for quiet; a file named
 // `.__testOnly_barrier`, which a test puts in every watched folder, is reported but never handled. Unset,
 // it costs a counter and a name check. Not exported, not part of any contract.
 type TestOnlyEventHandled = (event: string, path: string, stillRunning: number) => void;
-let running = 0;
 let closed = false;
 // One pending recheck per changed file (CHANGE_RECHECK_MS), by its timer.
 const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
@@ -160,14 +176,43 @@ const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
 // sees the truncate and the write separately). A change to a file that is as it was then is not handled
 // again.
 const lastHandled = new Map<string, Seen>();
+
+// Every event goes through one queue and is handled when the ones before it have finished, in the order
+// they arrived. Handlers used to start at once and interleave at their awaits, so one could work from state
+// another was halfway through changing (a restyle installing a style index a component save was patching),
+// and messages went out in the order handlers finished, not the order files changed: a link list computed
+// by an older handler could arrive last and remove a link a newer one had added. An event identical to one
+// still waiting (same event, same file) is not queued again: the waiting one reads the file when it starts.
+// The cost is the wait: an event waits for the handler ahead of it, at worst a full restyle.
+interface Job { readonly event: string; readonly path: string; readonly start: () => Promise<void> }
+const queue: Job[] = [];
+let current: Job | null = null;
+// Waiting for the queue to empty (close).
+let drainWaiters: Array<() => void> = [];
+function pump(): void {
+  if (current) return;
+  const next = queue.shift();
+  if (!next) { const waiters = drainWaiters; drainWaiters = []; waiters.forEach(w => w()); return; }
+  current = next;
+  void next.start().finally(() => { current = null; pump(); });
+}
+function enqueue(job: Job): void {
+  // Closing: nothing new starts (an event chokidar flushes while it closes is dropped).
+  if (closed) return;
+  if (queue.some(q => q.event === job.event && q.path === job.path)) return;
+  queue.push(job);
+  pump();
+}
+
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
-  const dispatch = (path: string, fromRecheck = false): void => {
+  // The event's turn: resolves once its handler has finished (or it was skipped).
+  const start = (path: string, fromRecheck: boolean): Promise<void> => new Promise<void>(finish => {
     // A change: the file as the handler is about to read it. A newer event for the same file replaces
     // the pending recheck, since it is handled with whatever the file holds by then.
     let seen: Seen | null = null;
     if (event === "change") {
       seen = seenNow(path);
-      if (!fromRecheck && unchanged(seen, lastHandled.get(path))) return;
+      if (!fromRecheck && unchanged(seen, lastHandled.get(path))) { finish(); return; }
       if (seen) lastHandled.set(path, seen); else lastHandled.delete(path);
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
@@ -176,10 +221,10 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       rechecks.delete(path);
       lastHandled.delete(path);
     }
-    running++;
     const done = () => {
-      running--;
-      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, running);
+      // Still to finish after this one: the ones waiting.
+      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, queue.length);
+      finish();
       if (event !== "change" || closed || seen === null) return;
       rechecks.set(path, setTimeout(() => {
         rechecks.delete(path);
@@ -191,10 +236,31 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       }, CHANGE_RECHECK_MS));
     };
     if (basename(path) === ".__testOnly_barrier") { done(); return; }
-    // The handler starts synchronously, as chokidar called it before; only its end is observed.
-    let result: unknown;
-    try { result = handler(path); } catch (e) { done(); throw e; }
-    void Promise.resolve(result).finally(done);
+    // A handler that fails (a file it cannot read, a folder gone mid-walk) is a problem in the terminal and
+    // on the open pages, like any other, and pd dev keeps running: nothing is left to reject unhandled.
+    const failed = (e: unknown): void => {
+      const message = `${shown(path)} (${event}) was not handled: ${e instanceof Error ? e.message : String(e)}`;
+      hotreloader.push({ type: "error", scope: "build", message });
+      console.error(`[dev-server] ${message}`);
+    };
+    const run = (): void => {
+      let result: unknown;
+      try {
+        const fail = (globalThis as { __testOnly_failHandler?: TestOnlyFailHandler }).__testOnly_failHandler?.(event, path);
+        if (fail === "throw") throw new Error("failed for a test");
+        result = fail === "reject" ? Promise.reject(new Error("failed for a test")) : handler(path);
+      } catch (e) {
+        failed(e);
+        done();
+        return;
+      }
+      void Promise.resolve(result).catch(failed).finally(done);
+    };
+    const held = (globalThis as { __testOnly_holdHandler?: TestOnlyHoldHandler }).__testOnly_holdHandler?.(event, path);
+    if (held) void held.then(run, run); else run();
+  });
+  const dispatch = (path: string, fromRecheck = false): void => {
+    enqueue({ event, path, start: () => start(path, fromRecheck) });
   };
   watcher.on(event, (path: string) => dispatch(path));
 }
@@ -215,6 +281,22 @@ const close = async (): Promise<void> => {
   closed = true;
   for (const timer of rechecks.values()) clearTimeout(timer);
   rechecks.clear();
+  // Let the handler running and the events already waiting finish, before the socket and the HTTP server
+  // close after this: a handler that finished later would write its scratch files (conflicts, flattening,
+  // the diagnostics artifact) after the next server for the same folder had started.
+  if (current || queue.length > 0) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finished = await Promise.race([
+      new Promise<true>(resolve => { drainWaiters.push(() => resolve(true)); }),
+      new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), CLOSE_DRAIN_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (!finished && current) {
+      const left = queue.length;
+      console.error(`[dev-server] Closing with a handler still running after ${CLOSE_DRAIN_MS / 1000} s: ${shown(current.path)} (${current.event})`
+        + `${left > 0 ? `, and ${left} more event(s) not handled` : ""}; closing anyway.`);
+    }
+  }
   lastHandled.clear();
   await watcher.close();
 };
@@ -226,6 +308,20 @@ const close = async (): Promise<void> => {
 // Accumulates css-link-swap messages, then attaches orderedHrefs for state.lastComponentId
 // computed AFTER all cache updates — so a newly-populated entry is visible in the closure.
 async function handleComponentScss(filePath: string): Promise<void> {
+  // From here until the save is written into the style data, no full build is installed or started: one
+  // in flight was built before the save (server-state.ts, hazard 5). Released stale unless a full restyle
+  // below stored a complete build itself, so the next request's full build starts after this save.
+  const release = state.style.fence();
+  let stale = true;
+  try {
+    stale = !(await patchStyles(filePath));
+  } finally {
+    release({ stale });
+  }
+}
+
+/** The save's patch, or a full restyle; true when it stored a complete full build. */
+async function patchStyles(filePath: string): Promise<boolean> {
   let recompiledFiles: string[];
   let compileErrors: Array<{ file: string; message: string }>;
   try {
@@ -236,7 +332,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
     // reaching the preview. Those arrive in `errors` and are pushed below.
     hotreloader.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
     console.error("[dev-server] SCSS error:", e);
-    return;
+    return false;
   }
 
   // Per-file compile failures. Until now these were only console.warn'ed inside the tracker, so a
@@ -249,8 +345,8 @@ async function handleComponentScss(filePath: string): Promise<void> {
       message: `SCSS ${basename(file)} — ${message.split("\n")[0]}`,
     });
   }
-  state.scssGraphDirty = true;
-  const allIds = baseComponentIds(await currentDiscovery(state, patternRoots));
+  const discovery = await currentDiscovery(state, patternRoots);
+  const allIds = baseComponentIds(discovery);
   const timestamp = Date.now();
 
   // If tracker returned no files (new file not yet registered in perFileCss),
@@ -263,8 +359,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
   // CSS even when it belongs to a component. Rebuild all style data instead and broadcast what changed.
   if (inBase(resolve(filePath)) ||
       effectiveFiles.some(f => inBase(resolve(f)) || !componentOfScss(resolve(f), allIds))) {
-    await restyleAll(allIds, timestamp, effectiveFiles, compileErrors.length > 0);
-    return;
+    return restyleAll(discovery, timestamp, effectiveFiles, compileErrors.length > 0);
   }
 
   const pending: Array<{ type: "css-link-swap"; componentId: string; href: string }> = [];
@@ -303,9 +398,10 @@ async function handleComponentScss(filePath: string): Promise<void> {
     if (verboseTiming) console.timeEnd("[dev-server:timing] classOwnerIndex patch");
   }
 
-  const orderedHrefs = await closureHrefs(timestamp);
+  const orderedHrefs = await closureHrefs(discovery, timestamp);
   for (const m of pending) hotreloader.push({ ...m, orderedHrefs });
   console.log(`[dev-server] CSS updated (recompiled: ${effectiveFiles.map(f => basename(f)).join(", ")})`);
+  return false;
 }
 
 // The full-restyle path: the same buildAllStyleData pass as boot and the routes' lazy rebuild, then
@@ -313,17 +409,22 @@ async function handleComponentScss(filePath: string): Promise<void> {
 // bump, so the preview document is reloaded instead (content-swap, as theme edits do); it comes back
 // with the base link at its new ?v= (state.baseCssVersion).
 async function restyleAll(
-  allIds: Set<string>, timestamp: number, files: string[], hadCompileErrors: boolean,
-): Promise<void> {
+  discovery: DiscoveryResult, timestamp: number, files: string[], hadCompileErrors: boolean,
+): Promise<boolean> {
+  const allIds = baseComponentIds(discovery);
   const names = files.map(f => basename(f)).join(", ");
   // A file that failed to compile is skipped by buildAllStyleData, which with one entry bundle would
   // empty every component's CSS. Keep the last good CSS on screen; the error is already on the Console.
   if (hadCompileErrors) {
     console.warn(`[dev-server] CSS not updated — compile errors (recompiled: ${names})`);
-    return;
+    return false;
   }
-  const changes = applyStyleData(state, await buildAllStyleData(styleRoots, allIds));
-  const orderedHrefs = await closureHrefs(timestamp);
+  // A request's full build in flight started before this change: it is never installed over this one.
+  state.style.invalidate();
+  const data = await buildAllStyleData(styleRoots, allIds);
+  const changes = applyStyleData(state, data);
+  state.style.set(data);
+  const orderedHrefs = await closureHrefs(discovery, timestamp);
   for (const componentId of changes.changedComponents) {
     hotreloader.push({ type: "css-link-swap", componentId, href: componentCssUrl(componentId, timestamp), orderedHrefs });
   }
@@ -338,18 +439,21 @@ async function restyleAll(
     ...(changes.baseChanged ? ["base layer"] : []),
   ].join(" + ");
   console.log(`[dev-server] CSS updated: ${what} (recompiled: ${names})`);
+  return true;
 }
 
 // The ordered link set for the component on screen, computed after all cache updates so a
 // newly-populated entry is included. Filtered to non-empty CSS: the preview head never links
 // zero-CSS components.
-async function closureHrefs(timestamp: number): Promise<string[] | undefined> {
-  const discovery = await cachedDiscovery(state);
-  if (!state.lastComponentId || !discovery || !state.compositionRegistry) return undefined;
+async function closureHrefs(discovery: DiscoveryResult, timestamp: number): Promise<string[] | undefined> {
+  if (!state.lastComponentId) return undefined;
+  // The caller's discovery, current when its handler took it, and its registry, built when an edit has just
+  // dropped it: without the list the preview could only update links it already has, never add one.
+  const registry = await compositionFor(state, discovery, patternDirs);
   // Must match the render path, rendered-class owners included — this list REPLACES the preview's
   // links, so anything the render path added and this one lacked would be stripped on every save.
   const staticClosure = await computeCssClosure(
-    state.lastComponentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), discovery.discoveryMap
+    state.lastComponentId, registry, patternDirs, state.classOwnerIndex ?? new Map(), discovery.discoveryMap
   );
   const renderedHtml = await render({ component: state.lastComponentId }).then(r => r.html, () => "");
   const closureIds = withRenderedClassOwners(staticClosure, renderedHtml, state.classOwnerIndex ?? new Map());
@@ -512,7 +616,8 @@ on("change", async (filePath) => {
     // Resolve using the current map BEFORE clearing it (file was in the previous discovery pass). A
     // second edit before any request has rebuilt it (a quick second save) finds none: build it, as the
     // SCSS path does, or that edit would reload nothing.
-    const componentId = resolveComponentForFile(filePath, await currentDiscovery(state, patternRoots));
+    const discovery = await currentDiscovery(state, patternRoots);
+    const componentId = resolveComponentForFile(filePath, discovery);
     // Invalidate caches so next request rebuilds with the new file state.
     invalidateDiscovery(state);
     if (!componentId) {
@@ -532,17 +637,25 @@ on("change", async (filePath) => {
     // its static findings may have changed). No full re-hash, no other component touched. A base id
     // from resolveComponentForFile keys straight into the slice map. quarantineEntry is undefined —
     // a live-edited component that renders is not quarantined (collisions come via add/rebuild).
-    if (state.auditSlices) {
-      state.auditSlices.set(componentId, await auditComponent(componentId, render, undefined));
-      state.liveReauditCount += 1;
-      if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
+    if (state.auditSeeding) {
+      // A seed is running: it audits this component again before it is stored (routes.ts).
+      state.auditSeeding.add(componentId);
+    } else {
+      const slices = await state.audit.peek();
+      if (slices) {
+        slices.set(componentId, await auditWithHash(
+          componentId, render, undefined, discovery.discoveryMap, globalDataDigest(rendering.current.globalData),
+        ));
+        state.liveReauditCount += 1;
+        if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
+      }
     }
 
   } else if (ext === ".ts" && scriptDirOf(filePath)) {
     // Script changed → invalidate cache + dispatch content-swap so the client re-renders
     // the srcdoc with a fresh ?v=<mtime> on the script src (busting the browser cache).
     const scriptId = basename(filePath, ".ts");
-    state.scriptCache.delete(scriptId);
+    scriptFor(state, scriptId).invalidate();
     if (state.lastComponentId) {
       hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });
     }
@@ -559,25 +672,23 @@ on("change", async (filePath) => {
 async function rebuildAndSignalTree(label: string): Promise<void> {
   const previous = await cachedDiscovery(state);
   const before = previous ? baseComponentIds(previous) : null;
-  // Current at once, before it runs: an invalidation during the build is not overwritten by its result.
-  state.compositionRegistry = null;
-  const dr = await startDiscovery(state, patternRoots);
+  // A discovery built after this change; one that a later change overtakes is never stored (lazy.ts).
+  const dr = await rebuildDiscovery(state, patternRoots);
   // A component that arrived (or left) changes who owns which stylesheet: a stylesheet saved before its
   // template was filed under the base layer, and now belongs to the component. Restyle against the new
   // set, so its CSS moves without a restart.
   const after = baseComponentIds(dr);
   if (!before || before.size !== after.size || [...after].some(id => !before.has(id))) {
-    await restyleAll(after, Date.now(), [], false);
+    await restyleAll(dr, Date.now(), [], false);
   }
   // Structural change (component added / removed) → the corpus node set changed; drop the diagnostics
   // slice cache so the next /api/audit re-seeds (still a hash-delta vs disk — only genuinely-changed
   // components re-audit). Not surgical, but adds/removes are rare and reshape the graph.
-  state.auditSlices = null;
+  state.audit.invalidate();
   await surfaceCollisions(dr.collisions, cwd, hotreloader);
-  // Re-derive the flattening artifact — the node set changed. The registry cache was just nulled
-  // for lazy rebuild, so build one locally for the pass (tree-changes are rare; cheap enough).
-  const reg = await buildCompositionRegistry(patternDirs, dr.handleMap, dr.discoveryMap);
-  await surfaceFlattening(dr.discoveryMap, reg, cwd);
+  // Re-derive the flattening artifact — the node set changed — from the new discovery's registry, which
+  // the next request then reuses.
+  await surfaceFlattening(dr.discoveryMap, await compositionFor(state, dr, patternDirs), cwd);
   hotreloader.push({ type: "tree-changed" });
   // A storefront page may embed the component that arrived or left: every page reloads and is checked again.
   await everyPageChanged();

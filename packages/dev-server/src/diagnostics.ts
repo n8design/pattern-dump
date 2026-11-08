@@ -18,8 +18,8 @@
 // stays in index.ts with the other orchestration, following the export.ts precedent: pure shaping
 // moves out, I/O orchestration stays.
 
-import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { runA11yProducer } from "@pattern-dump/a11y";
 import type {
@@ -216,9 +216,20 @@ export async function readDiagnosticsArtifact(root: string): Promise<PersistedDi
   } catch { return null; }
 }
 
+// Written to a file beside it, then renamed over it. A rename within one folder replaces the file in one
+// step, so a reader (headless `pd audit`, another pd dev on the same root) sees the old artifact or the
+// new one, never part of one: a torn read parses as "no artifact" and costs a full re-audit.
 async function writeDiagnosticsArtifact(root: string, art: PersistedDiagnostics): Promise<void> {
   await mkdir(pdScratchDir(root), { recursive: true });
-  await writeFile(graphArtifactPath(root), JSON.stringify(art));
+  const path = graphArtifactPath(root);
+  const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temp, JSON.stringify(art));
+    await rename(temp, path);
+  } catch (e) {
+    await rm(temp, { force: true });
+    throw e;
+  }
 }
 
 /**
@@ -243,6 +254,32 @@ export async function componentContentHash(
     .digest("hex");
 }
 
+/** The digest of the global data, part of every component's hash. */
+export function globalDataDigest(globalData: Record<string, unknown> | undefined): string {
+  return createHash("sha1").update(JSON.stringify(globalData ?? {})).digest("hex");
+}
+
+/** One component's audit, with the hash of exactly the content it audited. */
+export interface AuditedSlice {
+  readonly audit: ComponentAudit;
+  readonly hash: string;
+}
+
+/**
+ * Audit one component and capture the hash of what was audited. The audit reads the files itself, so the
+ * files are hashed before and after it; when they changed during it, it runs again. The hash kept is
+ * therefore never one read later (at persist time) for content the audit did not see.
+ */
+export async function auditWithHash(
+  id: string, render: CheckRenderer, quarantine: CollisionEntry | undefined, discoveryMap: DiscoveryMap, digest: string,
+): Promise<AuditedSlice> {
+  for (;;) {
+    const before = await componentContentHash(id, discoveryMap, digest);
+    const audit = await auditComponent(id, render, quarantine);
+    if (await componentContentHash(id, discoveryMap, digest) === before) return { audit, hash: before };
+  }
+}
+
 /**
  * Build or refresh the graph against the disk artifact. For each component: compute its hash; if the
  * prior artifact holds the SAME hash, reuse its cached slice (validated, not trusted blind); otherwise
@@ -256,9 +293,9 @@ export async function refreshDiagnosticsGraph(
   quarantineMap: Map<string, CollisionEntry>,
   discoveryMap: DiscoveryMap,
   globalData: Record<string, unknown> | undefined,
-): Promise<{ graph: DiagnosticsGraph; slices: Map<string, ComponentAudit>; reaudited: string[]; reused: number }> {
+): Promise<{ graph: DiagnosticsGraph; audited: Map<string, AuditedSlice>; reaudited: string[]; reused: number }> {
   const prior = await readDiagnosticsArtifact(root);
-  const globalDataDigest = createHash("sha1").update(JSON.stringify(globalData ?? {})).digest("hex");
+  const digest = globalDataDigest(globalData);
 
   const priorNodes = new Map((prior?.graph.components ?? []).map(c => [c.id, c] as const));
   const priorOcc = new Map<string, DiagnosticOccurrence[]>();
@@ -267,35 +304,28 @@ export async function refreshDiagnosticsGraph(
     arr.push(o); priorOcc.set(o.component, arr);
   }
 
-  const slices = new Map<string, ComponentAudit>();
-  const hashes: Record<string, string> = {};
+  const audited = new Map<string, AuditedSlice>();
   const reaudited: string[] = [];
   for (const id of [...componentIds].sort()) {
-    const h = await componentContentHash(id, discoveryMap, globalDataDigest);
-    hashes[id] = h;
+    const h = await componentContentHash(id, discoveryMap, digest);
     const priorNode = priorNodes.get(id);
     if (prior && prior.hashes[id] === h && priorNode) {
-      slices.set(id, { node: priorNode, occurrences: priorOcc.get(id) ?? [] }); // hash-validated reuse
+      audited.set(id, { audit: { node: priorNode, occurrences: priorOcc.get(id) ?? [] }, hash: h }); // hash-validated reuse
     } else {
-      slices.set(id, await auditComponent(id, render, quarantineMap.get(id)));
+      audited.set(id, await auditWithHash(id, render, quarantineMap.get(id), discoveryMap, digest));
       reaudited.push(id);
     }
   }
 
-  const graph = assembleGraph([...slices.values()]);
-  await writeDiagnosticsArtifact(root, { version: GRAPH_ARTIFACT_VERSION, hashes, graph });
-  return { graph, slices, reaudited, reused: slices.size - reaudited.length };
+  await persistSlices(root, audited);
+  return { graph: assembleGraph([...audited.values()].map(s => s.audit)), audited, reaudited, reused: audited.size - reaudited.length };
 }
 
-/** Re-persist the in-memory slices + fresh per-component hashes, so a later cold start can reuse them.
- *  Called after a batch of live re-audits (surgical patches) so the disk artifact tracks the live graph
- *  rather than drifting until the next full refresh. */
-export async function persistSlices(
-  root: string, slices: Map<string, ComponentAudit>, discoveryMap: DiscoveryMap,
-  globalData: Record<string, unknown> | undefined,
-): Promise<void> {
-  const globalDataDigest = createHash("sha1").update(JSON.stringify(globalData ?? {})).digest("hex");
+/** Persist the in-memory slices with the hash each was audited at, so a later cold start can reuse them.
+ *  Called after live re-audits too, so the disk artifact tracks the live graph. Nothing is read from disk:
+ *  a hash read now could be of content saved after the audit, and would validate a stale slice. */
+export async function persistSlices(root: string, slices: Map<string, AuditedSlice>): Promise<void> {
   const hashes: Record<string, string> = {};
-  for (const id of slices.keys()) hashes[id] = await componentContentHash(id, discoveryMap, globalDataDigest);
-  await writeDiagnosticsArtifact(root, { version: GRAPH_ARTIFACT_VERSION, hashes, graph: assembleGraph([...slices.values()]) });
+  for (const [id, slice] of slices) hashes[id] = slice.hash;
+  await writeDiagnosticsArtifact(root, { version: GRAPH_ARTIFACT_VERSION, hashes, graph: assembleGraph([...slices.values()].map(s => s.audit)) });
 }

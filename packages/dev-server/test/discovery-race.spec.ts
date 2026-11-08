@@ -1,11 +1,11 @@
-// A request takes the discovery once and uses only that, and an invalidation during a build is never
-// overwritten by that build's result (server-state.ts, hazard 4). Both moments are produced with the
-// test-only hook `__testOnly_onDiscovery`, on a served copy of the storefront bench with no watcher, so
-// the only invalidation is the one a test makes.
+// A request takes the discovery once and uses only that, and a build an invalidation overtook is never
+// stored or handed out: its request waits for the build after it (server-state.ts, hazard 4; lazy.ts).
+// Both moments are produced with the test-only hook `__testOnly_onLazy`, on a served copy of the
+// storefront bench with no watcher, so the only invalidation is the one a test makes.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,8 +14,11 @@ import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 
 type Hook = (phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
+type LazyHook = (name: string, phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
+/** Hook the discovery's lazy cache only. */
 const setHook = (hook: Hook | undefined) => {
-  (globalThis as { __testOnly_onDiscovery?: Hook }).__testOnly_onDiscovery = hook;
+  (globalThis as { __testOnly_onLazy?: LazyHook }).__testOnly_onLazy =
+    hook && ((name, phase, invalidate) => (name === "discovery" ? hook(phase, invalidate) : undefined));
 };
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
@@ -76,7 +79,7 @@ describe("the discovery a request takes", () => {
     }
   });
 
-  it("is invalidated mid-build: the next request sees the new discovery, not that build's", async () => {
+  it("is invalidated mid-build: that build is never handed out, and its request gets the one after it", async () => {
     // Empty the cache, so the next request builds.
     let emptied = false;
     setHook((phase, invalidate) => { if (phase === "taken" && !emptied) { emptied = true; invalidate(); } });
@@ -92,14 +95,49 @@ describe("the discovery a request takes", () => {
       await writeFile(join(root, "src/patterns/components/zz-late/zz-late.hbs"), "<p>late</p>\n");
       invalidate();
     });
+    // The request that started the overtaken build waits for the next one, which has seen the change.
     const during = await get("127.0.0.1", "/api/tree");
     expect(built).toBe(true);
     expect(during.status).toBe(200);
-    expect(during.body).not.toContain("zz-late");
+    expect(during.body).toContain("zz-late");
 
     setHook(undefined);
     const next = await get("127.0.0.1", "/api/tree");
     expect(next.status).toBe(200);
     expect(next.body).toContain("zz-late");
+  });
+});
+
+describe("the composition registry a request uses", () => {
+  /** The ids a component's template includes, as its detail reports them. */
+  const uses = async (id: string): Promise<string[]> => {
+    const r = await get("127.0.0.1", `/api/component/${id}`);
+    expect(r.status).toBe(200);
+    return (JSON.parse(r.body) as { relationships: { uses?: string[] } }).relationships.uses ?? [];
+  };
+
+  it("is the one built for its discovery: an include added while it was built is in the next request's", async () => {
+    // Empty the cache, so the next request builds a discovery and its registry.
+    let emptied = false;
+    setHook((phase, invalidate) => { if (phase === "taken" && !emptied) { emptied = true; invalidate(); } });
+    expect(await uses("components/callout")).toEqual([]);
+    expect(emptied).toBe(true);
+
+    // While that registry is built: the template gains an include, and the watcher would invalidate.
+    let edited = false;
+    (globalThis as { __testOnly_onLazy?: (name: string, phase: string, invalidate: () => void) => Promise<void> }).__testOnly_onLazy =
+      async (name, phase, invalidate) => {
+        if (name !== "composition" || phase !== "built" || edited) return;
+        edited = true;
+        await appendFile(join(root, "src/patterns/components/callout/callout.hbs"), "{{> partials-nav }}\n");
+        invalidate();
+      };
+    // That request keeps the registry of the discovery it took, read before the edit.
+    expect(await uses("components/callout")).toEqual([]);
+    expect(edited).toBe(true);
+
+    setHook(undefined);
+    // The next one takes the new discovery and gets its own registry, which has the include.
+    expect(await uses("components/callout")).toEqual(["partials/nav"]);
   });
 });

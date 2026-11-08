@@ -9,7 +9,7 @@
 // from two directions — HTTP requests and filesystem events. Wrapping it in methods would imply an
 // invariant the code does not have. The honest shape is a record whose hazards are documented.
 //
-// THREE HAZARDS, each of which has a real failure mode:
+// FIVE HAZARDS, each of which has a real failure mode:
 //
 //  1. `lastComponentId` is a request→watcher BACK-CHANNEL. A GET handler writes it; the watcher
 //     reads it to decide which component a theme or script edit should refresh. It is why the
@@ -27,20 +27,27 @@
 //     component route, the watcher's full restyle) goes through `applyStyleData`, so nothing
 //     else may hold on to the map.
 //
-//  4. `discoveryPromise` is INVALIDATED by the watcher while requests are using it. A request takes it
-//     once, `const discovery = await currentDiscovery(state, roots)`, and from then on uses only its
-//     local `discovery`, never the state again: across any later await the watcher may have cleared
-//     it. The PROMISE is cached, assigned synchronously before the build runs, so an invalidation that
-//     arrives during a build is never overwritten by that build's (stale) result. Always go through
-//     currentDiscovery / cachedDiscovery / setDiscovery / invalidateDiscovery below.
+//  4. `discovery` is INVALIDATED by the watcher while requests are using it. A request takes it once,
+//     `const discovery = await currentDiscovery(state, roots)`, and from then on uses only its local
+//     `discovery`, never the state again: across any later await the watcher may have cleared it. It is
+//     a lazy cache (lazy.ts): a build that an invalidation overtook is never stored, and its callers wait
+//     for the current one. Always go through currentDiscovery / cachedDiscovery / setDiscovery /
+//     invalidateDiscovery / rebuildDiscovery below.
 //
-// `themeCss`, `themeTokens` and `scriptCache` are `readonly` because they are only ever mutated,
+//  5. `style` is the full style build, installed into the state when it is stored. The watcher's
+//     per-save patch writes `perComponentCss` and `classOwnerIndex` directly, and invalidates `style`
+//     when its handler starts (so a build already in flight is never installed over the patch, nor
+//     replaces the map the patch is writing) and again once the patch is written (so the next request's
+//     full build starts after it and has the saved file in its module graph and provenance).
+//
+// `themeCss`, `themeTokens` and `scripts` are `readonly` because they are only ever mutated,
 // never replaced — the type records that difference rather than leaving it to convention.
 
 import type { DiscoveryResult } from "@pattern-dump/contracts";
 import { buildDiscoveryMap, type PatternRoot } from "@pattern-dump/discovery";
-import type { CompositionRegistry } from "./composition.js";
-import type { ComponentAudit } from "./diagnostics.js";
+import { createLazy, testHook, type Lazy } from "./lazy.js";
+import { buildCompositionRegistry, type CompositionRegistry } from "./composition.js";
+import type { AuditedSlice } from "./diagnostics.js";
 import type {
   AllStyleData, ScssModuleGraph, ClassOwnerIndex, BaseProvenanceIndex,
 } from "./style-index.js";
@@ -55,7 +62,10 @@ export interface ServerState {
   /** Base-class provenance: className → shared module that authored it. Same lifecycle as the
    *  module graph — rebuilt on the next full pass (navigation-lag MVP). */
   baseProvenance: BaseProvenanceIndex | null;
-  scssGraphDirty: boolean;
+  /** The full style build the fields above and `perComponentCss`/`baseCss` were installed from, as a lazy
+   *  cache: a build is installed (applyStyleData) only when it is stored, so one that a save overtook is
+   *  never installed over the save's patch. Nothing stored means the next request builds. See hazard 5. */
+  readonly style: Lazy<AllStyleData>;
 
   /** Per-component own-origin CSS: ComponentId → CSS text (origin-bucketed).
    *  Reassigned by the initial index build — see hazard 3. */
@@ -66,18 +76,18 @@ export interface ServerState {
    *  `<link>` as `?v=`, so a reloaded preview never reuses a stale base sheet. 0 = never changed. */
   baseCssVersion: number;
 
-  /** Rebuilt on HBS/JSON changes. */
-  compositionRegistry: CompositionRegistry | null;
-  /** The current discovery, as the promise of its build; null once invalidated. See hazard 4. */
-  discoveryPromise: Promise<DiscoveryResult> | null;
+  /** The current discovery, built on demand. See hazard 4. */
+  readonly discovery: Lazy<DiscoveryResult>;
 
-  /** In-memory per-component audit slices.
+  /** In-memory per-component audit slices, each with the hash it was audited at, as a lazy cache.
    *  Seeded on the first /api/audit (hash-delta vs disk), then patched surgically by the watcher:
    *  a .hbs/.json edit re-audits exactly that component; a .scss edit re-audits NOTHING (the
    *  covered engines are CSS-invariant — there is a tripwire test on that asymmetry); an
-   *  add/unlink drops the cache to re-seed. `_data` edits aren't watched, so a cold re-seed
+   *  add/unlink invalidates it to re-seed. `_data` edits aren't watched, so a cold re-seed
    *  re-audits all. */
-  auditSlices: Map<string, ComponentAudit> | null;
+  readonly audit: Lazy<Map<string, AuditedSlice>>;
+  /** While a seed runs: the components edited during it, re-audited before the seed is stored. */
+  auditSeeding: Set<string> | null;
   /** Total components re-audited via the surgical HMR path. The incremental proof reads this:
    *  surgical means +1 per .hbs edit, +0 per .scss edit. */
   liveReauditCount: number;
@@ -86,29 +96,32 @@ export interface ServerState {
   readonly themeCss: Map<string, string>;
   /** themeName → { "--slot": value | null }. Populated at startup and on HMR recompile. */
   readonly themeTokens: Map<string, Record<string, string | null>>;
-  /** scriptId → compiled JS. Invalidated on change, compiled on first request. */
-  readonly scriptCache: Map<string, string>;
+  /** scriptId → its compiled JS, a lazy cache per script (lazy.ts): compiled on first request,
+   *  invalidated by the watcher on a change. Through `scriptFor` only. */
+  readonly scripts: Map<string, Lazy<string>>;
 }
 
 /** A ServerState with empty caches and nothing indexed yet. The initial index build fills it. */
 export function createServerState(): ServerState {
-  return {
+  const state: ServerState = {
     lastComponentId: "",
     scssModuleGraph: null,
     classOwnerIndex: null,
     baseProvenance: null,
-    scssGraphDirty: true,
+
     perComponentCss: new Map<string, string>(),
     baseCss: "",
     baseCssVersion: 0,
-    compositionRegistry: null,
-    discoveryPromise: null,
-    auditSlices: null,
+    discovery: createLazy<DiscoveryResult>("discovery", { slow: { afterMs: DISCOVERY_SLOW_MS, what: "the component index" } }),
+    audit: createLazy<Map<string, AuditedSlice>>("audit"),
+    auditSeeding: null,
     liveReauditCount: 0,
     themeCss: new Map<string, string>(),
     themeTokens: new Map<string, Record<string, string | null>>(),
-    scriptCache: new Map<string, string>(),
+    scripts: new Map<string, Lazy<string>>(),
+    style: createLazy<AllStyleData>("style", { onStore: data => { applyStyleData(state, data); } }),
   };
+  return state;
 }
 
 /** What a full re-index changed, for the HMR path to broadcast. */
@@ -138,51 +151,69 @@ export function applyStyleData(state: ServerState, data: AllStyleData): StyleDat
   state.baseProvenance = data.baseProvenance;
   state.perComponentCss = data.componentCssMap;
   state.baseCss = data.baseCss;
-  state.scssGraphDirty = false;
   return { changedComponents: changedComponents.sort(), baseChanged };
 }
 
-// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onDiscovery`, it is called at two
-// moments with a function that invalidates the discovery as the watcher does. "built": a build finished,
-// before anyone has its result. "taken": a caller has its discovery and goes on with it. Tests use it to
-// invalidate at exactly those points. Unset, it costs a property read. Not exported, not a contract.
-type TestOnlyOnDiscovery = (phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
-const testHook = (): TestOnlyOnDiscovery | undefined =>
-  (globalThis as { __testOnly_onDiscovery?: TestOnlyOnDiscovery }).__testOnly_onDiscovery;
+/** The compiled script `scriptId`, as a lazy cache: a compile that a save overtook is never stored. */
+export function scriptFor(state: ServerState, scriptId: string): Lazy<string> {
+  let script = state.scripts.get(scriptId);
+  if (!script) {
+    script = createLazy<string>(`script:${scriptId}`);
+    state.scripts.set(scriptId, script);
+  }
+  return script;
+}
 
-/** Drop the discovery (and the composition registry derived from it): the next caller builds anew. */
+/** How long a request waits for discovery before the terminal says why. */
+export const DISCOVERY_SLOW_MS = 5_000;
+
+/** Drop the discovery (and with it the composition registry derived from it): the next caller builds anew. */
 export function invalidateDiscovery(state: ServerState): void {
-  state.discoveryPromise = null;
-  state.compositionRegistry = null;
+  state.discovery.invalidate();
+}
+
+// Each discovery's composition registry, built once for it. The registry is derived from a discovery's
+// templates, so it is keyed by the discovery object: a request's registry always matches the discovery it
+// took, and an .hbs or .json edit, which invalidates the discovery, gets a new one with the next discovery.
+// Nothing stores a registry in the state, so none can outlive its discovery.
+const registries = new WeakMap<DiscoveryResult, Promise<CompositionRegistry>>();
+
+/** The composition registry of `discovery`, built on first use. A build that fails is dropped. */
+export function compositionFor(
+  state: ServerState, discovery: DiscoveryResult, patternDirs: string | readonly string[],
+): Promise<CompositionRegistry> {
+  let registry = registries.get(discovery);
+  if (!registry) {
+    const built = buildCompositionRegistry(patternDirs, discovery.handleMap, discovery.discoveryMap).then(async r => {
+      await testHook()?.("composition", "built", () => invalidateDiscovery(state));
+      return r;
+    });
+    registry = built;
+    registries.set(discovery, built);
+    built.catch(() => { if (registries.get(discovery) === built) registries.delete(discovery); });
+  }
+  return registry;
 }
 
 /** Make `dr` the current discovery (startup, a full rebuild that has its result already). */
 export function setDiscovery(state: ServerState, dr: DiscoveryResult): void {
-  state.discoveryPromise = Promise.resolve(dr);
+  state.discovery.set(dr);
 }
 
-/** Start a build and make it the current discovery at once, before it runs. A build that fails is
- *  dropped, if it is still the current one, so the next caller tries again. */
-export function startDiscovery(state: ServerState, roots: string | PatternRoot[]): Promise<DiscoveryResult> {
-  const build: Promise<DiscoveryResult> = buildDiscoveryMap(roots).then(async dr => {
-    await testHook()?.("built", () => invalidateDiscovery(state));
-    return dr;
-  });
-  state.discoveryPromise = build;
-  build.catch(() => { if (state.discoveryPromise === build) state.discoveryPromise = null; });
-  return build;
+/** Drop the discovery and take a new one, built after this call: a structural change (a file added or
+ *  removed) needs one that has seen it. */
+export function rebuildDiscovery(state: ServerState, roots: string | PatternRoot[]): Promise<DiscoveryResult> {
+  invalidateDiscovery(state);
+  return currentDiscovery(state, roots);
 }
 
 /** The current discovery, building it when there is none. Take it once and use the result. */
-export async function currentDiscovery(state: ServerState, roots: string | PatternRoot[]): Promise<DiscoveryResult> {
-  const discovery = await (state.discoveryPromise ?? startDiscovery(state, roots));
-  await testHook()?.("taken", () => invalidateDiscovery(state));
-  return discovery;
+export function currentDiscovery(state: ServerState, roots: string | PatternRoot[]): Promise<DiscoveryResult> {
+  return state.discovery.get(() => buildDiscoveryMap(roots));
 }
 
 /** The current discovery if there is one (built or building), never starting a build; null otherwise,
  *  or when that build failed. */
-export async function cachedDiscovery(state: ServerState): Promise<DiscoveryResult | null> {
-  const pending = state.discoveryPromise;
-  return pending ? pending.catch(() => null) : null;
+export function cachedDiscovery(state: ServerState): Promise<DiscoveryResult | null> {
+  return state.discovery.peek();
 }
