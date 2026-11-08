@@ -4,9 +4,10 @@
 // pages, read off the rendered DOM. The spec writes into the bench and restores every file afterwards.
 import { expect, test, type FrameLocator, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { save } from "../../test-support/save.js";
 
 const DEV_PORT = process.env["PB_DEV_PORT"] ?? "4800";
 const WORKBENCH = `http://pd.localhost:${DEV_PORT}`;
@@ -25,19 +26,15 @@ const CHANGED = [
 const ADDED = ["vendor/fixture-ds/patterns/atoms/tag"];
 const originals = new Map<string, string>();
 
-/** Rewrite a file in place: `change` replaced by `to`, which must be there. */
+/** Rewrite a file: `change` replaced by `to`, which must be there. */
 async function edit(rel: string, change: string, to: string): Promise<void> {
   const text = await readFile(at(rel), "utf8");
   if (!text.includes(change)) throw new Error(`${rel} has no "${change}"`);
-  await writeFile(at(rel), text.replace(change, to));
+  await save(at(rel), text.replace(change, to));
 }
-/** A new file, written beside the bench and renamed into place, so it appears complete in one event. */
-async function create(rel: string, text: string): Promise<void> {
-  const staged = join(bench, ".out", `staged-${Date.now()}`);
-  await mkdir(dirname(staged), { recursive: true });
-  await writeFile(staged, text);
-  await mkdir(dirname(at(rel)), { recursive: true });
-  await rename(staged, at(rel));
+/** A new file, saved in one step, so it appears complete in one event. */
+function create(rel: string, text: string): Promise<void> {
+  return save(at(rel), text);
 }
 /** The design system's helpers, compiled again from their source, as its own build does. */
 function rebuildHelpers(): void {
@@ -48,7 +45,7 @@ function rebuildHelpers(): void {
 
 test.beforeAll(async () => { for (const rel of CHANGED) originals.set(rel, await readFile(at(rel), "utf8")); });
 test.afterAll(async () => {
-  for (const [rel, text] of originals) await writeFile(at(rel), text);
+  for (const [rel, text] of originals) await save(at(rel), text);
   for (const rel of ADDED) await rm(at(rel), { recursive: true, force: true });
   rebuildHelpers();
 });
@@ -79,7 +76,7 @@ test("edits to linked packages reach the open workbench and storefront page, wit
 
   await test.step("its data, through node_modules/", async () => {
     const text = await readFile(at("vendor/fixture-ds/patterns/molecules/card/card.json"), "utf8");
-    await writeFile(join(repo, "node_modules", "pd-fixture-ds", "patterns", "molecules", "card", "card.json"), text.replace(`"Card two"`, `"Card three"`));
+    await save(join(repo, "node_modules", "pd-fixture-ds", "patterns", "molecules", "card", "card.json"), text.replace(`"Card two"`, `"Card three"`));
     for (const f of both()) await expect(f.locator(".ds-card-title")).toHaveText("Card three");
   });
 
