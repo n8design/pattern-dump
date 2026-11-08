@@ -2,9 +2,11 @@
 // Each step adds files (or switches a page to one of them) and the open page must reload itself and
 // show the change. The spec writes into the bench and removes what it added after the test.
 import { expect, test, type Page } from "@playwright/test";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { save, saveInTwoSteps } from "../../test-support/save.js";
+import { existsSync } from "node:fs";
 
 const bench = (rel: string) => fileURLToPath(new URL(`../${rel}`, import.meta.url));
 const ADDED = [
@@ -16,8 +18,11 @@ const about = bench("pages/about.md");
 let original = "";
 
 const put = async (rel: string, text: string) => {
+  const fresh = !existsSync(dirname(bench(rel)));
   await mkdir(dirname(bench(rel)), { recursive: true });
-  await writeFile(bench(rel), text);
+  // Into a folder it has just made, in place, as on main: renamed into a folder made a moment ago, a file
+  // can be missed by the watcher (open: fix/watcher-new-folder). Back to save() once that is fixed.
+  await (fresh ? saveInTwoSteps : save)(bench(rel), text);
 };
 /** A marker on the open document: gone once the page has reloaded. */
 const mark = (page: Page) => page.evaluate(() => { (window as unknown as { stale: boolean }).stale = true; });
@@ -29,7 +34,7 @@ const reloaded = (page: Page) => expect.poll(
 
 test.beforeEach(async () => { original = await readFile(about, "utf8"); });
 test.afterEach(async () => {
-  await writeFile(about, original);
+  await save(about, original);
   for (const rel of ADDED) await rm(bench(rel), { recursive: true, force: true });
 });
 
@@ -99,7 +104,7 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
   await test.step("an existing page switched to the new layout", async () => {
     await page.goto("/about/");
     await mark(page);
-    await writeFile(about, original.replace("title: About", "layout: zz-plain\ntitle: About"));
+    await save(about, original.replace("title: About", "layout: zz-plain\ntitle: About"));
     await reloaded(page);
     await expect(page.locator("h1")).toHaveClass("zz-plain-title");
     await expect(page.locator("h1")).toHaveCSS("color", "rgb(1, 2, 3)");
