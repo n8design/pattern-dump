@@ -52,14 +52,16 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
   ["components/callout", "Callout", "A short note set apart from the text around it.", "centered",
     ["Good to know", "A callout sets a short note apart"]],
 ];
+/** The components the guides page places with values (pd- tags): a slider and its slides. */
+const PLACED = ["components/slide", "components/slider"];
 
 describe("storefront bench in the workbench", () => {
-  it("lists the skin's layouts and partials and the embedded component, and nothing else", async () => {
+  it("lists the skin's layouts and partials, the embedded component and the placed ones, and nothing else", async () => {
     const tree = await (await fetch(origin + "/api/tree")).json() as ComponentTree;
     const ids: string[] = [];
     const walk = (nodes: TreeNode[]): void => nodes.forEach(n => { if (n.kind === "component") ids.push(n.path); walk(n.children ?? []); });
     walk(tree.roots);
-    expect(ids.sort()).toEqual(SKIN.map(([id]) => id).sort());
+    expect(ids.sort()).toEqual([...SKIN.map(([id]) => id), ...PLACED].sort());
   });
 
   for (const [id, title, description, layout, shows] of SKIN) {

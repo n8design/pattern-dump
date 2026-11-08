@@ -1,7 +1,8 @@
 // Storefront pages place components with values (pd- tags): the component renders into the page through
 // render(), its stylesheets (and those of the components placed inside it) are linked in the page head, and
 // every problem is listed on the page in pd dev and fails pd build, as file:line:column. On a copy of the
-// storefront bench with a slider and a slide added, and one page per failure case.
+// storefront bench with a slider and a slide added, and one page per failure case. Their classes are not the
+// bench's own slider's (.slider, .slide), so the stylesheets linked are theirs alone.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
@@ -18,15 +19,15 @@ const config = validateConfig(benchConfig, "storefront-bench");
 const json = (v: unknown) => JSON.stringify(v);
 const FM = "---\ntitle: Case\n---\n\n";
 const ADDED: Record<string, string> = {
-  "src/patterns/molecules/slider/slider.hbs": `<section class="slider" aria-label="{{label}}" data-per-view="{{perView}}">{{#each slides}}<div class="slider-item">{{> atoms-slide}}</div>{{/each}}</section>\n`,
+  "src/patterns/molecules/slider/slider.hbs": `<section class="carousel" aria-label="{{label}}" data-per-view="{{perView}}">{{#each slides}}<div class="carousel-item">{{> atoms-slide}}</div>{{/each}}</section>\n`,
   "src/patterns/molecules/slider/slider.schema.json": json({ required: ["label", "slides"], properties: {
     label: { type: "string" }, perView: { type: "integer", enum: [1, 2, 3] }, loop: { type: "boolean" },
     slides: { type: "array", items: { "x-pd-component": "atoms/slide" } } } }),
-  "src/patterns/atoms/slide/slide.hbs": `<figure class="slide"><img src="{{image}}" alt="{{alt}}">{{#if caption}}<figcaption>{{{caption}}}</figcaption>{{/if}}</figure>\n`,
+  "src/patterns/atoms/slide/slide.hbs": `<figure class="carousel-slide"><img src="{{image}}" alt="{{alt}}">{{#if caption}}<figcaption>{{{caption}}}</figcaption>{{/if}}</figure>\n`,
   "src/patterns/atoms/slide/slide.schema.json": json({ "x-pd-content": "caption", required: ["image", "alt"], properties: {
     image: { type: "string" }, alt: { type: "string" }, caption: { type: "string", contentMediaType: "text/markdown" } } }),
-  "src/styles/molecules/slider.scss": ".slider {\n  display: flex;\n}\n",
-  "src/styles/atoms/slide.scss": ".slide {\n  margin: 0;\n}\n",
+  "src/styles/molecules/slider.scss": ".carousel {\n  display: flex;\n}\n",
+  "src/styles/atoms/slide.scss": ".carousel-slide {\n  margin: 0;\n}\n",
   "pages/talks.md": `---\ntitle: Talks\n---\n\n# Talks\n\n<pd-molecules-slider label="Recent talks" per-view="1" loop>\n  <pd-atoms-slide image="talks/espc.jpg" alt="On stage">ESPC **2025**</pd-atoms-slide>\n  <pd-atoms-slide image="talks/collab.jpg" alt="Audience">Collab Summit</pd-atoms-slide>\n</pd-molecules-slider>\n`,
 };
 const CASES: Record<string, [body: string, problem: string]> = {
@@ -89,9 +90,9 @@ describe("a storefront page that places a component", () => {
     const page = await get("/talks/");
     expect(page.status).toBe(200);
     // (The page layout indents the body's lines, hence the four spaces after each line break.)
-    expect(page.body).toContain(`<section class="slider" aria-label="Recent talks" data-per-view="1">`
-      + `<div class="slider-item"><figure class="slide"><img src="talks/espc.jpg" alt="On stage"><figcaption><p>ESPC <strong>2025</strong></p>\n    </figcaption></figure>\n    </div>`
-      + `<div class="slider-item"><figure class="slide"><img src="talks/collab.jpg" alt="Audience"><figcaption><p>Collab Summit</p>\n    </figcaption></figure>\n    </div></section>`);
+    expect(page.body).toContain(`<section class="carousel" aria-label="Recent talks" data-per-view="1">`
+      + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/espc.jpg" alt="On stage"><figcaption><p>ESPC <strong>2025</strong></p>\n    </figcaption></figure>\n    </div>`
+      + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/collab.jpg" alt="Audience"><figcaption><p>Collab Summit</p>\n    </figcaption></figure>\n    </div></section>`);
     // The placed component's stylesheet, and the nested slide's.
     expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/molecules\/slider\.css" data-pd-comp="molecules\/slider">/);
     expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/atoms\/slide\.css" data-pd-comp="atoms\/slide">/);

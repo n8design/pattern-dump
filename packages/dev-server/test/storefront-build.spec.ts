@@ -65,6 +65,8 @@ describe("pd build — the storefront root", () => {
       ".nojekyll",
       "_pd/base.css",
       "_pd/components/components/callout.css",
+      "_pd/components/components/slide.css",
+      "_pd/components/components/slider.css",
       "_pd/components/partials/base.css",
       "_pd/components/partials/footer.css",
       "_pd/components/partials/header.css",
@@ -77,7 +79,7 @@ describe("pd build — the storefront root", () => {
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 14, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 16, bytes: expect.any(Number) });
   });
 
   it("resolves every reference inside it to a file it holds", () => {
