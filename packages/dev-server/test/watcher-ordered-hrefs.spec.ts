@@ -34,15 +34,41 @@ describe("a stylesheet saved right after its template", () => {
     await b.start(config);
 
     const r = await b.step(async () => {
-      // The template first, handled, with no request after it; then the stylesheet.
+      // The template first, handled, with no request after it; then the stylesheet. Each save is one write
+      // (an append): a two-step write is its own test below.
       const from = handled.length;
-      await writeFile(b.at(HBS), `<button class="btn">Two</button>\n`);
+      await b.edit(HBS, `<span>Two</span>\n`);
       await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === HBS));
-      await writeFile(b.at(SCSS), `.btn { color: blue; }\n`);
+      await b.edit(SCSS, `.btn-two { color: blue; }\n`);
     }, [["change", HBS], ["change", SCSS]]);
 
     const swaps = r.messages.filter(m => m.includes(`"css-link-swap"`)).map(m => JSON.parse(m) as { orderedHrefs?: string[] });
     expect(swaps).toHaveLength(1);
     expect(swaps[0].orderedHrefs).toEqual(["/_pd/components/atoms/btn.css?v=<t>"]);
+  }, 60_000);
+
+  it("written in two steps (emptied, then written), as editors do: the last handling wins", async () => {
+    const root = join(tmp, "site-two-step");
+    for (const [rel, text] of [[HBS, `<button class="btn">One</button>\n`], [SCSS, `.btn { color: red; }\n`]]) {
+      await mkdir(dirname(join(root, rel)), { recursive: true });
+      await writeFile(join(root, rel), text);
+    }
+    const b = new Bench(root, "atoms/btn", join(tmp, "staging"));
+    await b.start(config);
+
+    // Emptied, and the empty file handled, then written: both states are seen, in that order (written
+    // together, the watcher often reads only the second, which would not tell which handling won).
+    const sentFrom = b.messages.length;
+    await b.step(async () => {
+      const from = handled.length;
+      await writeFile(b.at(SCSS), "");
+      await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === SCSS));
+      await writeFile(b.at(SCSS), `.btn { color: rgb(9, 8, 7); }\n`);
+    }, [["change", SCSS]]);
+    // In the order they were sent (step() sorts its messages): the last is the last handling's.
+    const swaps = b.messages.slice(sentFrom).filter(m => m.includes(`"css-link-swap"`)).map(m => JSON.parse(m) as { orderedHrefs?: string[] });
+    expect(swaps.length).toBeGreaterThan(0);
+    expect(swaps.at(-1)!.orderedHrefs).toEqual(["/_pd/components/atoms/btn.css?v=<t>"]);
+    expect(await (await fetch(`${b.origin}/_pd/components/atoms/btn.css`)).text()).toContain("rgb(9, 8, 7)");
   }, 60_000);
 });
