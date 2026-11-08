@@ -25,6 +25,9 @@ import MarkdownIt from "markdown-it";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { highlight, wrapWithCopyButton, deepMerge } from "@pattern-dump/renderer";
 import { escapeAttr, escapeHtml } from "./http-utils.js";
+import { usePlacedTags, type PlacedBlock } from "./placed-tags.js";
+import { placeBlock, type PlacementDeps } from "./storefront/placed.js";
+import type { PlacedProblem } from "./storefront/declared-values.js";
 
 /**
  * How a doc's live examples are embedded.
@@ -38,26 +41,49 @@ import { escapeAttr, escapeHtml } from "./http-utils.js";
  */
 export type DocEmbed =
   | { embed: "inline" }
-  | { embed: "frame"; workbenchUrl: string; problems: string[] };
+  | { embed: "frame"; workbenchUrl: string; problems: string[]; placed?: DocPlacing };
+
+/**
+ * Components placed with values (`pd-` tags, placed-tags.ts): on where a caller passes this, off
+ * everywhere else (a `<pd-…>` is then escaped text, as any tag). `lineOffset` is the number of lines before
+ * the body in its file (a page's frontmatter), so problems point into the file; they are collected here,
+ * with their positions, and every tag that has one renders as a marker instead of the component.
+ */
+export interface DocPlacing { deps: PlacementDeps; lineOffset: number; problems: PlacedProblem[] }
 
 const INLINE: DocEmbed = { embed: "inline" };
 
-const _md = new MarkdownIt({ html: false, linkify: false });
+/** The docs parser: one configuration, with or without placed components. */
+function createDocMarkdown(placing: boolean): MarkdownIt {
+  const md = new MarkdownIt({ html: false, linkify: false });
 
-// Positive allowlist: block javascript:, data:, vbscript:, etc.
-// html: false already escapes raw HTML in source; this covers link/image hrefs.
-// pattern: is allowed through so the link resolver can intercept it below.
-_md.validateLink = (url: string) => {
-  const t = url.trim();
-  return /^(https?|mailto|tel):/i.test(t) || /^[.#/]/.test(t) || t.startsWith("pattern:");
-};
+  // Positive allowlist: block javascript:, data:, vbscript:, etc.
+  // html: false already escapes raw HTML in source; this covers link/image hrefs.
+  // pattern: is allowed through so the link resolver can intercept it below.
+  md.validateLink = (url: string) => {
+    const t = url.trim();
+    return /^(https?|mailto|tel):/i.test(t) || /^[.#/]/.test(t) || t.startsWith("pattern:");
+  };
 
-// Fence rule set once at instance creation — reads pre-resolved HTML from env,
-// never mutates shared state during render, safe for parallel builds.
-_md.renderer.rules["fence"] = (tokens, idx, _opts, env) => {
-  const map = (env as { resolvedFences?: Map<number, string> }).resolvedFences;
-  return map?.get(idx) ?? _mdPlainPre(tokens[idx]?.content ?? "");
-};
+  // Fence rule set once at instance creation — reads pre-resolved HTML from env,
+  // never mutates shared state during render, safe for parallel builds.
+  md.renderer.rules["fence"] = (tokens, idx, _opts, env) => {
+    const map = (env as { resolvedFences?: Map<number, string> }).resolvedFences;
+    return map?.get(idx) ?? _mdPlainPre(tokens[idx]?.content ?? "");
+  };
+
+  if (placing) {
+    usePlacedTags(md);
+    // The same: a placed component's HTML, resolved before rendering; a marker where it has problems.
+    md.renderer.rules["pd_component"] = (_tokens, idx, _opts, env) =>
+      (env as { resolvedPlaced?: Map<number, string> }).resolvedPlaced?.get(idx)
+        ?? `<p class="doc-error">[component not placed: see the page's problems]</p>\n`;
+  }
+  return md;
+}
+
+const _md = createDocMarkdown(false);
+const _mdPlaced = createDocMarkdown(true);
 
 function _mdPlainPre(code: string): string {
   return `<pre><code>${escapeHtml(code)}</code></pre>`;
@@ -99,7 +125,7 @@ function _parsePatternSpec(spec: string): { compId: string; variant?: string } {
  * button~ghost is not in the discovery map.
  */
 function _resolvePatternLinks(
-  tokens: ReturnType<typeof _md.parse>,
+  tokens: ReturnType<MarkdownIt["parse"]>,
   discoveryMap: DiscoveryMap,
   embed: DocEmbed
 ): void {
@@ -135,7 +161,9 @@ export async function renderDoc(
   discoveryMap: DiscoveryMap,
   embed: DocEmbed = INLINE
 ): Promise<string> {
-  const tokens = _md.parse(body, {});
+  const placing = embed.embed === "frame" ? embed.placed : undefined;
+  const md = placing ? _mdPlaced : _md;
+  const tokens = md.parse(body, { pdLineOffset: placing?.lineOffset ?? 0 });
 
   // Resolve pattern: cross-links synchronously (discoveryMap.has is sync).
   _resolvePatternLinks(tokens, discoveryMap, embed);
@@ -149,7 +177,18 @@ export async function renderDoc(
     )
   );
 
-  return _md.renderer.render(tokens, _md.options, { resolvedFences });
+  // Placed components: each checked and rendered once through render(), its problems collected.
+  const resolvedPlaced = new Map<number, string>();
+  if (placing) {
+    for (const [idx, tok] of tokens.entries()) {
+      if (tok.type !== "pd_component") continue;
+      const r = await placeBlock(tok.meta as PlacedBlock, placing.deps);
+      placing.problems.push(...r.problems);
+      if (r.html !== undefined && r.problems.length === 0) resolvedPlaced.set(idx, `${r.html}\n`);
+    }
+  }
+
+  return md.renderer.render(tokens, md.options, { resolvedFences, resolvedPlaced });
 }
 
 // renderer throws "[renderer] Component not found: ..." / "[renderer] Variant not found: ..." for

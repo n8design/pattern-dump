@@ -28,6 +28,7 @@ import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/render
 
 import type { ResolvedConfig } from "./server-config.js";
 import { compositionFor, currentDiscovery, scriptFor, type ServerState } from "./server-state.js";
+import { createDisplayPath } from "./display-path.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 class ScriptMissing extends Error {}
@@ -481,7 +482,8 @@ export async function handleRequest(
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
       const page = await assemblePage(route, model, {
-        discoveryMap, composition: await compositionFor(state, discovery, patternDirs), render, site: cfg.storefront.site,
+        discoveryMap, handleMap: discovery.handleMap, shown: createDisplayPath(cwd, cfg.packages),
+        composition: await compositionFor(state, discovery, patternDirs), render, site: cfg.storefront.site,
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
