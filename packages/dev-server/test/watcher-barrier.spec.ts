@@ -45,7 +45,8 @@ beforeAll(async () => {
   server = started.server;
   const wsPort = started.wsPort;
   ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
-  ws.on("message", (d: Buffer) => messages.push(String(d)));
+  // Without the live-reload generation, which differs on every run (its own specs check it).
+  ws.on("message", (d: Buffer) => messages.push(String(d).replace(/,"generation":"[^"]*"/g, "")));
   await new Promise((resolve, reject) => { ws.once("open", resolve); ws.once("error", reject); });
   await fetch(`http://127.0.0.1:${server.port}/api/component/atoms/loud`);
 }, 60_000);

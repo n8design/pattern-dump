@@ -71,6 +71,7 @@ export class Bench {
   messages: string[] = [];
   private ws!: WebSocket;
   private port = 0;
+  private live = 0;
   /** One barrier file per watched folder. */
   private barriers: string[] = [];
   /** `component`: the one the workbench has open, or null for no workbench at all. `staging`: a folder
@@ -88,14 +89,20 @@ export class Bench {
     this.barriers = [...new Set(folders)].map(d => join(d, BARRIER));
     for (const file of this.barriers) await writeFile(file, "");
     const { server, wsPort } = await startOnFreeWsPort(cfg, this.root);
+    this.live = wsPort;
     servers.push(server);
     this.port = server.port;
     this.ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
     sockets.push(this.ws);
-    this.ws.on("message", (data: Buffer) => this.messages.push(data.toString().replace(/\?v=\d+/g, "?v=<t>").split(this.root).join("<root>")));
+    // Normalised for comparison: cache-busters, this project's folder, and the live-reload generation (its
+    // own specs check that), which differ on every run.
+    this.ws.on("message", (data: Buffer) => this.messages.push(data.toString().replace(/\?v=\d+/g, "?v=<t>")
+      .replace(/,"generation":"[^"]*"/g, "").split(this.root).join("<root>")));
     await new Promise<void>((resolve, reject) => { this.ws.once("open", () => resolve()); this.ws.once("error", reject); });
   }
 
+  /** The live-reload socket's port, for a socket a spec opens itself. */
+  get wsPort(): number { return this.live; }
   /** The server's address, for requests a spec makes itself. */
   get origin(): string { return `http://127.0.0.1:${this.port}`; }
   at(rel: string): string { return join(this.root, rel); }

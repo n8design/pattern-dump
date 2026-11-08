@@ -830,6 +830,27 @@ export const PD_PROTOCOL_VERSION = 1;
 export const PD_PROTOCOL_HEADER = "X-PD-Protocol";
 
 /**
+ * The live-reload generation a `pd dev` response was rendered from: `<boot>.<n>`, where `<boot>` names the
+ * server process and `<n>` counts the reload messages it has sent. Sent by a live server on every response
+ * (this header), in `hello`, and on every reload message (content-swap, css-link-swap, tree-changed,
+ * page-changed), bumped when such a message is sent, after the change's state is in place. A request takes
+ * it before anything else, so a document rendered while a change landed carries the generation from before
+ * it. A client that later sees a newer one knows its document may predate a change it never heard about
+ * (sent while its socket was not open, or while its fetch was in flight) and fetches it again. Absent when
+ * the server has no live reload (`pd build`). Additive: no protocol bump.
+ */
+export const PD_GENERATION_HEADER = "X-PD-Generation";
+
+/** True when generation `a` is older than `b`: from an earlier server process, or a lower count. Either
+ *  absent compares as not behind (a server without live reload never makes a client refetch). */
+export function generationBehind(a: string | undefined | null, b: string | undefined | null): boolean {
+  if (!a || !b) return false;
+  const [bootA, countA] = a.split(".");
+  const [bootB, countB] = b.split(".");
+  return bootA !== bootB || Number(countA) < Number(countB);
+}
+
+/**
  * HMR socket messages, discriminated on `type`:
  *  - hello         : sent once per connection — carries PD_PROTOCOL_VERSION.
  *  - content-swap  : template / data / `.ts` change → re-fetch and swap the preview document.
@@ -862,11 +883,15 @@ export interface CssLinkSwapMessage {
    * Only components with non-empty CSS output are included.
    */
   orderedHrefs?: string[];
+  /** The generation this message bumped the server to (PD_GENERATION_HEADER); set by the server. */
+  generation?: string;
 }
 
 /** Fired when a .hbs is added or removed — client re-fetches /api/tree to rebuild the nav. */
 export interface TreeChangedMessage {
   type: "tree-changed";
+  /** The generation this message bumped the server to (PD_GENERATION_HEADER); set by the server. */
+  generation?: string;
 }
 
 /** M6: a handle collision was detected at discovery time. Both paths are named so the author
@@ -884,6 +909,8 @@ export interface CollisionMessage {
 export interface PageChangedMessage {
   type: "page-changed";
   route: string | null;
+  /** The generation this message bumped the server to (PD_GENERATION_HEADER); set by the server. */
+  generation?: string;
 }
 
 export type HmrMessage = HelloMessage | ContentSwapMessage | ErrorMessage | CssLinkSwapMessage | TreeChangedMessage | CollisionMessage | PageChangedMessage;
@@ -892,12 +919,16 @@ export type HmrMessage = HelloMessage | ContentSwapMessage | ErrorMessage | CssL
 export interface HelloMessage {
   type: "hello";
   protocol: number;
+  /** The current live-reload generation (PD_GENERATION_HEADER). */
+  generation?: string;
 }
 
 export interface ContentSwapMessage {
   type: "content-swap";
   componentId: ComponentId;
   // No HTML payload: the iframe re-points/reloads its standalone document URL.
+  /** The generation this message bumped the server to (PD_GENERATION_HEADER); set by the server. */
+  generation?: string;
 }
 
 export interface ErrorMessage {
