@@ -183,7 +183,11 @@ describe("the watcher on test-bench", () => {
   for (const [name, act, events, messages] of CASES) {
     it(`sends what it sends for ${name}`, async () => {
       const b = await testBench(SETUP[name]);
-      expect(await b.step(() => act(b), events)).toEqual({ messages, events });
+      try {
+        expect(await b.step(() => act(b), events)).toEqual({ messages, events });
+      } finally {
+        await b.close();
+      }
     }, 60_000);
   }
 
@@ -213,6 +217,7 @@ describe("the watcher on test-bench", () => {
       expect(warn.mock.calls.map(c => c.join(" ")).filter(m => m.includes("zz-split"))).toEqual([]);
     } finally {
       warn.mockRestore();
+      await b.close();
     }
   }, 60_000);
 });
@@ -258,7 +263,11 @@ describe("the watcher on the storefront bench", () => {
   for (const [name, act, events, messages] of CASES) {
     it(`sends what it sends for ${name}`, async () => {
       const b = await storefrontBench(SETUP[name]);
-      expect(await b.step(() => act(b), events)).toEqual({ messages, events });
+      try {
+        expect(await b.step(() => act(b), events)).toEqual({ messages, events });
+      } finally {
+        await b.close();
+      }
     }, 60_000);
   }
 });
