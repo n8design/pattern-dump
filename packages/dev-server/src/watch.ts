@@ -561,6 +561,30 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   console.log(`[dev-server] ${label} → tree-changed`);
 }
 
+// A .json in a pattern root, added or removed. Discovery reads three kinds, each by name, once per build:
+// `<stem>.schema.json` is a component's schema (its schemaPath: what the Inspector shows, and what a
+// storefront page's frontmatter is checked against), `<stem>.json` is a component's data (its jsonPath:
+// the defaults it renders with), and `<base>~<variant>.json` is a variant of its own (a data-overlay
+// variant, a node in the tree; beside a `<base>~<variant>.hbs` it is that variant's data). A file that
+// arrives or leaves after the build is none of these until discovery is built again, so every .json in a
+// pattern root rebuilds it: matching the three by name here would repeat discovery's rules, and any other
+// .json rebuilds a discovery that comes out the same. Then the component it belongs to reloads, found in
+// the discovery that has the file (the new one for an add, the one before for a removal).
+async function handleComponentJson(filePath: string, event: "add" | "unlink"): Promise<void> {
+  const abs = resolve(filePath);
+  const ownerIn = (dr: DiscoveryResult | null): string | undefined => {
+    for (const [id, entry] of dr?.discoveryMap ?? []) {
+      if (entry.jsonPath === abs || entry.schemaPath === abs) return id.split("~")[0];
+    }
+    return undefined;
+  };
+  const rel = relative(patternRootOf(filePath) ?? patternsDir, filePath);
+  let owner = event === "unlink" ? ownerIn(await cachedDiscovery(state)) : undefined;
+  await rebuildAndSignalTree(`Data ${event === "add" ? "added" : "removed"}: ${rel}`);
+  owner ??= ownerIn(await cachedDiscovery(state));
+  if (owner) hotreloader.push({ type: "content-swap", componentId: owner });
+}
+
 /** Every storefront page changed: one page-changed per page (none without a storefront). */
 async function everyPageChanged(): Promise<void> {
   if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hotreloader.push({ type: "page-changed", route });
@@ -577,10 +601,12 @@ on("add", async (filePath) => {
     await rebuildAndSignalTree(`Pattern added: ${relative(patternRoot, filePath)}`);
   } else if (ext === ".md" && patternRoot) {
     await handleMarkdown(filePath, "add");
+  } else if (ext === ".json" && patternRoot) {
+    await handleComponentJson(filePath, "add");
   }
 });
 
-// Component template removed — rebuild discovery and signal nav rebuild.
+// A component's file removed — rebuild discovery and signal nav rebuild.
 on("unlink", async (filePath) => {
   if (handlePages(filePath, "unlink")) return;
   if (await handleReloadable(filePath, "unlink")) return;
@@ -589,6 +615,8 @@ on("unlink", async (filePath) => {
     await rebuildAndSignalTree(`Pattern removed: ${relative(patternRoot, filePath)}`);
   } else if (extname(filePath) === ".md" && patternRoot) {
     await handleMarkdown(filePath, "unlink");
+  } else if (extname(filePath) === ".json" && patternRoot) {
+    await handleComponentJson(filePath, "unlink");
   }
 });
 
