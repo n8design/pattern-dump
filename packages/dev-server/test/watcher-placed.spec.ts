@@ -5,13 +5,14 @@
 // of the storefront bench, whose guides page places its slider and slides (watch-harness.ts).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateConfig } from "@pattern-dump/config";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { Bench, closeAll } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const SLIDE = "src/patterns/components/slide";
@@ -26,8 +27,8 @@ async function bench(): Promise<Bench> {
     await cp(join(repo, file), to);
   }
   // The slide gets data, so a data edit can be made too.
-  await writeFile(join(root, SLIDE, "slide.json"), `{ "image": "x.svg" }\n`);
-  const b = new Bench(root, "components/slider", join(tmp, "staging"));
+  await save(join(root, SLIDE, "slide.json"), `{ "image": "x.svg" }\n`);
+  const b = new Bench(root, "components/slider");
   await b.start(validateConfig(benchConfig, "storefront-bench"));
   return b;
 }
@@ -50,7 +51,7 @@ describe("a placed component's files", () => {
       const b = await bench();
       try {
         const text = await readFile(b.at(file), "utf8");
-        const r = await b.step(() => writeFile(b.at(file), edit(text)), [["change", file]]);
+        const r = await b.step(() => save(b.at(file), edit(text)), [["change", file]]);
         expect(r.messages).toContain(SWAP);
       } finally {
         await b.close();

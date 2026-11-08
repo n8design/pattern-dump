@@ -2,12 +2,13 @@
 // terminating `;` from the parent. Serialising top-level nodes one by one must keep it, or the
 // next rule is parsed into the at-rule's prelude and the browser drops both.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import postcss from "postcss";
 import { buildAllStyleData } from "../src/style-index.js";
 import { recomputeComponentCss } from "../src/css-closure.js";
+import { save } from "../../../test-support/save.js";
 
 const componentIds = new Set(["atoms/button"]);
 let stylesDir: string;
@@ -23,9 +24,9 @@ function topLevel(css: string): string[] {
 beforeAll(async () => {
   stylesDir = await mkdtemp(join(tmpdir(), "pd-statement-at-rules-"));
   await mkdir(join(stylesDir, "atoms"), { recursive: true });
-  await writeFile(join(stylesDir, "base.scss"),
+  await save(join(stylesDir, "base.scss"),
     `body { margin: 0; }\n@import url("https://fonts.example/a.css");\n.page { color: red; }\n`);
-  await writeFile(join(stylesDir, "atoms", "button.scss"),
+  await save(join(stylesDir, "atoms", "button.scss"),
     `@layer reset, components;\n.btn { color: blue; }\n@layer components { .btn--x { color: green; } }\n`);
 });
 

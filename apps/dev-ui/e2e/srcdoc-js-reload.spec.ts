@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { gotoComponentReady as gotoComponent } from "./helpers.js";
 import type { ConsoleMessage } from "@playwright/test";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { save } from "../../../test-support/save.js";
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const testBench  = path.resolve(__dirname, "../../../test-bench");
@@ -44,7 +45,7 @@ async function writeAndWaitForMarker(
   page.on("console", onConsole);
 
   await waitForHmrConnected(page);
-  await writeFile(toggleTs, `${original}\nconsole.log("${marker}");`);
+  await save(toggleTs, `${original}\nconsole.log("${marker}");`);
 
   // Poll until the marker appeared the required number of times.
   await expect.poll(() => count, { timeout: 15_000 }).toBeGreaterThanOrEqual(occurrences);
@@ -52,7 +53,7 @@ async function writeAndWaitForMarker(
 
   return {
     marker,
-    restore: () => writeFile(toggleTs, original),
+    restore: () => save(toggleTs, original),
   };
 }
 
@@ -228,7 +229,7 @@ test.describe("JS HMR — srcdoc reload", () => {
 
     const original = await readFile(buttonScss, "utf-8");
     try {
-      await writeFile(buttonScss, `${original}\n/* hmr-js-css-guard */\n`);
+      await save(buttonScss, `${original}\n/* hmr-js-css-guard */\n`);
 
       // Wait for css-link-swap: button's CSS link href gains ?v=.
       await page.waitForFunction(() => {
@@ -243,7 +244,7 @@ test.describe("JS HMR — srcdoc reload", () => {
       });
       expect(markerSurvived).toBe(true);
     } finally {
-      await writeFile(buttonScss, original);
+      await save(buttonScss, original);
     }
   });
 });

@@ -3,11 +3,12 @@
 // current one, built for it, not from a cache that may be empty. Without the list the workbench can only
 // update links it already has, and a component whose stylesheet link is missing never gains it.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save, saveInTwoSteps } from "../../../test-support/save.js";
 
 const config = defineConfig({
   sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
@@ -28,9 +29,9 @@ describe("a stylesheet saved right after its template", () => {
     const root = join(tmp, "site");
     for (const [rel, text] of [[HBS, `<button class="btn">One</button>\n`], [SCSS, `.btn { color: red; }\n`]]) {
       await mkdir(dirname(join(root, rel)), { recursive: true });
-      await writeFile(join(root, rel), text);
+      await save(join(root, rel), text);
     }
-    const b = new Bench(root, "atoms/btn", join(tmp, "staging"));
+    const b = new Bench(root, "atoms/btn");
     await b.start(config);
 
     const r = await b.step(async () => {
@@ -51,9 +52,9 @@ describe("a stylesheet saved right after its template", () => {
     const root = join(tmp, "site-two-step");
     for (const [rel, text] of [[HBS, `<button class="btn">One</button>\n`], [SCSS, `.btn { color: red; }\n`]]) {
       await mkdir(dirname(join(root, rel)), { recursive: true });
-      await writeFile(join(root, rel), text);
+      await save(join(root, rel), text);
     }
-    const b = new Bench(root, "atoms/btn", join(tmp, "staging"));
+    const b = new Bench(root, "atoms/btn");
     await b.start(config);
 
     // Emptied, and the empty file handled, then written: both states are seen, in that order (written
@@ -61,9 +62,9 @@ describe("a stylesheet saved right after its template", () => {
     const sentFrom = b.messages.length;
     await b.step(async () => {
       const from = handled.length;
-      await writeFile(b.at(SCSS), "");
+      await saveInTwoSteps(b.at(SCSS), "");
       await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === SCSS));
-      await writeFile(b.at(SCSS), `.btn { color: rgb(9, 8, 7); }\n`);
+      await saveInTwoSteps(b.at(SCSS), `.btn { color: rgb(9, 8, 7); }\n`);
     }, [["change", SCSS]]);
     // In the order they were sent (step() sorts its messages): the last is the last handling's.
     const swaps = b.messages.slice(sentFrom).filter(m => m.includes(`"css-link-swap"`)).map(m => JSON.parse(m) as { orderedHrefs?: string[] });

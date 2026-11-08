@@ -3,7 +3,7 @@
 // before the template outputs it with triple-stash; and a template that outputs a plain value with
 // triple-stash is refused with a named error, nothing rendered. Through the real renderer and templates.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
@@ -12,6 +12,7 @@ import { buildCompositionRegistry } from "../src/composition.js";
 import { readPlacedBlocks } from "../src/placed-tags.js";
 import { readSchema } from "../src/storefront/declared-values.js";
 import { placeBlock, type PlacementDeps } from "../src/storefront/placed.js";
+import { save } from "../../../test-support/save.js";
 
 const FILES: Record<string, string> = {
   "molecules/slider/slider.hbs": `<ul class="slider">{{#each slides}}<li>{{> atoms-slide}}</li>{{/each}}</ul>\n`,
@@ -31,7 +32,7 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "pd-placed-escaping-"));
   for (const [rel, text] of Object.entries(FILES)) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), text);
+    await save(join(root, rel), text);
   }
   const { discoveryMap, handleMap } = await buildDiscoveryMap(root);
   deps = {

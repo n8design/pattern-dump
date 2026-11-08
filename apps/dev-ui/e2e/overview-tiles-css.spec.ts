@@ -4,10 +4,11 @@
 // a link to CSS that is now empty: the keyed update points it at the empty sheet, which styles nothing and
 // breaks nothing. The spec writes into test-bench and restores it after each test.
 import { expect, test, type FrameLocator, type Page } from "@playwright/test";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PD_GENERATION_HEADER, generationBehind } from "@pattern-dump/contracts";
+import { save } from "../../../test-support/save.js";
 
 const testBench = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../test-bench");
 const CHIP_SCSS = path.join(testBench, "src/styles/01-atoms/chip.scss");
@@ -26,7 +27,7 @@ test.beforeEach(async () => { buttonScss = await readFile(BUTTON_SCSS, "utf8"); 
 test.afterEach(async ({ page }) => {
   const before = await serverGeneration(page);
   await rm(CHIP_SCSS, { force: true });
-  await writeFile(BUTTON_SCSS, buttonScss);
+  await save(BUTTON_SCSS, buttonScss);
   await handled(page, before);
 });
 
@@ -37,7 +38,7 @@ test("a tile rendered while a component had no CSS gains its stylesheet on the f
   await expect(chip.locator('link[data-pd-comp="atoms/chip"]')).toHaveCount(0);
 
   const before = await serverGeneration(page);
-  await writeFile(CHIP_SCSS, ".pd-chip {\n  color: rgb(9, 8, 7);\n}\n");
+  await save(CHIP_SCSS, ".pd-chip {\n  color: rgb(9, 8, 7);\n}\n");
   await handled(page, before);
   await expect(chip.locator('link[data-pd-comp="atoms/chip"]')).toHaveCount(1, { timeout: 10_000 });
   await expect(chip.locator(".pd-chip")).toHaveCSS("color", "rgb(9, 8, 7)");
@@ -52,7 +53,7 @@ test("a tile keeps a harmless link when a component's CSS becomes empty", async 
   page.on("pageerror", e => errors.push(e.message));
 
   const before = await serverGeneration(page);
-  await writeFile(BUTTON_SCSS, "// emptied\n");
+  await save(BUTTON_SCSS, "// emptied\n");
   await handled(page, before);
   // The keyed update points the link at the now-empty sheet; the tile still renders, unstyled by it.
   await expect.poll(async () => (await link.getAttribute("href")) ?? "", { timeout: 10_000 }).toMatch(/\?v=\d+/);

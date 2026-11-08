@@ -1,13 +1,14 @@
 // The storefront's page model: routes from file paths, the nav from folders and `order` (the component
 // tree's rules, inherited), and every problem that keeps a pages folder from being a sound site.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { readPages, routeFor } from "../src/storefront/pages.js";
 import { checkPageFrontmatter } from "../src/storefront/frontmatter-contract.js";
+import { save } from "../../../test-support/save.js";
 
 const roots: string[] = [];
 afterAll(async () => { await Promise.all(roots.map(r => rm(r, { recursive: true, force: true }))); });
@@ -19,7 +20,7 @@ async function pages(files: Record<string, string>): Promise<string> {
   for (const [path, body] of Object.entries(files)) {
     const file = join(root, ...path.split("/"));
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(file, body);
+    await save(file, body);
   }
   return root;
 }
@@ -29,7 +30,7 @@ beforeAll(async () => {
   const dir = await mkdtemp(join(tmpdir(), "pd-pages-schema-"));
   roots.push(dir);
   schemaFile = join(dir, "page.schema.json");
-  await writeFile(schemaFile, JSON.stringify({ required: ["title"], properties: { title: { type: "string" }, description: { type: "string" } } }));
+  await save(schemaFile, JSON.stringify({ required: ["title"], properties: { title: { type: "string" }, description: { type: "string" } } }));
 });
 
 const page = (title: string, extra = ""): string => `---\ntitle: ${title}\n${extra}---\n\nBody of ${title}.\n`;

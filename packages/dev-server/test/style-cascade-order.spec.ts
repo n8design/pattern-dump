@@ -1,11 +1,12 @@
 // Cascade order survives bucketing. A repeated rule keeps its LAST position: the later copy is the one that wins the cascade, so
 // dropping it (and keeping the earlier one) silently changes what the browser paints.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildAllStyleData } from "../src/style-index.js";
 import { recomputeComponentCss } from "../src/css-closure.js";
+import { save } from "../../../test-support/save.js";
 
 let styles = "";
 const ids = new Set(["atoms/fieldset"]);
@@ -25,7 +26,7 @@ beforeAll(async () => {
   };
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(styles, rel)), { recursive: true });
-    await writeFile(join(styles, rel), text);
+    await save(join(styles, rel), text);
   }
 });
 afterAll(async () => { if (styles) await rm(styles, { recursive: true, force: true }); });
@@ -53,8 +54,8 @@ describe("repeated rules keep their last position", () => {
 
 describe("a configured entry list is the cascade order", () => {
   it("entries compile in the order given, not sorted", async () => {
-    await writeFile(join(styles, "z-first.scss"), `.order { color: red; }\n`);
-    await writeFile(join(styles, "a-second.scss"), `.order { color: blue; }\n`);
+    await save(join(styles, "z-first.scss"), `.order { color: red; }\n`);
+    await save(join(styles, "a-second.scss"), `.order { color: blue; }\n`);
     const d = await buildAllStyleData(
       [{ dir: styles, entries: [join(styles, "z-first.scss"), join(styles, "a-second.scss")] }], ids);
     const colors = [...d.baseCss.matchAll(/\.order\s*\{\s*color:\s*([^;]+);/g)].map(m => m[1]);

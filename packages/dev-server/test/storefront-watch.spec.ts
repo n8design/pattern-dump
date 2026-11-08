@@ -3,7 +3,7 @@
 // socket, against a copy of the bench, so the repo is never written to.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { appendFile, cp, mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,10 @@ import type { DevServer } from "@pattern-dump/dev-server";
 import { startOnFreeWsPort } from "./free-ports.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { Bench, closeAll } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
+
+/** Append `text` to `path`, as one save of the whole file. */
+const append = async (path: string, text: string) => save(path, `${await readFile(path, "utf8")}${text}`);
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const config = validateConfig(benchConfig, "storefront-bench");
@@ -78,28 +82,28 @@ describe("pd dev reloads storefront pages", () => {
   const pages = (...p: string[]) => join(root, "pages", ...p);
 
   it("sends an edited page's route", async () => {
-    expect(await after(messages, () => appendFile(pages("about.md"), "\nMore.\n"), pageChanged)).toEqual([{ type: "page-changed", route: "/about/" }]);
-    expect(await after(messages, () => appendFile(pages("index.md"), "\nMore.\n"), pageChanged)).toEqual([{ type: "page-changed", route: "/" }]);
-    expect(await after(messages, () => appendFile(pages("guides", "setup.md"), "\nMore.\n"), pageChanged)).toEqual([{ type: "page-changed", route: "/guides/setup/" }]);
+    expect(await after(messages, () => append(pages("about.md"), "\nMore.\n"), pageChanged)).toEqual([{ type: "page-changed", route: "/about/" }]);
+    expect(await after(messages, () => append(pages("index.md"), "\nMore.\n"), pageChanged)).toEqual([{ type: "page-changed", route: "/" }]);
+    expect(await after(messages, () => append(pages("guides", "setup.md"), "\nMore.\n"), pageChanged)).toEqual([{ type: "page-changed", route: "/guides/setup/" }]);
   });
 
   it("reloads every page when a page is added or removed", async () => {
-    expect(await after(messages, () => writeFile(pages("contact.md"), "---\ntitle: Contact\n---\n"), pageChanged)).toEqual([{ type: "page-changed", route: null }]);
+    expect(await after(messages, () => save(pages("contact.md"), "---\ntitle: Contact\n---\n"), pageChanged)).toEqual([{ type: "page-changed", route: null }]);
     expect(await after(messages, () => rm(pages("contact.md")), pageChanged)).toEqual([{ type: "page-changed", route: null }]);
   });
 
   it("reloads every page when a file that is not a page, or a folder, appears", async () => {
-    expect(await after(messages, () => writeFile(pages("notes.txt"), "x"), pageChanged)).toEqual([{ type: "page-changed", route: null }]);
+    expect(await after(messages, () => save(pages("notes.txt"), "x"), pageChanged)).toEqual([{ type: "page-changed", route: null }]);
     expect((await after(messages, () => mkdir(pages("news")), pageChanged))[0]).toEqual({ type: "page-changed", route: null });
   });
 
   it("ignores dotfiles", async () => {
-    expect(await after(messages, () => writeFile(pages(".DS_Store"), "x"), pageChanged, true)).toEqual([]);
+    expect(await after(messages, () => save(pages(".DS_Store"), "x"), pageChanged, true)).toEqual([]);
   });
 
   it("sends no page-changed for a component's docs, which keep their own reload", async () => {
     const docs = join(root, "src", "patterns", "components", "callout", "callout.md");
-    const sent = await after(messages, () => appendFile(docs, "\nMore.\n"), m => m.type === "tree-changed" || pageChanged(m));
+    const sent = await after(messages, () => append(docs, "\nMore.\n"), m => m.type === "tree-changed" || pageChanged(m));
     expect(sent.some(m => m.type === "tree-changed")).toBe(true);
     expect(sent.filter(pageChanged)).toEqual([]);
   });
@@ -122,13 +126,13 @@ describe("a change to the base layer, with no workbench open", () => {
 
   it("reloads every page when a file is added to it", async () => {
     const from = messages.length;
-    await settled(() => writeFile(join(root, "src", "styles", "site", "zz-added.scss"), ".site-footer {\n  letter-spacing: 0.3em;\n}\n"));
+    await settled(() => save(join(root, "src", "styles", "site", "zz-added.scss"), ".site-footer {\n  letter-spacing: 0.3em;\n}\n"));
     expect(messages.slice(from).filter(pageChanged)).toEqual(everyPage);
   }, 20_000);
 
   it("reloads every page when one of its files is edited", async () => {
     const from = messages.length;
-    await settled(() => appendFile(join(root, "src", "styles", "site", "tokens.scss"), "\n:root {\n  --sk-probe: 1;\n}\n"));
+    await settled(() => append(join(root, "src", "styles", "site", "tokens.scss"), "\n:root {\n  --sk-probe: 1;\n}\n"));
     expect(messages.slice(from).filter(pageChanged)).toEqual(everyPage);
   }, 20_000);
 });
@@ -139,7 +143,7 @@ describe("a pages folder beside the patterns, with a name that starts the same",
     await rename(join(root, "pages"), join(root, "src", "patterns-site"));
     const cfg = validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, pagesDir: "./src/patterns-site" } }, "sibling");
     const messages = await watch(root, cfg);
-    const sent = await after(messages, () => appendFile(join(root, "src", "patterns-site", "about.md"), "\nMore.\n"), m => pageChanged(m) || m.type === "tree-changed");
+    const sent = await after(messages, () => append(join(root, "src", "patterns-site", "about.md"), "\nMore.\n"), m => pageChanged(m) || m.type === "tree-changed");
     expect(sent).toEqual([{ type: "page-changed", route: "/about/" }]);
   }, 120_000);
 });
@@ -152,8 +156,8 @@ describe("script edits and new components, with no workbench open", () => {
   async function bench(name: string): Promise<Bench> {
     const root = await benchCopy(name);
     await mkdir(join(root, "src", "scripts"), { recursive: true });
-    await writeFile(join(root, "src", "scripts", "zz-tick.ts"), "document.body.dataset.tick = \"1\";\n");
-    const b = new Bench(root, null, join(tmp, "staging"));
+    await save(join(root, "src", "scripts", "zz-tick.ts"), "document.body.dataset.tick = \"1\";\n");
+    const b = new Bench(root, null);
     await b.start(validateConfig({ ...benchConfig, scriptsDir: "./src/scripts" }, name));
     return b;
   }

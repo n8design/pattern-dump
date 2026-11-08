@@ -6,13 +6,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateConfig } from "@pattern-dump/config";
 import { buildStaticSite, startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
+import { save } from "../../../test-support/save.js";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const config = validateConfig(benchConfig, "storefront-bench");
@@ -55,7 +56,7 @@ async function benchCopy(name: string, extra: Record<string, string>): Promise<s
   }
   for (const [rel, text] of Object.entries(extra)) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), text);
+    await save(join(root, rel), text);
   }
   return root;
 }

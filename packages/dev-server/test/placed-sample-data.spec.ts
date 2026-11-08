@@ -3,7 +3,7 @@
 // problem: in its own sample, in an included partial's, and one level inside a declared object. Through
 // the real renderer, so the cascade is the real one.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
@@ -12,6 +12,7 @@ import { buildCompositionRegistry } from "../src/composition.js";
 import { readPlacedBlocks } from "../src/placed-tags.js";
 import { readSchema } from "../src/storefront/declared-values.js";
 import { placeBlock, type PlacementDeps } from "../src/storefront/placed.js";
+import { save } from "../../../test-support/save.js";
 
 const json = (v: unknown) => JSON.stringify(v);
 const FILES: Record<string, string> = {
@@ -36,7 +37,7 @@ async function project(files: Record<string, string>): Promise<{ root: string; d
   const root = await mkdtemp(join(tmpdir(), "pd-placed-sample-"));
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), text);
+    await save(join(root, rel), text);
   }
   const { discoveryMap, handleMap } = await buildDiscoveryMap(root);
   return { root, deps: {

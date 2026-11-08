@@ -3,11 +3,12 @@
 // usual. The failure is forced with the test-only hook `__testOnly_failHandler`, so it does not depend on
 // the file system refusing a read (as root, a chmod 000 file is still readable).
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { Bench, closeAll } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 type Fail = (event: string, path: string) => "reject" | "throw" | undefined;
 const hooks = globalThis as { __testOnly_failHandler?: Fail };
@@ -23,9 +24,9 @@ let n = 0;
 async function project(): Promise<Bench> {
   const root = join(tmp, `site-${n++}`);
   await mkdir(dirname(join(root, FILE)), { recursive: true });
-  await writeFile(join(root, FILE), `<button class="btn">One</button>\n`);
+  await save(join(root, FILE), `<button class="btn">One</button>\n`);
   await mkdir(join(root, "src/styles"), { recursive: true });
-  const b = new Bench(root, "atoms/btn", join(tmp, "staging"));
+  const b = new Bench(root, "atoms/btn");
   await b.start(config);
   return b;
 }
@@ -63,7 +64,7 @@ describe("a watcher handler that fails", () => {
       const spy = vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => { errors.push(a.map(String).join(" ")); });
       let failed;
       try {
-        failed = await b.step(() => writeFile(b.at(FILE), `<button class="btn">Two</button>\n`), [["change", FILE]]);
+        failed = await b.step(() => save(b.at(FILE), `<button class="btn">Two</button>\n`), [["change", FILE]]);
       } finally {
         spy.mockRestore();
       }
@@ -77,7 +78,7 @@ describe("a watcher handler that fails", () => {
       expect(lost).toEqual([]);
 
       delete hooks.__testOnly_failHandler;
-      const next = await b.step(() => writeFile(b.at(FILE), `<button class="btn">Three</button>\n`), [["change", FILE]]);
+      const next = await b.step(() => save(b.at(FILE), `<button class="btn">Three</button>\n`), [["change", FILE]]);
       expect(next.messages).toEqual([`{"type":"content-swap","componentId":"atoms/btn"}`]);
     }, 60_000);
   }

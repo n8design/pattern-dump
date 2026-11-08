@@ -4,11 +4,12 @@
 // saved one (server-state.ts, hazard 5). The moment is the test-only hook `__testOnly_onLazy("style",
 // "built")`; the save is handled by the real watcher before the hook returns (watch-harness.ts).
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 type LazyHook = (name: string, phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
 const hooks = globalThis as { __testOnly_onLazy?: LazyHook };
@@ -38,15 +39,15 @@ describe("a stylesheet saved during a request's full style build", () => {
       ["src/styles/base/_tokens.scss", `$ink: rgb(1 2 3);\n`],
     ]) {
       await mkdir(dirname(join(root, rel)), { recursive: true });
-      await writeFile(join(root, rel), text);
+      await save(join(root, rel), text);
     }
-    const b = new Bench(root, "atoms/c", join(tmp, "staging"));
+    const b = new Bench(root, "atoms/c");
     await b.start(config);
     const detail = async () => (await fetch(`${b.origin}/api/component/atoms/c`)).json() as Promise<Detail>;
     const css = async () => (await fetch(`${b.origin}/_pd/components/atoms/c.css`)).text();
 
     // A first save leaves the full build to the next request.
-    await b.step(() => writeFile(b.at(SCSS), `.c {\n  color: blue;\n}\n`), [["change", SCSS]]);
+    await b.step(() => save(b.at(SCSS), `.c {\n  color: blue;\n}\n`), [["change", SCSS]]);
 
     // That request's build runs; when it finishes, before it is stored, the stylesheet gains a @use and the
     // watcher handles the save.
@@ -56,7 +57,7 @@ describe("a stylesheet saved during a request's full style build", () => {
       builds++;
       if (builds > 1) return;
       const from = handled.length;
-      await writeFile(b.at(SCSS), `@use "../base/tokens";\n.c {\n  color: tokens.$ink;\n}\n`);
+      await save(b.at(SCSS), `@use "../base/tokens";\n.c {\n  color: tokens.$ink;\n}\n`);
       await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === SCSS));
     };
     const during = await detail();

@@ -3,11 +3,12 @@
 // never replaces it. A response is held in the route after the server has produced it, so which one is
 // older does not depend on timing. The spec writes into test-bench and restores it after each test.
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PD_GENERATION_HEADER, generationBehind } from "@pattern-dump/contracts";
 import { gotoComponent } from "./helpers.js";
+import { save } from "../../../test-support/save.js";
 
 const testBench = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../test-bench");
 const ICON = path.join(testBench, "src/patterns/atoms/icon/icon.hbs");
@@ -17,7 +18,7 @@ const originals = new Map<string, string>();
 test.beforeEach(async () => { for (const f of [ICON, BUTTON]) originals.set(f, await readFile(f, "utf8")); });
 test.afterEach(async ({ page }) => {
   const before = await serverGeneration(page);
-  for (const [f, text] of originals) await writeFile(f, text);
+  for (const [f, text] of originals) await save(f, text);
   // Let the restores be handled before the next spec.
   await expect.poll(async () => generationBehind(before, await serverGeneration(page)), { timeout: 10_000 }).toBe(true);
 });
@@ -51,7 +52,7 @@ test("a component opened while it changed is fetched again: its preview is the c
   const generation = await hold.fetched;
 
   // The change, handled meanwhile: its reload names atoms/icon, which is not yet the open component.
-  await writeFile(ICON, `${originals.get(ICON)}<b class="zz-generation">changed while opening</b>\n`);
+  await save(ICON, `${originals.get(ICON)}<b class="zz-generation">changed while opening</b>\n`);
   await expect.poll(async () => generationBehind(generation, await serverGeneration(page)), { timeout: 10_000 }).toBe(true);
 
   hold.release();
@@ -65,7 +66,7 @@ test("an older preview response never replaces a newer one: two quick saves, the
   const data = JSON.parse(originals.get(BUTTON)!) as Record<string, unknown>;
   // The first save's preview is produced, then held.
   const hold = await holdFirst(page, "**/preview/atoms/button*");
-  await writeFile(BUTTON, JSON.stringify({ ...data, label: "First save" }));
+  await save(BUTTON, JSON.stringify({ ...data, label: "First save" }));
   await hold.fetched;
 
   // Every document the frame is given, in order: the end state alone would not show a stale document that
@@ -78,7 +79,7 @@ test("an older preview response never replaces a newer one: two quick saves, the
       .observe(frame, { attributes: true, attributeFilter: ["srcdoc"] });
   });
   // The second save's preview goes through and is shown.
-  await writeFile(BUTTON, JSON.stringify({ ...data, label: "Second save" }));
+  await save(BUTTON, JSON.stringify({ ...data, label: "Second save" }));
   await expect.poll(() => srcdoc(page), { timeout: 10_000 }).toContain("Second save");
 
   // The first one arrives last, and is dropped: it is older than what the frame shows, so the frame is

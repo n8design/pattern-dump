@@ -1,10 +1,11 @@
 // Discovery over several pattern roots (the project, then packages), with excludes.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildDiscoveryMap, globToRegExp } from "./index.js";
+import { save } from "../../../test-support/save.js";
 
 let root = "";
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ""; });
@@ -12,7 +13,7 @@ afterEach(async () => { if (root) await rm(root, { recursive: true, force: true 
 async function files(base: string, paths: string[]): Promise<void> {
   for (const p of paths) {
     await mkdir(dirname(join(base, p)), { recursive: true });
-    await writeFile(join(base, p), "<p>x</p>\n");
+    await save(join(base, p), "<p>x</p>\n");
   }
 }
 

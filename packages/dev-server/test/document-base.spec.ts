@@ -1,11 +1,12 @@
 // documentBase is authoritative and additive: a listed path always forms the base layer, even a file
 // that belongs to a component; rules no component owns still join it when unlisted, and are reported.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildAllStyleData, documentBaseMatcher, missingDocumentBase } from "../src/style-index.js";
 import { recomputeComponentCss } from "../src/css-closure.js";
+import { save } from "../../../test-support/save.js";
 
 let styles = "";
 const ids = new Set(["atoms/button", "organisms/hero"]);
@@ -21,7 +22,7 @@ beforeAll(async () => {
   };
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(styles, rel)), { recursive: true });
-    await writeFile(join(styles, rel), text);
+    await save(join(styles, rel), text);
   }
 });
 afterAll(async () => { if (styles) await rm(styles, { recursive: true, force: true }); });

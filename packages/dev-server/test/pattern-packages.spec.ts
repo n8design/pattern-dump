@@ -7,11 +7,12 @@
 // package helper, a package script — and the project must win a handle it shares with the package.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ComponentDetailResponse, ComponentTree, TreeNode } from "@pattern-dump/contracts";
 import { startDevServer } from "@pattern-dump/dev-server";
+import { save } from "../../../test-support/save.js";
 
 let root = "";
 let server: { port: number; close: () => Promise<void> };
@@ -20,7 +21,7 @@ const get = (p: string) => fetch(`http://127.0.0.1:${server.port}${p}`);
 async function write(files: Record<string, string>): Promise<void> {
   for (const [rel, body] of Object.entries(files)) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), body);
+    await save(join(root, rel), body);
   }
 }
 

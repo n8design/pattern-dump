@@ -6,12 +6,13 @@
 // Deterministic on Linux, where the second save always lands in chokidar's window; on macOS it is
 // reported by chokidar itself, and the spec checks that nothing is handled twice.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
 import { CHANGE_RECHECK_MS } from "../src/watch.js";
+import { save, saveInTwoSteps } from "../../../test-support/save.js";
 
 let tmp = "";
 let b: Bench;
@@ -19,7 +20,7 @@ const TEMPLATE = "src/patterns/atoms/quick/quick.hbs";
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, text);
+  await save(path, text);
 }
 
 beforeAll(async () => {
@@ -27,7 +28,7 @@ beforeAll(async () => {
   const root = join(tmp, "site");
   await write(join(root, TEMPLATE), "<p>first</p>\n");
   await mkdir(join(root, "src/styles"), { recursive: true });
-  b = new Bench(root, "atoms/quick", join(tmp, "staging"));
+  b = new Bench(root, "atoms/quick");
   await b.start(validateConfig(defineConfig({
     sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
     styles: { strategy: "parallel", dir: "./src/styles" },
@@ -47,10 +48,10 @@ describe("a quick second save", () => {
     const changes = () => b.handledSince(from).filter(([e, rel]) => e === "change" && rel === TEMPLATE).length;
     const swaps = () => b.messages.slice(msgFrom).filter(m => m === `{"type":"content-swap","componentId":"atoms/quick"}`).length;
 
-    await writeFile(b.at(TEMPLATE), "<p>second</p>\n");
+    await saveInTwoSteps(b.at(TEMPLATE), "<p>second</p>\n");
     await whenHandled(() => changes() === 1, () => `the first save handled; handled: ${JSON.stringify(b.handledSince(from))}`);
     // At once, as an editor's format-on-save writes again.
-    await writeFile(b.at(TEMPLATE), "<p>third</p>\n");
+    await saveInTwoSteps(b.at(TEMPLATE), "<p>third</p>\n");
     await whenHandled(() => changes() === 2, () => `the second save handled; handled: ${JSON.stringify(b.handledSince(from))}`);
 
     // Settled: past one more recheck, the file unchanged, nothing more handled.

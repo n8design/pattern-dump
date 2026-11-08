@@ -5,13 +5,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
 import { buildStaticSite, startDevServer } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
+import { save } from "../../../test-support/save.js";
+
+/** Append `text` to `path`, as one save of the whole file. */
+const append = async (path: string, text: string) => save(path, `${await readFile(path, "utf8")}${text}`);
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const NOW = new Date("2026-01-02T03:04:05.000Z");
@@ -140,10 +144,10 @@ describe("pd build — the storefront root", () => {
 });
 
 describe("pd build — a storefront with problems writes nothing", () => {
-  const breakPage = (root: string) => appendFile(join(root, "pages", "about.md"), "\n```pattern components/nope\n```\n");
+  const breakPage = (root: string) => append(join(root, "pages", "about.md"), "\n```pattern components/nope\n```\n");
   const brokenHome = async (root: string) => {
     const file = join(root, "pages", "index.md");
-    await writeFile(file, (await readFile(file, "utf8")).replace("title: Storefront bench", "title: Storefront bench\nbogus: 1"));
+    await save(file, (await readFile(file, "utf8")).replace("title: Storefront bench", "title: Storefront bench\nbogus: 1"));
   };
 
   it("fails, listing every problem, and leaves no output root behind", async () => {

@@ -2,10 +2,11 @@
 // rule that mentions it. A project base rule `.x .pkg-btn {}` must not take `pkg-btn` from the package
 // component that defines it — otherwise that component's CSS is never linked where the class is used.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildAllStyleData, patchClassOwnerIndex, selectorClasses } from "../src/style-index.js";
+import { save } from "../../../test-support/save.js";
 
 let project = "";
 let pkg = "";
@@ -14,7 +15,7 @@ const ids = new Set(["atoms/pkg-btn", "atoms/card", "atoms/radio", "molecules/ba
 async function tree(root: string, files: Record<string, string>): Promise<void> {
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), text);
+    await save(join(root, rel), text);
   }
 }
 

@@ -2,7 +2,7 @@
 // from its real folder everywhere: its pattern, style, theme, script, asset, data and helper roots, and
 // the file paths discovery finds in it. An installed copy is said to be one at startup.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +11,7 @@ import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { startDevServer } from "@pattern-dump/dev-server";
 import { loadPatternPackages } from "../src/packages.js";
 import { resolveServerConfig } from "../src/server-config.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let project = "";
@@ -23,7 +24,7 @@ const MANIFEST = {
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(join(path, ".."), { recursive: true });
-  await writeFile(path, text);
+  await save(path, text);
 }
 
 const config = defineConfig({

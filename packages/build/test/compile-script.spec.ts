@@ -1,10 +1,11 @@
 // A compiled behaviour script names its modules by their paths from the entry's folder, so the same
 // source compiles to the same bytes wherever it sits, and the output names no folder of the machine.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileScriptFile } from "../src/index.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 const SOURCES = {
@@ -16,7 +17,7 @@ const SOURCES = {
 async function scriptsAt(dir: string): Promise<string> {
   for (const [rel, text] of Object.entries(SOURCES)) {
     await mkdir(join(dir, rel, ".."), { recursive: true });
-    await writeFile(join(dir, rel), text);
+    await save(join(dir, rel), text);
   }
   return join(dir, "toggle.ts");
 }

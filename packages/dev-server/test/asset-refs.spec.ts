@@ -2,12 +2,13 @@
 // whether written relative (`../images/x`) or root-absolute (`/images/x`, the PatternLab form).
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { join } from "node:path";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { startDevServer } from "@pattern-dump/dev-server";
 import { defineConfig } from "@pattern-dump/config";
 import { normalizeAssetRefs } from "../src/preview-document.js";
+import { save } from "../../../test-support/save.js";
 
 describe("normalizeAssetRefs", () => {
   const roots = ["images", "css"];
@@ -57,11 +58,11 @@ describe("asset references over HTTP (PatternLab-style project)", () => {
     for (const d of ["src/patterns/atoms", "src/styles/atoms", "assets/images", "assets/css"]) {
       await mkdir(join(dir, d), { recursive: true });
     }
-    await writeFile(join(dir, "src/patterns/atoms/logo.hbs"), `<img class="logo" src="/images/logo.svg" alt="">\n`);
-    await writeFile(join(dir, "src/styles/atoms/logo.scss"), `.logo { background: url(/images/bg.svg); }\n`);
-    await writeFile(join(dir, "src/styles/base.scss"), `body { background: url("../images/bg.svg"); }\n`);
-    await writeFile(join(dir, "assets/images/logo.svg"), `<svg xmlns="http://www.w3.org/2000/svg"/>`);
-    await writeFile(join(dir, "assets/images/bg.svg"), `<svg xmlns="http://www.w3.org/2000/svg"/>`);
+    await save(join(dir, "src/patterns/atoms/logo.hbs"), `<img class="logo" src="/images/logo.svg" alt="">\n`);
+    await save(join(dir, "src/styles/atoms/logo.scss"), `.logo { background: url(/images/bg.svg); }\n`);
+    await save(join(dir, "src/styles/base.scss"), `body { background: url("../images/bg.svg"); }\n`);
+    await save(join(dir, "assets/images/logo.svg"), `<svg xmlns="http://www.w3.org/2000/svg"/>`);
+    await save(join(dir, "assets/images/bg.svg"), `<svg xmlns="http://www.w3.org/2000/svg"/>`);
     server = await startDevServer(config, dir, { port: 0, wsPort: 0 });
   }, 60_000);
 

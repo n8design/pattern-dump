@@ -1,10 +1,11 @@
 // The browser suite refuses to start when the bench's vendor/ or pages/ differ from git, and says how
 // to restore them; on the committed bench it starts.
 import { afterEach, describe, expect, it } from "vitest";
-import { rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { guard, guardedStatus, refusal, RESTORE } from "../e2e/guard.js";
+import { save } from "../../test-support/save.js";
 
 const stray = join(fileURLToPath(new URL("../vendor/fixture-ds/patterns/", import.meta.url)), "zz-guard-probe.hbs");
 afterEach(async () => { await rm(stray, { force: true }); });
@@ -27,7 +28,7 @@ describe("the package bench's e2e guard", () => {
   });
 
   it("refuses on a real stray file in vendor/", async () => {
-    await writeFile(stray, "<p>stray</p>\n");
+    await save(stray, "<p>stray</p>\n");
     expect(() => guard()).toThrow(/package-bench e2e: .* differ from git[\s\S]*\?\? package-bench\/vendor\/fixture-ds\/patterns\/zz-guard-probe\.hbs[\s\S]*Restore them with/);
   });
 });

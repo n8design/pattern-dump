@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { readFile, writeFile, cp, mkdtemp, rm } from "node:fs/promises";
+import { readFile, cp, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { startDevServer, formatAuditReport, formatAudit, buildAuditRollup, AUDIT_SCOPE } from "@pattern-dump/dev-server";
 import type { DiagnosticsGraph } from "@pattern-dump/contracts";
 import { defineConfig } from "@pattern-dump/config";
+import { save } from "../../../test-support/save.js";
 
 const here      = dirname(fileURLToPath(import.meta.url));
 const testBench = join(here, "../../../test-bench");
@@ -110,11 +111,11 @@ describe("diagnostics graph — corpus sweep + guards", () => {
         expect((await fetchAudit(server.port))._liveReaudits).toBe(0);
 
         // Template edit → the watcher re-audits exactly one component.
-        await writeFile(canary, await readFile(canary, "utf-8") + "\n<!-- incr-proof -->\n", "utf-8");
+        await save(canary, await readFile(canary, "utf-8") + "\n<!-- incr-proof -->\n");
         expect(await poll(server.port, 1), "template edit must trigger exactly one live re-audit").toBe(1);
 
         // SCSS edit → the tripwire: zero re-audits (covered engines are CSS-invariant).
-        await writeFile(scss, await readFile(scss, "utf-8") + "\n/* incr-proof */\n", "utf-8");
+        await save(scss, await readFile(scss, "utf-8") + "\n/* incr-proof */\n");
         await new Promise(r => setTimeout(r, 1500)); // give the watcher time to (not) act
         expect((await fetchAudit(server.port))._liveReaudits, "SCSS edit must NOT re-audit").toBe(1);
       } finally {

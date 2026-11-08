@@ -22,12 +22,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { readFile, writeFile, mkdir, rm, cp, mkdtemp } from "node:fs/promises";
+import { readFile, mkdir, rm, cp, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import WebSocket from "ws";
 
 import { startDevServer } from "@pattern-dump/dev-server";
 import { defineConfig } from "@pattern-dump/config";
+import { save, saveInTwoSteps } from "../../../test-support/save.js";
 
 const here      = dirname(fileURLToPath(import.meta.url));
 const testBench = join(here, "../../../test-bench");
@@ -105,7 +106,7 @@ describe("file watcher / HMR — characterisation", () => {
     JSON.stringify(await (await get("/api/tree")).json()).includes(slug);
   const touch = async (rel: string, append: string) => {
     const abs = join(dir, rel);
-    await writeFile(abs, (await readFile(abs, "utf-8")) + append, "utf-8");
+    await save(abs, (await readFile(abs, "utf-8")) + append);
   };
 
   beforeAll(async () => {
@@ -129,7 +130,9 @@ describe("file watcher / HMR — characterisation", () => {
       const slug = `watcher-add-${Date.now()}`;
       tap.clear();
       await mkdir(join(dir, "src/patterns/atoms", slug), { recursive: true });
-      await writeFile(join(dir, "src/patterns/atoms", slug, `${slug}.hbs`), `<div class="${slug}"></div>\n`, "utf-8");
+      // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+      // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+      await saveInTwoSteps(join(dir, "src/patterns/atoms", slug, `${slug}.hbs`), `<div class="${slug}"></div>\n`);
 
       // Wait on the server's own completion signal before polling HTTP. Blind-polling /api/tree
       // was flaky: vitest runs spec files in parallel, so several dev servers compile at once and
@@ -147,7 +150,9 @@ describe("file watcher / HMR — characterisation", () => {
       // that has not been rebuilt yet.
       tap.clear();
       await mkdir(compDir, { recursive: true });
-      await writeFile(join(compDir, `${slug}.hbs`), `<div class="${slug}"></div>\n`, "utf-8");
+      // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+      // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+      await saveInTwoSteps(join(compDir, `${slug}.hbs`), `<div class="${slug}"></div>\n`);
 
       await tap.waitFor(m => m.type === "tree-changed", "tree-changed after add");
       expect(await treeContains(slug), "precondition: component was added").toBe(true);
@@ -239,7 +244,7 @@ describe("file watcher / HMR — characterisation", () => {
       const withTitle = /^title:.*$/m.test(md)
         ? md.replace(/^title:.*$/m, `title: Chip ${stamp}`)
         : md.replace(/^---\n/, `---\ntitle: Chip ${stamp}\n`);
-      await writeFile(file, `${withTitle}\n${stamp}\n`, "utf-8");
+      await save(file, `${withTitle}\n${stamp}\n`);
 
       await tap.waitFor(m => m.type === "tree-changed", "tree-changed");
       await tap.waitFor(m => m.type === "content-swap" && m.componentId === "atoms/chip", "content-swap atoms/chip");
@@ -257,7 +262,7 @@ describe("file watcher / HMR — characterisation", () => {
     it("adding a .md to an undocumented component rebuilds discovery, so its docs appear", async () => {
       tap.clear();
       const stamp = `watcher-new-docs-${Date.now()}`;
-      await writeFile(join(dir, "src/patterns/organisms/buttonbar/buttonbar.md"), `---\ntitle: Button bar\n---\n\n${stamp}\n`, "utf-8");
+      await save(join(dir, "src/patterns/organisms/buttonbar/buttonbar.md"), `---\ntitle: Button bar\n---\n\n${stamp}\n`);
 
       await tap.waitFor(m => m.type === "content-swap" && m.componentId === "organisms/buttonbar", "content-swap organisms/buttonbar");
       const detail = await (await get("/api/component/organisms/buttonbar")).json() as { doc?: string };
@@ -270,7 +275,9 @@ describe("file watcher / HMR — characterisation", () => {
       tap.clear();
       const slug = `watcher-bc-${Date.now()}`;
       await mkdir(join(dir, "src/patterns/atoms", slug), { recursive: true });
-      await writeFile(join(dir, "src/patterns/atoms", slug, `${slug}.hbs`), "<div></div>\n", "utf-8");
+      // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+      // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+      await saveInTwoSteps(join(dir, "src/patterns/atoms", slug, `${slug}.hbs`), "<div></div>\n");
 
       const msg = await tap.waitFor(m => m.type === "tree-changed", "tree-changed");
       expect(msg.type).toBe("tree-changed");

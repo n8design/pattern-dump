@@ -4,7 +4,7 @@
 // copy is not watched: its folders are not in the watch list, and an edit to it is not handled.
 // Each case runs on a fresh project, through watch-harness.ts (no waiting for quiet).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -13,6 +13,7 @@ import { loadPatternPackages } from "../src/packages.js";
 import { resolveServerConfig } from "../src/server-config.js";
 import { watchedRoots } from "../src/watch-roots.js";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let n = 0;
@@ -38,7 +39,7 @@ const config = validateConfig(defineConfig({
 
 async function write(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, text);
+  await save(path, text);
 }
 
 /** A fresh project using @acme/ds, linked (vendor/ds and a link in node_modules) or as an installed copy. */
@@ -54,7 +55,7 @@ async function project(kind: "linked" | "copy"): Promise<Bench> {
   } else {
     for (const [rel, text] of Object.entries(FILES)) await write(join(installed, rel), text);
   }
-  const b = new Bench(root, "atoms/chip", join(tmp, "staging"));
+  const b = new Bench(root, "atoms/chip");
   await b.start(config);
   return b;
 }

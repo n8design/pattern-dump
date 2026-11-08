@@ -2,11 +2,12 @@
 // template rule (only for a schema that uses them), and render() reporting a broken schema as
 // SCHEMA_INVALID, so it shows on its component before any page places it.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { checkSchemaExtensions, createRenderer } from "../src/index";
+import { save } from "../../../test-support/save.js";
 
 const ctx = {
   componentExists: (id: string) => ["atoms/slide", "atoms/plain"].includes(id),
@@ -81,7 +82,7 @@ describe("render()", () => {
       "atoms/bad/bad.schema.json": JSON.stringify({ "x-pd-content": "text", properties: { text: { type: "string" } } }),
     })) {
       await mkdir(dirname(join(root, rel)), { recursive: true });
-      await writeFile(join(root, rel), text);
+      await save(join(root, rel), text);
     }
   });
   afterAll(async () => { if (root) await rm(root, { recursive: true, force: true }); });

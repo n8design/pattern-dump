@@ -8,9 +8,10 @@
 
 import { test, expect } from "@playwright/test";
 import { gotoComponent } from "./helpers.js";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { save } from "../../../test-support/save.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testBench = path.resolve(__dirname, "../../../test-bench");
@@ -190,11 +191,11 @@ test.describe("Audit facet — corpus diagnostics", () => {
     try {
       const mutated = JSON.parse(original);
       mutated.label = `${mutated.label ?? "Button"} audited`;
-      await writeFile(jsonPath, JSON.stringify(mutated, null, 2));
+      await save(jsonPath, JSON.stringify(mutated, null, 2));
 
       await expect.poll(() => calls, { timeout: 15_000 }).toBeGreaterThan(1);
     } finally {
-      await writeFile(jsonPath, original);
+      await save(jsonPath, original);
       // The restore fires its own watcher event; let it land so it doesn't leak into the next spec.
       await expect
         .poll(async () => page.locator("#preview-frame").getAttribute("srcdoc"), { timeout: 10_000 })

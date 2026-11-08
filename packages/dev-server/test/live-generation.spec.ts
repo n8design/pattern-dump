@@ -6,7 +6,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,7 @@ import { validateConfig } from "@pattern-dump/config";
 import { PD_GENERATION_HEADER, generationBehind } from "@pattern-dump/contracts";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { Bench, closeAll, handled, whenHandled } from "./watch-harness.js";
+import { save } from "../../../test-support/save.js";
 
 type LazyHook = (name: string, phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
 const hooks = globalThis as { __testOnly_onLazy?: LazyHook };
@@ -54,7 +55,7 @@ beforeAll(async () => {
     await mkdir(dirname(to), { recursive: true });
     await cp(join(repo, file), to);
   }
-  b = new Bench(root, null, join(tmp, "staging"));
+  b = new Bench(root, null);
   await b.start(validateConfig(benchConfig, "storefront-bench"));
 }, 60_000);
 afterEach(() => { delete hooks.__testOnly_onLazy; });
@@ -72,7 +73,7 @@ describe("the live-reload generation a page carries", () => {
       if (name !== "discovery" || phase !== "taken" || edited) return;
       edited = true;
       const from = handled.length;
-      await writeFile(about, `${original}\nEdited while the home page rendered.\n`);
+      await save(about, `${original}\nEdited while the home page rendered.\n`);
       await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === "pages/about.md"));
     };
     const page = await getPage("/");

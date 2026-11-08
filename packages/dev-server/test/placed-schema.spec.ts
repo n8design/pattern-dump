@@ -2,7 +2,7 @@
 // detail's diagnostics, SCHEMA_INVALID) before any page uses it, and a page that places it is refused with
 // the same message.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import type { ComponentDetail } from "@pattern-dump/contracts";
@@ -14,6 +14,7 @@ import { buildCompositionRegistry } from "../src/composition.js";
 import { readPlacedBlocks } from "../src/placed-tags.js";
 import { readSchema } from "../src/storefront/declared-values.js";
 import { placeBlock } from "../src/storefront/placed.js";
+import { save } from "../../../test-support/save.js";
 
 const FILES: Record<string, string> = {
   "src/patterns/atoms/note/note.hbs": `<p class="note">{{text}}</p>\n`,
@@ -26,7 +27,7 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "pd-placed-schema-"));
   for (const [rel, text] of Object.entries(FILES)) {
     await mkdir(dirname(join(root, rel)), { recursive: true });
-    await writeFile(join(root, rel), text);
+    await save(join(root, rel), text);
   }
   await mkdir(join(root, "src/styles"), { recursive: true });
   server = await startDevServer(validateConfig(defineConfig({

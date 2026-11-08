@@ -445,13 +445,30 @@ test.describe("motion and print", () => {
   for (const [motion, transitions] of [["no-preference", true], ["reduce", false]] as const) {
     test(`moving to another page ${transitions ? "runs" : "skips"} a view transition when the reader's motion preference is ${motion}`, async ({ page }) => {
       await page.emulateMedia({ reducedMotion: motion });
+      // The page being left starts the transition (pageswap), and the page arrived at runs it (pagereveal).
+      // Chromium may still drop a started transition when the new page is ready to show before the old
+      // page's snapshot is taken, which a busy machine makes likely: the old page then rejects with a bare
+      // "AbortError: Transition was skipped", and the new page reveals without one. That timing is the
+      // browser's, so the test accepts that skip and no other. A fault in the skin's markup or CSS (a
+      // duplicate view-transition-name, say) is an InvalidStateError instead, and still fails.
       await page.addInitScript(() => {
+        addEventListener("pageswap", e => { sessionStorage.setItem("pd-swap", String(!!(e as Event & { viewTransition: unknown }).viewTransition)); });
         addEventListener("pagereveal", e => { (window as unknown as { revealed: boolean | null }).revealed = !!(e as Event & { viewTransition: unknown }).viewTransition; });
       });
+      const errors: string[] = [];
+      page.on("pageerror", e => errors.push(`${e.name}: ${e.message}`));
       await page.goto("/");
       await page.locator('.site-nav a[href="/about/"]').click();
       await expect(page.locator("h1")).toHaveText("About");
-      await expect.poll(() => page.evaluate(() => (window as unknown as { revealed?: boolean }).revealed)).toBe(transitions);
+      const revealed = () => page.evaluate(() => (window as unknown as { revealed?: boolean }).revealed);
+      expect(await page.evaluate(() => sessionStorage.getItem("pd-swap")), "the old page starts a transition").toBe(String(transitions));
+      if (transitions) {
+        await expect.poll(async () => await revealed() === true || errors.length > 0).toBe(true);
+        expect(errors, "skipped for no reason but the browser's timing").toEqual(await revealed() ? [] : ["AbortError: Transition was skipped"]);
+      } else {
+        await expect.poll(revealed).toBe(false);
+        expect(errors).toEqual([]);
+      }
     });
   }
 

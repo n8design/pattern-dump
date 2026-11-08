@@ -5,11 +5,12 @@
 // `preview/` holding `preview/thing`: the workbench route of `preview/thing` is /preview/thing, which is
 // also the server URL of the preview of `thing`, so both map to preview/thing/index.html.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
 import { buildStaticSite, type StaticBuildReport } from "@pattern-dump/dev-server";
+import { save } from "../../../test-support/save.js";
 
 let tmp = "";
 let report: StaticBuildReport;
@@ -20,8 +21,8 @@ beforeAll(async () => {
   await mkdir(join(project, "src", "patterns", "preview"), { recursive: true });
   await mkdir(join(project, "src", "patterns", "thing"), { recursive: true });
   await mkdir(join(project, "src", "styles"), { recursive: true });
-  await writeFile(join(project, "src", "patterns", "thing", "thing.hbs"), `<p class="thing">the thing</p>`);
-  await writeFile(join(project, "src", "patterns", "preview", "thing.hbs"), `<p class="other">another thing</p>`);
+  await save(join(project, "src", "patterns", "thing", "thing.hbs"), `<p class="thing">the thing</p>`);
+  await save(join(project, "src", "patterns", "preview", "thing.hbs"), `<p class="other">another thing</p>`);
   const config = defineConfig({ sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist", styles: { dir: "./src/styles" } });
   report = await buildStaticSite(config, project, { outDir: join(tmp, "site"), pdVersion: "0.0.0-test", audit: false });
 }, 120_000);
