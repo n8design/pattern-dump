@@ -4,7 +4,7 @@
 // generation has moved past the page's), then let through. The spec writes into the bench's stylesheets
 // and restores them after the test.
 import { expect, test } from "@playwright/test";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { PD_GENERATION_HEADER, generationBehind } from "@pattern-dump/contracts";
 
@@ -61,12 +61,41 @@ test("one change that sends several reload messages reloads the page once", asyn
   let navigations = 0;
   page.on("framenavigated", f => { if (f === page.mainFrame()) navigations++; });
   try {
-    await writeFile(svg, `${before}<!-- changed -->\n`);
+    // One change: written beside the bench (in e2e/, which nothing watches, on the same disk) and moved into
+    // place in one step. A plain writeFile truncates and then writes, which Linux reports as two changes.
+    const staged = fileURLToPath(new URL("./.staged-bench-blocks.svg", import.meta.url));
+    await writeFile(staged, `${before}<!-- changed -->\n`);
+    await rename(staged, svg);
     await expect.poll(() => navigations, { timeout: 10_000 }).toBeGreaterThan(0);
     await expect(page.locator("h1")).toHaveText("About");
     // Its socket reopened after the reload; hello finds it current: no second reload.
     await page.waitForTimeout(2_000);
     expect(navigations).toBe(1);
+  } finally {
+    await writeFile(svg, before);
+  }
+});
+
+test("a save in two steps (emptied, then written, as an editor does) leaves the page on the final asset", async ({ page }) => {
+  const svg = fileURLToPath(new URL("../src/assets/images/bench-blocks.svg", import.meta.url));
+  const before = await readFile(svg, "utf8");
+  await page.goto("/about/");
+  await expect(page.locator("h1")).toHaveText("About");
+  let navigations = 0;
+  page.on("framenavigated", f => { if (f === page.mainFrame()) navigations++; });
+  try {
+    // Two changes on disk: the watcher may handle the empty file, then the full one (two reloads), or only
+    // the full one (one). Not an exact count: what is left must be the final asset, and no more reloads.
+    await writeFile(svg, "");
+    await writeFile(svg, `${before}<!-- two steps -->\n`);
+    await expect.poll(() => navigations, { timeout: 10_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(2_000);
+    expect(navigations).toBeGreaterThanOrEqual(1);
+    expect(navigations).toBeLessThanOrEqual(2);
+    // The page shows the final asset: its image loaded, and the file it loads is the written one.
+    await expect(page.locator(`img[src="/assets/images/bench-blocks.svg"]`)).toHaveJSProperty("complete", true);
+    expect(await page.locator(`img[src="/assets/images/bench-blocks.svg"]`).evaluate(img => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    expect(await page.evaluate(() => fetch("/assets/images/bench-blocks.svg").then(r => r.text()))).toContain("<!-- two steps -->");
   } finally {
     await writeFile(svg, before);
   }
