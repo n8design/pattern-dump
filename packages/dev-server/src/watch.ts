@@ -185,7 +185,7 @@ type TestOnlyEventHandled = (event: string, path: string, stillRunning: number) 
 let closed = false;
 // One pending recheck per changed file (CHANGE_RECHECK_MS), by its timer.
 const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
-// Each changed file as its last handling saw it. chokidar can report one write twice: its own event for
+// Each changed or added file as its last handling saw it. chokidar can report one write twice: its own event for
 // a write a recheck already handled (macOS reports writes about 100 ms late, after the recheck), and on
 // macOS under load one writeFile as two events about 100 ms apart, past its own 50 ms window (fsevents
 // sees the truncate and the write separately). A change to a file that is as it was then is not handled
@@ -255,6 +255,11 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       if (seen) lastHandled.set(path, seen); else lastHandled.delete(path);
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
+    } else if (event === "add") {
+      // A new file, as its handler reads it: a change chokidar reports after the add for the same content
+      // (fsevents can report a file moved into place as an add and then a change) is not a second change.
+      const added = seenNow(path);
+      if (added) lastHandled.set(path, added); else lastHandled.delete(path);
     } else if (event === "unlink") {
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);

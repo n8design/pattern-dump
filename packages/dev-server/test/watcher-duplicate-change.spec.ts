@@ -80,4 +80,22 @@ describe("a change reported twice", () => {
     expect(second.messages).toEqual(RELOAD);
     expect(await (await fetch(`${b.origin}/api/component/atoms/btn`)).text()).toContain("Bbb");
   }, 60_000);
+
+  it("after an add, a change reporting the same content is not a second change", async () => {
+    const { b, deliver } = await project();
+    const NEW = "src/patterns/atoms/fresh/fresh.hbs";
+    const from = handled.length;
+    // Moved into place in one step (as the harness creates every new file), and handled as an add.
+    const added = await b.step(() => b.create(NEW, `<p class="fresh">One</p>\n`), [["add", NEW]]);
+    expect(added.events.filter(([e]) => e !== "addDir")).toEqual([["add", NEW]]);
+
+    // The change fsevents can report after it, for the same content: skipped.
+    const path = handled.slice(from).find(h => b.owns(h.path) && b.rel(h.path) === NEW)!.path;
+    const again = await b.step(async () => { deliver("change", path); }, []);
+    expect(again).toEqual({ messages: [], events: [] });
+
+    // A real edit is still handled.
+    const edited = await b.step(() => writeFile(b.at(NEW), `<p class="fresh">Two</p>\n`), [["change", NEW]]);
+    expect(edited.events).toEqual([["change", NEW]]);
+  }, 60_000);
 });
