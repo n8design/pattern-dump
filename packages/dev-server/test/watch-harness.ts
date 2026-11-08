@@ -72,6 +72,7 @@ export class Bench {
   private ws!: WebSocket;
   private port = 0;
   private live = 0;
+  private server: DevServer | undefined;
   /** One barrier file per watched folder. */
   private barriers: string[] = [];
   /** `component`: the one the workbench has open, or null for no workbench at all. `staging`: a folder
@@ -90,6 +91,7 @@ export class Bench {
     for (const file of this.barriers) await writeFile(file, "");
     const { server, wsPort } = await startOnFreeWsPort(cfg, this.root);
     this.live = wsPort;
+    this.server = server;
     servers.push(server);
     this.port = server.port;
     this.ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
@@ -99,6 +101,18 @@ export class Bench {
     this.ws.on("message", (data: Buffer) => this.messages.push(data.toString().replace(/\?v=\d+/g, "?v=<t>")
       .replace(/,"generation":"[^"]*"/g, "").split(this.root).join("<root>")));
     await new Promise<void>((resolve, reject) => { this.ws.once("open", () => resolve()); this.ws.once("error", reject); });
+  }
+
+  /** Close this project's socket and server now, rather than with the rest at closeAll: a spec that starts
+   *  one per case does not keep them all open, with their watchers and ports, until its end. */
+  async close(): Promise<void> {
+    this.ws?.close();
+    if (this.ws) sockets.splice(sockets.indexOf(this.ws), 1);
+    if (this.server) {
+      servers.splice(servers.indexOf(this.server), 1);
+      await this.server.close();
+      this.server = undefined;
+    }
   }
 
   /** The live-reload socket's port, for a socket a spec opens itself. */

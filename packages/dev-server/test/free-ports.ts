@@ -20,6 +20,8 @@ export async function startOnFreeWsPort(
     try {
       return { server: await startDevServer(cfg, root, { port: 0, wsPort }), wsPort };
     } catch (e) {
+      // Said in the test output, so a run that runs out of attempts shows which ports it lost and why.
+      console.warn(`[free-ports] attempt ${attempt}/${attempts}: live-reload port ${wsPort} lost: ${e instanceof Error ? `${e.name}: ${e.message.split("\n")[0]}` : String(e)}`);
       if (!(e instanceof Error && e.name === "PortInUseError") || attempt >= attempts) throw e;
     }
   }
