@@ -18,8 +18,9 @@ export function baseComponentIds(dr: DiscoveryResult): Set<string> {
 
 /** Resolve a changed file to its component id using the discovery result's reverse indexes.
  *  For .hbs files: O(1) lookup via hbsPathToId.
- *  For .json files: scan discoveryMap for a matching jsonPath and return the base id
- *  (variant json → base component so HMR targets the rendering component, not the data slot). */
+ *  For .json files: scan discoveryMap for a matching jsonPath (data) or schemaPath (schema) and return the
+ *  base id (variant json → base component so HMR targets the rendering component, not the data slot). A
+ *  schema is what a placed component's values are checked against, and what its diagnostics come from. */
 export function resolveComponentForFile(filePath: string, dr: DiscoveryResult): string | null {
   const absPath = resolve(filePath);
 
@@ -29,7 +30,7 @@ export function resolveComponentForFile(filePath: string, dr: DiscoveryResult): 
 
   // .json scan (data files are not in hbsPathToId)
   for (const [id, entry] of dr.discoveryMap) {
-    if (entry.jsonPath === absPath) {
+    if (entry.jsonPath === absPath || entry.schemaPath === absPath) {
       return id.includes("~") ? id.split("~")[0] : id;
     }
   }
