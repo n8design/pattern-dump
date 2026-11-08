@@ -12,6 +12,7 @@
 // included with the current context sees the placement's values too.
 
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import MarkdownIt from "markdown-it";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
 import { unescapedOutputs } from "@pattern-dump/renderer";
@@ -88,6 +89,45 @@ async function unsafeOutputs(id: string, at: PlacedProblem["at"], deps: Placemen
   return problems;
 }
 
+// Sample data. The renderer's data cascade puts a component's sample data beneath what it is given, and an
+// included partial's beneath the context it is included with; objects merge key by key (lists replace).
+// The null-fill (checkPlaced) covers every declared key, so what could still reach the page is a sample key
+// the schema does not declare, at any depth of a declared object. So for each component of the placement,
+// its own sample and that of every other template in its include tree may set only keys it declares. A
+// partial reachable from two components is held to both.
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+function undeclaredSampleKeys(sample: Record<string, unknown>, props: Record<string, PropertySchema> | undefined, prefix: string): string[] {
+  const out: string[] = [];
+  for (const [key, value] of Object.entries(sample)) {
+    const prop = props && Object.hasOwn(props, key) ? props[key] : undefined;
+    if (!prop) { out.push(`${prefix}${key}`); continue; }
+    if (isObject(value) && prop.properties) out.push(...undeclaredSampleKeys(value, prop.properties, `${prefix}${key}.`));
+  }
+  return out;
+}
+
+async function sampleDataProblems(id: string, at: PlacedProblem["at"], deps: PlacementDeps): Promise<PlacedProblem[]> {
+  const components = await placementComponents(id, deps);
+  const problems: PlacedProblem[] = [];
+  for (const owner of components) {
+    const declared = (await deps.schemaOf(owner))?.properties;
+    for (const template of includeTree(owner, deps.composition)) {
+      // Another component of the placement has its own context, checked as its own owner.
+      if (template !== owner && components.includes(template)) continue;
+      const jsonPath = deps.discoveryMap.get(template)?.jsonPath;
+      if (!jsonPath) continue;
+      let sample: unknown;
+      try { sample = JSON.parse(await readFile(jsonPath, "utf8")); } catch { continue; } // reported as DATA_INVALID
+      if (!isObject(sample)) continue;
+      for (const key of undeclaredSampleKeys(sample, declared, "")) {
+        problems.push({ at, message: `the sample data of ${template} (${basename(jsonPath)}) sets "${key}", which ${owner} does not declare, so it would show wherever ${owner} is placed` });
+      }
+    }
+  }
+  return problems;
+}
+
 /** A claimed `pd-` block: its HTML, or every problem (nothing is rendered when there is one). */
 export async function placeBlock(block: PlacedBlock, deps: PlacementDeps): Promise<{ html?: string; problems: PlacedProblem[] }> {
   const problems = [...block.problems];
@@ -105,7 +145,7 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps): Promi
     label: kebab,
     markdown: text => contentMd.render(text),
   });
-  problems.push(...checked.problems, ...await unsafeOutputs(id, block.root.at, deps));
+  problems.push(...checked.problems, ...await unsafeOutputs(id, block.root.at, deps), ...await sampleDataProblems(id, block.root.at, deps));
   if (problems.length) return { problems };
   return { html: (await deps.render({ component: id, data: checked.value })).html, problems };
 }
