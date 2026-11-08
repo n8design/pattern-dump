@@ -17,7 +17,8 @@
 // Guarded by test/watcher.spec.ts, which asserts both the durable HTTP effects and the broadcasts
 // themselves over a real socket.
 
-import { statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, statSync } from "node:fs";
 import { basename, extname, relative, resolve, sep } from "node:path";
 import chokidar from "chokidar";
 import { componentCssUrl, type DiscoveryResult } from "@pattern-dump/contracts";
@@ -61,9 +62,9 @@ export interface WatchContext {
  * that comes within 50 ms of the previous one and never reports it later (`_throttle(EV_CHANGE, path,
  * 50)` in its `_emit`). On Linux, where events arrive within a few milliseconds, a quick second save
  * is lost that way, and the page keeps the first one. So after each change is handled the file's
- * modification time and size are compared with what they were when the handler read the file, past
- * that window, and a difference is handled as one more change, again until they hold still. Must stay
- * above chokidar's window: test/watcher-chokidar.spec.ts pins it.
+ * modification time and size, and its content, are compared with what they were when the handler read
+ * the file, past that window, and a difference is handled as one more change, again until they hold
+ * still. Must stay above chokidar's window: test/watcher-chokidar.spec.ts pins it.
  */
 export const CHANGE_RECHECK_MS = 60;
 
@@ -86,15 +87,31 @@ export interface WatchHandle {
   close(): Promise<void>;
 }
 
-/** The file's inode, change and modification times and size, or null when it is gone. */
-function stamp(path: string): string | null {
+/** A file as a change is judged by: its stamp (inode, change and modification times, size) and a hash of its content. */
+interface Seen { readonly stamp: string; readonly hash: string }
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_watchStamp`, a file's stamp is what
+// it returns, given the real one, so a test can give two different writes the same stamp, as a file system
+// with coarse timestamps does. Not exported, not part of any contract.
+type TestOnlyWatchStamp = (path: string, stamp: string) => string;
+
+/** The file as it is now, or null when it is gone. */
+function seenNow(path: string): Seen | null {
   try {
     const s = statSync(path);
-    return `${s.ino}:${s.ctimeMs}:${s.mtimeMs}:${s.size}`;
+    const stamp = `${s.ino}:${s.ctimeMs}:${s.mtimeMs}:${s.size}`;
+    const forced = (globalThis as { __testOnly_watchStamp?: TestOnlyWatchStamp }).__testOnly_watchStamp;
+    return { stamp: forced ? forced(path, stamp) : stamp, hash: createHash("sha1").update(readFileSync(path)).digest("hex") };
   } catch {
     return null;
   }
 }
+
+/** Unchanged: the same stamp and the same content. Either alone is not enough: with timestamps a second
+ *  or two coarse (FAT, some network mounts) a real same-size edit keeps its stamp, and a rewrite of the
+ *  same content (a save with no edit) gets a new one. */
+const unchanged = (now: Seen | null, before: Seen | undefined): boolean =>
+  now !== null && before !== undefined && now.stamp === before.stamp && now.hash === before.hash;
 
 /**
  * Start watching the project. Resolves once chokidar has finished its initial scan (until then a file
@@ -122,6 +139,11 @@ const watchDirs = [
 ];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onWatchStarted`, it is called once
+// the watcher is ready, with a function that delivers an event to the handlers below as chokidar would (a
+// test uses it to deliver one chokidar sends twice). Not exported, not part of any contract.
+type TestOnlyWatchStarted = (deliver: (event: "change", path: string) => void) => void;
+
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
 // after each watcher event's handler has finished, with the number of handlers still running. Tests
 // use it as a barrier ("every event so far has been handled") instead of waiting for quiet; a file named
@@ -132,26 +154,27 @@ let running = 0;
 let closed = false;
 // One pending recheck per changed file (CHANGE_RECHECK_MS), by its timer.
 const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
-// A file a recheck handled, as it was then: chokidar's own event for that same write can still follow
-// (macOS reports writes about 100 ms late, after the recheck), and is not handled a second time.
-const recheckHandled = new Map<string, string>();
+// Each changed file as its last handling saw it. chokidar can report one write twice: its own event for
+// a write a recheck already handled (macOS reports writes about 100 ms late, after the recheck), and on
+// macOS under load one writeFile as two events about 100 ms apart, past its own 50 ms window (fsevents
+// sees the truncate and the write separately). A change to a file that is as it was then is not handled
+// again.
+const lastHandled = new Map<string, Seen>();
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
   const dispatch = (path: string, fromRecheck = false): void => {
     // A change: the file as the handler is about to read it. A newer event for the same file replaces
     // the pending recheck, since it is handled with whatever the file holds by then.
-    let seen: string | null = null;
+    let seen: Seen | null = null;
     if (event === "change") {
-      seen = stamp(path);
-      const already = recheckHandled.get(path);
-      recheckHandled.delete(path);
-      if (!fromRecheck && already !== undefined && already === seen) return;
-      if (fromRecheck && seen !== null) recheckHandled.set(path, seen);
+      seen = seenNow(path);
+      if (!fromRecheck && unchanged(seen, lastHandled.get(path))) return;
+      if (seen) lastHandled.set(path, seen); else lastHandled.delete(path);
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
     } else if (event === "unlink") {
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
-      recheckHandled.delete(path);
+      lastHandled.delete(path);
     }
     running++;
     const done = () => {
@@ -161,10 +184,10 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       rechecks.set(path, setTimeout(() => {
         rechecks.delete(path);
         if (closed) return;
-        const now = stamp(path);
+        const now = seenNow(path);
         // Still as the handler read it: done. Gone: its unlink is on its way. Otherwise a write chokidar
         // dropped, handled as a change (which looks again after it).
-        if (now !== null && now !== seen) dispatch(path, true);
+        if (now !== null && !unchanged(now, seen ?? undefined)) dispatch(path, true);
       }, CHANGE_RECHECK_MS));
     };
     if (basename(path) === ".__testOnly_barrier") { done(); return; }
@@ -192,7 +215,7 @@ const close = async (): Promise<void> => {
   closed = true;
   for (const timer of rechecks.values()) clearTimeout(timer);
   rechecks.clear();
-  recheckHandled.clear();
+  lastHandled.clear();
   await watcher.close();
 };
 
@@ -635,5 +658,8 @@ on("unlinkDir", async (dirPath) => {
     await close();
     throw e;
   }
+  (globalThis as { __testOnly_onWatchStarted?: TestOnlyWatchStarted }).__testOnly_onWatchStarted?.(
+    (event, path) => { watcher.emit(event, path); },
+  );
   return { close };
 }
