@@ -144,6 +144,11 @@ const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: t
 // test uses it to deliver one chokidar sends twice). Not exported, not part of any contract.
 type TestOnlyWatchStarted = (deliver: (event: "change", path: string) => void) => void;
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_failHandler`, it is asked before each
+// handler runs; "reject" or "throw" makes that handler fail that way instead of running, so a test can see
+// what a failing handler does to the server. Not exported, not part of any contract.
+type TestOnlyFailHandler = (event: string, path: string) => "reject" | "throw" | undefined;
+
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
 // after each watcher event's handler has finished, with the number of handlers still running. Tests
 // use it as a barrier ("every event so far has been handled") instead of waiting for quiet; a file named
@@ -193,8 +198,23 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
     if (basename(path) === ".__testOnly_barrier") { done(); return; }
     // The handler starts synchronously, as chokidar called it before; only its end is observed.
     let result: unknown;
-    try { result = handler(path); } catch (e) { done(); throw e; }
-    void Promise.resolve(result).finally(done);
+    // A handler that fails (a file it cannot read, a folder gone mid-walk) is a problem in the terminal and
+    // on the open pages, like any other, and pd dev keeps running: nothing is left to reject unhandled.
+    const failed = (e: unknown): void => {
+      const message = `${shown(path)} (${event}) was not handled: ${e instanceof Error ? e.message : String(e)}`;
+      hotreloader.push({ type: "error", scope: "build", message });
+      console.error(`[dev-server] ${message}`);
+    };
+    try {
+      const fail = (globalThis as { __testOnly_failHandler?: TestOnlyFailHandler }).__testOnly_failHandler?.(event, path);
+      if (fail === "throw") throw new Error("failed for a test");
+      result = fail === "reject" ? Promise.reject(new Error("failed for a test")) : handler(path);
+    } catch (e) {
+      failed(e);
+      done();
+      return;
+    }
+    void Promise.resolve(result).catch(failed).finally(done);
   };
   watcher.on(event, (path: string) => dispatch(path));
 }
