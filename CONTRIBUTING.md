@@ -59,6 +59,25 @@ If a check fails, fix the cause, or add a narrowly scoped disable with a written
 current behaviour; a real bug gets the code fixed. A test that passes while the behaviour is broken is
 worse than a failing one. When a new test guards a fix, check that it fails without the fix.
 
+### Writing tests that watch files or reload pages
+
+A test that depends on timing passes on a quiet machine and fails on a busy one. Write these so they
+cannot depend on it:
+
+- **Assert state, not events.** Check what the server or the page holds after the change (the rendered
+  markup, the served stylesheet, the message that was sent), not that a particular watcher event arrived
+  or arrived once. The operating system decides how many events one save is.
+- **Wait for the outcome, not for time.** Wait for the thing you assert, with a condition that names it.
+  Never wait for a fixed time, and never for "nothing more has happened lately": that is a fixed time
+  under another name. In the watcher specs, `step()` in `packages/dev-server/test/watch-harness.ts` does
+  this: it returns once the last write of every file the act touched has been handled.
+- **No fixed ports, no sleeps.** Bind port 0 or use the helpers in `free-ports.ts`, and read the port back.
+- **Write files through `save()`** (`test-support/save.ts`), so a save is one event; use `saveInTwoSteps()`
+  only to test the editor-style save.
+- **Repeat before the first commit.** Run the new or changed spec 20 times, with retries off, on Linux with
+  the machine busy (`node scripts/ci/burn-in.mjs --runs 20 --load`). A pull request does this in CI for
+  every spec it changes; a failure there is a real failure, not a reason to retry.
+
 ## Reporting bugs and proposing features
 
 Use [GitHub issues](https://github.com/n8design/pattern-dump/issues) and pick the bug report or feature

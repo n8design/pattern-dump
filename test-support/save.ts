@@ -17,6 +17,14 @@ const repo = fileURLToPath(new URL("../", import.meta.url));
 const STAGING = [join(repo, "node_modules", ".cache", "pd-save"), join(tmpdir(), "pd-save")];
 let staged = 0;
 
+/** Called with each path a test saves, once it is in place: for a harness that must know what an act wrote. */
+const observers = new Set<(path: string) => void>();
+/** Be told of every path saved from now on, until the returned function is called. */
+export function observeSaves(observer: (path: string) => void): () => void {
+  observers.add(observer);
+  return () => { observers.delete(observer); };
+}
+
 /** The device a path is on: its own, or its nearest existing ancestor's. */
 async function deviceOf(path: string): Promise<number> {
   for (let p = path; ; p = dirname(p)) {
@@ -47,10 +55,12 @@ export async function save(path: string, data: string | Uint8Array): Promise<voi
   const staging = join(await stagingFor(target), `${process.pid}-${staged++}`);
   await writeFile(staging, data);
   await rename(staging, target);
+  observers.forEach(o => o(target));
 }
 
 /** Write `data` to `path` in place, as an editor saves: truncated, then written. The OS may report it as one
  *  change or two, and a test that uses it must hold either way. */
-export function saveInTwoSteps(path: string, data: string | Uint8Array): Promise<void> {
-  return writeFile(path, data);
+export async function saveInTwoSteps(path: string, data: string | Uint8Array): Promise<void> {
+  await writeFile(path, data);
+  observers.forEach(o => o(path));
 }

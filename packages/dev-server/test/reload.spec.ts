@@ -106,7 +106,7 @@ describe("pd dev reloads data, helpers and assets", () => {
   it("global data: the next render uses the new values", async () => {
     const b = await project();
     expect(await b.preview()).toBe("QUIET! data-1");
-    const r = await b.step(() => b.create("src/_data/site.json", `{ "site": { "v": "data-2" } }\n`), [["change", "src/_data/site.json"]]);
+    const r = await b.step(() => b.create("src/_data/site.json", `{ "site": { "v": "data-2" } }\n`));
     expect(r.messages).toEqual(OPEN);
     expect(await b.preview()).toBe("QUIET! data-2");
   }, 60_000);
@@ -166,14 +166,14 @@ describe("pd dev reloads data, helpers and assets", () => {
 
   it("a file a helper imports: asks for a restart, and nothing reloads", async () => {
     const b = await project();
-    const r = await b.step(() => b.create("src/helpers/lib/mark.js", `export const mark = "?";\n`), [["change", "src/helpers/lib/mark.js"]]);
+    const r = await b.step(() => b.create("src/helpers/lib/mark.js", `export const mark = "?";\n`));
     expect(r.messages).toEqual([`{"type":"error","scope":"build","message":"src/helpers/lib/mark.js changed: restart pd dev to load it (a helper's own imports are not reloaded)"}`]);
     expect(await b.preview()).toBe("QUIET! data-1");
   }, 60_000);
 
   it("an asset: reloads what is open", async () => {
     const b = await project();
-    const r = await b.step(() => b.create("assets/dot.svg", `<svg xmlns="http://www.w3.org/2000/svg" width="1"/>\n`), [["change", "assets/dot.svg"]]);
+    const r = await b.step(() => b.create("assets/dot.svg", `<svg xmlns="http://www.w3.org/2000/svg" width="1"/>\n`));
     expect(r.messages).toEqual(OPEN);
   }, 60_000);
 });
