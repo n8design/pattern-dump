@@ -8,12 +8,12 @@
 // are written beside the project and renamed into place, so each appears in one event.
 import { appendFile, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { realpathSync } from "node:fs";
-import { createServer } from "node:net";
 import { existsSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import WebSocket from "ws";
 import type { PatternDumpConfig } from "@pattern-dump/config";
-import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import type { DevServer } from "@pattern-dump/dev-server";
+import { startOnFreeWsPort } from "./free-ports.js";
 import { loadPatternPackages } from "../src/packages.js";
 import { resolveServerConfig } from "../src/server-config.js";
 import { watchedRoots } from "../src/watch-roots.js";
@@ -64,10 +64,6 @@ export async function closeAll(): Promise<void> {
   delete (globalThis as { __testOnly_onEventHandled?: unknown }).__testOnly_onEventHandled;
 }
 
-const freePort = (): Promise<number> => new Promise((resolve, reject) => {
-  const s = createServer().listen(0, "127.0.0.1", () => { const p = (s.address() as { port: number }).port; s.close(() => resolve(p)); });
-  s.on("error", reject);
-});
 
 let staged = 0;
 /** A served project: its socket's messages, and the acts a case can take on it. */
@@ -91,17 +87,7 @@ export class Bench {
     ].filter(d => existsSync(d));
     this.barriers = [...new Set(folders)].map(d => join(d, BARRIER));
     for (const file of this.barriers) await writeFile(file, "");
-    // A free port can be taken by another test file between finding it and binding it: try a fresh one.
-    let server: DevServer | undefined;
-    let wsPort = 0;
-    for (let attempt = 1; !server; attempt++) {
-      wsPort = await freePort();
-      try {
-        server = await startDevServer(cfg, this.root, { port: 0, wsPort });
-      } catch (e) {
-        if (!(e instanceof Error && e.name === "PortInUseError") || attempt >= 5) throw e;
-      }
-    }
+    const { server, wsPort } = await startOnFreeWsPort(cfg, this.root);
     servers.push(server);
     this.port = server.port;
     this.ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
