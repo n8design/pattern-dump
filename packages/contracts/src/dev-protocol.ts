@@ -108,7 +108,9 @@ export type DiagnosticKind =
   | "A11Y"               // axe-core node-mode finding (producer = later milestone)
   | "HIGHLIGHT_FALLBACK" // M4.1 fence/Shiki degradation note
   | "HANDLE_COLLISION"   // M6: component quarantined — handle held by incumbent; rename to resolve
-  | "DATA_INVALID";      // a component or variant .json that does not parse; its data was not used
+  | "DATA_INVALID"       // a component or variant .json that does not parse; its data was not used
+  | "SCHEMA_INVALID";    // a schema misuses a placement extension (x-pd-component, x-pd-content, contentMediaType),
+                         // names an unknown x-pd- key, or its template outputs a non-markdown value unescaped
 
 /** Fields every diagnostic carries, whichever engine produced it. */
 interface DiagnosticBase {

@@ -15,7 +15,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import MarkdownIt from "markdown-it";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
-import { unescapedOutputs } from "@pattern-dump/renderer";
+import { checkSchemaExtensions, unescapedOutputs } from "@pattern-dump/renderer";
 import type { CompositionRegistry } from "../composition.js";
 import { toPlaced, type PlacedBlock, type PlacedResolver } from "../placed-tags.js";
 import { checkPlaced, type ObjectSchema, type PlacedProblem, type PropertySchema } from "./declared-values.js";
@@ -128,6 +128,24 @@ async function sampleDataProblems(id: string, at: PlacedProblem["at"], deps: Pla
   return problems;
 }
 
+/** A schema of the placement that misuses the placement extensions (the workbench shows the same, as
+ *  SCHEMA_INVALID on that component): it cannot be placed. */
+async function schemaProblems(id: string, at: PlacedProblem["at"], deps: PlacementDeps): Promise<PlacedProblem[]> {
+  const problems: PlacedProblem[] = [];
+  for (const component of await placementComponents(id, deps)) {
+    const entry = deps.discoveryMap.get(component);
+    if (!entry?.schemaPath) continue; // no schema: checkPlaced says it cannot be placed with values
+    const template = entry.hbsPath ? await readFile(entry.hbsPath, "utf8").catch(() => undefined) : undefined;
+    for (const p of checkSchemaExtensions(await deps.schemaOf(component), template, {
+      componentExists: c => deps.discoveryMap.has(c),
+      hasSchema: c => deps.discoveryMap.get(c)?.schemaPath !== undefined,
+    })) {
+      problems.push({ at, message: `${component} cannot be placed: its schema (${deps.shown(entry.schemaPath)}, ${p.path}): ${p.message}` });
+    }
+  }
+  return problems;
+}
+
 /** A claimed `pd-` block: its HTML, or every problem (nothing is rendered when there is one). */
 export async function placeBlock(block: PlacedBlock, deps: PlacementDeps): Promise<{ html?: string; problems: PlacedProblem[] }> {
   const problems = [...block.problems];
@@ -140,6 +158,8 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps): Promi
   };
   const { id, values } = await toPlaced(block.root, resolver, problems);
   if (!id || !values) return { problems };
+  const broken = await schemaProblems(id, block.root.at, deps);
+  if (broken.length) return { problems: [...problems, ...broken] };
   const checked = await checkPlaced(id, values, `<${block.root.name}>`, {
     schemaOf: deps.schemaOf,
     label: kebab,
