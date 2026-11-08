@@ -168,13 +168,19 @@ export function connectHmr(): void {
           if (f.id === "preview-frame") return;
           if (f.closest("#variants-gallery")) return;
           const link = f.contentDocument?.querySelector<HTMLLinkElement>(`link[data-pd-comp="${componentId}"]`);
-          if (link) link.href = href;
+          if (link) { link.href = href; return; }
+          // No link to update. An overview tile rendered while this component's CSS was empty has none even
+          // when the component is in its closure, so when that CSS has just become non-empty it reloads,
+          // and comes back with whatever links its closure now needs.
+          if (msg.cssBecameNonEmpty && dom.categoryOverview.contains(f)) f.contentWindow?.location.reload();
         });
       } else {
-        // Fallback: server sent no orderedHrefs (pre-reconcile broadcast) — keyed bump only.
+        // No component open (no closure list): keyed bump only, and the same reload for an overview tile
+        // that has no link for a component whose CSS has just become non-empty.
         document.querySelectorAll<HTMLIFrameElement>("iframe").forEach(f => {
           const link = f.contentDocument?.querySelector<HTMLLinkElement>(`link[data-pd-comp="${componentId}"]`);
-          if (link) link.href = href;
+          if (link) { link.href = href; return; }
+          if (msg.cssBecameNonEmpty && dom.categoryOverview.contains(f)) f.contentWindow?.location.reload();
         });
       }
 

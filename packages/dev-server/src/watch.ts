@@ -376,7 +376,7 @@ async function patchStyles(filePath: string): Promise<boolean> {
     return restyleAll(discovery, timestamp, effectiveFiles, compileErrors.length > 0);
   }
 
-  const pending: Array<{ type: "css-link-swap"; componentId: string; href: string }> = [];
+  const pending: Array<{ type: "css-link-swap"; componentId: string; href: string; cssBecameNonEmpty?: true }> = [];
   for (const recompiledFile of effectiveFiles) {
     const compId = componentOfScss(resolve(recompiledFile), allIds);
     const root = styleRootOf(resolve(recompiledFile));
@@ -384,11 +384,13 @@ async function patchStyles(filePath: string): Promise<boolean> {
       // Recompile with source map to get updated per-origin CSS for this component.
       const newCss = await recomputeComponentCss(recompiledFile, compId, root.dir, allIds, root.inBase);
       if (newCss !== null) {
+        const wasEmpty = (state.perComponentCss.get(compId) ?? "") === "";
         state.perComponentCss.set(compId, newCss);
         pending.push({
           type: "css-link-swap",
           componentId: compId,
           href: componentCssUrl(compId, timestamp),
+          ...(wasEmpty && newCss !== "" ? { cssBecameNonEmpty: true as const } : {}),
         });
       }
     }
@@ -436,11 +438,17 @@ async function restyleAll(
   // A request's full build in flight started before this change: it is never installed over this one.
   state.style.invalidate();
   const data = await buildAllStyleData(styleRoots, allIds);
+  // The map before: applyStyleData installs a new one.
+  const before = state.perComponentCss;
   const changes = applyStyleData(state, data);
   state.style.set(data);
   const orderedHrefs = await closureHrefs(discovery, timestamp);
   for (const componentId of changes.changedComponents) {
-    hotreloader.push({ type: "css-link-swap", componentId, href: componentCssUrl(componentId, timestamp), orderedHrefs });
+    const cssBecameNonEmpty = (before.get(componentId) ?? "") === "" && (data.componentCssMap.get(componentId) ?? "") !== "";
+    hotreloader.push({
+      type: "css-link-swap", componentId, href: componentCssUrl(componentId, timestamp), orderedHrefs,
+      ...(cssBecameNonEmpty ? { cssBecameNonEmpty: true as const } : {}),
+    });
   }
   if (changes.baseChanged && state.lastComponentId) {
     hotreloader.push({ type: "content-swap", componentId: state.lastComponentId });

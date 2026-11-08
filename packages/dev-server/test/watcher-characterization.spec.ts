@@ -135,8 +135,9 @@ describe("the watcher on test-bench", () => {
       "{\"type\":\"content-swap\",\"componentId\":\"atoms/zz-char\"}",
       "{\"type\":\"tree-changed\"}",
     ]],
+    // The component had no CSS before: the swap says so (cssBecameNonEmpty), as no document can have its link.
     ["its new stylesheet", b => b.create("src/styles/01-atoms/zz-char.scss", ".zz-char { color: red; }\n"), [["add", "src/styles/01-atoms/zz-char.scss"]], [
-      "{\"type\":\"css-link-swap\",\"componentId\":\"atoms/zz-char\",\"href\":\"/_pd/components/atoms/zz-char.css?v=<t>\",\"orderedHrefs\":[\"/_pd/components/atoms/button.css?v=<t>\"]}",
+      "{\"type\":\"css-link-swap\",\"componentId\":\"atoms/zz-char\",\"href\":\"/_pd/components/atoms/zz-char.css?v=<t>\",\"cssBecameNonEmpty\":true,\"orderedHrefs\":[\"/_pd/components/atoms/button.css?v=<t>\"]}",
     ]],
     ["removing its docs", b => b.remove("src/patterns/atoms/zz-char/zz-char.md"), [["unlink", "src/patterns/atoms/zz-char/zz-char.md"]], [
       "{\"type\":\"collision\",\"handle\":\"atoms-baseless-2\",\"incumbentPath\":\"<root>/src/patterns/atoms/baseless-2/baseless-2.hbs\",\"quarantinedPath\":\"<root>/src/patterns/atoms/baseless/baseless-2.hbs\"}",

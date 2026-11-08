@@ -883,6 +883,12 @@ export interface CssLinkSwapMessage {
    * Only components with non-empty CSS output are included.
    */
   orderedHrefs?: string[];
+  /**
+   * Present (true) when the component's CSS was empty before this change and is not now. A component with
+   * no CSS gets no link (the link set holds linkable components only), so a document rendered while it
+   * was empty has no link for it to update.
+   */
+  cssBecameNonEmpty?: true;
   /** The generation this message bumped the server to (PD_GENERATION_HEADER); set by the server. */
   generation?: string;
 }
