@@ -81,7 +81,15 @@ export function describeWatchError(e: unknown): string {
   return what;
 }
 
-/** A running watcher. `close` stops it and every recheck still pending. */
+/**
+ * How long `close` waits for the handler running and the events waiting before it closes anyway, saying
+ * which handler it left. Long enough for any handler on a large corpus (a full restyle is well under a
+ * second there), short enough that a handler that never settles cannot hold pd dev open.
+ */
+export const CLOSE_DRAIN_MS = 3_000;
+
+/** A running watcher. `close` lets the handlers already queued finish (up to CLOSE_DRAIN_MS), then stops it
+ *  and every recheck still pending. */
 export interface WatchHandle {
   close(): Promise<void>;
 }
@@ -179,14 +187,18 @@ const lastHandled = new Map<string, Seen>();
 interface Job { readonly event: string; readonly path: string; readonly start: () => Promise<void> }
 const queue: Job[] = [];
 let current: Job | null = null;
+// Waiting for the queue to empty (close).
+let drainWaiters: Array<() => void> = [];
 function pump(): void {
   if (current) return;
   const next = queue.shift();
-  if (!next) return;
+  if (!next) { const waiters = drainWaiters; drainWaiters = []; waiters.forEach(w => w()); return; }
   current = next;
   void next.start().finally(() => { current = null; pump(); });
 }
 function enqueue(job: Job): void {
+  // Closing: nothing new starts (an event chokidar flushes while it closes is dropped).
+  if (closed) return;
   if (queue.some(q => q.event === job.event && q.path === job.path)) return;
   queue.push(job);
   pump();
@@ -269,6 +281,22 @@ const close = async (): Promise<void> => {
   closed = true;
   for (const timer of rechecks.values()) clearTimeout(timer);
   rechecks.clear();
+  // Let the handler running and the events already waiting finish, before the socket and the HTTP server
+  // close after this: a handler that finished later would write its scratch files (conflicts, flattening,
+  // the diagnostics artifact) after the next server for the same folder had started.
+  if (current || queue.length > 0) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finished = await Promise.race([
+      new Promise<true>(resolve => { drainWaiters.push(() => resolve(true)); }),
+      new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), CLOSE_DRAIN_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (!finished && current) {
+      const left = queue.length;
+      console.error(`[dev-server] Closing with a handler still running after ${CLOSE_DRAIN_MS / 1000} s: ${shown(current.path)} (${current.event})`
+        + `${left > 0 ? `, and ${left} more event(s) not handled` : ""}; closing anyway.`);
+    }
+  }
   lastHandled.clear();
   await watcher.close();
 };
