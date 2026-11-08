@@ -18,8 +18,8 @@
 // stays in index.ts with the other orchestration, following the export.ts precedent: pure shaping
 // moves out, I/O orchestration stays.
 
-import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { runA11yProducer } from "@pattern-dump/a11y";
 import type {
@@ -216,9 +216,20 @@ export async function readDiagnosticsArtifact(root: string): Promise<PersistedDi
   } catch { return null; }
 }
 
+// Written to a file beside it, then renamed over it. A rename within one folder replaces the file in one
+// step, so a reader (headless `pd audit`, another pd dev on the same root) sees the old artifact or the
+// new one, never part of one: a torn read parses as "no artifact" and costs a full re-audit.
 async function writeDiagnosticsArtifact(root: string, art: PersistedDiagnostics): Promise<void> {
   await mkdir(pdScratchDir(root), { recursive: true });
-  await writeFile(graphArtifactPath(root), JSON.stringify(art));
+  const path = graphArtifactPath(root);
+  const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temp, JSON.stringify(art));
+    await rename(temp, path);
+  } catch (e) {
+    await rm(temp, { force: true });
+    throw e;
+  }
 }
 
 /**
