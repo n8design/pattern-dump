@@ -36,7 +36,7 @@ import {
 } from "./css-closure.js";
 import { buildAllStyleData, patchClassOwnerIndex } from "./style-index.js";
 import { rootMatchers, watchedRoots, within, type WatchedRoots } from "./watch-roots.js";
-import { auditComponent } from "./diagnostics.js";
+import { auditWithHash, globalDataDigest } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
@@ -535,7 +535,8 @@ on("change", async (filePath) => {
     // Resolve using the current map BEFORE clearing it (file was in the previous discovery pass). A
     // second edit before any request has rebuilt it (a quick second save) finds none: build it, as the
     // SCSS path does, or that edit would reload nothing.
-    const componentId = resolveComponentForFile(filePath, await currentDiscovery(state, patternRoots));
+    const discovery = await currentDiscovery(state, patternRoots);
+    const componentId = resolveComponentForFile(filePath, discovery);
     // Invalidate caches so next request rebuilds with the new file state.
     invalidateDiscovery(state);
     if (!componentId) {
@@ -555,10 +556,18 @@ on("change", async (filePath) => {
     // its static findings may have changed). No full re-hash, no other component touched. A base id
     // from resolveComponentForFile keys straight into the slice map. quarantineEntry is undefined —
     // a live-edited component that renders is not quarantined (collisions come via add/rebuild).
-    if (state.auditSlices) {
-      state.auditSlices.set(componentId, await auditComponent(componentId, render, undefined));
-      state.liveReauditCount += 1;
-      if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
+    if (state.auditSeeding) {
+      // A seed is running: it audits this component again before it is stored (routes.ts).
+      state.auditSeeding.add(componentId);
+    } else {
+      const slices = await state.audit.peek();
+      if (slices) {
+        slices.set(componentId, await auditWithHash(
+          componentId, render, undefined, discovery.discoveryMap, globalDataDigest(rendering.current.globalData),
+        ));
+        state.liveReauditCount += 1;
+        if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
+      }
     }
 
   } else if (ext === ".ts" && scriptDirOf(filePath)) {
@@ -594,7 +603,7 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   // Structural change (component added / removed) → the corpus node set changed; drop the diagnostics
   // slice cache so the next /api/audit re-seeds (still a hash-delta vs disk — only genuinely-changed
   // components re-audit). Not surgical, but adds/removes are rare and reshape the graph.
-  state.auditSlices = null;
+  state.audit.invalidate();
   await surfaceCollisions(dr.collisions, cwd, hotreloader);
   // Re-derive the flattening artifact — the node set changed — from the new discovery's registry, which
   // the next request then reuses.

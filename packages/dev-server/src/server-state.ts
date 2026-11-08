@@ -41,7 +41,7 @@ import type { DiscoveryResult } from "@pattern-dump/contracts";
 import { buildDiscoveryMap, type PatternRoot } from "@pattern-dump/discovery";
 import { createLazy, testHook, type Lazy } from "./lazy.js";
 import { buildCompositionRegistry, type CompositionRegistry } from "./composition.js";
-import type { ComponentAudit } from "./diagnostics.js";
+import type { AuditedSlice } from "./diagnostics.js";
 import type {
   AllStyleData, ScssModuleGraph, ClassOwnerIndex, BaseProvenanceIndex,
 } from "./style-index.js";
@@ -70,13 +70,15 @@ export interface ServerState {
   /** The current discovery, built on demand. See hazard 4. */
   readonly discovery: Lazy<DiscoveryResult>;
 
-  /** In-memory per-component audit slices.
+  /** In-memory per-component audit slices, each with the hash it was audited at, as a lazy cache.
    *  Seeded on the first /api/audit (hash-delta vs disk), then patched surgically by the watcher:
    *  a .hbs/.json edit re-audits exactly that component; a .scss edit re-audits NOTHING (the
    *  covered engines are CSS-invariant — there is a tripwire test on that asymmetry); an
-   *  add/unlink drops the cache to re-seed. `_data` edits aren't watched, so a cold re-seed
+   *  add/unlink invalidates it to re-seed. `_data` edits aren't watched, so a cold re-seed
    *  re-audits all. */
-  auditSlices: Map<string, ComponentAudit> | null;
+  readonly audit: Lazy<Map<string, AuditedSlice>>;
+  /** While a seed runs: the components edited during it, re-audited before the seed is stored. */
+  auditSeeding: Set<string> | null;
   /** Total components re-audited via the surgical HMR path. The incremental proof reads this:
    *  surgical means +1 per .hbs edit, +0 per .scss edit. */
   liveReauditCount: number;
@@ -102,7 +104,8 @@ export function createServerState(): ServerState {
     baseCss: "",
     baseCssVersion: 0,
     discovery: createLazy<DiscoveryResult>("discovery", { slow: { afterMs: DISCOVERY_SLOW_MS, what: "the component index" } }),
-    auditSlices: null,
+    audit: createLazy<Map<string, AuditedSlice>>("audit"),
+    auditSeeding: null,
     liveReauditCount: 0,
     themeCss: new Map<string, string>(),
     themeTokens: new Map<string, Record<string, string | null>>(),

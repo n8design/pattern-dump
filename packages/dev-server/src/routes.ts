@@ -43,8 +43,9 @@ import { aggregateRequires, normalizeScriptId } from "./requires.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
-  assembleGraph, checkComponent, persistSlices, refreshDiagnosticsGraph,
+  assembleGraph, auditWithHash, checkComponent, globalDataDigest, persistSlices, refreshDiagnosticsGraph,
 } from "./diagnostics.js";
+import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
@@ -223,25 +224,44 @@ export async function handleRequest(
       try {
         const discovery = await currentDiscovery(state, patternRoots);
         const discoveryMap = discovery.discoveryMap;
-        let graph: DiagnosticsGraph;
-        if (!state.auditSlices) {
-          // Cold seed: hash-delta vs the disk artifact — re-audit only changed components.
-          if (verboseTiming) console.time("[dev-server:timing] diagnostics seed");
-          const r = await refreshDiagnosticsGraph(
-            cwd, baseComponentIds(discovery), render, discovery.quarantineMap, discoveryMap, globalData,
-          );
-          state.auditSlices = r.slices;
-          graph = r.graph;
-          if (verboseTiming) {
-            console.timeEnd("[dev-server:timing] diagnostics seed");
-            console.log(`[dev-server:timing] diagnostics seed: re-audited ${r.reaudited.length}, reused ${r.reused} (of ${state.auditSlices.size})`);
+        // Cold: seed, a hash-delta vs the disk artifact (only changed components are re-audited); requests
+        // during a seed share it. Warm: the slices the watcher keeps current with surgical re-audits.
+        const slices = await state.audit.get(async () => {
+          const editedDuringSeed = new Set<string>();
+          state.auditSeeding = editedDuringSeed;
+          try {
+            if (verboseTiming) console.time("[dev-server:timing] diagnostics seed");
+            const r = await refreshDiagnosticsGraph(
+              cwd, baseComponentIds(discovery), render, discovery.quarantineMap, discoveryMap, globalData,
+            );
+            await testHook()?.("audit-seed", "built", () => {});
+            // The deviation from lazy.ts's rule that a value an invalidation overtook is never stored: a
+            // seed is long on a large corpus, and a save during every seed would otherwise repeat the whole
+            // sweep. Edits during it do not invalidate it; they are recorded, and those components are
+            // audited again here, each with the hash of what it audited, before the seed is stored.
+            // A structural change (a component added or removed) still invalidates it as usual.
+            const digest = globalDataDigest(globalData);
+            while (editedDuringSeed.size > 0) {
+              const ids = [...editedDuringSeed];
+              editedDuringSeed.clear();
+              for (const id of ids) {
+                if (!r.audited.has(id)) continue;
+                r.audited.set(id, await auditWithHash(id, render, discovery.quarantineMap.get(id), discoveryMap, digest));
+                state.liveReauditCount += 1;
+              }
+            }
+            if (verboseTiming) {
+              console.timeEnd("[dev-server:timing] diagnostics seed");
+              console.log(`[dev-server:timing] diagnostics seed: re-audited ${r.reaudited.length}, reused ${r.reused} (of ${r.audited.size})`);
+            }
+            return r.audited;
+          } finally {
+            if (state.auditSeeding === editedDuringSeed) state.auditSeeding = null;
           }
-        } else {
-          // Warm: the graph is kept current by surgical HMR re-audits — assemble from memory, re-persist
-          // so the disk artifact tracks the live edits (later cold starts stay fast).
-          graph = assembleGraph([...state.auditSlices.values()]);
-          await persistSlices(cwd, state.auditSlices, discoveryMap, globalData);
-        }
+        });
+        const graph: DiagnosticsGraph = assembleGraph([...slices.values()].map(s => s.audit));
+        // Re-persist so the disk artifact tracks the live edits (later cold starts stay fast).
+        await persistSlices(cwd, slices);
         // _liveReaudits: total surgical HMR re-audits since startup — the incremental-proof instrument
         // (rises by exactly 1 per .hbs edit, 0 per .scss edit). Debug envelope field, not the graph.
         json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount } satisfies AuditResponse);

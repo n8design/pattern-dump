@@ -32,12 +32,12 @@ afterAll(async () => {
 
 describe("the diagnostics artifact, while it is written", () => {
   it("reads as the previous artifact, whole, never as part of the new one", async () => {
-    await persistSlices(root, new Map(), new Map(), undefined);
+    await persistSlices(root, new Map());
     expect(await readDiagnosticsArtifact(root)).not.toBeNull();
 
     gate.held = true;
     const paused = new Promise<void>(resolve => { gate.paused = resolve; });
-    const writing = persistSlices(root, new Map(), new Map(), { changed: true });
+    const writing = persistSlices(root, new Map());
     await paused;
     // Half of the new text is on disk somewhere; the artifact a reader finds is still whole.
     const during = await readDiagnosticsArtifact(root);
