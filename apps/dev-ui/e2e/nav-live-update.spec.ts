@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { saveInTwoSteps } from "../../../test-support/save.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const patternsDir = path.resolve(__dirname, "../../../test-bench/src/patterns/atoms");
@@ -53,7 +54,9 @@ test.describe("live nav update — tree-changed HMR", () => {
 
     // Create the directory and .hbs.
     await mkdir(compDir, { recursive: true });
-    await writeFile(hbsPath, `<div class="${SLUG}">live nav test</div>\n`);
+    // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+    // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+    await saveInTwoSteps(hbsPath, `<div class="${SLUG}">live nav test</div>\n`);
 
     // Nav must gain the new item.
     await waitForNavItem(page, `atoms/${SLUG}`, true);
@@ -65,7 +68,9 @@ test.describe("live nav update — tree-changed HMR", () => {
 
     // Add the component via HMR (same reliable path as the add test) so it appears in nav.
     await mkdir(compDir, { recursive: true });
-    await writeFile(hbsPath, `<div class="${SLUG}">live nav test</div>\n`);
+    // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+    // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+    await saveInTwoSteps(hbsPath, `<div class="${SLUG}">live nav test</div>\n`);
     await waitForNavItem(page, `atoms/${SLUG}`, true);
 
     // Remove the directory — unlinking just the .hbs leaves an empty dir (group node) in the tree.
@@ -84,7 +89,9 @@ test.describe("live nav update — tree-changed HMR", () => {
     await page.waitForSelector("#preview-frame[srcdoc]");
 
     await mkdir(compDir, { recursive: true });
-    await writeFile(hbsPath, `<div class="${SLUG}">live nav test</div>\n`);
+    // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+    // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+    await saveInTwoSteps(hbsPath, `<div class="${SLUG}">live nav test</div>\n`);
     await waitForNavItem(page, `atoms/${SLUG}`, true);
 
     // Navigate to the new component.
@@ -110,7 +117,9 @@ test.describe("live nav update — tree-changed HMR", () => {
 
     // Add a sibling component.
     await mkdir(compDir, { recursive: true });
-    await writeFile(hbsPath, `<div class="${SLUG}">sibling</div>\n`);
+    // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+    // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+    await saveInTwoSteps(hbsPath, `<div class="${SLUG}">sibling</div>\n`);
     await waitForNavItem(page, `atoms/${SLUG}`, true);
 
     // Button's highlight must survive the nav re-render.
@@ -133,7 +142,9 @@ test.describe("live nav update — tree-changed HMR", () => {
 
     // Trigger tree-changed in atoms by adding a folder-per-component (flat .hbs won't appear).
     await mkdir(siblingDir, { recursive: true });
-    await writeFile(path.join(siblingDir, `${SLUG}-sibling.hbs`), "<div>sibling</div>\n");
+    // In place, as on main: renamed into a folder made a moment ago, a file can be missed by the watcher
+    // (open: fix/watcher-new-folder). Back to save() once that is fixed.
+    await saveInTwoSteps(path.join(siblingDir, `${SLUG}-sibling.hbs`), "<div>sibling</div>\n");
 
     // New node appearing proves the full round-trip (watch → ws → re-fetch → mountSidebar) landed.
     await waitForNavItem(page, `atoms/${SLUG}-sibling`, true);

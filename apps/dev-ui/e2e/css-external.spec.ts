@@ -1,7 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { save } from "../../../test-support/save.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testBench = path.resolve(__dirname, "../../../test-bench");
@@ -172,7 +173,7 @@ test.describe("CSS externalisation — HMR link-swap", () => {
     const original = await readFile(scssPath, "utf-8");
 
     try {
-      await writeFile(scssPath, `${original}\n/* hmr-link-swap-test */\n`);
+      await save(scssPath, `${original}\n/* hmr-link-swap-test */\n`);
 
       // Wait for the link href to gain a cache-buster query param.
       await page.waitForFunction(() => {
@@ -187,7 +188,7 @@ test.describe("CSS externalisation — HMR link-swap", () => {
       });
       expect(markerIntact, "iframe window marker should survive (srcdoc not rewritten)").toBe(true);
     } finally {
-      await writeFile(scssPath, original);
+      await save(scssPath, original);
     }
   });
 });
@@ -225,7 +226,7 @@ test.describe("CSS externalisation — HMR link-swap: variants overview", () => 
     const scssPath = path.join(testBench, "src/styles/01-atoms/button.scss");
     const original = await readFile(scssPath, "utf-8");
     try {
-      await writeFile(scssPath, `${original}\n/* hmr-tiles-test */\n`);
+      await save(scssPath, `${original}\n/* hmr-tiles-test */\n`);
 
       // All tiles must gain a cache-buster on their button link.
       await page.waitForFunction(() => {
@@ -246,7 +247,7 @@ test.describe("CSS externalisation — HMR link-swap: variants overview", () => 
         expect(updatedHrefs[i]).not.toBe(originalHrefs[i]);
       }
     } finally {
-      await writeFile(scssPath, original);
+      await save(scssPath, original);
     }
   });
 });
@@ -277,7 +278,7 @@ test.describe("CSS externalisation — HMR link-swap: dependency edit", () => {
     const scssPath = path.join(testBench, "src/styles/01-atoms/icon.scss");
     const original = await readFile(scssPath, "utf-8");
     try {
-      await writeFile(scssPath, `${original}\n/* hmr-dep-test */\n`);
+      await save(scssPath, `${original}\n/* hmr-dep-test */\n`);
 
       // Server dispatches componentId = "atoms/icon" ≠ current.id ("organisms/card").
       // The broadcast handler must still update card's iframe — no id filter.
@@ -293,7 +294,7 @@ test.describe("CSS externalisation — HMR link-swap: dependency edit", () => {
       );
       expect(markerIntact, "srcdoc must not be rewritten on dependency edit").toBe(true);
     } finally {
-      await writeFile(scssPath, original);
+      await save(scssPath, original);
     }
   });
 });

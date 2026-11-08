@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { gotoComponentReady as gotoComponent } from "./helpers.js";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { save } from "../../../test-support/save.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testBench = path.resolve(__dirname, "../../../test-bench");
@@ -56,7 +57,7 @@ test.describe("HMR smoke", () => {
 
     try {
       // Append a harmless rule to trigger the HMR css-link-swap path.
-      await writeFile(scssPath, `${original}\n/* hmr-css-smoke */ .df-button { outline-offset: 2px; }\n`);
+      await save(scssPath, `${original}\n/* hmr-css-smoke */ .df-button { outline-offset: 2px; }\n`);
 
       // Wait for the link href to change (cache-buster appended by css-link-swap).
       await previewFrame.locator("link[data-pd-comp='atoms/button']").waitFor({ state: "attached", timeout: 10_000 });
@@ -74,7 +75,7 @@ test.describe("HMR smoke", () => {
     } finally {
       const hrefBeforeRestore = await previewFrame
         .locator("link[data-pd-comp='atoms/button']").getAttribute("href").catch(() => null);
-      await writeFile(scssPath, original);
+      await save(scssPath, original);
       // The restore recompiles and swaps the link again; wait for that second swap.
       await settleAfterRestore(page, async () => {
         const href = await previewFrame
@@ -97,14 +98,14 @@ test.describe("HMR smoke", () => {
 
     try {
       // Make a visible change to the label so the rendered HTML differs.
-      await writeFile(jsonPath, original.replace("Action", "Action HMR_SMOKE"));
+      await save(jsonPath, original.replace("Action", "Action HMR_SMOKE"));
 
       // HMR content-swap sets iframe.srcdoc — assert the new text appears in the iframe.
       await expect(
         page.frameLocator("#preview-frame").locator("body")
       ).toContainText("HMR_SMOKE", { timeout: 10_000 });
     } finally {
-      await writeFile(jsonPath, original);
+      await save(jsonPath, original);
       // The restore re-renders; wait for the marker to disappear so the next spec does not load
       // atoms/button while this component is mid-swap.
       await settleAfterRestore(page, async () => {
@@ -123,11 +124,11 @@ test.describe("HMR smoke", () => {
     const mdPath = path.join(testBench, "src/patterns/atoms/chip/chip.md");
     const original = await readFile(mdPath, "utf-8");
     try {
-      await writeFile(mdPath, `${original}\nHMR_DOCS_SMOKE\n`);
+      await save(mdPath, `${original}\nHMR_DOCS_SMOKE\n`);
       await expect(page.locator(".panel-content")).toContainText("HMR_DOCS_SMOKE", { timeout: 10_000 });
       expect(await page.evaluate(() => !!(window as Window & { __no_reload_marker?: boolean }).__no_reload_marker)).toBe(true);
     } finally {
-      await writeFile(mdPath, original);
+      await save(mdPath, original);
       await settleAfterRestore(page, async () =>
         !((await page.locator(".panel-content").textContent().catch(() => "")) ?? "").includes("HMR_DOCS_SMOKE"));
     }
@@ -140,11 +141,11 @@ test.describe("HMR smoke", () => {
     const mdPath = path.join(testBench, "src/patterns/molecules/index.md");
     const original = await readFile(mdPath, "utf-8");
     try {
-      await writeFile(mdPath, original.replace("title: Molecules", "title: Molecules HMR").replace("Composite components", "HMR_FOLDER_SMOKE composite components"));
+      await save(mdPath, original.replace("title: Molecules", "title: Molecules HMR").replace("Composite components", "HMR_FOLDER_SMOKE composite components"));
       await expect(page.locator(".sidebar")).toContainText(/Molecules HMR/i, { timeout: 10_000 });
       await expect(page.locator(".overview-doc")).toContainText("HMR_FOLDER_SMOKE", { timeout: 10_000 });
     } finally {
-      await writeFile(mdPath, original);
+      await save(mdPath, original);
       await settleAfterRestore(page, async () =>
         !((await page.locator(".sidebar").textContent().catch(() => "")) ?? "").match(/Molecules HMR/i));
     }
