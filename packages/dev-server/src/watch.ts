@@ -148,13 +148,17 @@ type TestOnlyWatchStarted = (deliver: (event: "change", path: string) => void) =
 // what a failing handler does to the server. Not exported, not part of any contract.
 type TestOnlyFailHandler = (event: string, path: string) => "reject" | "throw" | undefined;
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_holdHandler`, it is called as each
+// handler's turn comes; a promise it returns holds that handler until it settles, so a test can see what
+// waits behind it. Not exported, not part of any contract.
+type TestOnlyHoldHandler = (event: string, path: string) => Promise<void> | undefined;
+
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onEventHandled`, it is called
-// after each watcher event's handler has finished, with the number of handlers still running. Tests
+// after each watcher event's handler has finished, with the number of events still waiting. Tests
 // use it as a barrier ("every event so far has been handled") instead of waiting for quiet; a file named
 // `.__testOnly_barrier`, which a test puts in every watched folder, is reported but never handled. Unset,
 // it costs a counter and a name check. Not exported, not part of any contract.
 type TestOnlyEventHandled = (event: string, path: string, stillRunning: number) => void;
-let running = 0;
 let closed = false;
 // One pending recheck per changed file (CHANGE_RECHECK_MS), by its timer.
 const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
@@ -164,14 +168,39 @@ const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
 // sees the truncate and the write separately). A change to a file that is as it was then is not handled
 // again.
 const lastHandled = new Map<string, Seen>();
+
+// Every event goes through one queue and is handled when the ones before it have finished, in the order
+// they arrived. Handlers used to start at once and interleave at their awaits, so one could work from state
+// another was halfway through changing (a restyle installing a style index a component save was patching),
+// and messages went out in the order handlers finished, not the order files changed: a link list computed
+// by an older handler could arrive last and remove a link a newer one had added. An event identical to one
+// still waiting (same event, same file) is not queued again: the waiting one reads the file when it starts.
+// The cost is the wait: an event waits for the handler ahead of it, at worst a full restyle.
+interface Job { readonly event: string; readonly path: string; readonly start: () => Promise<void> }
+const queue: Job[] = [];
+let current: Job | null = null;
+function pump(): void {
+  if (current) return;
+  const next = queue.shift();
+  if (!next) return;
+  current = next;
+  void next.start().finally(() => { current = null; pump(); });
+}
+function enqueue(job: Job): void {
+  if (queue.some(q => q.event === job.event && q.path === job.path)) return;
+  queue.push(job);
+  pump();
+}
+
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
-  const dispatch = (path: string, fromRecheck = false): void => {
+  // The event's turn: resolves once its handler has finished (or it was skipped).
+  const start = (path: string, fromRecheck: boolean): Promise<void> => new Promise<void>(finish => {
     // A change: the file as the handler is about to read it. A newer event for the same file replaces
     // the pending recheck, since it is handled with whatever the file holds by then.
     let seen: Seen | null = null;
     if (event === "change") {
       seen = seenNow(path);
-      if (!fromRecheck && unchanged(seen, lastHandled.get(path))) return;
+      if (!fromRecheck && unchanged(seen, lastHandled.get(path))) { finish(); return; }
       if (seen) lastHandled.set(path, seen); else lastHandled.delete(path);
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
@@ -180,10 +209,10 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       rechecks.delete(path);
       lastHandled.delete(path);
     }
-    running++;
     const done = () => {
-      running--;
-      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, running);
+      // Still to finish after this one: the ones waiting.
+      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, queue.length);
+      finish();
       if (event !== "change" || closed || seen === null) return;
       rechecks.set(path, setTimeout(() => {
         rechecks.delete(path);
@@ -195,8 +224,6 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       }, CHANGE_RECHECK_MS));
     };
     if (basename(path) === ".__testOnly_barrier") { done(); return; }
-    // The handler starts synchronously, as chokidar called it before; only its end is observed.
-    let result: unknown;
     // A handler that fails (a file it cannot read, a folder gone mid-walk) is a problem in the terminal and
     // on the open pages, like any other, and pd dev keeps running: nothing is left to reject unhandled.
     const failed = (e: unknown): void => {
@@ -204,16 +231,24 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       hotreloader.push({ type: "error", scope: "build", message });
       console.error(`[dev-server] ${message}`);
     };
-    try {
-      const fail = (globalThis as { __testOnly_failHandler?: TestOnlyFailHandler }).__testOnly_failHandler?.(event, path);
-      if (fail === "throw") throw new Error("failed for a test");
-      result = fail === "reject" ? Promise.reject(new Error("failed for a test")) : handler(path);
-    } catch (e) {
-      failed(e);
-      done();
-      return;
-    }
-    void Promise.resolve(result).catch(failed).finally(done);
+    const run = (): void => {
+      let result: unknown;
+      try {
+        const fail = (globalThis as { __testOnly_failHandler?: TestOnlyFailHandler }).__testOnly_failHandler?.(event, path);
+        if (fail === "throw") throw new Error("failed for a test");
+        result = fail === "reject" ? Promise.reject(new Error("failed for a test")) : handler(path);
+      } catch (e) {
+        failed(e);
+        done();
+        return;
+      }
+      void Promise.resolve(result).catch(failed).finally(done);
+    };
+    const held = (globalThis as { __testOnly_holdHandler?: TestOnlyHoldHandler }).__testOnly_holdHandler?.(event, path);
+    if (held) void held.then(run, run); else run();
+  });
+  const dispatch = (path: string, fromRecheck = false): void => {
+    enqueue({ event, path, start: () => start(path, fromRecheck) });
   };
   watcher.on(event, (path: string) => dispatch(path));
 }
