@@ -15,9 +15,9 @@
 //   its callers get the failure.
 // - `peek()` never starts a build.
 //
-// Deviation, documented where it is used: the audit seed (routes.ts) stores a seed that an invalidation
-// overtook, after re-auditing the components invalidated during it, instead of discarding the whole seed.
-// See `invalidated` there.
+// One deviation, documented where it is used: the audit seed (the audit route in routes.ts). Edits during
+// a seed do not invalidate it; they are recorded (`editedDuringSeed`) and those components are audited
+// again before the seed is stored, instead of the whole seed being discarded and run again.
 
 export interface Lazy<T> {
   /** The current value: the stored one, the build in flight, or a new `build()`. */
