@@ -144,10 +144,12 @@ describe("the watcher on test-bench", () => {
       "{\"type\":\"content-swap\",\"componentId\":\"atoms/zz-char\"}",
       "{\"type\":\"tree-changed\"}",
     ]],
+    // The restyle after the removal carries the open component's link list, like any other css-link-swap
+    // (before, it went without: the rebuild had just emptied the composition registry it is worked out from).
     ["removing its template", b => b.remove("src/patterns/atoms/zz-char/zz-char.hbs"), [["unlink", "src/patterns/atoms/zz-char/zz-char.hbs"]], [
       "{\"type\":\"collision\",\"handle\":\"atoms-baseless-2\",\"incumbentPath\":\"<root>/src/patterns/atoms/baseless-2/baseless-2.hbs\",\"quarantinedPath\":\"<root>/src/patterns/atoms/baseless/baseless-2.hbs\"}",
       "{\"type\":\"content-swap\",\"componentId\":\"atoms/button\"}",
-      "{\"type\":\"css-link-swap\",\"componentId\":\"atoms/zz-char\",\"href\":\"/_pd/components/atoms/zz-char.css?v=<t>\"}",
+      "{\"type\":\"css-link-swap\",\"componentId\":\"atoms/zz-char\",\"href\":\"/_pd/components/atoms/zz-char.css?v=<t>\",\"orderedHrefs\":[\"/_pd/components/atoms/button.css?v=<t>\"]}",
       "{\"type\":\"tree-changed\"}",
     ]],
     ["removing its folder", b => b.remove("src/patterns/atoms/zz-char"), [["unlinkDir", "src/patterns/atoms/zz-char"]], [

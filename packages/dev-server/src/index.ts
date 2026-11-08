@@ -48,7 +48,6 @@ import { fileURLToPath } from "node:url";
 // Preview layout resolution — shared by the tree, detail, overview and the /preview route.
 // The composition graph (uses/usedBy) + its registry type, which css-closure, flattening
 // surfacing and export planning all pass around.
-import { buildCompositionRegistry } from "./composition.js";
 // Theme discovery + swatch-token extraction.
 import { discoverThemeFiles, extractThemeTokens } from "./themes.js";
 // Read-only queries over the discovery index — no site reconstructs a component file path.
@@ -68,7 +67,7 @@ export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // All mutable server state in one typed object — the seam that lets routes and the watcher
 // stop sharing lexical scope. Its header documents the three hazards.
 import { reportUnresolvableScripts } from "./requires.js";
-import { applyStyleData, cachedDiscovery, createServerState, setDiscovery } from "./server-state.js";
+import { applyStyleData, cachedDiscovery, compositionFor, createServerState, setDiscovery } from "./server-state.js";
 // Resolved paths + flags, derived once from PatternDumpConfig against the ONE resolution base.
 import { resolveServerConfig } from "./server-config.js";
 // HTTP route handling — takes an explicit RouteContext instead of closing over this scope.
@@ -235,8 +234,7 @@ export async function startDevServer(
     for (const o of dr.overrides) {
       console.log(`[dev-server] ${o.id} overrides ${o.shadowedSource}'s component of the same handle ("${o.handle}")`);
     }
-    state.compositionRegistry = await buildCompositionRegistry(patternsDir, dr.handleMap, dr.discoveryMap);
-    await surfaceFlattening(dr.discoveryMap, state.compositionRegistry, cwd);
+    await surfaceFlattening(dr.discoveryMap, await compositionFor(state, dr, cfg.patternDirs), cwd);
     const allComponentIds = baseComponentIds(dr);
     const styleData = await buildAllStyleData(styleRoots, allComponentIds);
     applyStyleData(state, styleData);

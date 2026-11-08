@@ -5,7 +5,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -105,5 +105,39 @@ describe("the discovery a request takes", () => {
     const next = await get("127.0.0.1", "/api/tree");
     expect(next.status).toBe(200);
     expect(next.body).toContain("zz-late");
+  });
+});
+
+describe("the composition registry a request uses", () => {
+  /** The ids a component's template includes, as its detail reports them. */
+  const uses = async (id: string): Promise<string[]> => {
+    const r = await get("127.0.0.1", `/api/component/${id}`);
+    expect(r.status).toBe(200);
+    return (JSON.parse(r.body) as { relationships: { uses?: string[] } }).relationships.uses ?? [];
+  };
+
+  it("is the one built for its discovery: an include added while it was built is in the next request's", async () => {
+    // Empty the cache, so the next request builds a discovery and its registry.
+    let emptied = false;
+    setHook((phase, invalidate) => { if (phase === "taken" && !emptied) { emptied = true; invalidate(); } });
+    expect(await uses("components/callout")).toEqual([]);
+    expect(emptied).toBe(true);
+
+    // While that registry is built: the template gains an include, and the watcher would invalidate.
+    let edited = false;
+    (globalThis as { __testOnly_onLazy?: (name: string, phase: string, invalidate: () => void) => Promise<void> }).__testOnly_onLazy =
+      async (name, phase, invalidate) => {
+        if (name !== "composition" || phase !== "built" || edited) return;
+        edited = true;
+        await appendFile(join(root, "src/patterns/components/callout/callout.hbs"), "{{> partials-nav }}\n");
+        invalidate();
+      };
+    // That request keeps the registry of the discovery it took, read before the edit.
+    expect(await uses("components/callout")).toEqual([]);
+    expect(edited).toBe(true);
+
+    setHook(undefined);
+    // The next one takes the new discovery and gets its own registry, which has the include.
+    expect(await uses("components/callout")).toEqual(["partials/nav"]);
   });
 });

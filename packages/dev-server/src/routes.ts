@@ -27,10 +27,9 @@ import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import type { ResolvedConfig } from "./server-config.js";
-import { applyStyleData, currentDiscovery, type ServerState } from "./server-state.js";
+import { applyStyleData, compositionFor, currentDiscovery, type ServerState } from "./server-state.js";
 import { buildShellHtml, json, mimeType, serveFile, servesShell } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
-import { buildCompositionRegistry } from "./composition.js";
 import { buildComponentTree } from "./component-tree.js";
 import { buildComponentDetail } from "./detail.js";
 import { buildFolderOverview } from "./overview.js";
@@ -267,10 +266,7 @@ export async function handleRequest(
           const styleData = await buildAllStyleData(styleRoots, ids);
           applyStyleData(state, styleData);
         }
-        if (!state.compositionRegistry) {
-          state.compositionRegistry = await buildCompositionRegistry(patternDirs, handleMap, discovery.discoveryMap);
-        }
-        const compReg = state.compositionRegistry;
+        const compReg = await compositionFor(state, discovery, patternDirs);
         const detail = await buildComponentDetail(
           componentId, patternDirs, render, tracker, defaultTheme, handleMap, compReg,
           state.scssModuleGraph ?? undefined, state.classOwnerIndex ?? undefined,
@@ -377,13 +373,11 @@ export async function handleRequest(
           resolveLayoutMode(componentId, patternDirs, previewDiscoveryMap),
         ]);
         const themeNames  = themesDir ? [...state.themeCss.keys()] : [];
-        if (!state.compositionRegistry) {
-          state.compositionRegistry = await buildCompositionRegistry(patternDirs, previewHandleMap, previewDiscoveryMap);
-        }
+        const previewComposition = await compositionFor(state, discovery, patternDirs);
         const requires    = await aggregateRequires(componentId, patternDirs, previewHandleMap, previewDiscoveryMap);
         const assets = await resolveDocumentAssets(cfg, state, {
           componentId, html, requireScripts: requires.scripts, requireAssets: requires.assets,
-          compositionRegistry: state.compositionRegistry, discoveryMap: previewDiscoveryMap,
+          compositionRegistry: previewComposition, discoveryMap: previewDiscoveryMap,
         });
         const doc = buildPreviewDocument(
           normalizeAssetRefs(html, assetRootNames), assets.closureIds, layout, themeNames, effectiveTheme,
@@ -456,11 +450,8 @@ export async function handleRequest(
       // In pd dev a page links to the workbench of this same process, whatever the config's build-time
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
-      if (!state.compositionRegistry) {
-        state.compositionRegistry = await buildCompositionRegistry(patternDirs, discovery.handleMap, discoveryMap);
-      }
       const page = await assemblePage(route, model, {
-        discoveryMap, composition: state.compositionRegistry, render, site: cfg.storefront.site,
+        discoveryMap, composition: await compositionFor(state, discovery, patternDirs), render, site: cfg.storefront.site,
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
         ...(ctx.live ? { live: { wsPort } } : {}),

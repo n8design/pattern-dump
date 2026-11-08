@@ -28,10 +28,9 @@ import type { HotReloader } from "@pattern-dump/hotreloader";
 
 import type { ResolvedConfig } from "./server-config.js";
 import {
-  applyStyleData, cachedDiscovery, currentDiscovery, invalidateDiscovery, rebuildDiscovery, type ServerState,
+  applyStyleData, cachedDiscovery, compositionFor, currentDiscovery, invalidateDiscovery, rebuildDiscovery, type ServerState,
 } from "./server-state.js";
 import { baseComponentIds, resolveComponentForFile } from "./discovery-index.js";
-import { buildCompositionRegistry } from "./composition.js";
 import {
   computeCssClosure, linkableClosure, recomputeComponentCss, withRenderedClassOwners,
 } from "./css-closure.js";
@@ -270,7 +269,8 @@ async function handleComponentScss(filePath: string): Promise<void> {
     });
   }
   state.scssGraphDirty = true;
-  const allIds = baseComponentIds(await currentDiscovery(state, patternRoots));
+  const discovery = await currentDiscovery(state, patternRoots);
+  const allIds = baseComponentIds(discovery);
   const timestamp = Date.now();
 
   // If tracker returned no files (new file not yet registered in perFileCss),
@@ -283,7 +283,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
   // CSS even when it belongs to a component. Rebuild all style data instead and broadcast what changed.
   if (inBase(resolve(filePath)) ||
       effectiveFiles.some(f => inBase(resolve(f)) || !componentOfScss(resolve(f), allIds))) {
-    await restyleAll(allIds, timestamp, effectiveFiles, compileErrors.length > 0);
+    await restyleAll(discovery, timestamp, effectiveFiles, compileErrors.length > 0);
     return;
   }
 
@@ -323,7 +323,7 @@ async function handleComponentScss(filePath: string): Promise<void> {
     if (verboseTiming) console.timeEnd("[dev-server:timing] classOwnerIndex patch");
   }
 
-  const orderedHrefs = await closureHrefs(timestamp);
+  const orderedHrefs = await closureHrefs(discovery, timestamp);
   for (const m of pending) hotreloader.push({ ...m, orderedHrefs });
   console.log(`[dev-server] CSS updated (recompiled: ${effectiveFiles.map(f => basename(f)).join(", ")})`);
 }
@@ -333,8 +333,9 @@ async function handleComponentScss(filePath: string): Promise<void> {
 // bump, so the preview document is reloaded instead (content-swap, as theme edits do); it comes back
 // with the base link at its new ?v= (state.baseCssVersion).
 async function restyleAll(
-  allIds: Set<string>, timestamp: number, files: string[], hadCompileErrors: boolean,
+  discovery: DiscoveryResult, timestamp: number, files: string[], hadCompileErrors: boolean,
 ): Promise<void> {
+  const allIds = baseComponentIds(discovery);
   const names = files.map(f => basename(f)).join(", ");
   // A file that failed to compile is skipped by buildAllStyleData, which with one entry bundle would
   // empty every component's CSS. Keep the last good CSS on screen; the error is already on the Console.
@@ -343,7 +344,7 @@ async function restyleAll(
     return;
   }
   const changes = applyStyleData(state, await buildAllStyleData(styleRoots, allIds));
-  const orderedHrefs = await closureHrefs(timestamp);
+  const orderedHrefs = await closureHrefs(discovery, timestamp);
   for (const componentId of changes.changedComponents) {
     hotreloader.push({ type: "css-link-swap", componentId, href: componentCssUrl(componentId, timestamp), orderedHrefs });
   }
@@ -363,13 +364,15 @@ async function restyleAll(
 // The ordered link set for the component on screen, computed after all cache updates so a
 // newly-populated entry is included. Filtered to non-empty CSS: the preview head never links
 // zero-CSS components.
-async function closureHrefs(timestamp: number): Promise<string[] | undefined> {
-  const discovery = await cachedDiscovery(state);
-  if (!state.lastComponentId || !discovery || !state.compositionRegistry) return undefined;
+async function closureHrefs(discovery: DiscoveryResult, timestamp: number): Promise<string[] | undefined> {
+  if (!state.lastComponentId) return undefined;
+  // The caller's discovery, current when its handler took it, and its registry, built when an edit has just
+  // dropped it: without the list the preview could only update links it already has, never add one.
+  const registry = await compositionFor(state, discovery, patternDirs);
   // Must match the render path, rendered-class owners included — this list REPLACES the preview's
   // links, so anything the render path added and this one lacked would be stripped on every save.
   const staticClosure = await computeCssClosure(
-    state.lastComponentId, state.compositionRegistry, patternDirs, state.classOwnerIndex ?? new Map(), discovery.discoveryMap
+    state.lastComponentId, registry, patternDirs, state.classOwnerIndex ?? new Map(), discovery.discoveryMap
   );
   const renderedHtml = await render({ component: state.lastComponentId }).then(r => r.html, () => "");
   const closureIds = withRenderedClassOwners(staticClosure, renderedHtml, state.classOwnerIndex ?? new Map());
@@ -586,17 +589,16 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   // set, so its CSS moves without a restart.
   const after = baseComponentIds(dr);
   if (!before || before.size !== after.size || [...after].some(id => !before.has(id))) {
-    await restyleAll(after, Date.now(), [], false);
+    await restyleAll(dr, Date.now(), [], false);
   }
   // Structural change (component added / removed) → the corpus node set changed; drop the diagnostics
   // slice cache so the next /api/audit re-seeds (still a hash-delta vs disk — only genuinely-changed
   // components re-audit). Not surgical, but adds/removes are rare and reshape the graph.
   state.auditSlices = null;
   await surfaceCollisions(dr.collisions, cwd, hotreloader);
-  // Re-derive the flattening artifact — the node set changed. The registry cache was just nulled
-  // for lazy rebuild, so build one locally for the pass (tree-changes are rare; cheap enough).
-  const reg = await buildCompositionRegistry(patternDirs, dr.handleMap, dr.discoveryMap);
-  await surfaceFlattening(dr.discoveryMap, reg, cwd);
+  // Re-derive the flattening artifact — the node set changed — from the new discovery's registry, which
+  // the next request then reuses.
+  await surfaceFlattening(dr.discoveryMap, await compositionFor(state, dr, patternDirs), cwd);
   hotreloader.push({ type: "tree-changed" });
   // A storefront page may embed the component that arrived or left: every page reloads and is checked again.
   await everyPageChanged();

@@ -39,8 +39,8 @@
 
 import type { DiscoveryResult } from "@pattern-dump/contracts";
 import { buildDiscoveryMap, type PatternRoot } from "@pattern-dump/discovery";
-import { createLazy, type Lazy } from "./lazy.js";
-import type { CompositionRegistry } from "./composition.js";
+import { createLazy, testHook, type Lazy } from "./lazy.js";
+import { buildCompositionRegistry, type CompositionRegistry } from "./composition.js";
 import type { ComponentAudit } from "./diagnostics.js";
 import type {
   AllStyleData, ScssModuleGraph, ClassOwnerIndex, BaseProvenanceIndex,
@@ -67,8 +67,6 @@ export interface ServerState {
    *  `<link>` as `?v=`, so a reloaded preview never reuses a stale base sheet. 0 = never changed. */
   baseCssVersion: number;
 
-  /** Rebuilt on HBS/JSON changes. */
-  compositionRegistry: CompositionRegistry | null;
   /** The current discovery, built on demand. See hazard 4. */
   readonly discovery: Lazy<DiscoveryResult>;
 
@@ -102,7 +100,6 @@ export function createServerState(): ServerState {
     perComponentCss: new Map<string, string>(),
     baseCss: "",
     baseCssVersion: 0,
-    compositionRegistry: null,
     discovery: createLazy<DiscoveryResult>("discovery", { slow: { afterMs: DISCOVERY_SLOW_MS, what: "the component index" } }),
     auditSlices: null,
     liveReauditCount: 0,
@@ -146,10 +143,32 @@ export function applyStyleData(state: ServerState, data: AllStyleData): StyleDat
 /** How long a request waits for discovery before the terminal says why. */
 export const DISCOVERY_SLOW_MS = 5_000;
 
-/** Drop the discovery (and the composition registry derived from it): the next caller builds anew. */
+/** Drop the discovery (and with it the composition registry derived from it): the next caller builds anew. */
 export function invalidateDiscovery(state: ServerState): void {
   state.discovery.invalidate();
-  state.compositionRegistry = null;
+}
+
+// Each discovery's composition registry, built once for it. The registry is derived from a discovery's
+// templates, so it is keyed by the discovery object: a request's registry always matches the discovery it
+// took, and an .hbs or .json edit, which invalidates the discovery, gets a new one with the next discovery.
+// Nothing stores a registry in the state, so none can outlive its discovery.
+const registries = new WeakMap<DiscoveryResult, Promise<CompositionRegistry>>();
+
+/** The composition registry of `discovery`, built on first use. A build that fails is dropped. */
+export function compositionFor(
+  state: ServerState, discovery: DiscoveryResult, patternDirs: string | readonly string[],
+): Promise<CompositionRegistry> {
+  let registry = registries.get(discovery);
+  if (!registry) {
+    const built = buildCompositionRegistry(patternDirs, discovery.handleMap, discovery.discoveryMap).then(async r => {
+      await testHook()?.("composition", "built", () => invalidateDiscovery(state));
+      return r;
+    });
+    registry = built;
+    registries.set(discovery, built);
+    built.catch(() => { if (registries.get(discovery) === built) registries.delete(discovery); });
+  }
+  return registry;
 }
 
 /** Make `dr` the current discovery (startup, a full rebuild that has its result already). */

@@ -40,7 +40,8 @@ export interface LazyOptions {
 // build finished, before it is stored. "taken": a caller has its value and goes on with it. Tests use it
 // to invalidate at exactly those points. Not exported, not part of any contract.
 type TestOnlyOnLazy = (name: string, phase: "built" | "taken", invalidate: () => void) => void | Promise<void>;
-const testHook = (): TestOnlyOnLazy | undefined => (globalThis as { __testOnly_onLazy?: TestOnlyOnLazy }).__testOnly_onLazy;
+/** The test-only hook, for a value derived from a lazy one (the composition registry). */
+export const testHook = (): TestOnlyOnLazy | undefined => (globalThis as { __testOnly_onLazy?: TestOnlyOnLazy }).__testOnly_onLazy;
 
 export function createLazy<T>(name: string, options: LazyOptions = {}): Lazy<T> {
   let generation = 0;
