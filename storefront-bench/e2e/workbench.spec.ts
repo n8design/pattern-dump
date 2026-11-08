@@ -14,11 +14,11 @@ const SKIN: Array<[id: string, docs: string]> = [
 ];
 
 test.describe("the skin in the workbench", () => {
-  test("lists every layout and partial, and the embedded component", async ({ page }) => {
+  test("lists every layout and partial, the embedded component, and the placed slider and slide", async ({ page }) => {
     await page.goto(`${WORKBENCH}/layouts/page`);
     await page.waitForSelector("#preview-frame[srcdoc]");
     const hrefs = await page.locator(".sidebar-tree a.tree-link").evaluateAll(as => as.map(a => a.getAttribute("href")));
-    expect(hrefs.sort()).toEqual(["/components/callout", "/layouts/article", "/layouts/home", "/layouts/page", "/partials/base", "/partials/footer", "/partials/header", "/partials/nav"]);
+    expect(hrefs.sort()).toEqual(["/components/callout", "/components/slide", "/components/slider", "/layouts/article", "/layouts/home", "/layouts/page", "/partials/base", "/partials/footer", "/partials/header", "/partials/nav"]);
   });
 
   for (const [id, docs] of SKIN) {

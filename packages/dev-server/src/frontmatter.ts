@@ -135,6 +135,13 @@ export function readFrontmatterStrict(md: string): FrontmatterReading {
   return scan(md);
 }
 
+/** The number of lines before frontmatterBody's text in the file: 0 without a block. Line n of the body is
+ *  line n + this of the file. */
+export function frontmatterBodyOffset(md: string): number {
+  const { end } = block(md);
+  return end === null || end < 0 ? 0 : end + 1;
+}
+
 /** The markdown after the leading `---` block, found by the same rule as the readings above: the whole
  *  file (without a byte-order mark) when it has no block, nothing when its block is never closed. */
 export function frontmatterBody(md: string): string {

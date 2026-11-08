@@ -13,10 +13,10 @@
 // never show on a real page.
 
 import { createHeightFitter, generationBehind, type DiscoveryMap, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
-import { frontmatterBody } from "../frontmatter.js";
+import { frontmatterBody, frontmatterBodyOffset } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
 import { renderDoc } from "../markdown.js";
-import { readSchema } from "./declared-values.js";
+import { readSchema, type PlacedProblem } from "./declared-values.js";
 import { checkPageFrontmatter } from "./frontmatter-contract.js";
 import type { PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
@@ -26,6 +26,10 @@ import { readFile } from "node:fs/promises";
 
 export interface PageAssembly {
   discoveryMap: DiscoveryMap;
+  /** Handle to component id: a page places a component by its handle (`<pd-molecules-slider>`). */
+  handleMap: Map<string, string>;
+  /** A file as problems name it: never an absolute path. */
+  shown(path: string): string;
   /** Which components include which: the layout's include tree, for its sample-data check. */
   composition: CompositionRegistry;
   render: Render;
@@ -144,13 +148,27 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   problems.push(...site.problems);
 
   const docProblems: string[] = [];
+  const placedProblems: PlacedProblem[] = [];
   const body = await renderDoc(
     frontmatterBody(source),
     (id, variant) => a.render({ component: id, variant }).then(r => r.html),
     a.discoveryMap,
-    { embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems },
+    {
+      embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems,
+      // Components placed with values (pd- tags): checked against their schemas, rendered into the page.
+      placed: {
+        lineOffset: frontmatterBodyOffset(source),
+        problems: placedProblems,
+        deps: {
+          discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition, render: a.render,
+          schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath)).schema,
+          shown: a.shown,
+        },
+      },
+    },
   );
   problems.push(...docProblems.map(p => `${page.path}: ${p}`));
+  problems.push(...placedProblems.map(p => `${page.path}:${p.at.line}:${p.at.column}: ${p.message}`));
 
   // The layout's sample data, and that of every partial it includes, must stay out of real pages.
   const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath)).schema;

@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "required": [
+    "label",
+    "slides"
+  ],
+  "properties": {
+    "label": {
+      "type": "string"
+    },
+    "slides": {
+      "type": "array",
+      "items": {
+        "x-pd-component": "components/slide"
+      }
+    }
+  }
+}

@@ -6,6 +6,9 @@
 //     When RendererOptions.discoveryMap is absent the renderer calls buildDiscoveryMap(patternsDir)
 //     from @pattern-dump/discovery — never the old walk. No path reconstruction anywhere.
 export { initHighlighter, highlight, getShikiCSS, wrapWithCopyButton } from "./highlight";
+export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
+export { checkSchemaExtensions, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
+import { checkSchemaExtensions } from "./schema-extensions";
 import type {
   CreateRenderer, RendererOptions, Diagnostic, RenderMeta,
 } from "@pattern-dump/contracts";
@@ -454,6 +457,21 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         required?: string[];
         properties?: Record<string, { type?: string | string[] }>;
       };
+
+      // The placement extensions, and the template of a schema that uses them (schema-extensions.ts).
+      for (const p of checkSchemaExtensions(schema, templateSrc, {
+        componentExists: id => discoveryMap.has(id),
+        hasSchema: id => discoveryMap.get(id)?.schemaPath !== undefined,
+      })) {
+        diagnostics.push({
+          kind: "SCHEMA_INVALID",
+          severity: "error",
+          source: "schema",
+          message: p.message,
+          path: p.path,
+          location: { file: display(entry.schemaPath) },
+        });
+      }
 
       for (const key of schema.required ?? []) {
         if (data[key] === undefined || data[key] === null) {
