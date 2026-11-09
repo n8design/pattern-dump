@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig } from "@pattern-dump/config";
-import { Bench, closeAll, diskStamp, handled, isSettled } from "./watch-harness.js";
+import { Bench, closeAll, diskStamp, handled, isSettled, LATCH_MS } from "./watch-harness.js";
 import { save } from "../../../test-support/save.js";
 
 describe("isSettled: the last handled stamp equals the stamp on disk", () => {
@@ -57,6 +57,11 @@ afterAll(async () => {
   if (tmp) await rm(tmp, { recursive: true, force: true });
 });
 
+// A case's own limit, above the harness latch (LATCH_MS, 5 s): a step waits on up to four latches, so a
+// case limit at or under one latch (vitest's default is 5 s) ends the case before a stalled latch can say
+// what it waited for, and a slow run reads as a bare timeout.
+const CASE_MS = 4 * LATCH_MS;
+
 describe("step() with no declared events", () => {
   it("returns after the last of two writes to one file is handled, and the disk's stamp is the last one read", async () => {
     const from = handled.length;
@@ -67,7 +72,7 @@ describe("step() with no declared events", () => {
     expect(mine[mine.length - 1]!.stamp).toBe(await diskStamp(b.at(FILE)));
     expect(r.events.every(([event]) => event === "change")).toBe(true);
     expect(r.messages.length).toBeGreaterThan(0);
-  }, 20_000);
+  }, CASE_MS);
 
   it("waits for each of two files the act wrote", async () => {
     const from = handled.length;
@@ -75,16 +80,16 @@ describe("step() with no declared events", () => {
     const rels = handled.slice(from).filter(h => b.owns(h.path)).map(h => b.rel(h.path));
     expect(rels).toContain(FILE);
     expect(rels).toContain(OTHER);
-  });
+   }, CASE_MS);
 
   it("waits for the removal of a file the act removed", async () => {
     await b.step(() => b.create("src/patterns/atoms/gone/gone.hbs", "<i>x</i>\n"));
     const r = await b.step(() => b.remove("src/patterns/atoms/gone/gone.hbs"));
     expect(r.events).toContainEqual(["unlink", "src/patterns/atoms/gone/gone.hbs"]);
-  });
+   }, CASE_MS);
 
   it("a declared list still behaves as it did: the events named, and the case asserts what it got", async () => {
     const r = await b.step(() => b.edit(FILE, "c\n"), [["change", FILE]]);
     expect(r.events).toContainEqual(["change", FILE]);
-  });
+   }, CASE_MS);
 });
