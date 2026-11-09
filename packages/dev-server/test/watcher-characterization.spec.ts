@@ -194,23 +194,38 @@ describe("the watcher on test-bench", () => {
 
   it("handles a file created empty and then written as two events, add then change, dropping neither", async () => {
     // What the OS sometimes reports for one write of a new file, made to happen: the file appears empty,
-    // the watcher handles that, then its content is written.
+    // the watcher handles that, then its content is written. That second write is itself two steps (a
+    // truncate, then the text), and how many change events it arrives as is the OS's choice: one, or two
+    // under load on Linux. So this case checks the outcome, not the count (unlike every other case here):
+    // the empty file and the full one were both handled, nothing was dropped, and the full content is served.
     const rel = "src/patterns/atoms/zz-split/zz-split.hbs";
+    const content = "<p>split</p>\n";
     const b = await testBench();
     const warn = vi.spyOn(console, "warn");
     try {
+      const from = handled.length;
       const result = await b.step(async () => {
-        const from = handled.length;
         await mkdir(b.at("src/patterns/atoms/zz-split"), { recursive: true });
         await saveInTwoSteps(b.at(rel), "");
         await whenHandled(() => handled.slice(from).some(h => h.event === "add" && h.path === b.at(rel)));
-        await saveInTwoSteps(b.at(rel), "<p>split</p>\n");
-      }, [["addDir", "src/patterns/atoms/zz-split"], ["add", rel], ["change", rel]]);
-      expect(result.events).toEqual([["addDir", "src/patterns/atoms/zz-split"], ["add", rel], ["change", rel]]);
-      // The change is handled, not dropped: its content-swap names the new component. (Changed with linked
-      // packages being watched: the package stylesheet edited the case before now reloads in its own step,
-      // so this restyle no longer picks it up.)
-      expect(result.messages).toEqual([
+        await saveInTwoSteps(b.at(rel), content);
+      }); // No declared events: the step waits until the last write of the file is handled, whatever the count.
+      // Its folder and the empty file came first, then one or more changes, and nothing else.
+      expect(result.events.slice(0, 2)).toEqual([["addDir", "src/patterns/atoms/zz-split"], ["add", rel]]);
+      expect(result.events.slice(2).length).toBeGreaterThanOrEqual(1);
+      expect(result.events.slice(2).every(([event, path]) => event === "change" && path === rel)).toBe(true);
+      // Both states were handled, as the handler read them (the stamp ends in the size): the empty file by
+      // the add, the full one by a change. A dropped change leaves only the empty one.
+      const sizes = handled.slice(from).filter(h => h.path === b.at(rel) && h.stamp !== null)
+        .map(h => [h.event, Number(h.stamp!.split(":").pop())]);
+      expect(sizes[0]).toEqual(["add", 0]);
+      expect(sizes.some(([event, size]) => event === "change" && size === Buffer.byteLength(content))).toBe(true);
+      // The full content is what pd dev serves.
+      expect(await (await fetch(`${b.origin}/preview/atoms/zz-split`)).text()).toContain("<p>split</p>");
+      // Every kind of message, each named exactly; a repeat of one is the extra event above. Its content-swap
+      // names the new component. (Changed with linked packages being watched: the package stylesheet edited
+      // the case before now reloads in its own step, so this restyle no longer picks it up.)
+      expect([...new Set(result.messages)].sort()).toEqual([
         "{\"type\":\"collision\",\"handle\":\"atoms-baseless-2\",\"incumbentPath\":\"<root>/src/patterns/atoms/baseless-2/baseless-2.hbs\",\"quarantinedPath\":\"<root>/src/patterns/atoms/baseless/baseless-2.hbs\"}",
         "{\"type\":\"content-swap\",\"componentId\":\"atoms/zz-split\"}",
         "{\"type\":\"tree-changed\"}",
