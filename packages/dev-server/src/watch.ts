@@ -200,6 +200,9 @@ export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
 const pagesDir = cfg.storefront?.pagesDir ?? null;
+// What every page shows of the others (handlePages): read before the watcher starts, then after each event
+// in the pages folder.
+let pagesPrint = await pagesFingerprint();
 const watchDirs = [
   ...watched.patterns, ...watched.styles.map(r => r.dir), ...watched.themes, ...watched.scripts,
   ...watched.data, ...watched.assets, ...watched.helpers.map(h => h.scope), ...(pagesDir ? [pagesDir] : []),
@@ -898,25 +901,39 @@ async function handleReloadable(filePath: string, event: "change" | "add" | "unl
 }
 
 // Storefront pages. Nothing is cached server-side — every page request reads the folder — so all a
-// change needs is a reload of the pages it touches: an edited page reloads itself; a file or folder
-// added or removed can change the nav (or the folder's problems), so every page reloads. Dotfiles are
-// not pages and change nothing. Checked first, with a folder boundary, because the other handlers
-// match on a path prefix.
+// change needs is a reload of the pages it touches. An edited page reloads itself, unless the edit changed
+// what other pages show of it: its title, description or order is in every page's nav, so then every page
+// reloads. A file or folder added or removed can change the nav (or the folder's problems), so every page
+// reloads. Dotfiles are not pages and change nothing. Checked first, with a folder boundary, because the
+// other handlers match on a path prefix.
 const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p);
-function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): boolean {
+
+/** What every page shows of the others: the nav, and each page's route, title and layout. Null without a
+ *  storefront. Compared, never parsed. */
+async function pagesFingerprint(): Promise<string | null> {
+  if (!pagesDir) return null;
+  const model = await readPages(pagesDir);
+  return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems });
+}
+
+async function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): Promise<boolean> {
   if (!inPages(filePath)) return false;
   const rel = relative(pagesDir!, filePath).split(sep).join("/");
   if (rel.split("/").some(seg => seg.startsWith("."))) return true;
-  const route = event === "change" && rel.endsWith(".md") ? routeFor(rel) : null;
+  const before = pagesPrint;
+  pagesPrint = await pagesFingerprint();
+  const own = event === "change" && rel.endsWith(".md") ? routeFor(rel) : null;
+  const route = own !== null && pagesPrint === before ? own : null;
   hmr.push({ type: "page-changed", route });
-  console.log(`[dev-server] Page ${event}: ${rel || "."} → page-changed ${route ?? "(every page)"}`);
+  const why = own !== null && route === null ? " (it changed what other pages show of it)" : "";
+  console.log(`[dev-server] Page ${event}: ${rel || "."} → page-changed ${route ?? "(every page)"}${why}`);
   return true;
 }
 
-on("addDir", (dirPath) => { handlePages(dirPath, "addDir"); });
+on("addDir", async (dirPath) => { await handlePages(dirPath, "addDir"); });
 
 on("change", async (filePath) => {
-  if (handlePages(filePath, "change")) return;
+  if (await handlePages(filePath, "change")) return;
   if (await handleReloadable(filePath, "change")) return;
   const ext = extname(filePath);
 
@@ -1083,7 +1100,7 @@ async function everyPageChanged(): Promise<void> {
 }
 
 on("add", async (filePath) => {
-  if (handlePages(filePath, "add")) return;
+  if (await handlePages(filePath, "add")) return;
   if (await handleReloadable(filePath, "add")) return;
   const ext = extname(filePath);
   const patternRoot = patternRootOf(filePath);
@@ -1100,7 +1117,7 @@ on("add", async (filePath) => {
 
 // A component's file removed — rebuild discovery and signal nav rebuild.
 on("unlink", async (filePath) => {
-  if (handlePages(filePath, "unlink")) return;
+  if (await handlePages(filePath, "unlink")) return;
   if (await handleReloadable(filePath, "unlink")) return;
   const patternRoot = patternRootOf(filePath);
   if (extname(filePath) === ".hbs" && patternRoot) {
@@ -1114,7 +1131,7 @@ on("unlink", async (filePath) => {
 
 // Component directory removed — covers the case where the entire component folder is deleted.
 on("unlinkDir", async (dirPath) => {
-  if (handlePages(dirPath, "unlinkDir")) return;
+  if (await handlePages(dirPath, "unlinkDir")) return;
   const patternRoot = patternRootOf(dirPath);
   if (patternRoot && dirPath !== patternRoot) {
     await rebuildAndSignalTree(`Pattern dir removed: ${relative(patternRoot, dirPath)}`);

@@ -20,6 +20,14 @@ test.describe("storefront pages reload in pd dev", () => {
     await expect(page.locator(".page-body")).toContainText("An edit made while the page was open.", { timeout: 10_000 });
   });
 
+  test("a title edit reaches another open page, whose nav shows it", async ({ page }) => {
+    await page.goto("/guides/");
+    const link = page.locator('.site-nav a[href="/about/"]');
+    await expect(link).toHaveText("About");
+    await save(about, original.replace("title: About", "title: About us"));
+    await expect(link).toHaveText("About us", { timeout: 10_000 });
+  });
+
   test("a frontmatter error replaces the page with its problems, and the fix brings it back", async ({ page }) => {
     await page.goto("/about/");
     await save(about, original.replace("title: About", "title: About\nbogus: 1"));
