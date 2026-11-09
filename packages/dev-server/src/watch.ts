@@ -18,9 +18,10 @@
 // themselves over a real socket.
 
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
-import { basename, extname, relative, resolve, sep } from "node:path";
-import chokidar from "chokidar";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { readdir } from "node:fs/promises";
+import { basename, extname, join, relative, resolve, sep } from "node:path";
+import chokidar, { type FSWatcher } from "chokidar";
 import { componentCssUrl, type DiscoveryResult, type HmrMessage } from "@pattern-dump/contracts";
 import { compileSassFile } from "@pattern-dump/build";
 import { dryRunHelperRegistrar } from "@pattern-dump/renderer";
@@ -66,6 +67,49 @@ export interface WatchContext {
  * still. Must stay above chokidar's window: test/watcher-chokidar.spec.ts pins it.
  */
 export const CHANGE_RECHECK_MS = 60;
+
+/**
+ * A new folder, with chokidar 3.6's own watcher (nodefs-handler.js, `_handleDir`; Linux, Windows, and macOS
+ * without fsevents): it reports the folder's `addDir` (551), reads it once (563) and only then watches it
+ * (567). A file that lands after that read and before the watch is in no read and causes no event, so it is
+ * never reported: `git checkout`, `git pull` and `mv` do exactly that, and under load the gap is seconds
+ * wide. So a new folder's `addDir`, when handled, starts a rescan cycle: the folder is scanned at once and
+ * every CHANGE_RECHECK_MS until chokidar watches it and every folder reported in it, read from chokidar's
+ * private `_closers` (`chokidarWatches`), and then once more: the closing scan, for a write that landed
+ * between the last scan and the watch. Each scan queues every folder as an `addDir`, and every file not as
+ * last handled as an `add`, or as a `change` when the file was already reported in the cycle (by a scan or by
+ * chokidar, which reports it a few ms after the scan does: its `add`, waiting behind the scan's, would read a
+ * file written since, and be a second add). After NEW_FOLDER_CAP_MS the cycle stops, closing scans
+ * included, and the terminal says so. With fsevents (`chokidarBackend`) the whole tree is one stream, there
+ * is no gap, and nothing is rescanned.
+ */
+export const NEW_FOLDER_CAP_MS = 2_000;
+/** When `_closers` cannot be read as expected (another chokidar): the times a new folder is scanned after its
+ *  `addDir` is handled, with no way to tell when its watch is there. */
+export const NEW_FOLDER_FALLBACK_MS: readonly number[] = [0, CHANGE_RECHECK_MS, 1_000];
+
+/**
+ * The paths chokidar has a watch on, from its private `_closers` (`_addPathCloser` records a folder's watch
+ * once `_handleDir` has returned, nodefs-handler.js 617-640), or null when that is not there as expected: a
+ * Map, holding every folder in `roots` that exists. test/watcher-chokidar.spec.ts pins what this relies on.
+ */
+export function chokidarWatches(watcher: FSWatcher, roots: readonly string[]): ReadonlyMap<string, unknown> | null {
+  const closers = (watcher as unknown as { _closers?: unknown })._closers;
+  if (!(closers instanceof Map)) return null;
+  return roots.filter(r => existsSync(r)).every(r => closers.has(r)) ? closers : null;
+}
+
+/**
+ * Which of its watchers chokidar uses, from its own flag (`options.useFsEvents`) and the handler it built from
+ * it (`_fsEventsHandler` or `_nodeFsHandler`, index.js 389-393); null when the two do not agree, as they do
+ * in chokidar 3.6. test/watcher-chokidar.spec.ts pins it.
+ */
+export function chokidarBackend(watcher: FSWatcher): "fsevents" | "nodefs" | null {
+  const w = watcher as unknown as { options?: { useFsEvents?: boolean }; _fsEventsHandler?: unknown; _nodeFsHandler?: unknown };
+  if (w.options?.useFsEvents === true && w._fsEventsHandler && !w._nodeFsHandler) return "fsevents";
+  if (w.options?.useFsEvents === false && w._nodeFsHandler && !w._fsEventsHandler) return "nodefs";
+  return null;
+}
 
 /** The file watcher could not start (an inotify limit, a folder it may not read): pd dev cannot run. */
 export class WatchStartError extends Error {
@@ -149,7 +193,7 @@ const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: t
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onWatchStarted`, it is called once
 // the watcher is ready, with a function that delivers an event to the handlers below as chokidar would (a
 // test uses it to deliver one chokidar sends twice). Not exported, not part of any contract.
-type TestOnlyWatchStarted = (deliver: (event: "change", path: string) => void) => void;
+type TestOnlyWatchStarted = (deliver: (event: "change" | "add", path: string) => void) => void;
 
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_failHandler`, it is asked before each
 // handler runs; "reject" or "throw" makes that handler fail that way instead of running, so a test can see
@@ -185,6 +229,28 @@ type TestOnlyHoldHandler = (event: string, path: string) => Promise<void> | unde
 // `.__testOnly_barrier`, which a test puts in every watched folder, is reported but never handled. Unset,
 // it costs a counter and a name check. Not exported, not part of any contract.
 type TestOnlyEventHandled = (event: string, path: string, stillRunning: number, stamp: string | null) => void;
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_hideChokidarWatches` to true before the
+// watcher is ready, chokidar's `_closers` is treated as not readable, so a test can see the fallback for new
+// folders (NEW_FOLDER_FALLBACK_MS) and its warning. Not exported, not part of any contract.
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_dropEvent`, it is asked about each event
+// chokidar reports; true drops it, as chokidar sometimes misses one (an unlinkDir of a folder moved away). Not
+// exported, not part of any contract.
+type TestOnlyDropEvent = (event: string, path: string) => boolean;
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onCycleEnded`, it is called when a new
+// folder's rescan cycle ends, with the folder and why: its watches attached, the folder gone, the fallback's
+// last scan done, or the cap reached. A test waits for it instead of for the cycle's time. Not exported, not
+// part of any contract.
+type TestOnlyOnCycleEnded = (dir: string, why: "watched" | "gone" | "fallback-done" | "cap") => void;
+
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_cycleTick`, it is called before each
+// scan of a new folder's rescan cycle, with the folder and whether `_closers` shows its watches; the cycle
+// goes on as if they were shown when it returns true, and waits for it when it returns a promise. A test
+// holds a cycle open (the cap, a late duplicate) or writes between the last scan and the closing scan with
+// it. Not exported, not part of any contract.
+type TestOnlyCycleTick = (dir: string, watching: boolean) => boolean | Promise<boolean>;
 let closed = false;
 // One pending recheck per changed file (CHANGE_RECHECK_MS), by its timer.
 const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
@@ -194,6 +260,26 @@ const rechecks = new Map<string, ReturnType<typeof setTimeout>>();
 // sees the truncate and the write separately). A change to a file that is as it was then is not handled
 // again.
 const lastHandled = new Map<string, Seen>();
+// The rescan cycles running (NEW_FOLDER_CAP_MS), by the new folder each is for: the timer of its next scan
+// (null while one runs), and the folders and files inside it reported during the cycle, by its scans or by
+// chokidar. Each is reported by both; the second report within the cycle is dropped, and a scan that finds a
+// reported file other than last handled queues a `change` for it, not a second `add` (the content written
+// between the two reports is then the change it is). Once the cycle ends (its watches attached and the
+// closing scan done, the cap, or the fallback's last scan), every `addDir` and `add` is handled again,
+// whether or not an unlink came: chokidar can miss one. A handled `unlink` of a file drops it from `files`.
+interface Cycle { timer: ReturnType<typeof setTimeout> | null; readonly reported: Set<string>; readonly files: Set<string> }
+const cycles = new Map<string, Cycle>();
+// Each `addDir` queued while new folders are rescanned, chokidar's or a rescan's, by the order it was queued
+// in, until its own cycle starts. A folder inside a new one can be queued before the new one's cycle starts
+// (its `addDir` is handled, then the next event, while the cycle's first scan is still reading): the cycle
+// starts with those queued after its own `addDir`, so its scans do not report them again.
+const queuedDirs = new Map<string, number>();
+let dirOrder = 0;
+// How new folders are rescanned, settled once chokidar is ready: not at all with fsevents (no gap), until
+// `_closers` has the folder's watch, or at NEW_FOLDER_FALLBACK_MS when `_closers` cannot be read.
+let newFolders: { readonly mode: "none" } | { readonly mode: "closers"; readonly watches: ReadonlyMap<string, unknown> } | { readonly mode: "timed" } = { mode: "none" };
+// How the rescans queue what they find: the `add`, `addDir` and `change` of `on` below, as chokidar's would be.
+const dispatchers: { add?: (path: string) => void; addDir?: (path: string) => void; change?: (path: string) => void } = {};
 
 // Every event goes through one queue and is handled when the ones before it have finished, in the order
 // they arrived. Handlers used to start at once and interleave at their awaits, so one could work from state
@@ -264,13 +350,25 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
     } else if (event === "add") {
       // A new file, as its handler reads it: a change chokidar reports after the add for the same content
       // (fsevents can report a file moved into place as an add and then a change) is not a second change.
+      // A file a new folder's rescan has already handled, then reported by chokidar too, is as that handling
+      // saw it: not handled again. An unlink clears `lastHandled`, and so does a handled `addDir` of a folder
+      // it is in (chokidar can miss the unlinks of a folder moved away and back), so an add of the same
+      // content after either is handled.
       const added = seenNow(path);
+      if (unchanged(added, lastHandled.get(path))) { finish(); return; }
       if (added) lastHandled.set(path, added); else lastHandled.delete(path);
       readStamp = added?.real ?? null;
     } else if (event === "unlink") {
       clearTimeout(rechecks.get(path));
       rechecks.delete(path);
       lastHandled.delete(path);
+      for (const c of cycles.values()) c.files.delete(path);
+    } else if (event === "addDir") {
+      // A folder that is there now: whatever was handled at its paths before is not what it holds.
+      forgetInside(path);
+      startCycle(path);
+    } else if (event === "unlinkDir") {
+      forgetInside(path);
     }
     const done = () => {
       const sending = outbox;
@@ -314,14 +412,155 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
   const dispatch = (path: string, fromRecheck = false): void => {
     enqueue({ event, path, start: () => start(path, fromRecheck) });
   };
-  watcher.on(event, (path: string) => dispatch(path));
+  if (event === "add" || event === "addDir" || event === "change") dispatchers[event] = path => dispatch(path);
+  watcher.on(event, (path: string) => {
+    if ((globalThis as { __testOnly_dropEvent?: TestOnlyDropEvent }).__testOnly_dropEvent?.(event, path)) return;
+    if (event === "addDir" && !firstReport(path)) return;
+    if (event === "add" && !firstFileReport(path)) return;
+    dispatch(path);
+  });
+}
+
+/** The rescan cycles of the folders `path` is in. */
+const cyclesOver = (path: string): Cycle[] =>
+  [...cycles].filter(([folder]) => path.startsWith(folder + sep)).map(([, c]) => c);
+
+/**
+ * Whether a folder's `addDir`, from chokidar or a rescan, is to be queued: not when a rescan cycle of a folder
+ * it is in has already had it reported (Cycle). Recorded in each such cycle.
+ */
+function firstReport(dir: string): boolean {
+  const owners = cyclesOver(dir);
+  if (owners.some(c => c.reported.has(dir))) return false;
+  for (const c of owners) c.reported.add(dir);
+  if (newFolders.mode !== "none") queuedDirs.set(dir, ++dirOrder);
+  return true;
+}
+
+/**
+ * Whether a file's `add`, from chokidar or a rescan, is to be queued: not when a rescan cycle of a folder it
+ * is in has already had it reported (Cycle). Recorded in each such cycle.
+ */
+function firstFileReport(file: string): boolean {
+  const owners = cyclesOver(file);
+  if (owners.some(c => c.files.has(file))) return false;
+  for (const c of owners) c.files.add(file);
+  return true;
+}
+
+/**
+ * A new folder's rescan cycle (NEW_FOLDER_CAP_MS says why): scanned at once, then every CHANGE_RECHECK_MS
+ * until chokidar watches it and every folder reported in it (or one is gone), and once more after
+ * that, the closing scan; it ends when a closing scan reports nothing new. Each scan queues every file in it,
+ * at any depth, that is not as last handled, as an `add` (a `change` when the cycle has had it reported), and
+ * every folder as an `addDir` (which starts its own cycle). Links are left to chokidar, which follows them itself.
+ */
+function startCycle(dir: string): void {
+  const queuedAt = queuedDirs.get(dir) ?? 0;
+  queuedDirs.delete(dir);
+  if (newFolders.mode === "none" || closed || cycles.has(dir)) return;
+  const cycle: Cycle = { timer: null, reported: new Set(), files: new Set() };
+  for (const [p, at] of queuedDirs) if (at > queuedAt && p.startsWith(dir + sep)) cycle.reported.add(p);
+  // The files in it already queued (after its `addDir`, while it waited its turn): reported once.
+  for (const q of queue) if (q.event === "add" && q.path.startsWith(dir + sep)) cycle.files.add(q.path);
+  cycles.set(dir, cycle);
+  const began = Date.now();
+  let step = 0;
+  const live = (): boolean => !closed && cycles.get(dir) === cycle;
+  const watched = (watches: ReadonlyMap<string, unknown>): boolean =>
+    [dir, ...cycle.reported].every(p => watches.has(p) || !existsSync(p));
+  const tick = async (): Promise<void> => {
+    if (!live()) return;
+    // Read before the scan: when every watch is there, this scan is the closing one, and a write that landed
+    // between the last scan and the watches is in it.
+    let watching = newFolders.mode === "closers" && watched(newFolders.watches);
+    const hook = (globalThis as { __testOnly_cycleTick?: TestOnlyCycleTick }).__testOnly_cycleTick;
+    if (hook) {
+      watching = await hook(dir, watching);
+      if (!live()) return;
+    }
+    const known = cycle.reported.size + cycle.files.size;
+    const there = await scanFolder(dir);
+    if (!live()) return;
+    // A closing scan that reported something new is not the last: a new folder's watch is waited for too.
+    if (cycle.reported.size + cycle.files.size > known) watching = false;
+    let next: number | null = null;
+    let why: Parameters<TestOnlyOnCycleEnded>[1] = "watched";
+    if (!there) why = "gone";
+    else if (watching) why = "watched";
+    else if (newFolders.mode === "timed") {
+      step += 1;
+      if (step < NEW_FOLDER_FALLBACK_MS.length) next = NEW_FOLDER_FALLBACK_MS[step]! - NEW_FOLDER_FALLBACK_MS[step - 1]!;
+      else why = "fallback-done";
+    } else if (Date.now() - began >= NEW_FOLDER_CAP_MS) {
+      why = "cap";
+      console.warn(`[dev-server] New folder ${shown(dir)} is still not watched after ${NEW_FOLDER_CAP_MS / 1000} s; `
+        + "a file saved into it from now on may go unseen until pd dev restarts.");
+    } else next = CHANGE_RECHECK_MS;
+    if (next === null) {
+      cycles.delete(dir);
+      (globalThis as { __testOnly_onCycleEnded?: TestOnlyOnCycleEnded }).__testOnly_onCycleEnded?.(dir, why);
+      return;
+    }
+    cycle.timer = setTimeout(run, next);
+  };
+  function run(): void {
+    cycle.timer = null;
+    void tick().catch((e: unknown) => {
+      if (cycles.get(dir) === cycle) cycles.delete(dir);
+      reportHandlerFailure("addDir", dir, e, "its rescan");
+    });
+  }
+  run();
+}
+
+/** Queue what a new folder holds (startCycle). False when the folder is gone. */
+async function scanFolder(dir: string): Promise<boolean> {
+  let entries;
+  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return false; }
+  for (const entry of entries) {
+    if (closed) return true;
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (firstReport(path)) dispatchers.addDir?.(path);
+      await scanFolder(path);
+    } else if (entry.isFile()) {
+      // As last handled, or an `add` or `change` of it still waiting (it reads the file when it starts): nothing to queue.
+      if (unchanged(seenNow(path), lastHandled.get(path))
+        || queue.some(q => q.path === path && (q.event === "add" || q.event === "change"))) continue;
+      if (firstFileReport(path)) dispatchers.add?.(path);
+      else dispatchers.change?.(path);
+    }
+  }
+  return true;
+}
+
+/** A folder there anew or gone: nothing at or in it as handled before, and no cycle of a folder in it left. */
+function forgetInside(dir: string): void {
+  const inside = (p: string): boolean => p.startsWith(dir + sep);
+  for (const p of [...lastHandled.keys()]) if (inside(p)) lastHandled.delete(p);
+  for (const [p, c] of [...cycles]) if (p === dir || inside(p)) { clearTimeout(c.timer ?? undefined); cycles.delete(p); }
 }
 
 // chokidar's errors: before "ready" the watcher cannot start, and startWatching rejects; after it, each is
 // a named problem in the terminal and on the Console. Without a listener chokidar's error would throw.
 let ready = false;
 const started = new Promise<void>((resolve, reject) => {
-  watcher.once("ready", () => { ready = true; resolve(); });
+  watcher.once("ready", () => {
+    ready = true;
+    // fsevents: one stream for the whole tree, no gap. Any other (chokidar's own, or one this code does not know): rescan.
+    if (chokidarBackend(watcher) !== "fsevents") {
+      const hidden = (globalThis as { __testOnly_hideChokidarWatches?: boolean }).__testOnly_hideChokidarWatches === true;
+      const watches = hidden ? null : chokidarWatches(watcher, watchDirs);
+      if (watches) newFolders = { mode: "closers", watches };
+      else {
+        newFolders = { mode: "timed" };
+        console.warn("[dev-server] New-folder detection is degraded: this chokidar does not show which folders it watches, "
+          + `so a new folder is scanned at ${NEW_FOLDER_FALLBACK_MS.join(", ")} ms only, and a file saved into it later may go unseen.`);
+      }
+    }
+    resolve();
+  });
   watcher.on("error", (e: unknown) => {
     const message = describeWatchError(e);
     if (!ready) { reject(new WatchStartError(message)); return; }
@@ -333,6 +572,9 @@ const close = async (): Promise<void> => {
   closed = true;
   for (const timer of rechecks.values()) clearTimeout(timer);
   rechecks.clear();
+  for (const c of cycles.values()) clearTimeout(c.timer ?? undefined);
+  cycles.clear();
+  queuedDirs.clear();
   // Let the handler running and the events already waiting finish, before the socket and the HTTP server
   // close after this: a handler that finished later would write its scratch files (conflicts, flattening,
   // the diagnostics artifact) after the next server for the same folder had started.
