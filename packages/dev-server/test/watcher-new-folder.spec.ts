@@ -352,6 +352,38 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
     }
   }, 60_000);
 
+  it("handles a file removed before the folder was watched as removed: its last scan finds it gone", async () => {
+    const { b } = await project();
+    try {
+      // chokidar never reports the removal, as when it lands before the folder's watch: only the last scan can see it.
+      hooks.__testOnly_dropEvent = (event, path) => event === "unlink" && ofF(b, path);
+      const added = (): boolean => handled.some(h => h.event === "add" && ofF(b, h.path));
+      let removed = false;
+      let wasInTree = false;
+      hooks.__testOnly_cycleTick = async (dir, watching) => {
+        if (!ofD(b, dir) || removed) return watching;
+        // Held open until the watches are there and a scan has added the file; then it is removed, and the
+        // scan that follows is the last one.
+        if (!watching || !added()) return false;
+        wasInTree = await inTree(b, "atoms/zz-late/item");
+        await rm(b.at(F));
+        removed = true;
+        return true;
+      };
+      const endedFrom = cyclesEnded.length;
+      const { events } = await b.step(async () => {
+        await b.create(F, "<p class=\"late\">one</p>\n");
+        await until(ended(b, endedFrom), "the folder's rescan cycle ended");
+      });
+      expect(endedWhy.get(b.at(D))).toBe("watched");
+      expect(fileEvents(events)).toEqual([["add", F], ["unlink", F]]);
+      expect(wasInTree).toBe(true);
+      expect(await inTree(b, "atoms/zz-late/item")).toBe(false);
+    } finally {
+      await b.close();
+    }
+  }, 60_000);
+
   it("lets chokidar's add after it ended through lastHandled: skipped when the file is as handled, handled when not", async () => {
     const { b, deliver } = await project();
     try {
