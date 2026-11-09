@@ -28,7 +28,7 @@ import { save } from "../../../test-support/save.js";
 
 type Deliver = (event: "change" | "add", path: string) => void;
 const hooks = globalThis as {
-  __testOnly_onWatchStarted?: (deliver: Deliver) => void;
+  __testOnly_onWatchStarted?: (deliver: Deliver, forget: (path: string) => void) => void;
   __testOnly_hideChokidarWatches?: boolean;
   __testOnly_watchStamp?: (path: string, stamp: string) => string;
   __testOnly_dropEvent?: (event: string, path: string) => boolean;
@@ -60,18 +60,19 @@ hooks.__testOnly_onCycleEnded = (dir, why) => { cyclesEnded.push(dir); endedWhy.
 
 let tmp = "";
 let n = 0;
-/** A fresh project with one component, open in the workbench; and its watcher's deliver function. */
-async function project(): Promise<{ b: Bench; deliver: Deliver }> {
+/** A fresh project with one component, open in the workbench; and its watcher's deliver and forget functions. */
+async function project(): Promise<{ b: Bench; deliver: Deliver; forget: (path: string) => void }> {
   const root = join(tmp, `site-${n++}`);
   await save(join(root, "src/patterns/atoms/btn/btn.hbs"), `<button class="btn">One</button>\n`);
   await mkdir(join(root, "src/styles"), { recursive: true });
   let deliver: Deliver | undefined;
-  hooks.__testOnly_onWatchStarted = d => { deliver = d; };
+  let forget: ((path: string) => void) | undefined;
+  hooks.__testOnly_onWatchStarted = (d, f) => { deliver = d; forget = f; };
   const b = new Bench(root, "atoms/btn");
   await b.start(config);
   delete hooks.__testOnly_onWatchStarted;
-  if (!deliver) throw new Error("the watcher did not hand over its deliver function");
-  return { b, deliver };
+  if (!deliver || !forget) throw new Error("the watcher did not hand over its deliver and forget functions");
+  return { b, deliver, forget };
 }
 
 /** The files of a component folder at `dir` with FILES. */
@@ -379,6 +380,57 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
       expect(fileEvents(events)).toEqual([["add", F], ["unlink", F]]);
       expect(wasInTree).toBe(true);
       expect(await inTree(b, "atoms/zz-late/item")).toBe(false);
+    } finally {
+      await b.close();
+    }
+  }, 60_000);
+
+  it("hands what it reported to chokidar: a file chokidar never saw is reported removed after the cycle, once, also with its folder", async () => {
+    const { b, forget } = await project();
+    const G = `${D}/other.hbs`;
+    const onlyOf = (events: string[][], rel: string) => events.filter(([, p]) => p === rel);
+    try {
+      const added = (rel: string): boolean => handled.some(h => h.event === "add" && b.owns(h.path) && b.rel(h.path) === rel);
+      let forgot = false;
+      hooks.__testOnly_cycleTick = async (dir, watching) => {
+        if (!ofD(b, dir) || forgot) return watching;
+        if (!watching || !added(F) || !added(G)) return false;
+        // chokidar forgets both files, as when they land between its read of the new folder and its watch: it
+        // would report nothing of them again. The scan that follows is the last.
+        forget(b.at(F));
+        forget(b.at(G));
+        forgot = true;
+        return true;
+      };
+      const endedFrom = cyclesEnded.length;
+      await b.step(async () => {
+        await b.create(F, "<p class=\"late\">one</p>\n");
+        await b.create(G, "<p class=\"other\">one</p>\n");
+        await until(ended(b, endedFrom), "the folder's rescan cycle ended");
+      });
+      expect(endedWhy.get(b.at(D))).toBe("watched");
+      expect([await inTree(b, "atoms/zz-late/item"), await inTree(b, "atoms/zz-late/other")]).toEqual([true, true]);
+
+      // One file removed, well after the cycle ended: reported once, and gone from the tree.
+      const one = await b.step(() => b.remove(F));
+      expect(onlyOf(one.events, F)).toEqual([["unlink", F]]);
+      expect(await inTree(b, "atoms/zz-late/item")).toBe(false);
+
+      // Then the whole folder: the other file reported removed once, and the folder's own unlinkDir. chokidar
+      // sends the folder's unlinkDir first and the file's unlink from the file's own watch a little later (as for
+      // any file it found itself), so the step waits for that unlink too.
+      const all = await b.step(async () => {
+        const from = handled.length;
+        await b.remove(D);
+        await whenHandled(() => handled.slice(from).some(h => h.event === "unlink" && b.owns(h.path) && b.rel(h.path) === G),
+          () => `the unlink of ${G}; handled: ${JSON.stringify(b.handledSince(from))}`);
+      });
+      expect(onlyOf(all.events, G)).toEqual([["unlink", G]]);
+      expect(onlyOf(all.events, D)).toEqual([["unlinkDir", D]]);
+      expect(await inTree(b, "atoms/zz-late/other")).toBe(false);
+      // And nothing of either arrives later.
+      const later = await b.step(async () => {});
+      expect([...onlyOf(later.events, F), ...onlyOf(later.events, G), ...onlyOf(later.events, D)]).toEqual([]);
     } finally {
       await b.close();
     }
