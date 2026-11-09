@@ -3,13 +3,15 @@
 // removed and made again. Each must be handled every time it arrives, its files with it, and each file once,
 // though a new folder's rescan and chokidar both report what is in it, and the tree must show it. An `add` of
 // a file as its last handling saw it is skipped, unless an unlink, or a handled `addDir` of its folder, came
-// between. Within a rescan cycle, chokidar's late add of a file the cycle already reported is not a second
-// add, a write between the last scan and the watches is seen by the closing scan, and a folder still not
-// watched at the cap is said so once. And with chokidar's `_closers` not readable, the fallback still sees a
+// between. A folder restored with its files reported as changes only is built into discovery again. Within a
+// rescan cycle, chokidar's late add of a file the cycle already reported is not a second add, a folder in it
+// queued before the cycle started is not reported again however slow the first scan, a write between the last
+// scan and the watches is seen by the closing scan, and a folder still not watched at the cap is said so once. And with chokidar's `_closers` not readable, the fallback still sees a
 // file in a new folder, saying so once.
 //
 // The repeat is delivered with `__testOnly_onWatchStarted`, a missed removal made with `__testOnly_dropEvent`,
-// a cycle held or its watches shown with `__testOnly_cycleTick`, and `_closers` hidden with
+// a cycle held or its watches shown with `__testOnly_cycleTick`, the queue backed up with
+// `__testOnly_holdHandler`, and `_closers` hidden with
 // `__testOnly_hideChokidarWatches`, so none of it depends on timing. The gap itself
 // (a file renamed into a folder made a moment before, never reported) shows under load only: watcher.spec's
 // new-component cases and watcher-characterization's are its reproduction.
@@ -32,6 +34,7 @@ const hooks = globalThis as {
   __testOnly_dropEvent?: (event: string, path: string) => boolean;
   __testOnly_onCycleEnded?: (dir: string, why: string) => void;
   __testOnly_cycleTick?: (dir: string, watching: boolean) => boolean | Promise<boolean>;
+  __testOnly_holdHandler?: (event: string, path: string) => Promise<void> | undefined;
 };
 
 const config = defineConfig({
@@ -134,6 +137,7 @@ afterEach(() => {
   delete hooks.__testOnly_hideChokidarWatches;
   delete hooks.__testOnly_dropEvent;
   delete hooks.__testOnly_cycleTick;
+  delete hooks.__testOnly_holdHandler;
 });
 afterAll(async () => {
   delete hooks.__testOnly_onCycleEnded;
@@ -215,6 +219,33 @@ describe("a folder that leaves and comes back", () => {
       expect(await arrive(b, () => rename(b.at(B), b.at(A)), [A], filesOf(A), [["unlinkDir", B]]))
         .toEqual(expectedArrivals([A], filesOf(A)));
       expect(await inTree(b, "atoms/zz-a/item")).toBe(true);
+    } finally {
+      await b.close();
+    }
+  }, 60_000);
+
+  it("removed and restored, its files reported as changes only: discovery is built again, the tree has it, it renders", async () => {
+    const { b, deliver } = await project();
+    try {
+      await component(b, A);
+      await b.step(() => b.remove(A), [["unlinkDir", A]]);
+      expect(await inTree(b, "atoms/zz-a/item")).toBe(false);
+      // chokidar reports the restored folder's files as changes (its watches of them outlived the folder), and
+      // nothing else: no addDir, so no rescan either.
+      const inA = (path: string): boolean => b.owns(path) && (b.rel(path) === A || b.rel(path).startsWith(`${A}/`));
+      hooks.__testOnly_dropEvent = (event, path) => inA(path) && event !== "change";
+      // Its template and data only: a change to a docs file sends tree-changed of its own.
+      const back = ["item.hbs", "item.json"] as const;
+      const restored = await b.step(async () => {
+        for (const f of back) await save(b.at(`${A}/${f}`), FILES[f]);
+        for (const f of back) deliver("change", b.at(`${A}/${f}`));
+      });
+      // The open page is told the tree changed (it refetches on it), and what it fetches has the component.
+      expect(restored.messages).toContain(`{"type":"tree-changed"}`);
+      expect(await inTree(b, "atoms/zz-a/item")).toBe(true);
+      const page = await fetch(`${b.origin}/api/component/atoms/zz-a/item`);
+      expect(page.status).toBe(200);
+      expect(await page.text()).toContain("Item</p>");
     } finally {
       await b.close();
     }
@@ -344,6 +375,56 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
       expect(fileEvents(changed.events)).toEqual([["add", F]]);
       expect(await shows(b, "two")).toBe(true);
     } finally {
+      await b.close();
+    }
+  }, 60_000);
+
+  it("counts a folder in it queued before it started as reported, however slow its first scan", async () => {
+    const { b } = await project();
+    const BTN = "src/patterns/atoms/btn/btn.hbs";
+    const M = "src/patterns/atoms/zz-q";
+    const SUB = `${M}/sub`;
+    let release = (): void => {};
+    try {
+      // The button's change is held, so the queue backs up behind it: the new folder's addDir and its inner
+      // folder's both wait there, the inner one queued after it, before the new folder's cycle starts.
+      let holding = false;
+      hooks.__testOnly_holdHandler = (event, path) => {
+        if (holding || event !== "change" || !b.owns(path) || b.rel(path) !== BTN) return undefined;
+        holding = true;
+        return new Promise<void>(resolve => { release = resolve; });
+      };
+      let subReported = false;
+      hooks.__testOnly_dropEvent = (event, path) => {
+        if (event === "addDir" && b.owns(path) && b.rel(path) === SUB) subReported = true;
+        return false;
+      };
+      // The new folder's first scan is slow: it waits until the inner folder's addDir has been handled, so
+      // that addDir is no longer waiting when the scan finds the folder, and only the cycle's record of it
+      // keeps the scan from reporting it again.
+      const subHandled = (): boolean => handled.some(h => h.event === "addDir" && b.owns(h.path) && b.rel(h.path) === SUB);
+      let first = true;
+      hooks.__testOnly_cycleTick = async (dir, watching) => {
+        if (!first || !b.owns(dir) || b.rel(dir) !== M) return watching;
+        first = false;
+        await until(subHandled, "the inner folder's addDir handled");
+        return watching;
+      };
+      const outside = join(tmp, `outside-${n++}`, "zz-q");
+      await save(join(outside, "item.hbs"), FILES["item.hbs"]);
+      await save(join(outside, "sub", "sub-item.hbs"), "<p class=\"sub\">sub</p>\n");
+      const endedFrom = cyclesEnded.length;
+      const { events } = await b.step(async () => {
+        await save(b.at(BTN), `<button class="btn">Two</button>\n`);
+        await until(() => holding, "the button's change held");
+        await rename(outside, b.at(M));
+        await until(() => subReported, "chokidar's addDir of the inner folder");
+        release();
+        await until(() => [M, SUB].every(d => cyclesEnded.slice(endedFrom).includes(b.at(d))), "both rescan cycles ended");
+      });
+      expect(events.filter(([e]) => e === "addDir")).toEqual([["addDir", M], ["addDir", SUB]]);
+    } finally {
+      release();
       await b.close();
     }
   }, 60_000);
