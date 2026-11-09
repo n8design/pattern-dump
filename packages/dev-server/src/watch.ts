@@ -209,7 +209,9 @@ const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: t
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onWatchStarted`, it is called once
 // the watcher is ready, with a function that delivers an event to the handlers below as chokidar would (a
 // test uses it to deliver one chokidar sends twice). Not exported, not part of any contract.
-type TestOnlyWatchStarted = (deliver: (event: "change" | "add", path: string) => void) => void;
+// The second argument makes chokidar forget a file (its `unwatch`): it no longer reports anything of it, as for a
+// file that landed in a new folder before chokidar watched it.
+type TestOnlyWatchStarted = (deliver: (event: "change" | "add", path: string) => void, forget: (path: string) => void) => void;
 
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_failHandler`, it is asked before each
 // handler runs; "reject" or "throw" makes that handler fail that way instead of running, so a test can see
@@ -471,7 +473,8 @@ function firstFileReport(file: string): boolean {
  * that, the closing scan; it ends when a closing scan reports nothing new. Each scan queues every file in it,
  * at any depth, that is not as last handled, as an `add` (a `change` when the cycle has had it reported), and
  * every folder as an `addDir` (which starts its own cycle). The last scan also queues an `unlink` for each file the
- * cycle reported that is gone: removed before chokidar watched the folder, it would never be reported. Links are left to chokidar, which follows them itself.
+ * cycle reported that is gone: removed before chokidar watched the folder, it would never be reported. Each one that
+ * is there is handed to chokidar (`add`), so a later removal of a file chokidar never saw is reported too. Links are left to chokidar, which follows them itself.
  */
 function startCycle(dir: string): void {
   const queuedAt = queuedDirs.get(dir) ?? 0;
@@ -519,9 +522,14 @@ function startCycle(dir: string): void {
       // The last scan also looks for what has left: a file the cycle reported that is gone from disk now was
       // removed before chokidar watched its folder, so chokidar never reports its unlink. Handled as one, unless
       // chokidar's is already waiting.
+      // And each file it reported that is there is handed to chokidar: one that landed between chokidar's read of
+      // the folder and its watch is a file chokidar does not know, and chokidar reports the removal of a file it
+      // knows only. For a file it knows already this does nothing; for one it does not, it adds the one watch a
+      // file has, as chokidar would have.
       if (there) {
         for (const file of [...cycle.files]) {
-          if (existsSync(file) || queue.some(q => q.path === file && q.event === "unlink")) continue;
+          if (existsSync(file)) { if (!closed) watcher.add(file); continue; }
+          if (queue.some(q => q.path === file && q.event === "unlink")) continue;
           cycle.files.delete(file);
           dispatchers.unlink?.(file);
         }
@@ -1121,6 +1129,7 @@ on("unlinkDir", async (dirPath) => {
   }
   (globalThis as { __testOnly_onWatchStarted?: TestOnlyWatchStarted }).__testOnly_onWatchStarted?.(
     (event, path) => { watcher.emit(event, path); },
+    path => { watcher.unwatch(path); },
   );
   return { close };
 }
