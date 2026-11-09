@@ -111,6 +111,16 @@ export function chokidarBackend(watcher: FSWatcher): "fsevents" | "nodefs" | nul
   return null;
 }
 
+/** Every template, data file and schema a discovery has, by absolute path. */
+function componentFilesOf(dr: DiscoveryResult): Set<string> {
+  const files = new Set<string>(dr.hbsPathToId.keys());
+  for (const entry of dr.discoveryMap.values()) {
+    if (entry.jsonPath) files.add(resolve(entry.jsonPath));
+    if (entry.schemaPath) files.add(resolve(entry.schemaPath));
+  }
+  return files;
+}
+
 /** The file watcher could not start (an inotify limit, a folder it may not read): pd dev cannot run. */
 export class WatchStartError extends Error {
   override name = "WatchStartError";
@@ -181,6 +191,12 @@ export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
   const { patternRootOf, styleRootOf, themeDirOf, scriptDirOf, dataDirOf, assetRootOf, helperOf, inBase, componentOfScss } = rootMatchers(watched);
   /** A file as messages name it: never an absolute path. */
   const shown = createDisplayPath(cwd, cfg.packages);
+  // The component files (templates, data, schemas) of the discovery the tree was last told about: the one
+  // pd dev starts with, then each rebuildAndSignalTree's. A change to a file not in it is a file the tree does
+  // not have: chokidar reports a file that comes back to a path it knew (a folder removed and restored) as a
+  // change, not an add. The cached discovery cannot tell: any edit drops it, and the next one is built from
+  // disk, file and all, without the tree being told.
+  let treeFiles = componentFilesOf(await currentDiscovery(state, patternRoots));
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
 const pagesDir = cfg.storefront?.pagesDir ?? null;
@@ -915,6 +931,13 @@ on("change", async (filePath) => {
     }
 
   } else if (ext === ".hbs" || ext === ".json") {
+    // A file the tree does not have (treeFiles): handled as the add it is.
+    const patternRoot = patternRootOf(filePath);
+    if (patternRoot && !treeFiles.has(resolve(filePath))) {
+      if (ext === ".hbs") await rebuildAndSignalTree(`Pattern added: ${relative(patternRoot, filePath)}`);
+      else await handleComponentJson(filePath, "add");
+      return;
+    }
     // Resolve using the current map BEFORE clearing it (file was in the previous discovery pass). A
     // second edit before any request has rebuilt it (a quick second save) finds none: build it, as the
     // SCSS path does, or that edit would reload nothing.
@@ -988,6 +1011,7 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   const before = previous ? baseComponentIds(previous) : null;
   // A discovery built after this change; one that a later change overtakes is never stored (lazy.ts).
   const dr = await rebuildDiscovery(state, patternRoots);
+  treeFiles = componentFilesOf(dr);
   // A component that arrived (or left) changes who owns which stylesheet: a stylesheet saved before its
   // template was filed under the base layer, and now belongs to the component. Restyle against the new
   // set, so its CSS moves without a restart.

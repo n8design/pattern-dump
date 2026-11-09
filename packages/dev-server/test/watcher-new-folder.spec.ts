@@ -3,9 +3,10 @@
 // removed and made again. Each must be handled every time it arrives, its files with it, and each file once,
 // though a new folder's rescan and chokidar both report what is in it, and the tree must show it. An `add` of
 // a file as its last handling saw it is skipped, unless an unlink, or a handled `addDir` of its folder, came
-// between. Within a rescan cycle, chokidar's late add of a file the cycle already reported is not a second
-// add, a write between the last scan and the watches is seen by the closing scan, and a folder still not
-// watched at the cap is said so once. And with chokidar's `_closers` not readable, the fallback still sees a
+// between. A folder restored with its files reported as changes only is built into discovery again. Within a
+// rescan cycle, chokidar's late add of a file the cycle already reported is not a second add, a write between
+// the last scan and the watches is seen by the closing scan, and a folder still not watched at the cap is said
+// so once. And with chokidar's `_closers` not readable, the fallback still sees a
 // file in a new folder, saying so once.
 //
 // The repeat is delivered with `__testOnly_onWatchStarted`, a missed removal made with `__testOnly_dropEvent`,
@@ -215,6 +216,33 @@ describe("a folder that leaves and comes back", () => {
       expect(await arrive(b, () => rename(b.at(B), b.at(A)), [A], filesOf(A), [["unlinkDir", B]]))
         .toEqual(expectedArrivals([A], filesOf(A)));
       expect(await inTree(b, "atoms/zz-a/item")).toBe(true);
+    } finally {
+      await b.close();
+    }
+  }, 60_000);
+
+  it("removed and restored, its files reported as changes only: discovery is built again, the tree has it, it renders", async () => {
+    const { b, deliver } = await project();
+    try {
+      await component(b, A);
+      await b.step(() => b.remove(A), [["unlinkDir", A]]);
+      expect(await inTree(b, "atoms/zz-a/item")).toBe(false);
+      // chokidar reports the restored folder's files as changes (its watches of them outlived the folder), and
+      // nothing else: no addDir, so no rescan either.
+      const inA = (path: string): boolean => b.owns(path) && (b.rel(path) === A || b.rel(path).startsWith(`${A}/`));
+      hooks.__testOnly_dropEvent = (event, path) => inA(path) && event !== "change";
+      // Its template and data only: a change to a docs file sends tree-changed of its own.
+      const back = ["item.hbs", "item.json"] as const;
+      const restored = await b.step(async () => {
+        for (const f of back) await save(b.at(`${A}/${f}`), FILES[f]);
+        for (const f of back) deliver("change", b.at(`${A}/${f}`));
+      });
+      // The open page is told the tree changed (it refetches on it), and what it fetches has the component.
+      expect(restored.messages).toContain(`{"type":"tree-changed"}`);
+      expect(await inTree(b, "atoms/zz-a/item")).toBe(true);
+      const page = await fetch(`${b.origin}/api/component/atoms/zz-a/item`);
+      expect(page.status).toBe(200);
+      expect(await page.text()).toContain("Item</p>");
     } finally {
       await b.close();
     }
