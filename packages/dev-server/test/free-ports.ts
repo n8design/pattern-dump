@@ -3,7 +3,7 @@
 // so a spec that must run without one can use it.
 import { createServer } from "node:net";
 import type { PatternDumpConfig } from "@pattern-dump/config";
-import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import { startDevServer, type DevServer, type DevServerOptions } from "@pattern-dump/dev-server";
 
 /** A port free at the moment of asking. */
 export const freePort = (): Promise<number> => new Promise((resolve, reject) => {
@@ -13,12 +13,12 @@ export const freePort = (): Promise<number> => new Promise((resolve, reject) => 
 
 /** Start pd dev on any workbench port and a free live-reload port, trying a fresh one when the port was taken. */
 export async function startOnFreeWsPort(
-  cfg: PatternDumpConfig, root: string, attempts = 5,
+  cfg: PatternDumpConfig, root: string, attempts = 5, opts: Omit<DevServerOptions, "port" | "wsPort"> = {},
 ): Promise<{ server: DevServer; wsPort: number }> {
   for (let attempt = 1; ; attempt++) {
     const wsPort = await freePort();
     try {
-      return { server: await startDevServer(cfg, root, { port: 0, wsPort }), wsPort };
+      return { server: await startDevServer(cfg, root, { ...opts, port: 0, wsPort }), wsPort };
     } catch (e) {
       // Said in the test output, so a run that runs out of attempts shows which ports it lost and why.
       console.warn(`[free-ports] attempt ${attempt}/${attempts}: live-reload port ${wsPort} lost: ${e instanceof Error ? `${e.name}: ${e.message.split("\n")[0]}` : String(e)}`);

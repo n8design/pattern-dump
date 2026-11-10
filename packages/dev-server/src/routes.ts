@@ -54,6 +54,7 @@ import { readPages } from "./storefront/pages.js";
 import { assemblePage } from "./storefront/page.js";
 import { pageStylesheets } from "./storefront/page-head.js";
 import type { RenderingHandle } from "./rendering.js";
+import type { SiteValuesHandle } from "./storefront/site-values.js";
 
 /** Everything the routes need, handed in explicitly rather than captured from a closure. */
 export interface RouteContext {
@@ -76,6 +77,8 @@ export interface RouteContext {
   readonly generation?: () => string;
   /** Set by `pd build`: storefront pages link into the workbench at this address. See DevServerOptions. */
   readonly storefrontWorkbenchUrl?: string;
+  /** storefront.site as the server holds it now (the watcher replaces it when the config changes only it). */
+  readonly site: SiteValuesHandle;
 }
 
 /** What the running process knows about itself, frozen at startup. The wire shape adds `protocol`. */
@@ -483,7 +486,7 @@ export async function handleRequest(
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
       const page = await assemblePage(route, model, {
         discoveryMap, handleMap: discovery.handleMap, shown: createDisplayPath(cwd, cfg.packages),
-        composition: await compositionFor(state, discovery, patternDirs), render, site: cfg.storefront.site,
+        composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
