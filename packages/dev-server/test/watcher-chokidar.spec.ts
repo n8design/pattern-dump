@@ -5,7 +5,9 @@
 //
 // Linux only: there events arrive within milliseconds, so a second save can land in the window. With
 // macOS's fsevents they arrive about 100 ms after the write, outside it, and the drop cannot be produced
-// through the file system.
+// through the file system. Even on Linux a loaded machine can be slower than the window, so the drop case
+// measures each attempt and retries one whose second save landed outside it (bounded; it never passes
+// without having tested the drop).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { realpathSync } from "node:fs";
@@ -16,26 +18,38 @@ import { CHANGE_RECHECK_MS, chokidarBackend, chokidarWatches } from "../src/watc
 import { save, saveInTwoSteps } from "../../../test-support/save.js";
 
 let tmp = "";
-let file = "";
-/** The file's text: each change saves it in place, grown by one character. */
-let text = "";
 let watcher: FSWatcher;
-const changes: number[] = [];
+/** When chokidar reported each change, by file. */
+const changes = new Map<string, number[]>();
+/** chokidar's window: a change to a path within this long of the last one it reported is dropped. */
+const WINDOW_MS = 50;
+/** How many attempts the drop case makes before it gives up, saying it could not test the drop. */
+const ATTEMPTS = 10;
 
-/** Resolve with whether a change to the file is reported within `ms`. */
-const reported = (ms: number): Promise<boolean> => new Promise(resolve => {
-  const from = changes.length;
-  const timer = setInterval(() => { if (changes.length > from) { clearInterval(timer); resolve(true); } }, 2);
-  setTimeout(() => { clearInterval(timer); resolve(changes.length > from); }, ms);
-});
+/** A file of the case's own, saved in place, grown by one character each time. */
+function track(name: string) {
+  const file = join(tmp, name);
+  let text = "";
+  const seen = (): number[] => changes.get(file) ?? [];
+  return {
+    file,
+    /** Save once more; resolves when the write is done. */
+    save: () => saveInTwoSteps(file, text += "x"),
+    seen,
+    /** Resolve with when a change after the `from`-th is reported, or null if none is within `ms`. */
+    reported: (from: number, ms: number): Promise<number | null> => new Promise(resolve => {
+      const timer = setInterval(() => { if (seen().length > from) { clearInterval(timer); clearTimeout(out); resolve(seen()[from]!); } }, 2);
+      const out = setTimeout(() => { clearInterval(timer); resolve(seen().length > from ? seen()[from]! : null); }, ms);
+    }),
+  };
+}
 
 beforeAll(async () => {
   tmp = realpathSync(await mkdtemp(join(tmpdir(), "pd-chokidar-")));
-  file = join(tmp, "f.txt");
-  await save(file, text);
+  for (const name of ["drop.txt", "recheck.txt"]) await save(join(tmp, name), "");
   // The options watch.ts uses.
   watcher = chokidar.watch(tmp, { ignoreInitial: true, persistent: true });
-  watcher.on("change", () => changes.push(Date.now()));
+  watcher.on("change", (path: string) => { changes.set(path, [...(changes.get(path) ?? []), Date.now()]); });
   await new Promise<void>(resolve => watcher.once("ready", () => resolve()));
 });
 afterAll(async () => {
@@ -45,23 +59,44 @@ afterAll(async () => {
 
 describe.runIf(process.platform === "linux")("chokidar's change window (Linux)", () => {
   it("drops a change to the same file made right after the previous one was reported, and never reports it", async () => {
-    const first = reported(1_000);
-    await saveInTwoSteps(file, text += "1");
-    expect(await first).toBe(true);
-    // At once, inside the window.
-    const second = reported(500);
-    await saveInTwoSteps(file, text += "2");
-    expect(await second).toBe(false);
-  });
+    const f = track("drop.txt");
+    const tried: string[] = [];
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+      // Each attempt starts outside the last report's window, so its first save is reported.
+      const last = f.seen().at(-1);
+      if (last !== undefined) await new Promise(resolve => setTimeout(resolve, Math.max(0, last + 2 * WINDOW_MS - Date.now())));
+      const from = f.seen().length;
+      const first = f.reported(from, 1_000);
+      await f.save();
+      const firstAt = await first;
+      expect(firstAt, `attempt ${attempt}: the first save is reported`).not.toBeNull();
+      // At once, as an editor's format-on-save writes again.
+      await f.save();
+      const savedAfter = Date.now() - firstAt!;
+      const secondAt = await f.reported(from + 1, 500);
+      if (secondAt !== null) {
+        // Reported: inside the window, the drop failed; after it, this attempt could not test the drop.
+        expect(secondAt - firstAt!, `attempt ${attempt}: a change ${secondAt - firstAt!} ms after the last report, inside chokidar's ${WINDOW_MS} ms window, was reported`).toBeGreaterThanOrEqual(WINDOW_MS);
+        tried.push(`reported ${secondAt - firstAt!} ms after the first`);
+        continue;
+      }
+      // Not reported: the drop, if the save landed inside the window.
+      if (savedAfter < WINDOW_MS) return;
+      tried.push(`saved ${savedAfter} ms after the first, not reported`);
+    }
+    throw new Error(`the drop could not be tested: no second save landed inside chokidar's ${WINDOW_MS} ms window in ${ATTEMPTS} attempts (${tried.join("; ")})`);
+  }, 30_000);
 
   it("reports a change made once CHANGE_RECHECK_MS has passed since the previous one", async () => {
-    const first = reported(1_000);
-    await saveInTwoSteps(file, text += "3");
-    expect(await first).toBe(true);
+    // A file of its own: chokidar's window is per path, so nothing the case above did can reach it.
+    const f = track("recheck.txt");
+    const firstAt = f.reported(0, 1_000);
+    await f.save();
+    expect(await firstAt).not.toBeNull();
     await new Promise(resolve => setTimeout(resolve, CHANGE_RECHECK_MS));
-    const next = reported(1_000);
-    await saveInTwoSteps(file, text += "4");
-    expect(await next).toBe(true);
+    const next = f.reported(1, 1_000);
+    await f.save();
+    expect(await next).not.toBeNull();
   });
 });
 
