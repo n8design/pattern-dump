@@ -1,7 +1,7 @@
 // pd dev takes a storefront.site change in its config live: the open page reloads with the new value. Any
 // other change asks for a restart on the open page, and a config that does not load says so; the page keeps
 // its values in both. The spec edits the bench's config and restores it after each test.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { save } from "../../test-support/save.js";
@@ -9,6 +9,19 @@ import { save } from "../../test-support/save.js";
 const config = fileURLToPath(new URL("../pattern-dump.config.ts", import.meta.url));
 const FOOTER = "Built with Pattern Dump from the storefront bench.";
 let original = "";
+
+/**
+ * /about/, once its live socket has said hello. A notice reaches only the pages connected when it is sent
+ * (a page that connects later is caught up on reloads, not on notices), so a save made before then can
+ * leave the page without it.
+ */
+const open = async (page: Page) => {
+  const hello = new Promise<void>(resolve => page.on("websocket", ws => ws.on("framereceived", frame => {
+    try { if ((JSON.parse(String(frame.payload)) as { type?: string }).type === "hello") resolve(); } catch { /* not JSON */ }
+  })));
+  await page.goto("/about/");
+  await hello;
+};
 
 test.beforeEach(async () => { original = await readFile(config, "utf8"); });
 // Restored, and waited for until pd dev serves the original values again: the next test's save would
@@ -21,14 +34,14 @@ test.afterEach(async ({ request }) => {
 
 test.describe("the config file in pd dev", () => {
   test("a storefront.site edit shows on the open page", async ({ page }) => {
-    await page.goto("/about/");
+    await open(page);
     await expect(page.locator(".site-footer p").first()).toHaveText(FOOTER);
     await save(config, original.replace(`footer: "${FOOTER}"`, `footer: "A footer edited while the page was open."`));
     await expect(page.locator(".site-footer p").first()).toHaveText("A footer edited while the page was open.", { timeout: 10_000 });
   });
 
   test("any other edit asks for a restart, and the page keeps its values", async ({ page }) => {
-    await page.goto("/about/");
+    await open(page);
     await save(config, original
       .replace(`footer: "${FOOTER}"`, `footer: "Not taken."`)
       .replace(`outDir: "./.out/workbench"`, `outDir: "./.out/workbench-elsewhere"`));
@@ -38,7 +51,7 @@ test.describe("the config file in pd dev", () => {
   });
 
   test("a config that does not load is reported, and the page keeps its values", async ({ page }) => {
-    await page.goto("/about/");
+    await open(page);
     // An unknown key at the top of the config (inside storefront.site any key is the skin's to check, per page).
     await save(config, original
       .replace(`footer: "${FOOTER}"`, `footer: "Not taken either."`)
