@@ -5,7 +5,9 @@
 // values, and each included partial's beneath the context it is included with. A page's context always
 // carries every key the layout declares (null where the page sets none), plus body, nav and site; so a
 // sample key outside those would render on every page using the layout. Inside `site`, an object that
-// merges key by key, the same holds for each key partials/base does not declare for it.
+// merges key by key, the same holds for each key partials/base does not declare for it. `page` is there
+// only when the layout declares it, with only the sub-keys it declares; below them, its shape is
+// Pattern Dump's (derived.ts), and every key outside it, at any depth, is refused too.
 //
 // So every sample file in a layout's include tree — the layout's own and each partial it includes,
 // however deep — may only use those keys. Anything else is a problem, fatal to every page using the
@@ -16,6 +18,7 @@ import { basename } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "../composition.js";
 import { ASSEMBLY_KEYS } from "./frontmatter-contract.js";
+import { outsideShape, PAGE_SHAPE } from "./derived.js";
 import { SITE_SCHEMA_OWNER } from "./site.js";
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -38,9 +41,12 @@ export async function checkSampleData(
   composition: CompositionRegistry,
   layoutDeclared: string[],
   siteDeclared: string[],
+  /** The sub-keys of `page` the layout declares; undefined when it does not declare `page`. */
+  pageDeclared?: string[],
 ): Promise<string[]> {
   const problems: string[] = [];
-  const allowed = new Set([...layoutDeclared, ...ASSEMBLY_KEYS]);
+  const allowed = new Set<string>([...layoutDeclared, ...ASSEMBLY_KEYS].filter(k => k !== "page" || pageDeclared !== undefined));
+  const shapeFields: Record<string, unknown> = PAGE_SHAPE.fields;
   for (const id of includeTree(layoutId, composition)) {
     const jsonPath = discoveryMap.get(id)?.jsonPath;
     if (!jsonPath) continue;
@@ -53,6 +59,20 @@ export async function checkSampleData(
       if (!allowed.has(key)) {
         problems.push(`${where} sets "${key}", which ${layoutId} does not declare, so it would show on every page using that layout`);
         continue;
+      }
+      if (key === "page" && isPlainObject(value)) {
+        for (const [sub, v] of Object.entries(value)) {
+          const outside = Object.hasOwn(shapeFields, sub)
+            ? (pageDeclared ?? []).includes(sub) ? outsideShape(v, PAGE_SHAPE.fields[sub as keyof typeof PAGE_SHAPE.fields], `page.${sub}`) : undefined
+            : [`page.${sub}`];
+          if (outside === undefined) {
+            problems.push(`${where} sets "page.${sub}", which ${layoutId} does not declare for page, so it would show on every page using that layout`);
+            continue;
+          }
+          for (const at of outside) {
+            problems.push(`${where} sets "${at}", which is not part of the page data Pattern Dump fills, so it would show on every page using ${layoutId}`);
+          }
+        }
       }
       if (key === "site" && isPlainObject(value)) {
         for (const sub of Object.keys(value)) {

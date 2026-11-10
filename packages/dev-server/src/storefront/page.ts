@@ -10,7 +10,8 @@
 // The layout's own sample data sits beneath what a page passes in (the renderer's data cascade). So
 // every key the layout declares and the page does not set is passed as null, and every site key the base
 // partial declares and the config does not set is too: the sample data stays in the workbench and can
-// never show on a real page.
+// never show on a real page. A layout that declares `page` gets what is derived for the page (derived.ts),
+// each declared sub-key present and null where nothing is.
 
 import { createHeightFitter, generationBehind, type DiscoveryMap, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
 import { frontmatterBody, frontmatterBodyOffset } from "../frontmatter.js";
@@ -22,6 +23,7 @@ import { checkPageFrontmatter } from "./frontmatter-contract.js";
 import type { PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { checkSampleData } from "./sample-data.js";
+import { checkPageDeclaration, pageValue } from "./derived.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 
@@ -176,17 +178,20 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const siteSchema = (await readSchema(a.discoveryMap.get(SITE_SCHEMA_OWNER)?.schemaPath)).schema;
   const layoutDeclared = Object.keys(layoutSchema?.properties ?? {});
   const siteDeclared = Object.keys(siteSchema?.properties?.site?.properties ?? {});
+  const pageDeclaration = checkPageDeclaration(layoutSchema, checked.layoutId);
+  problems.push(...pageDeclaration.problems);
   if (a.discoveryMap.has(checked.layoutId)) {
-    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared));
+    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared));
   }
   if (problems.length) return fail(problems);
 
   // What the layout gets: its declared values, null where the page sets none, then what the storefront fills.
   const data = {
-    ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site"]),
+    ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),
     body,
     nav: markCurrent(model.nav, route),
     site: withDeclaredAbsentAsNull(site.values, siteDeclared),
+    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, {}) } : {}),
   };
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
