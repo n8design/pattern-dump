@@ -78,6 +78,10 @@ describe("docs rendering — characterisation", () => {
       }
     });
 
+    it("sets no heading ids: anchors are for storefront pages only", () => {
+      expect(specimen).not.toMatch(/<h[1-6][^>]*\sid=/);
+    });
+
     it("renders nested lists, blockquote, table and inline formatting", () => {
       expect(specimen).toContain("<ul>");
       expect(specimen).toContain("<ol>");

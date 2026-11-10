@@ -44,7 +44,7 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = [];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings"];
 
 type Prop = Record<string, unknown>;
 const isObject = (v: unknown): v is Prop => typeof v === "object" && v !== null && !Array.isArray(v);
