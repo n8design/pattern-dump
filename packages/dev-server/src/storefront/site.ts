@@ -4,11 +4,11 @@
 // What they may hold is declared, not inferred: the `site` property of `partials/base`'s schema — the
 // frame every layout is built on — names the keys, their types and which are required. The values are
 // checked against it with the same checker as page frontmatter, with coercion off: config values are
-// already typed. Every problem is fatal to the caller (D7).
+// already typed. The check looks inside objects and lists, at every level (checkJsonKeys). Every problem
+// is fatal to the caller (D7).
 
 import type { DiscoveryMap } from "@pattern-dump/contracts";
-import { suggest } from "@pattern-dump/config";
-import { checkDeclared, readSchema } from "./declared-values.js";
+import { checkJsonKeys, readSchema } from "./declared-values.js";
 
 /** The component whose schema declares `site`. */
 export const SITE_SCHEMA_OWNER = "partials/base";
@@ -40,21 +40,8 @@ export async function checkSite(site: Record<string, unknown> | undefined, disco
     return { values: {}, problems };
   }
 
-  const properties = declared.properties ?? {};
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(site)) {
-    const prop = Object.hasOwn(properties, key) ? properties[key] : undefined;
-    if (!prop) {
-      const near = suggest(key, Object.keys(properties));
-      problems.push(`storefront.site.${key} is not declared by ${SITE_SCHEMA_OWNER}${near ? ` — did you mean "${near}"?` : ""}`);
-      continue;
-    }
-    const r = checkDeclared(prop, value, "json");
-    if (r.ok) out[key] = r.value;
-    else problems.push(`storefront.site.${key} ${r.message}`);
-  }
-  for (const key of declared.required ?? []) {
-    if (!(key in site)) problems.push(`storefront.site.${key} is required by ${SITE_SCHEMA_OWNER}`);
-  }
+  const checked = checkJsonKeys(declared, site, "storefront.site", SITE_SCHEMA_OWNER);
+  problems.push(...checked.problems);
+  const out = checked.value;
   return { values: problems.length ? {} : out, problems };
 }
