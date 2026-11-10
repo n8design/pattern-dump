@@ -86,6 +86,23 @@ describe("pd build — the storefront root", () => {
     expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 16, bytes: expect.any(Number) });
   });
 
+  it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
+    expect(report.notes).toEqual([`guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"`]);
+    expect(report.warnings).toEqual([]);
+    const setup = files.get("guides/setup/index.html")!.bytes.toString("utf8");
+    expect(setup).toContain(`<h2 id="main-1">Main</h2>`);
+    expect(setup).toContain(`href="#main-1"`);
+  });
+
+  it("is the same, byte for byte, when built again", async () => {
+    const again = await benchCopy();
+    const second = await build(again, join(again, "..", "wb-again"));
+    const files2 = await tree(join(again, ".out", "storefront"));
+    expect([...files2.keys()].sort()).toEqual([...files.keys()].sort());
+    for (const [file, { bytes }] of files) expect(files2.get(file)!.bytes.equals(bytes), file).toBe(true);
+    expect(second.notes).toEqual(report.notes);
+  }, 120_000);
+
   it("resolves every reference inside it to a file it holds", () => {
     const missing: string[] = [];
     for (const [file, { bytes }] of files) {
