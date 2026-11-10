@@ -149,10 +149,10 @@ describe("checkSampleData", () => {
     const patterns = fileURLToPath(new URL("../../../storefront-bench/src/patterns/", import.meta.url));
     const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
     const composition = await buildCompositionRegistry(patterns, handleMap, discoveryMap);
-    const site = ["title", "tagline", "href", "footer", "year"];
-    expect(await checkSampleData("layouts/page", discoveryMap, composition, ["title", "description"], site)).toEqual([]);
-    expect(await checkSampleData("layouts/article", discoveryMap, composition, ["title", "description", "lede"], site)).toEqual([]);
-    expect(await checkSampleData("layouts/doc", discoveryMap, composition, ["title", "description", "lede", "page"], site, ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified"])).toEqual([]);
+    const site = ["title", "tagline", "href", "footer", "year", "navigations"];
+    expect(await checkSampleData("layouts/page", discoveryMap, composition, ["title", "description"], site, undefined, ["footer"])).toEqual([]);
+    expect(await checkSampleData("layouts/article", discoveryMap, composition, ["title", "description", "lede"], site, undefined, ["footer"])).toEqual([]);
+    expect(await checkSampleData("layouts/doc", discoveryMap, composition, ["title", "description", "lede", "page"], site, ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified"], ["footer"])).toEqual([]);
   });
 });
 

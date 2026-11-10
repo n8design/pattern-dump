@@ -22,6 +22,14 @@ export default defineConfig({
       href: "/",
       year: "2026",
       footer: "Built with Pattern Dump from the storefront bench.",
+      // A declared navigation: a page, an external link and a group, in the footer of every page.
+      navigations: {
+        footer: [
+          { page: "about.md" },
+          { href: "https://example.test/source", label: "Source" },
+          { label: "Guides", children: [{ page: "guides/setup.md" }, { page: "guides/index.md", label: "All guides" }] },
+        ],
+      },
     },
   },
 });

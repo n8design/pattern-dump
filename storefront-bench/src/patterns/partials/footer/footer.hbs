@@ -1,4 +1,24 @@
 <footer class="site-footer">
+  {{#if site.navigations.footer}}
+  <nav class="site-footer-nav" aria-label="Footer">
+    <ul>
+      {{#each site.navigations.footer}}
+      <li{{#if ancestor}} class="is-ancestor"{{/if}}>
+        {{#if children}}
+        <span class="site-footer-group">{{label}}</span>
+        <ul>
+          {{#each children}}
+          <li><a href="{{#if route}}{{route}}{{else}}{{href}}{{/if}}"{{#if current}} aria-current="page"{{/if}}>{{label}}</a></li>
+          {{/each}}
+        </ul>
+        {{else}}
+        <a href="{{#if route}}{{route}}{{else}}{{href}}{{/if}}"{{#if current}} aria-current="page"{{/if}}>{{label}}</a>
+        {{/if}}
+      </li>
+      {{/each}}
+    </ul>
+  </nav>
+  {{/if}}
   <p>{{site.footer}}</p>
   {{#if site.year}}<p class="site-year">© {{site.year}}</p>{{/if}}
 </footer>
