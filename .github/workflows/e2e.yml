@@ -16,13 +16,13 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Storefront pages take their dates from git, and pd build refuses a shallow clone's: the
           # storefront E2E reads page dates, so it needs the whole history.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -79,7 +79,7 @@ jobs:
 
       - name: Upload Playwright traces and videos on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ github.run_id }}
           path: |
@@ -100,12 +100,12 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The diff against the base branch needs its history.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -127,7 +127,7 @@ jobs:
 
       - name: Upload Playwright traces and videos on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: burn-in-report-${{ github.run_id }}
           path: |
