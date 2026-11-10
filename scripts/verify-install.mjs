@@ -297,10 +297,12 @@ if (failures.length === 0 && tmp) {
   check(page.status === 200 && page.body.includes(`<h1 class="sk-title">INSTALLED SITE</h1>`),
     "a storefront page renders with the installed package's compiled helper", `${page.status} ${page.body.slice(0, 300)}`);
 
-  // An edit to the installed copy sends nothing: the copy is not watched. An edit to the project's page,
-  // after it, sends its page-changed; that is then the only message. Across processes there is no barrier,
-  // and events in two folders are not ordered, so this cannot catch a late message: the line above (said
-  // from the watch list) and test/package-watch.spec.ts (in process, with the watcher's hook) prove it.
+  // An edit to the project's page sends its page-changed, and nothing else arrives before it. The installed
+  // copy is edited first, so a message from it could come first, but nothing here can prove it sends none:
+  // across processes there is no barrier, and changes in two folders are not ordered, so a late message
+  // goes unseen. That the installed copy is not watched is proved by the check above ("pd dev says the
+  // installed copy is not watched", read from the watch list) and by packages/dev-server/test/
+  // package-watch.spec.ts (in process, with the watcher's hook).
   const ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
   const messages = [];
   ws.on("message", d => messages.push(String(d)));
@@ -313,11 +315,14 @@ if (failures.length === 0 && tmp) {
   await writeFile(join(site, "pages", "index.md"), "\nEdited.\n", { flag: "a" });
   try {
     await pageChanged;
-    const sent = messages.filter(m => !m.startsWith(`{"type":"hello"`));
-    check(JSON.stringify(sent) === JSON.stringify([`{"type":"page-changed","route":"/"}`]),
-      "an edit to the installed copy sends nothing", JSON.stringify(sent));
+    // What was sent, by type and route: every live-reload message also carries the generation it belongs
+    // to, which differs on every run and is not what this checks (the other live-reload specs leave it
+    // out the same way). The one message so far is the project page's own.
+    const sent = messages.map(m => JSON.parse(m)).filter(m => m.type !== "hello").map(({ type, route }) => ({ type, route }));
+    check(JSON.stringify(sent) === JSON.stringify([{ type: "page-changed", route: "/" }]),
+      "an edit to the project's page sends its page-changed, and nothing else arrives before it", JSON.stringify(messages));
   } catch (e) {
-    check(false, "an edit to the installed copy sends nothing", String(e));
+    check(false, "an edit to the project's page sends its page-changed, and nothing else arrives before it", String(e));
   }
   ws.close();
   dev.kill();
