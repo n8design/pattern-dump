@@ -2,7 +2,8 @@
 // carries its id, the doc layout's table of contents (from page.headings) links to them, and a heading whose
 // anchor the layout already has as an id ("Main", against <main id="main">) gets the next free suffix.
 // Against pd dev and the built root alike.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 // Short enough that every heading but the first starts below the fold, so reaching one is a scroll.
 const HEIGHT = 240;

@@ -3,7 +3,7 @@
 // behind it. The socket is held with page.routeWebSocket until the change has been handled (the server's
 // generation has moved past the page's), then let through. The spec writes into the bench's stylesheets
 // and restores them after the test.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { PD_GENERATION_HEADER, generationBehind } from "@pattern-dump/contracts";
