@@ -1,0 +1,18 @@
+{{#> partials-base }}
+<article class="doc">
+  <header class="doc-header">
+    <h1 class="doc-title">{{title}}</h1>
+    {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
+  </header>
+  {{#if page.headings.length}}
+  <nav class="doc-toc" aria-label="On this page">
+    <ul>
+      {{#each page.headings}}
+      <li class="doc-toc-h{{level}}"><a href="#{{anchor}}">{{text}}</a></li>
+      {{/each}}
+    </ul>
+  </nav>
+  {{/if}}
+  <div class="doc-body">{{{body}}}</div>
+</article>
+{{/partials-base}}

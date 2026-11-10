@@ -55,7 +55,7 @@ describe("readPages — the storefront bench", () => {
     expect(model.pages).toEqual([
       { route: "/", title: "Storefront bench", layout: "home" },
       { route: "/guides/", title: "Guides", layout: "page" },
-      { route: "/guides/setup/", title: "Setup", layout: "article" },
+      { route: "/guides/setup/", title: "Setup", layout: "doc" },
       { route: "/about/", title: "About", layout: "page" },
     ]);
     expect(model.nav).toEqual([

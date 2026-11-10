@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Doc layout",
+  "description": "The frontmatter a page using layout: doc may set, besides layout and order. It also shows what the storefront derives for the page.",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "title":       { "type": "string", "description": "The page's heading, and its title in the nav" },
+    "description": { "type": "string", "description": "The page's meta description" },
+    "lede":        { "type": "string", "description": "An opening paragraph, set larger than the body" },
+    "page": {
+      "type": "object",
+      "description": "Derived by the storefront for each page; a page cannot set it",
+      "properties": {
+        "headings": {
+          "type": "array",
+          "description": "Every heading of the page's markdown, in order: the table of contents",
+          "items": {
+            "type": "object",
+            "properties": {
+              "level":  { "type": "integer", "description": "1 to 6" },
+              "text":   { "type": "string", "description": "The heading as it reads" },
+              "anchor": { "type": "string", "description": "The heading's id, for #anchor links" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
