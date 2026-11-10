@@ -14,6 +14,7 @@
 // watcher later reads to decide which component a theme or script edit refreshes. It is state, not
 // a cache, and it is why two concurrent clients interfere with each other.
 
+import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile, stat } from "node:fs/promises";
@@ -57,6 +58,9 @@ import type { RenderingHandle } from "./rendering.js";
 import type { SiteValuesHandle } from "./storefront/site-values.js";
 
 /** Everything the routes need, handed in explicitly rather than captured from a closure. */
+/** The storefront notes a server has printed (pd dev), so each is printed once. */
+const printedNotes = new WeakMap<RouteContext, Set<string>>();
+
 export interface RouteContext {
   readonly cfg: ResolvedConfig;
   readonly state: ServerState;
@@ -79,6 +83,8 @@ export interface RouteContext {
   readonly storefrontWorkbenchUrl?: string;
   /** Set by `pd build`: where a storefront page's notes go. Without it they go to the terminal. */
   readonly onStorefrontNote?: (note: string) => void;
+  /** The storefront pages' dates from git, when there is a storefront (git-dates.ts). */
+  readonly dates?: GitDates;
   /** storefront.site as the server holds it now (the watcher replaces it when the config changes only it). */
   readonly site: SiteValuesHandle;
 }
@@ -491,12 +497,16 @@ export async function handleRequest(
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
+        ...(ctx.dates ? { dates: ctx.dates } : {}),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
       });
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
       for (const note of page.notes) {
-        if (ctx.onStorefrontNote) ctx.onStorefrontNote(note);
-        else console.log(`[storefront] ${note}`);
+        if (ctx.onStorefrontNote) { ctx.onStorefrontNote(note); continue; }
+        // In pd dev each note is printed once per server, not on every request for the page.
+        const printed = printedNotes.get(ctx) ?? new Set<string>();
+        printedNotes.set(ctx, printed);
+        if (!printed.has(note)) { printed.add(note); console.log(`[storefront] ${note}`); }
       }
       res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });
       res.end(page.html);

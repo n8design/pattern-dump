@@ -164,6 +164,7 @@ A layout receives:
 | `body` | The page's markdown, rendered. Include it unescaped, `{{{body}}}`: it is the only value safe to, because the markdown renderer escapes everything an author writes. Every other value is included escaped, `{{…}}` |
 | `nav` | The navigation: `{ route, title, description?, current?, children? }` per entry, `current: true` on the page's own entry |
 | `site` | The values of `storefront.site` |
+| `page` | What the storefront derives for the page, when the layout declares it (below) |
 
 ```hbs
 {{#> partials-base }}
@@ -177,6 +178,42 @@ A layout receives:
 A layout's sample data (`<name>.json`) is what its workbench preview shows. It never reaches a page: a
 page gets only its own values and the ones above. To keep that true, a sample may only use the keys its
 layout declares plus `body`, `nav` and `site`, and the storefront reports any other as a problem.
+
+### What the storefront derives for a page
+
+A layout that declares a `page` property in its schema, with sub-properties, gets those sub-keys of what
+the storefront works out for each page, and only those. Each is present, and `null` where there is
+nothing. A page cannot set `page`, and a sub-key the storefront does not fill is a problem that names the
+ones it does. A sample's `page` may only use the sub-keys the layout declares, and inside them only the
+keys below, at any depth.
+
+| `page.…` | |
+|---|---|
+| `headings` | Every heading of the page's markdown, in order: `{ level, text, anchor }`. `anchor` is the heading's `id`, GitHub's slug of its text (`## Getting started` is `#getting-started`, a second one `#getting-started-1`). A heading whose anchor the layout already uses as an id (`## Main` against `<main id="main">`) gets the next free suffix, `main-1`, and a note says so |
+| `section` | The top-level nav entry the page falls under, `{ route, title }`; a top-level page is its own section |
+| `breadcrumbs` | Home, then each folder above the page by its `index.md`, as `{ route, title }`; empty on the home page. They reach pages the one-level nav does not list |
+| `prev`, `next` | The pages before and after this one in the nav, read entry by entry with each folder's pages after it, across sections; `null` at either end and for a page the nav does not list |
+| `created`, `modified` | The page's first and last commit, from git: the author date, ISO 8601. A renamed page keeps the date it was first added |
+
+```hbs
+{{#each page.headings}}<a href="#{{anchor}}">{{text}}</a>{{/each}}
+{{#if page.next}}<a rel="next" href="{{page.next.route}}">{{page.next.title}}</a>{{/if}}
+```
+
+A field named like a helper (`id`, `eq`, …) can never be read by its name, since `{{id}}` calls the
+helper: such a schema field is an error, which is why the heading's field is `anchor`.
+
+**Dates.** They are read from git once, the first time a layout that declares them is rendered; a site
+whose layouts show no dates never runs git. A page with uncommitted changes has its last commit's dates
+(a note in `pd build`). A page git does not know — not committed yet, ignored, or outside any repository —
+has `null` for both, with a note. In `pd dev` the dates are as of the first page that asked for them: a new
+commit is seen on restart. Two limits:
+
+- **A shallow clone** has only part of the history, so its dates would be wrong, not missing. `pd build`
+  refuses to build a page whose layout shows dates from a shallow clone; in CI, check out the full history
+  (`fetch-depth: 0` with `actions/checkout`). `pd dev` notes it.
+- **A page moved into the pages folder from outside it** counts as created at the move: the history read
+  is limited to the pages folder, so that move reads as an add.
 
 The page's `<head>` links the stylesheets of the layout and everything it includes, and the project's
 base layer (`documentBase`), which also reaches every preview. It does not link themes: a skin's colours

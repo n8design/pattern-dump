@@ -46,7 +46,7 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next"];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified"];
 
 /** A page's place in the site. */
 export type Position = Pick<DerivedPage, "section" | "breadcrumbs" | "prev" | "next">;
