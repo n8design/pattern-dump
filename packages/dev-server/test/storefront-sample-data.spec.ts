@@ -128,6 +128,13 @@ describe("checkSampleData", () => {
     });
   });
 
+  it("refuses a sample navigation partials/base does not list", async () => {
+    const p = await project({ "partials/header/header.json": JSON.stringify({ site: { navigations: { footer: [], legal: [{ label: "Sample" }] } } }) });
+    expect(await checkSampleData("layouts/page", p.map, p.composition, ["title"], ["title", "navigations"], undefined, ["footer"])).toEqual([
+      `the sample data of partials/header (header.json) sets "site.navigations.legal", which partials/base does not list, so it would show on every page using layouts/page`,
+    ]);
+  });
+
   it("reports sample data that cannot be read", async () => {
     const problems = await check({ "partials/header/header.json": "{ not json" });
     expect(problems).toHaveLength(1);
@@ -142,9 +149,10 @@ describe("checkSampleData", () => {
     const patterns = fileURLToPath(new URL("../../../storefront-bench/src/patterns/", import.meta.url));
     const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
     const composition = await buildCompositionRegistry(patterns, handleMap, discoveryMap);
-    expect(await checkSampleData("layouts/page", discoveryMap, composition, ["title", "description"], ["title", "tagline", "href", "footer", "year"])).toEqual([]);
-    expect(await checkSampleData("layouts/article", discoveryMap, composition, ["title", "description", "lede"], ["title", "tagline", "href", "footer", "year"])).toEqual([]);
-    expect(await checkSampleData("layouts/doc", discoveryMap, composition, ["title", "description", "lede", "page"], ["title", "tagline", "href", "footer", "year"], ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified"])).toEqual([]);
+    const site = ["title", "tagline", "href", "footer", "year"];
+    expect(await checkSampleData("layouts/page", discoveryMap, composition, ["title", "description"], site)).toEqual([]);
+    expect(await checkSampleData("layouts/article", discoveryMap, composition, ["title", "description", "lede"], site)).toEqual([]);
+    expect(await checkSampleData("layouts/doc", discoveryMap, composition, ["title", "description", "lede", "page"], site, ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified"])).toEqual([]);
   });
 });
 

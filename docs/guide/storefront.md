@@ -215,6 +215,34 @@ commit is seen on restart. Two limits:
 - **A page moved into the pages folder from outside it** counts as created at the move: the history read
   is limited to the pages folder, so that move reads as an add.
 
+### Declared navigations
+
+Besides the nav built from the pages folder, `storefront.site.navigations` holds named lists of links a
+skin shows, such as a footer's. Each entry is a page, an external link or a group, and groups nest to any
+depth:
+
+```ts
+site: {
+  navigations: {
+    footer: [
+      { page: "about.md" },                                   // labelled with the page's title
+      { href: "https://github.com/acme/ds", label: "Source" }, // https:, http:, mailto:, or a path from /
+      { label: "Guides", children: [{ page: "guides/setup.md" }, { page: "guides/index.md", label: "All guides" }] },
+    ],
+  },
+},
+```
+
+The shape is Pattern Dump's, so the skin does not declare it: `partials/base`'s schema only lists the
+names it shows, under `site.properties.navigations.properties`, each with a description at most, and
+`required` for the ones it needs. A name the skin does not list, a page that is not in the pages folder, an
+entry that is none of the three forms or an unknown key is a problem with its place named
+(`storefront.site.navigations.footer[2].children[0]`), reported once for the whole site.
+
+A layout gets `site.navigations.<name>` for every name the skin lists, resolved for the page: entries of
+`{ label, route }`, `{ label, href }` or `{ label, children }`, with `current: true` on the page's own entry
+and `ancestor: true` on every group above it; `null` for a name the config does not set.
+
 The page's `<head>` links the stylesheets of the layout and everything it includes, and the project's
 base layer (`documentBase`), which also reaches every preview. It does not link themes: a skin's colours
 belong to the skin.
