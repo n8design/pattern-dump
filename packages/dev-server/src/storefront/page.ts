@@ -24,6 +24,7 @@ import type { PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { checkSampleData } from "./sample-data.js";
 import { checkPageDeclaration, pageValue, type PageHeading } from "./derived.js";
+import { collidingHeadings, idsBesides } from "./anchors.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 
@@ -51,6 +52,8 @@ export interface AssembledPage {
   html: string;
   /** Every problem, one line each. Empty for a page that rendered. */
   problems: string[];
+  /** Notes about a page that rendered, one line each: a heading whose anchor was suffixed (anchors.ts). */
+  notes: string[];
 }
 
 /** The fitter's glue: frames start at 1px (from script, so with scripting off they keep the UA default
@@ -125,13 +128,13 @@ const markCurrent = (nav: StorefrontNavItem[], route: string): unknown[] => nav.
 }));
 
 export async function assemblePage(route: string, model: PageModel, a: PageAssembly): Promise<AssembledPage> {
-  const fail = (problems: string[]): AssembledPage => ({ status: 500, html: errorDocument(route, problems, a.live), problems });
+  const fail = (problems: string[]): AssembledPage => ({ status: 500, html: errorDocument(route, problems, a.live), problems, notes: [] });
 
   // The pages folder as a whole: a problem there is a problem for every page.
   if (model.problems.length) return fail(model.problems);
 
   const notFound = (): AssembledPage =>
-    ({ status: 404, html: errorDocument(route, [`there is no page at ${route}`], a.live), problems: [`there is no page at ${route}`] });
+    ({ status: 404, html: errorDocument(route, [`there is no page at ${route}`], a.live), problems: [`there is no page at ${route}`], notes: [] });
   const page = model.files.get(route);
   if (!page) return notFound();
   // A page the folder listed can be gone by now (deleted between reading the folder and this request):
@@ -150,29 +153,34 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const site = await checkSite(a.site, a.discoveryMap);
   problems.push(...site.problems);
 
-  const docProblems: string[] = [];
-  const placedProblems: PlacedProblem[] = [];
-  const headings: PageHeading[] = [];
-  const body = await renderDoc(
-    frontmatterBody(source),
-    (id, variant) => a.render({ component: id, variant }).then(r => r.html),
-    a.discoveryMap,
-    {
-      embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings,
-      // Components placed with values (pd- tags): checked against their schemas, rendered into the page.
-      placed: {
-        lineOffset: frontmatterBodyOffset(source),
-        problems: placedProblems,
-        deps: {
-          discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition, render: a.render,
-          schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath)).schema,
-          shown: a.shown,
+  /** The page's markdown, rendered; its headings' anchors never take one of `takenIds`. */
+  const renderBody = async (takenIds: string[] = []) => {
+    const docProblems: string[] = [];
+    const placedProblems: PlacedProblem[] = [];
+    const headings: PageHeading[] = [];
+    const body = await renderDoc(
+      frontmatterBody(source),
+      (id, variant) => a.render({ component: id, variant }).then(r => r.html),
+      a.discoveryMap,
+      {
+        embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings, takenIds,
+        // Components placed with values (pd- tags): checked against their schemas, rendered into the page.
+        placed: {
+          lineOffset: frontmatterBodyOffset(source),
+          problems: placedProblems,
+          deps: {
+            discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition, render: a.render,
+            schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath)).schema,
+            shown: a.shown,
+          },
         },
       },
-    },
-  );
-  problems.push(...docProblems.map(p => `${page.path}: ${p}`));
-  problems.push(...placedProblems.map(p => `${page.path}:${p.at.line}:${p.at.column}: ${p.message}`));
+    );
+    return { body, headings, docProblems, placedProblems };
+  };
+  const first = await renderBody();
+  problems.push(...first.docProblems.map(p => `${page.path}: ${p}`));
+  problems.push(...first.placedProblems.map(p => `${page.path}:${p.at.line}:${p.at.column}: ${p.message}`));
 
   // The layout's sample data, and that of every partial it includes, must stay out of real pages.
   const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath)).schema;
@@ -187,26 +195,53 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (problems.length) return fail(problems);
 
   // What the layout gets: its declared values, null where the page sets none, then what the storefront fills.
-  const data = {
+  const dataFor = (body: string, headings: PageHeading[]) => ({
     ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),
     body,
     nav: markCurrent(model.nav, route),
     site: withDeclaredAbsentAsNull(site.values, siteDeclared),
     ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings }) } : {}),
-  };
+  });
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
-  let rendered: Awaited<ReturnType<Render>>;
-  try {
-    rendered = await a.render({ component: checked.layoutId, data });
-  } catch (e) {
-    return fail([`${page.path}: ${e instanceof Error ? e.message : String(e)}`]);
-  }
+  const renderLayout = async (body: string, headings: PageHeading[]): Promise<Awaited<ReturnType<Render>> | AssembledPage> => {
+    try {
+      return await a.render({ component: checked.layoutId, data: dataFor(body, headings) });
+    } catch (e) {
+      return fail([`${page.path}: ${e instanceof Error ? e.message : String(e)}`]);
+    }
+  };
+  const isFailed = (r: Awaited<ReturnType<Render>> | AssembledPage): r is AssembledPage => "status" in r;
+  let rendered = await renderLayout(first.body, first.headings);
+  if (isFailed(rendered)) return rendered;
   // A layout field named like a registered helper can never be shown by its name: the page fails, as the
   // workbench shows the same SCHEMA_INVALID on the layout.
   const helperNamed = (rendered.meta?.diagnostics ?? []).filter(d => d.kind === "SCHEMA_INVALID" && isHelperNameProblem(d.message));
   if (helperNamed.length) {
     return fail(helperNamed.map(d => `${d.location?.file ?? checked.layoutId} (${d.path ?? "#"}): ${d.message}`));
+  }
+
+  // A heading's anchor the layout has as an id too: the body again, with the layout's ids taken, so the
+  // heading gets the next free suffix, and the layout again, with the anchors that now hold.
+  const notes: string[] = [];
+  const layoutIds = idsBesides(rendered.html, first.headings);
+  const colliding = collidingHeadings(first.headings, layoutIds);
+  if (colliding.length) {
+    const second = await renderBody(layoutIds);
+    rendered = await renderLayout(second.body, second.headings);
+    if (isFailed(rendered)) return rendered;
+    const still = collidingHeadings(second.headings, idsBesides(rendered.html, second.headings));
+    if (still.length) {
+      return fail(still.map(h => `${page.path}: heading "${h.text}" is #${h.anchor}, which the layout has as an id as well, `
+        + `even after the suffix: the layout must not make ids from page.headings`));
+    }
+    for (const [i, h] of first.headings.entries()) {
+      const now = second.headings[i]!;
+      if (now.anchor === h.anchor) continue;
+      notes.push(`${page.path}: heading "${h.text}" is #${now.anchor}, ` + (layoutIds.includes(h.anchor)
+        ? `because the layout uses id="${h.anchor}"`
+        : `because #${h.anchor} went to an earlier heading whose anchor the layout uses`));
+    }
   }
 
   const html = rendered.html;
@@ -218,5 +253,5 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
     await a.head(checked.layoutId, html),
   ].join("\n");
-  return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live), problems: [] };
+  return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live), problems: [], notes };
 }

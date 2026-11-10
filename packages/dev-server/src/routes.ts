@@ -77,6 +77,8 @@ export interface RouteContext {
   readonly generation?: () => string;
   /** Set by `pd build`: storefront pages link into the workbench at this address. See DevServerOptions. */
   readonly storefrontWorkbenchUrl?: string;
+  /** Set by `pd build`: where a storefront page's notes go. Without it they go to the terminal. */
+  readonly onStorefrontNote?: (note: string) => void;
   /** storefront.site as the server holds it now (the watcher replaces it when the config changes only it). */
   readonly site: SiteValuesHandle;
 }
@@ -492,6 +494,10 @@ export async function handleRequest(
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
       });
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
+      for (const note of page.notes) {
+        if (ctx.onStorefrontNote) ctx.onStorefrontNote(note);
+        else console.log(`[storefront] ${note}`);
+      }
       res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });
       res.end(page.html);
       return;
