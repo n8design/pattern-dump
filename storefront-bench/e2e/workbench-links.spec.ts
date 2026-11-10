@@ -1,6 +1,6 @@
 // Every live example links into the workbench. In pd dev the link opens this process's workbench on the
 // right component and variant; in the built site it points exactly at storefront.workbenchUrl.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { BUILD_WORKBENCH_URL, isDev, WORKBENCH } from "./helpers.js";
 
 test.describe("workbench links", () => {

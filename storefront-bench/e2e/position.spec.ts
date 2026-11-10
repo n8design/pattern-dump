@@ -1,7 +1,8 @@
 // A page's place in the site, as the doc layout shows it from page.section, page.breadcrumbs, page.prev and
 // page.next, read off the rendered DOM in pd dev and the built root. The layout's sample data sets all four
 // (its workbench preview), so a value missing on a real page would show the sample's instead.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 const links = (page: Page, selector: string) =>
   page.locator(selector).evaluateAll(as => as.map(a => [a.getAttribute("href"), a.textContent?.trim()]));

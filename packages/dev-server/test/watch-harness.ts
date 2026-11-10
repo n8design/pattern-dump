@@ -7,6 +7,14 @@
 // socket ping: frames on one socket arrive in order, so every message sent so far has arrived. Files are
 // written with save() (test-support/save.ts), so each save appears in one event. A barrier file is edited
 // with a one-character append: no truncate, so no emptied file in between, and always a change.
+//
+// The same barrier, across processes: with PD_TEST_HOOKS=1 a live pd dev serves POST /_pd/__test/settle
+// (watch.ts settle, routes.ts). It appends to the barrier in every folder it watches and answers 204 once
+// those writes, and every change before them, are handled, the queue empty and no recheck or new-folder scan
+// pending: by then every reload message for those changes has been sent. Without the flag the route does not
+// exist. It is not part of the dev-server protocol (not in contracts). The storefront Playwright specs call
+// it before each test (storefront-bench/e2e/fixtures.ts). Barriers send no message, are ignored by git, and
+// never reach pd build output.
 import { appendFile, readFile, rm, stat } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { existsSync } from "node:fs";

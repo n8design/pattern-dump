@@ -41,6 +41,9 @@ export default defineConfig({
   webServer: [{
     command: `node ${path.join(repo, "packages/cli/dist/index.js")} dev --port ${DEV_PORT} --ws-port ${WS_PORT}`,
     cwd: bench,
+    // The settle hook the specs' fixture calls before each test (fixtures.ts). Test-only: without this the
+    // server has no such route.
+    env: { PD_TEST_HOOKS: "1" },
     url: `http://localhost:${DEV_PORT}/api/version`,
     reuseExistingServer: false,
     timeout: 60_000,

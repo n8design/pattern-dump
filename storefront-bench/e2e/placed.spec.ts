@@ -1,7 +1,7 @@
 // A component placed on a page with values (pd- tags), read on the rendered page: the slider and its slides
 // are in the DOM, their stylesheets paint, and the caption's markdown is rendered. Live (pd dev) and built
 // (pd build, from a static host): the same DOM is dom-parity's.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 test("the guides page shows the slider placed on it, styled", async ({ page }) => {
   await page.goto("/guides/");

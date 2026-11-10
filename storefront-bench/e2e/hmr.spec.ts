@@ -1,7 +1,7 @@
 // pd dev reloads a storefront page when it changes: an edit shows on the open page; a frontmatter error
 // replaces it with the problems (the live client stays, so the fix reloads it back). The spec writes into
 // the bench's pages and restores them after each test.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { save } from "../../test-support/save.js";

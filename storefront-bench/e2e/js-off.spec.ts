@@ -1,5 +1,5 @@
 // With scripting off a page is still readable, and every live example still leads into the workbench.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { BUILD_WORKBENCH_URL, isDev, WORKBENCH } from "./helpers.js";
 
 test.use({ javaScriptEnabled: false });

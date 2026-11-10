@@ -1,7 +1,8 @@
 // A declared navigation (storefront.site.navigations.footer in the bench's config), as the footer partial
 // renders it, read off the rendered DOM in pd dev and the built root: a page, an external link and a group,
 // the current page's link marked aria-current="page", and the group above it marked.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 const nav = (page: Page) => page.locator("nav.site-footer-nav");
 const links = (page: Page) => nav(page).locator("a").evaluateAll(as => as.map(a => [a.getAttribute("href"), a.textContent?.trim()]));

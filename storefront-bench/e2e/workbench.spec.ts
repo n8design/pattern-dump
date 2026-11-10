@@ -1,6 +1,6 @@
 // The skin's layouts and partials are ordinary patterns: the bench's workbench, on pd.localhost, lists
 // them in its Nav Rail and documents them in its Inspector.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { WORKBENCH } from "./helpers.js";
 
 const SKIN: Array<[id: string, docs: string]> = [
