@@ -1,7 +1,8 @@
 // pd dev takes a storefront.site change in its config live: the open page reloads with the new value. Any
 // other change asks for a restart on the open page, and a config that does not load says so; the page keeps
 // its values in both. The spec edits the bench's config and restores it after each test.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { save } from "../../test-support/save.js";

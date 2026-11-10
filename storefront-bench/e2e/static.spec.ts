@@ -1,6 +1,6 @@
 // The built storefront root on a plain static host: every page and every preview it embeds is a file the
 // host serves, fetched past any cache.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 const NO_CACHE = { "Cache-Control": "no-cache", Pragma: "no-cache" };
 

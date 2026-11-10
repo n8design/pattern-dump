@@ -2,7 +2,7 @@
 // rendered DOM in pd dev and the built root. The bench's pages are committed in Pattern Dump's own history,
 // so the expected dates are read from git here, at test time: the first and the last commit of each page
 // (its author date). Neither page has been renamed, so a plain log of its path is its whole history.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 

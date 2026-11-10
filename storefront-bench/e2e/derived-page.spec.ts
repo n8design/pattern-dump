@@ -2,7 +2,7 @@
 // through it. The renderer merges sample data beneath a page's values key by key, so sample keys under
 // `page` (`page.foo`, `page.prev.extra`) would show on every page using the layout. The layout and a page
 // using it are written into the bench at test time and removed after.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";

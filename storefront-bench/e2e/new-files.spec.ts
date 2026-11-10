@@ -1,7 +1,8 @@
 // Authoring with new files: one running pd dev, one open page, never restarted or reloaded by hand.
 // Each step adds files (or switches a page to one of them) and the open page must reload itself and
 // show the change. The spec writes into the bench and removes what it added after the test.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
