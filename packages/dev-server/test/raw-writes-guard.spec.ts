@@ -1,7 +1,8 @@
 // Every test, in every suite, writes files with save() or saveInTwoSteps() (test-support/save.ts), never with
 // a plain writeFile or appendFile. Written in place, a file is truncated and then written, which the OS can
 // report as two changes; a test that means one save then fails at random on Linux (a second reload, a second
-// rebuild). This holds every tracked test file to it.
+// rebuild). This holds every test file to it: tracked ones, and new ones not yet added (so a new spec is caught
+// before its first commit), but not what git ignores.
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -43,7 +44,7 @@ describe("plain writes", () => {
   });
 
   it("are in no test file but the two allowed", () => {
-    const files = execFileSync("git", ["ls-files"], { cwd: repo, encoding: "utf8" }).split("\n")
+    const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: repo, encoding: "utf8" }).split("\n")
       .filter(f => f !== SELF && /\.(ts|mts|mjs|js)$/.test(f) && (/(^|\/)(test|e2e)\//.test(f) || /\.(spec|test)\.ts$/.test(f)));
     expect(files.length).toBeGreaterThan(100);
     const offending = files
