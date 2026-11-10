@@ -43,6 +43,7 @@ export interface StorefrontCrawl {
 
 export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>): Promise<StorefrontCrawl> {
   const problems: string[] = [];
+  const siteProblems = new Set<string>();
   const list = await get(PD_ROUTES.pages);
   if (list.status !== 200) {
     const body = await list.text();
@@ -64,9 +65,13 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
     const type = res.headers.get("content-type") ?? "";
     if (res.status !== 200) {
       const body = await res.text();
-      const items = [...body.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(m => unescapeHtml(m[1]));
-      if (items.length) problems.push(...items.map(i => `${url}: ${i}`));
-      else problems.push(`${url}: ${res.status} ${body.split("\n")[0]?.slice(0, 160) ?? ""}`.trimEnd());
+      // A problem of the whole site (data-pd-site) is on every page: listed once, without a page's URL.
+      const items = [...body.matchAll(/<li( data-pd-site)?>([\s\S]*?)<\/li>/g)].map(m => ({ site: !!m[1], text: unescapeHtml(m[2]) }));
+      for (const i of items) {
+        if (!i.site) problems.push(`${url}: ${i.text}`);
+        else if (!siteProblems.has(i.text)) { siteProblems.add(i.text); problems.push(i.text); }
+      }
+      if (!items.length) problems.push(`${url}: ${res.status} ${body.split("\n")[0]?.slice(0, 160) ?? ""}`.trimEnd());
       continue;
     }
     urls.push(url);

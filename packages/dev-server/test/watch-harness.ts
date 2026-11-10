@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import WebSocket from "ws";
 import type { PatternDumpConfig } from "@pattern-dump/config";
-import type { DevServer } from "@pattern-dump/dev-server";
+import type { DevServer, DevServerOptions } from "@pattern-dump/dev-server";
 import { startOnFreeWsPort } from "./free-ports.js";
 import { loadPatternPackages } from "../src/packages.js";
 import { resolveServerConfig } from "../src/server-config.js";
@@ -96,7 +96,8 @@ export class Bench {
   /** `component`: the one the workbench has open, or null for no workbench at all. */
   constructor(readonly root: string, private readonly component: string | null) {}
 
-  async start(cfg: PatternDumpConfig): Promise<void> {
+  /** `opts`: further server options (the watched config file, say); the ports are the harness's. */
+  async start(cfg: PatternDumpConfig, opts: Omit<DevServerOptions, "port" | "wsPort"> = {}): Promise<void> {
     // The folders the watcher will watch, as it finds them.
     const rc = resolveServerConfig(cfg, this.root, {}, loadPatternPackages(cfg.packages, this.root));
     const w = watchedRoots(rc);
@@ -106,7 +107,7 @@ export class Bench {
     ].filter(d => existsSync(d));
     this.barriers = [...new Set(folders)].map(d => join(d, BARRIER));
     for (const file of this.barriers) await save(file, "");
-    const { server, wsPort } = await startOnFreeWsPort(cfg, this.root);
+    const { server, wsPort } = await startOnFreeWsPort(cfg, this.root, 5, opts);
     this.live = wsPort;
     this.server = server;
     servers.push(server);

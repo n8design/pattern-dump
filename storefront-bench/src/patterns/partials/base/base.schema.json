@@ -33,6 +33,15 @@
         "year": {
           "type": "string",
           "description": "The year, in the footer"
+        },
+        "navigations": {
+          "type": "object",
+          "description": "The navigations the skin shows, by name: their entries are Pattern Dump's",
+          "properties": {
+            "footer": {
+              "description": "Links in the footer of every page"
+            }
+          }
         }
       }
     }

@@ -1,0 +1,71 @@
+{
+  "title": "Setup",
+  "description": "How the bench is put together.",
+  "lede": "Three folders make a site: the pages, the layouts that dress them, and the components they show.",
+  "body": "<h2 id=\"pages\">Pages</h2><p>Each markdown file in <code>pages/</code> is a page at the URL its path names.</p><h2 id=\"layouts\">Layouts</h2><p>A page picks its layout in its frontmatter.</p>",
+  "page": {
+    "headings": [
+      {
+        "level": 2,
+        "text": "Pages",
+        "anchor": "pages"
+      },
+      {
+        "level": 2,
+        "text": "Layouts",
+        "anchor": "layouts"
+      }
+    ],
+    "section": {
+      "route": "/guides/",
+      "title": "Guides"
+    },
+    "breadcrumbs": [
+      {
+        "route": "/",
+        "title": "Storefront bench"
+      },
+      {
+        "route": "/guides/",
+        "title": "Guides"
+      }
+    ],
+    "prev": {
+      "route": "/guides/",
+      "title": "Guides"
+    },
+    "next": {
+      "route": "/about/",
+      "title": "Sample next page"
+    },
+    "created": "2026-01-10T10:00:00+01:00",
+    "modified": "2026-03-20T10:00:00+01:00"
+  },
+  "site": {
+    "title": "Storefront bench",
+    "tagline": "A website written in markdown",
+    "href": "/",
+    "footer": "Built with Pattern Dump from the storefront bench."
+  },
+  "nav": [
+    {
+      "route": "/",
+      "title": "Home"
+    },
+    {
+      "route": "/guides/",
+      "title": "Guides",
+      "children": [
+        {
+          "route": "/guides/setup/",
+          "title": "Setup",
+          "current": true
+        }
+      ]
+    },
+    {
+      "route": "/about/",
+      "title": "About"
+    }
+  ]
+}

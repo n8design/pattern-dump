@@ -86,6 +86,27 @@ describe("pd build — the storefront root", () => {
     expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 16, bytes: expect.any(Number) });
   });
 
+  it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
+    // The bench copy is outside any repository, so its doc layout's dates are null, noted once.
+    expect(report.notes).toEqual([
+      "the pages folder is not in a git repository: no page has dates",
+      `guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"`,
+    ]);
+    expect(report.warnings).toEqual([]);
+    const setup = files.get("guides/setup/index.html")!.bytes.toString("utf8");
+    expect(setup).toContain(`<h2 id="main-1">Main</h2>`);
+    expect(setup).toContain(`href="#main-1"`);
+  });
+
+  it("is the same, byte for byte, when built again", async () => {
+    const again = await benchCopy();
+    const second = await build(again, join(again, "..", "wb-again"));
+    const files2 = await tree(join(again, ".out", "storefront"));
+    expect([...files2.keys()].sort()).toEqual([...files.keys()].sort());
+    for (const [file, { bytes }] of files) expect(files2.get(file)!.bytes.equals(bytes), file).toBe(true);
+    expect(second.notes).toEqual(report.notes);
+  }, 120_000);
+
   it("resolves every reference inside it to a file it holds", () => {
     const missing: string[] = [];
     for (const [file, { bytes }] of files) {
@@ -162,6 +183,16 @@ describe("pd build — a storefront with problems writes nothing", () => {
     );
     expect(await exists(out)).toBe(false);
     expect(await exists(join(root, ".out", "storefront"))).toBe(false);
+  }, 120_000);
+
+  it("lists a problem of the whole site once, not once for every page that shows it", async () => {
+    const root = await benchCopy();
+    const site = { ...benchConfig.storefront!.site!, navigations: { footer: [{ page: "nope.md" }] } };
+    const out = join(root, "..", "wb-nav");
+    const error = await build(root, out, config({ site })).then(() => "", (e: Error) => e.message);
+    const problem = `storefront.site.navigations.footer[0]: "nope.md" is not a page in the pages folder`;
+    expect(error).toBe(`pd build: the storefront has problems, so nothing was written:\n  - ${problem}`);
+    expect(await exists(out)).toBe(false);
   }, 120_000);
 
   it("leaves both roots of an earlier build untouched", async () => {

@@ -110,7 +110,8 @@ export type DiagnosticKind =
   | "HANDLE_COLLISION"   // M6: component quarantined — handle held by incumbent; rename to resolve
   | "DATA_INVALID"       // a component or variant .json that does not parse; its data was not used
   | "SCHEMA_INVALID";    // a schema misuses a placement extension (x-pd-component, x-pd-content, contentMediaType),
-                         // names an unknown x-pd- key, or its template outputs a non-markdown value unescaped
+                         // names an unknown x-pd- key, or its template outputs a non-markdown value unescaped;
+                         // or a property, at any depth, is named like a registered helper
 
 /** Fields every diagnostic carries, whichever engine produced it. */
 interface DiagnosticBase {

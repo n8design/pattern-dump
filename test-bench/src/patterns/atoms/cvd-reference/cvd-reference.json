@@ -1,7 +1,7 @@
 {
   "rows": [
     {
-      "id": "A",
+      "key": "A",
       "patches": [
         { "name": "Red",    "hex": "#C8322D" },
         { "name": "Green",  "hex": "#3FA34D" },
@@ -12,7 +12,7 @@
       ]
     },
     {
-      "id": "B",
+      "key": "B",
       "patches": [
         { "name": "Blue",   "hex": "#2D5BC8" },
         { "name": "Teal",   "hex": "#2E8B8B" },
@@ -23,7 +23,7 @@
       ]
     },
     {
-      "id": "C",
+      "key": "C",
       "patches": [
         { "name": "Red",     "hex": "#E11D1D" },
         { "name": "Green",   "hex": "#1FA81F" },
@@ -34,7 +34,7 @@
       ]
     },
     {
-      "id": "D",
+      "key": "D",
       "patches": [
         { "name": "White",      "hex": "#FFFFFF" },
         { "name": "Light grey", "hex": "#C8C8C8" },

@@ -1,5 +1,5 @@
 ---
-layout: article
+layout: doc
 title: Setup
 description: How the bench is put together.
 lede: Three folders make a site — the pages, the layouts that dress them, and the components they show.
@@ -16,3 +16,8 @@ example looks.
 
 ```pattern components/callout~warning
 ```
+
+## Main
+
+Every layout fills the main region of the base partial, which has the id `main`. This heading would
+have the same anchor, so it gets `main-1`.

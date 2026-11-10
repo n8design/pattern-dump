@@ -50,6 +50,9 @@ export interface StaticBuildReport {
   /** Requests that did not return 200: a component that fails to render, a missing asset. They are not
    *  written, and do not fail the build. */
   warnings: string[];
+  /** Notes about what was built, one line each: a storefront heading whose anchor was suffixed because the
+   *  layout has that id. Nothing is left out for them. */
+  notes: string[];
   /** The storefront's own output root, when the project has a storefront. */
   storefront?: { outDir: string; pages: number; files: number; bytes: number };
   ms: number;
@@ -100,8 +103,11 @@ export async function buildStaticSite(
 
   const fixed = opts.now;
   const now = fixed ? (): Date => new Date(fixed.getTime()) : (): Date => new Date();
+  // A storefront page's notes, once each however often the page is fetched: the report's notes.
+  const storefrontNotes = new Set<string>();
   const server = await startDevServer(config, root, {
     port: 0, live: false, now, ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
+    onStorefrontNote: note => { storefrontNotes.add(note); },
   });
   log("… server ready");
 
@@ -118,7 +124,7 @@ export async function buildStaticSite(
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
   const origin = `http://127.0.0.1:${server.port}`;
-  const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], ms: 0 };
+  const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], ms: 0 };
   const { capture, store } = createSnapshotWriter({ outDir, basePath, origin, report });
 
   /** Every /_pd/ stylesheet and script a document references. */
@@ -238,6 +244,7 @@ export async function buildStaticSite(
       counts.files++;
       const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u)).length;
       report.storefront = { outDir: sfOut, pages, files: counts.files, bytes: counts.bytes };
+      report.notes.push(...storefrontNotes);
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
 

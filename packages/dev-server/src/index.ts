@@ -74,6 +74,7 @@ import { applyStyleData, cachedDiscovery, compositionFor, createServerState, set
 import { resolveServerConfig } from "./server-config.js";
 // HTTP route handling — takes an explicit RouteContext instead of closing over this scope.
 import { handleRequest, type RouteContext, type BootStamp } from "./routes.js";
+import { createSiteValues } from "./storefront/site-values.js";
 import { resolveDevUiDist } from "./assets.js";
 import { describeBindError } from "./ports.js";
 export { PortInUseError } from "./ports.js";
@@ -83,6 +84,8 @@ import { createRenderingHandle, type BuildRenderer } from "./rendering.js";
 import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching, type WatchHandle } from "./watch.js";
+import { createGitDates } from "./storefront/git-dates.js";
+import { readPages } from "./storefront/pages.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
 // module graph. Substrate for the style and style-modules graphs.
 import { buildAllStyleData } from "./style-index.js";
@@ -128,6 +131,14 @@ export interface DevServerOptions {
   /** `pd build` only: where storefront pages link into the workbench — the built workbench's address
    *  (storefront.workbenchUrl). Without it, pages link to this process's own workbench on pd.localhost. */
   storefrontWorkbenchUrl?: string;
+  /** `pd build` only: receives each note a storefront page gives (a suffixed heading anchor), for the build
+   *  report. Without it, notes are printed to the terminal. */
+  onStorefrontNote?: (note: string) => void;
+  /** `pd dev` only: the config file, watched, and how to load it again (core owns config loading). A change
+   *  to `storefront.site` alone is taken live and every storefront page reloads; any other change asks for a
+   *  restart. Without them the config is read once, at start. */
+  configPath?: string;
+  reloadConfig?: () => Promise<PatternDumpConfig>;
 }
 export interface DevServer {
   port: number;
@@ -266,10 +277,18 @@ export async function startDevServer(
       .catch(() => null),
   };
 
+  // storefront.site as the server holds it: replaced live by the watcher (site-values.ts).
+  const site = createSiteValues(cfg.storefront?.site);
+  // The storefront pages' dates from git: read once, the first time a page's layout asks for them.
+  const pagesDir = cfg.storefront?.pagesDir;
+  const dates = pagesDir
+    ? createGitDates(pagesDir, async () => [...(await readPages(pagesDir)).files.values()].map(f => f.path))
+    : undefined;
   const routeCtx: RouteContext = {
-    cfg, state, rendering, tracker, devUiDist, boot, now, live,
+    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, ...(dates ? { dates } : {}),
     ...(live ? { generation: () => hotreloader.generation() } : {}),
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
+    ...(opts.onStorefrontNote ? { onStorefrontNote: opts.onStorefrontNote } : {}),
   };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 
@@ -293,7 +312,10 @@ export async function startDevServer(
   let watcher: WatchHandle | null = null;
   if (live) {
     try {
-      watcher = await startWatching({ cfg, state, render, rendering, tracker, hotreloader });
+      watcher = await startWatching({
+        cfg, state, render, rendering, tracker, hotreloader, site, config, ...(dates ? { dates } : {}),
+        ...(opts.configPath && opts.reloadConfig ? { configFile: { path: opts.configPath, reload: opts.reloadConfig } } : {}),
+      });
     } catch (e) {
       await hotreloader.close().catch(() => {});
       await new Promise<void>(res => httpServer.close(() => res()));

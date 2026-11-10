@@ -41,6 +41,10 @@ import { auditWithHash, globalDataDigest } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
+import type { PatternDumpConfig } from "@pattern-dump/config";
+import { classifyConfigChange } from "./config-change.js";
+import type { SiteValuesHandle } from "./storefront/site-values.js";
+import type { GitDates } from "./storefront/git-dates.js";
 import { readPages, routeFor } from "./storefront/pages.js";
 import { readGlobalData, readHelperRegistrars, type LoadProblem } from "./project-loaders.js";
 import { createDisplayPath } from "./display-path.js";
@@ -55,6 +59,14 @@ export interface WatchContext {
   readonly rendering: RenderingHandle;
   readonly tracker: Awaited<ReturnType<typeof import("@pattern-dump/build").createSassDependencyTracker>>;
   readonly hotreloader: HotReloader;
+  /** storefront.site as the server holds it: replaced when the config file changes only it. */
+  readonly site: SiteValuesHandle;
+  /** The storefront pages' dates from git, when there is a storefront: a page change re-reads git status. */
+  readonly dates?: GitDates;
+  /** The config the server was started with. */
+  readonly config: PatternDumpConfig;
+  /** `pd dev`: the config file, and how to load it again. Absent, the config file is not watched. */
+  readonly configFile?: { readonly path: string; readonly reload: () => Promise<PatternDumpConfig> };
 }
 
 /**
@@ -181,7 +193,7 @@ const unchanged = (now: Seen | null, before: Seen | undefined): boolean =>
  * Console, never silent.
  */
 export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
-  const { cfg, state, render, rendering, tracker, hotreloader } = ctx;
+  const { cfg, state, render, rendering, tracker, hotreloader, site, configFile, dates } = ctx;
   // Destructured so the body below reads exactly as it did inside startDevServer.
   const { patternsDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
   // The source roots watched, by kind: the project's, and every linked package's (watch-roots.ts). Each
@@ -200,11 +212,30 @@ export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
 const pagesDir = cfg.storefront?.pagesDir ?? null;
+// What every page shows of the others (handlePages): read before the watcher starts, then after each event
+// in the pages folder.
+let pagesPrint = await pagesFingerprint();
 const watchDirs = [
   ...watched.patterns, ...watched.styles.map(r => r.dir), ...watched.themes, ...watched.scripts,
   ...watched.data, ...watched.assets, ...watched.helpers.map(h => h.scope), ...(pagesDir ? [pagesDir] : []),
 ];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
+// The config file (handleConfig), by a watcher of its own, without fsevents: chokidar watches a file with
+// fsevents through a stream on its whole folder, here the project's root, which would carry every write under
+// it (build output, test traces) into the watcher's callbacks. Its events join the one queue below.
+const configWatcher = configFile
+  ? chokidar.watch(configFile.path, { ignoreInitial: true, persistent: true, useFsEvents: false })
+  : null;
+// Listened for at once: its ready can come before the main watcher's.
+const configReady = configWatcher ? new Promise<void>(resolve => configWatcher.once("ready", () => resolve())) : Promise.resolve();
+// The config file's events, through the dispatchers of `on` below (handleConfig is first in change and add).
+configWatcher?.on("change", path => dispatchers.change?.(path));
+configWatcher?.on("add", path => dispatchers.add?.(path));
+configWatcher?.on("error", (e: unknown) => {
+  const message = describeWatchError(e);
+  hmr.push({ type: "error", scope: "build", message });
+  console.error(`[dev-server] ${message}`);
+});
 
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onWatchStarted`, it is called once
 // the watcher is ready, with a function that delivers an event to the handlers below as chokidar would (a
@@ -629,6 +660,7 @@ const close = async (): Promise<void> => {
   }
   lastHandled.clear();
   await watcher.close();
+  await configWatcher?.close();
 };
 
 // Single source of truth for link-set membership: a component is linkable iff it has
@@ -897,26 +929,77 @@ async function handleReloadable(filePath: string, event: "change" | "add" | "unl
   return false;
 }
 
-// Storefront pages. Nothing is cached server-side — every page request reads the folder — so all a
-// change needs is a reload of the pages it touches: an edited page reloads itself; a file or folder
-// added or removed can change the nav (or the folder's problems), so every page reloads. Dotfiles are
-// not pages and change nothing. Checked first, with a folder boundary, because the other handlers
-// match on a path prefix.
-const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p);
-function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): boolean {
-  if (!inPages(filePath)) return false;
-  const rel = relative(pagesDir!, filePath).split(sep).join("/");
-  if (rel.split("/").some(seg => seg.startsWith("."))) return true;
-  const route = event === "change" && rel.endsWith(".md") ? routeFor(rel) : null;
-  hmr.push({ type: "page-changed", route });
-  console.log(`[dev-server] Page ${event}: ${rel || "."} → page-changed ${route ?? "(every page)"}`);
+// The config file. The config the server runs with is read once, at start, except `storefront.site`: a
+// change to it alone is taken live (the site values are replaced, then every page reloads), since every page
+// reads them per request. Any other change needs a restart, and says so; nothing of it is taken, so the
+// server keeps running as it is. A config that does not load (a syntax error, an invalid value) is an error
+// notice, and the running values stay. Only the file is watched: a module it imports is not.
+let runningConfig = ctx.config;
+const isConfigFile = (p: string): boolean => configFile !== undefined && resolve(p) === resolve(configFile.path);
+async function handleConfig(filePath: string): Promise<boolean> {
+  if (!isConfigFile(filePath)) return false;
+  const name = shown(filePath);
+  let next: PatternDumpConfig;
+  try {
+    next = await configFile!.reload();
+  } catch (e) {
+    const message = `${name} cannot be loaded, so pd dev keeps running with the config it has: ${e instanceof Error ? e.message : String(e)}`;
+    hmr.push({ type: "error", scope: "build", message });
+    console.error(`[dev-server] ${message}`);
+    return true;
+  }
+  const change = classifyConfigChange(runningConfig, next);
+  if (change === "none") { console.log(`[dev-server] Config saved: ${name}, nothing pd dev reads changed`); return true; }
+  if (change === "other") {
+    const message = `${name} changed: restart pd dev to load it (only storefront.site is taken without a restart)`;
+    hmr.push({ type: "error", scope: "build", message });
+    console.error(`[dev-server] ${message}`);
+    return true;
+  }
+  runningConfig = next;
+  site.replace(next.storefront?.site);
+  hmr.push({ type: "page-changed", route: null });
+  console.log(`[dev-server] Config changed: ${name}, storefront.site → page-changed (every page)`);
   return true;
 }
 
-on("addDir", (dirPath) => { handlePages(dirPath, "addDir"); });
+// Storefront pages. Nothing is cached server-side — every page request reads the folder — so all a
+// change needs is a reload of the pages it touches. An edited page reloads itself, unless the edit changed
+// what other pages show of it: its title, description or order is in every page's nav, so then every page
+// reloads. A file or folder added or removed can change the nav (or the folder's problems), so every page
+// reloads. Dotfiles are not pages and change nothing. Checked first, with a folder boundary, because the
+// other handlers match on a path prefix.
+const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p);
+
+/** What every page shows of the others: the nav, and each page's route, title and layout. Null without a
+ *  storefront. Compared, never parsed. */
+async function pagesFingerprint(): Promise<string | null> {
+  if (!pagesDir) return null;
+  const model = await readPages(pagesDir);
+  return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems });
+}
+
+async function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): Promise<boolean> {
+  if (!inPages(filePath)) return false;
+  const rel = relative(pagesDir!, filePath).split(sep).join("/");
+  if (rel.split("/").some(seg => seg.startsWith("."))) return true;
+  const before = pagesPrint;
+  pagesPrint = await pagesFingerprint();
+  // A page saved, added or removed can change what git status says of it (committed, changed, untracked).
+  dates?.statusChanged();
+  const own = event === "change" && rel.endsWith(".md") ? routeFor(rel) : null;
+  const route = own !== null && pagesPrint === before ? own : null;
+  hmr.push({ type: "page-changed", route });
+  const why = own !== null && route === null ? " (it changed what other pages show of it)" : "";
+  console.log(`[dev-server] Page ${event}: ${rel || "."} → page-changed ${route ?? "(every page)"}${why}`);
+  return true;
+}
+
+on("addDir", async (dirPath) => { await handlePages(dirPath, "addDir"); });
 
 on("change", async (filePath) => {
-  if (handlePages(filePath, "change")) return;
+  if (await handleConfig(filePath)) return;
+  if (await handlePages(filePath, "change")) return;
   if (await handleReloadable(filePath, "change")) return;
   const ext = extname(filePath);
 
@@ -1083,7 +1166,8 @@ async function everyPageChanged(): Promise<void> {
 }
 
 on("add", async (filePath) => {
-  if (handlePages(filePath, "add")) return;
+  if (await handleConfig(filePath)) return; // an editor's save by rename comes back as an add
+  if (await handlePages(filePath, "add")) return;
   if (await handleReloadable(filePath, "add")) return;
   const ext = extname(filePath);
   const patternRoot = patternRootOf(filePath);
@@ -1100,7 +1184,8 @@ on("add", async (filePath) => {
 
 // A component's file removed — rebuild discovery and signal nav rebuild.
 on("unlink", async (filePath) => {
-  if (handlePages(filePath, "unlink")) return;
+  if (isConfigFile(filePath)) return; // mid-save by rename: its add follows
+  if (await handlePages(filePath, "unlink")) return;
   if (await handleReloadable(filePath, "unlink")) return;
   const patternRoot = patternRootOf(filePath);
   if (extname(filePath) === ".hbs" && patternRoot) {
@@ -1114,7 +1199,7 @@ on("unlink", async (filePath) => {
 
 // Component directory removed — covers the case where the entire component folder is deleted.
 on("unlinkDir", async (dirPath) => {
-  if (handlePages(dirPath, "unlinkDir")) return;
+  if (await handlePages(dirPath, "unlinkDir")) return;
   const patternRoot = patternRootOf(dirPath);
   if (patternRoot && dirPath !== patternRoot) {
     await rebuildAndSignalTree(`Pattern dir removed: ${relative(patternRoot, dirPath)}`);
@@ -1123,6 +1208,7 @@ on("unlinkDir", async (dirPath) => {
 
   try {
     await started;
+    await configReady;
   } catch (e) {
     await close();
     throw e;

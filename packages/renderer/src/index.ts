@@ -8,7 +8,9 @@
 export { initHighlighter, highlight, getShikiCSS, wrapWithCopyButton } from "./highlight";
 export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
 export { checkSchemaExtensions, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
+export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
 import { checkSchemaExtensions } from "./schema-extensions";
+import { checkSchemaHelperNames } from "./schema-helper-names";
 import type {
   CreateRenderer, RendererOptions, Diagnostic, RenderMeta,
 } from "@pattern-dump/contracts";
@@ -463,6 +465,18 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         componentExists: id => discoveryMap.has(id),
         hasSchema: id => discoveryMap.get(id)?.schemaPath !== undefined,
       })) {
+        diagnostics.push({
+          kind: "SCHEMA_INVALID",
+          severity: "error",
+          source: "schema",
+          message: p.message,
+          path: p.path,
+          location: { file: display(entry.schemaPath) },
+        });
+      }
+
+      // A field named like a helper this render has registered (schema-helper-names.ts).
+      for (const p of checkSchemaHelperNames(schema, Object.keys(env.helpers))) {
         diagnostics.push({
           kind: "SCHEMA_INVALID",
           severity: "error",
