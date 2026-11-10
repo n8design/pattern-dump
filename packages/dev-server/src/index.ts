@@ -129,6 +129,9 @@ export interface DevServerOptions {
   /** `pd build` only: where storefront pages link into the workbench — the built workbench's address
    *  (storefront.workbenchUrl). Without it, pages link to this process's own workbench on pd.localhost. */
   storefrontWorkbenchUrl?: string;
+  /** `pd build` only: receives each note a storefront page gives (a suffixed heading anchor), for the build
+   *  report. Without it, notes are printed to the terminal. */
+  onStorefrontNote?: (note: string) => void;
   /** `pd dev` only: the config file, watched, and how to load it again (core owns config loading). A change
    *  to `storefront.site` alone is taken live and every storefront page reloads; any other change asks for a
    *  restart. Without them the config is read once, at start. */
@@ -278,6 +281,7 @@ export async function startDevServer(
     cfg, state, rendering, tracker, devUiDist, boot, now, live, site,
     ...(live ? { generation: () => hotreloader.generation() } : {}),
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
+    ...(opts.onStorefrontNote ? { onStorefrontNote: opts.onStorefrontNote } : {}),
   };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 

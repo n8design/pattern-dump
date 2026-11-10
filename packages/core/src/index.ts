@@ -49,6 +49,7 @@ export async function runBuild(
     console.log(`[pd build] storefront: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from /)`);
   }
   for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
+  for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
 }
 
 /**

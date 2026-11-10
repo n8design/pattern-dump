@@ -35,9 +35,17 @@ export function slug(value: string): string {
   return value.toLowerCase().replace(STRIP, "").replace(/ /g, "-");
 }
 
-/** Unique slugs: one slugger per page, so the same page always gets the same anchors. */
+/**
+ * Unique slugs: one slugger per page, so the same page always gets the same anchors. Pattern Dump's one
+ * addition: it can start with ids that are already taken (the layout's), which it then treats as slugs it
+ * has given out, so a heading that would take one gets the next free suffix instead (`main` → `main-1`).
+ */
 export class Slugger {
   private occurrences: Record<string, number> = Object.create(null) as Record<string, number>;
+
+  constructor(taken: Iterable<string> = []) {
+    for (const id of taken) this.occurrences[id] = 0;
+  }
 
   slug(value: string): string {
     const original = slug(value);

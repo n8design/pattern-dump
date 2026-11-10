@@ -195,10 +195,15 @@ workbench snapshot is written exactly as it would be without one. Deploy each fo
 [pd build] 8 components → 69 files, 1.0 MB in 983 ms
 [pd build] /path/to/dist  (served from /)
 [pd build] storefront: 4 pages → 14 files in /path/to/site  (served from /)
+[pd build]   note: guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"
 ```
 
 The storefront is always served from the root of its host. Unlike a component that fails to render in the
 workbench, a problem on a storefront page fails the build, and then neither folder is written.
+
+**"note"** lines are about pages that were built as they are: nothing is left out for them. A heading's
+anchor that the layout already uses as an id (`## Main` against `<main id="main">`) gets the next free
+suffix, `main-1`, and the note says so; `pd dev` prints the same line.
 
 ---
 

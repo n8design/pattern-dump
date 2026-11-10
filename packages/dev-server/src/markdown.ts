@@ -45,7 +45,11 @@ import { slug, Slugger } from "./storefront/slug.js";
  */
 export type DocEmbed =
   | { embed: "inline" }
-  | { embed: "frame"; workbenchUrl: string; problems: string[]; placed?: DocPlacing; headings?: PageHeading[] };
+  | {
+    embed: "frame"; workbenchUrl: string; problems: string[]; placed?: DocPlacing; headings?: PageHeading[];
+    /** Ids the page already has besides its headings (its layout's): a heading's anchor never takes one. */
+    takenIds?: string[];
+  };
 
 /**
  * Components placed with values (`pd-` tags, placed-tags.ts): on where a caller passes this, off
@@ -174,7 +178,7 @@ export async function renderDoc(
 
   // Frame mode only (a storefront page): every heading gets its anchor as its id.
   if (embed.embed === "frame") {
-    const headings = headingAnchors(tokens);
+    const headings = headingAnchors(tokens, embed.takenIds);
     embed.headings?.push(...headings);
   }
 
@@ -212,10 +216,10 @@ function headingText(inline: { children: { type: string; content: string }[] | n
 /**
  * Sets an `id` on every heading, h1 to h6, and returns them in document order: the anchor is the
  * GitHub slug of its text (slug.ts), deduplicated across the page; a heading whose slug is empty (only
- * emoji, say) is `section`, deduplicated like any other.
+ * emoji, say) is `section`, deduplicated like any other. An id in `taken` counts as given out already.
  */
-function headingAnchors(tokens: ReturnType<MarkdownIt["parse"]>): PageHeading[] {
-  const slugger = new Slugger();
+function headingAnchors(tokens: ReturnType<MarkdownIt["parse"]>, taken: string[] = []): PageHeading[] {
+  const slugger = new Slugger(taken);
   const headings: PageHeading[] = [];
   for (const [i, tok] of tokens.entries()) {
     if (tok.type !== "heading_open") continue;
