@@ -88,6 +88,46 @@ describe("checkSampleData", () => {
     ]);
   });
 
+  describe("page: what the layout declares, inside the shape Pattern Dump fills, at every depth", () => {
+    /** `pageDeclared` null: the layout does not declare page. */
+    const checkPage = async (json: unknown, pageDeclared: string[] | null = ["prev", "headings"]) => {
+      const p = await project({ "layouts/page/page.json": JSON.stringify(json) });
+      return checkSampleData("layouts/page", p.map, p.composition, ["title", "kicker"], ["title"], pageDeclared ?? undefined);
+    };
+    const outside = (key: string) =>
+      `the sample data of layouts/page (page.json) sets "${key}", which is not part of the page data Pattern Dump fills, so it would show on every page using layouts/page`;
+
+    it("refuses page.foo and page.prev.extra, and accepts page.prev.title", async () => {
+      expect(await checkPage({ page: { foo: "LEAKED-SAMPLE", prev: { title: "T", extra: "LEAKED-NESTED" } } }))
+        .toEqual([outside("page.foo"), outside("page.prev.extra")]);
+      expect(await checkPage({ page: { prev: { route: "/a/", title: "T" } } })).toEqual([]);
+    });
+
+    it("refuses a key inside a list's items", async () => {
+      expect(await checkPage({ page: { headings: [{ level: 2, text: "A", anchor: "a" }, { level: 2, text: "B", anchor: "b", extra: 1 }] } }))
+        .toEqual([outside("page.headings[1].extra")]);
+    });
+
+    it("refuses a sub-key of the shape the layout does not declare", async () => {
+      expect(await checkPage({ page: { next: { title: "T" } } })).toEqual([
+        `the sample data of layouts/page (page.json) sets "page.next", which layouts/page does not declare for page, so it would show on every page using that layout`,
+      ]);
+    });
+
+    it("refuses page in a layout that does not declare it", async () => {
+      expect(await checkPage({ page: { prev: { title: "T" } } }, null)).toEqual([
+        `the sample data of layouts/page (page.json) sets "page", which layouts/page does not declare, so it would show on every page using that layout`,
+      ]);
+    });
+
+    it("checks a partial's sample page as well", async () => {
+      const p = await project({ "partials/header/header.json": JSON.stringify({ page: { prev: { extra: 1 } } }) });
+      expect(await checkSampleData("layouts/page", p.map, p.composition, ["title"], ["title"], ["prev"])).toEqual([
+        `the sample data of partials/header (header.json) sets "page.prev.extra", which is not part of the page data Pattern Dump fills, so it would show on every page using layouts/page`,
+      ]);
+    });
+  });
+
   it("reports sample data that cannot be read", async () => {
     const problems = await check({ "partials/header/header.json": "{ not json" });
     expect(problems).toHaveLength(1);
