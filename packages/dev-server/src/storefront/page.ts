@@ -25,6 +25,7 @@ import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { checkSampleData } from "./sample-data.js";
 import { checkPageDeclaration, pageValue, positionOf, type PageHeading } from "./derived.js";
 import { collidingHeadings, idsBesides } from "./anchors.js";
+import type { GitDates, PageDates } from "./git-dates.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 
@@ -45,6 +46,8 @@ export interface PageAssembly {
   workbenchUrl: string;
   /** Set in `pd dev`: the live-reload socket's port, and the generation the page's request took. */
   live?: { wsPort: number; generation: string };
+  /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created and page.modified are null. */
+  dates?: GitDates;
 }
 
 export interface AssembledPage {
@@ -189,6 +192,15 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const siteDeclared = Object.keys(siteSchema?.properties?.site?.properties ?? {});
   const pageDeclaration = checkPageDeclaration(layoutSchema, checked.layoutId);
   problems.push(...pageDeclaration.problems);
+  // Dates only for a layout that declares one: the git pass never runs for a site that shows none.
+  const notes: string[] = [];
+  let dates: Partial<PageDates> = {};
+  if (a.dates && pageDeclaration.declared?.some(k => k === "created" || k === "modified")) {
+    const dated = await a.dates.of(page.path, a.live ? "dev" : "build");
+    dates = dated.dates;
+    notes.push(...dated.notes);
+    problems.push(...dated.problems);
+  }
   if (a.discoveryMap.has(checked.layoutId)) {
     problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared));
   }
@@ -200,7 +212,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     body,
     nav: markCurrent(model.nav, route),
     site: withDeclaredAbsentAsNull(site.values, siteDeclared),
-    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model) }) } : {}),
+    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates }) } : {}),
   });
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
@@ -223,7 +235,6 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
 
   // A heading's anchor the layout has as an id too: the body again, with the layout's ids taken, so the
   // heading gets the next free suffix, and the layout again, with the anchors that now hold.
-  const notes: string[] = [];
   const layoutIds = idsBesides(rendered.html, first.headings);
   const colliding = collidingHeadings(first.headings, layoutIds);
   if (colliding.length) {

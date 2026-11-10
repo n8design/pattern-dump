@@ -44,6 +44,7 @@ import { verboseTiming } from "./timing.js";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import { classifyConfigChange } from "./config-change.js";
 import type { SiteValuesHandle } from "./storefront/site-values.js";
+import type { GitDates } from "./storefront/git-dates.js";
 import { readPages, routeFor } from "./storefront/pages.js";
 import { readGlobalData, readHelperRegistrars, type LoadProblem } from "./project-loaders.js";
 import { createDisplayPath } from "./display-path.js";
@@ -60,6 +61,8 @@ export interface WatchContext {
   readonly hotreloader: HotReloader;
   /** storefront.site as the server holds it: replaced when the config file changes only it. */
   readonly site: SiteValuesHandle;
+  /** The storefront pages' dates from git, when there is a storefront: a page change re-reads git status. */
+  readonly dates?: GitDates;
   /** The config the server was started with. */
   readonly config: PatternDumpConfig;
   /** `pd dev`: the config file, and how to load it again. Absent, the config file is not watched. */
@@ -190,7 +193,7 @@ const unchanged = (now: Seen | null, before: Seen | undefined): boolean =>
  * Console, never silent.
  */
 export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
-  const { cfg, state, render, rendering, tracker, hotreloader, site, configFile } = ctx;
+  const { cfg, state, render, rendering, tracker, hotreloader, site, configFile, dates } = ctx;
   // Destructured so the body below reads exactly as it did inside startDevServer.
   const { patternsDir, styleRoots, patternRoots, patternDirs, swatchSlots, cwd } = cfg;
   // The source roots watched, by kind: the project's, and every linked package's (watch-roots.ts). Each
@@ -982,6 +985,8 @@ async function handlePages(filePath: string, event: "change" | "add" | "unlink" 
   if (rel.split("/").some(seg => seg.startsWith("."))) return true;
   const before = pagesPrint;
   pagesPrint = await pagesFingerprint();
+  // A page saved, added or removed can change what git status says of it (committed, changed, untracked).
+  dates?.statusChanged();
   const own = event === "change" && rel.endsWith(".md") ? routeFor(rel) : null;
   const route = own !== null && pagesPrint === before ? own : null;
   hmr.push({ type: "page-changed", route });

@@ -84,6 +84,8 @@ import { createRenderingHandle, type BuildRenderer } from "./rendering.js";
 import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching, type WatchHandle } from "./watch.js";
+import { createGitDates } from "./storefront/git-dates.js";
+import { readPages } from "./storefront/pages.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
 // module graph. Substrate for the style and style-modules graphs.
 import { buildAllStyleData } from "./style-index.js";
@@ -277,8 +279,13 @@ export async function startDevServer(
 
   // storefront.site as the server holds it: replaced live by the watcher (site-values.ts).
   const site = createSiteValues(cfg.storefront?.site);
+  // The storefront pages' dates from git: read once, the first time a page's layout asks for them.
+  const pagesDir = cfg.storefront?.pagesDir;
+  const dates = pagesDir
+    ? createGitDates(pagesDir, async () => [...(await readPages(pagesDir)).files.values()].map(f => f.path))
+    : undefined;
   const routeCtx: RouteContext = {
-    cfg, state, rendering, tracker, devUiDist, boot, now, live, site,
+    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, ...(dates ? { dates } : {}),
     ...(live ? { generation: () => hotreloader.generation() } : {}),
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
     ...(opts.onStorefrontNote ? { onStorefrontNote: opts.onStorefrontNote } : {}),
@@ -306,7 +313,7 @@ export async function startDevServer(
   if (live) {
     try {
       watcher = await startWatching({
-        cfg, state, render, rendering, tracker, hotreloader, site, config,
+        cfg, state, render, rendering, tracker, hotreloader, site, config, ...(dates ? { dates } : {}),
         ...(opts.configPath && opts.reloadConfig ? { configFile: { path: opts.configPath, reload: opts.reloadConfig } } : {}),
       });
     } catch (e) {
