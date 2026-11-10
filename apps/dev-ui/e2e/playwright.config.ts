@@ -21,6 +21,10 @@ const STATIC_SITE = path.join(os.tmpdir(), "pd-e2e-static-site");
 
 export default defineConfig({
   testDir: ".",
+  // The commit in the report, but no diff: to make one on CI, Playwright fetches the pull request's base
+  // with --depth=1, and that fetch turns the full clone shallow for every step after it (storefront
+  // dates refuse to build from a shallow clone).
+  captureGitInfo: { commit: true, diff: false },
   // Serial, and the reason is NOT filesystem races — that was the previous explanation here and it
   // would send you after the wrong fix. Per-spec fixture isolation would not help.
   //

@@ -17,6 +17,10 @@ const WORKBENCH_OUT = path.join(os.tmpdir(), "pd-e2e-storefront-workbench");
 
 export default defineConfig({
   testDir: ".",
+  // The commit in the report, but no diff: to make one on CI, Playwright fetches the pull request's base
+  // with --depth=1, and that fetch turns the full clone shallow for every step after it (storefront
+  // dates refuse to build from a shallow clone).
+  captureGitInfo: { commit: true, diff: false },
   // Serial: the HMR specs write into the bench's pages and restore them, and the one dev server
   // broadcasts every reload to every page.
   workers: 1,
