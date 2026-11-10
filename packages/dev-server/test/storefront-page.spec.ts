@@ -169,6 +169,29 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
   });
 });
 
+describe("assemblePage — a layout field named like a helper", () => {
+  it("fails the page with the problem the workbench shows on the layout", async () => {
+    // A skin of its own: one layout, whose schema declares `id`, which is Pattern Dump's id helper.
+    const skin = join(tmp, "helper-skin");
+    for (const [rel, text] of Object.entries({
+      "layouts/plain/plain.hbs": `<main id="{{id}}">{{title}}{{{body}}}</main>\n`,
+      "layouts/plain/plain.schema.json": JSON.stringify({ required: ["title"], properties: { title: { type: "string" }, id: { type: "string" } } }),
+    })) {
+      await mkdir(dirname(join(skin, rel)), { recursive: true });
+      await save(join(skin, rel), text);
+    }
+    const { discoveryMap, handleMap } = await buildDiscoveryMap(skin);
+    const page = await build("/", await pagesOf({ "index.md": "---\nlayout: plain\ntitle: Home\nid: top\n---\n\nText.\n" }), {
+      discoveryMap, composition: await buildCompositionRegistry(skin, handleMap, discoveryMap),
+      render: createRenderer({ patternsDir: skin, discoveryMap, handleMap }), site: undefined,
+    });
+    expect(page.status).toBe(500);
+    expect(page.problems).toEqual([
+      `layouts/plain/plain.schema.json (#/properties/id): "id" is the name of a registered helper, so {{id}} would call the helper, not read this field`,
+    ]);
+  });
+});
+
 describe("the skin's templates", () => {
   it("use {{{body}}} as their only unescaped value", async () => {
     const found: string[] = [];
