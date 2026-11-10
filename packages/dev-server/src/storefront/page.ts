@@ -22,6 +22,7 @@ import { readSchema, type PlacedProblem } from "./declared-values.js";
 import { checkPageFrontmatter } from "./frontmatter-contract.js";
 import type { PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
+import { resolveNavigations } from "./navigations.js";
 import { checkSampleData } from "./sample-data.js";
 import { checkPageDeclaration, pageValue, positionOf, type PageHeading } from "./derived.js";
 import { collidingHeadings, idsBesides } from "./anchors.js";
@@ -111,8 +112,10 @@ ${live ? liveScript(live.wsPort, live.generation) : ""}
 }
 
 /** The document shown instead of a page that has problems: every problem, escaped. */
-export function errorDocument(route: string, problems: string[], live: PageAssembly["live"]): string {
-  const items = problems.map(p => `<li>${escapeHtml(p)}</li>`).join("\n");
+/** `siteWide`: the problems that are the whole site's, not this page's (storefront.site): each is marked
+ *  data-pd-site, so a build that crawls every page lists it once. */
+export function errorDocument(route: string, problems: string[], live: PageAssembly["live"], siteWide: readonly string[] = []): string {
+  const items = problems.map(p => `<li${siteWide.includes(p) ? " data-pd-site" : ""}>${escapeHtml(p)}</li>`).join("\n");
   return document(`<title>Problems — ${escapeHtml(route)}</title>`,
     `<main>\n<h1>The page ${escapeHtml(route)} cannot be built</h1>\n<ul class="pd-problems">\n${items}\n</ul>\n</main>`, live);
 }
@@ -131,7 +134,8 @@ const markCurrent = (nav: StorefrontNavItem[], route: string): unknown[] => nav.
 }));
 
 export async function assemblePage(route: string, model: PageModel, a: PageAssembly): Promise<AssembledPage> {
-  const fail = (problems: string[]): AssembledPage => ({ status: 500, html: errorDocument(route, problems, a.live), problems, notes: [] });
+  let siteWide: string[] = [];
+  const fail = (problems: string[]): AssembledPage => ({ status: 500, html: errorDocument(route, problems, a.live, siteWide), problems, notes: [] });
 
   // The pages folder as a whole: a problem there is a problem for every page.
   if (model.problems.length) return fail(model.problems);
@@ -153,7 +157,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const problems: string[] = [];
   const checked = await checkPageFrontmatter(page, a.discoveryMap);
   problems.push(...checked.problems.map(p => `${p.file}${p.line !== undefined ? `:${p.line}` : ""}: ${p.message}`));
-  const site = await checkSite(a.site, a.discoveryMap);
+  const site = await checkSite(a.site, a.discoveryMap, new Set([...model.files.values()].map(f => f.path)));
+  siteWide = site.problems;
   problems.push(...site.problems);
 
   /** The page's markdown, rendered; its headings' anchors never take one of `takenIds`. */
@@ -202,7 +207,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     problems.push(...dated.problems);
   }
   if (a.discoveryMap.has(checked.layoutId)) {
-    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared));
+    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed));
   }
   if (problems.length) return fail(problems);
 
@@ -211,7 +216,10 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),
     body,
     nav: markCurrent(model.nav, route),
-    site: withDeclaredAbsentAsNull(site.values, siteDeclared),
+    site: {
+      ...withDeclaredAbsentAsNull(site.values, siteDeclared),
+      ...(site.listed.length ? { navigations: resolveNavigations(site.navigations, site.listed, model, route) } : {}),
+    },
     ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates }) } : {}),
   });
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem

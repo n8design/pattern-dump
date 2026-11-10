@@ -13,6 +13,9 @@ import { checkSite } from "../src/storefront/site.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
 
+/** What these cases compare: the values and the problems (navigations have their own spec). */
+const vp = (c: { values: unknown; problems: string[] }) => ({ values: c.values, problems: c.problems });
+
 let tmp = "";
 const maps: Record<string, DiscoveryMap> = {};
 
@@ -59,6 +62,10 @@ const PROJECTS: Record<string, Record<string, string>> = {
   broken: { "partials/base/base.hbs": "<div></div>", "partials/base/base.schema.json": "{ not json" },
   noBase: { "layouts/page/page.hbs": "<main></main>" },
   nested: { "partials/base/base.hbs": "<div></div>", "partials/base/base.schema.json": JSON.stringify(NESTED) },
+  // A skin that lists one navigation by name, beside a value of its own.
+  navs: { "partials/base/base.hbs": "<div></div>", "partials/base/base.schema.json": JSON.stringify({ properties: { site: { type: "object", properties: {
+    title: { type: "string" }, navigations: { type: "object", properties: { footer: { description: "At the foot of every page" } } },
+  } } } }) },
 };
 
 beforeAll(async () => {
@@ -78,7 +85,7 @@ afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true });
 describe("checkSite — values partials/base declares", () => {
   it("passes declared values through as they are", async () => {
     const site = { title: "Docs", version: 2, theme: "dark", year: 2026, links: ["a", "b"] };
-    expect(await checkSite(site, maps.full)).toEqual({ values: site, problems: [] });
+    expect(vp(await checkSite(site, maps.full))).toEqual({ values: site, problems: [] });
   });
 
   it("tries a union's types in order", async () => {
@@ -100,7 +107,7 @@ describe("checkSite — values partials/base declares", () => {
   });
 
   it("refuses a key it does not declare, suggesting the one probably meant, and requires what it requires", async () => {
-    expect(await checkSite({ titel: "Docs", colour: "red" }, maps.full)).toEqual({
+    expect(vp(await checkSite({ titel: "Docs", colour: "red" }, maps.full))).toEqual({
       values: {},
       problems: [
         `storefront.site.titel is not declared by partials/base — did you mean "title"?`,
@@ -137,7 +144,7 @@ describe("checkSite — inside objects and lists", () => {
 
   it("reports every problem, not only the first", async () => {
     const r = await checkSite({ home: { page: 5 }, links: [{ label: 2 }, { lable: "x" }], meta: { note: 1 }, titel: "x" }, maps.nested);
-    expect(r).toEqual({
+    expect(vp(r)).toEqual({
       values: {},
       problems: [
         "storefront.site.home.page must be text (got 5)",
@@ -152,15 +159,36 @@ describe("checkSite — inside objects and lists", () => {
 
   it("passes nested values through as they are, and takes an object that declares nothing inside as closed", async () => {
     const site = { home: { page: "/", label: "Home" }, links: [{ label: "A", href: "/a" }], tags: ["b"], meta: { note: "n" }, social: {} };
-    expect(await checkSite(site, maps.nested)).toEqual({ values: site, problems: [] });
+    expect(vp(await checkSite(site, maps.nested))).toEqual({ values: site, problems: [] });
     expect(await check({ social: { x: "@pd" } })).toEqual(["storefront.site.social.x is not declared by partials/base"]);
+  });
+});
+
+describe("checkSite — navigations", () => {
+  const PAGES = new Set(["index.md", "about.md"]);
+
+  it("takes navigations apart from the other values, checked by their own shape", async () => {
+    const r = await checkSite({ title: "Docs", navigations: { footer: [{ page: "about.md" }] } }, maps.navs!, PAGES);
+    expect(r).toEqual({ values: { title: "Docs" }, navigations: { footer: [{ page: "about.md" }] }, listed: ["footer"], problems: [] });
+  });
+
+  it("reports a navigation's problem once, by its own check, beside the other values' problems", async () => {
+    expect((await checkSite({ title: 3, navigations: { footer: [{ page: 5 }], legal: [] } }, maps.navs!, PAGES)).problems).toEqual([
+      "storefront.site.title must be text (got 3)",
+      `storefront.site.navigations.footer[0].page must be the path of a page in the pages folder, such as "about.md" (got 5)`,
+      `storefront.site.navigations.legal is not a navigation partials/base lists (it lists "footer")`,
+    ]);
+  });
+
+  it("lists the skin's navigations even when the config sets none", async () => {
+    expect(await checkSite({ title: "Docs" }, maps.navs!, PAGES)).toMatchObject({ navigations: {}, listed: ["footer"], problems: [] });
   });
 });
 
 describe("checkSite — when there is nothing to check against", () => {
   it("requires storefront.site when partials/base requires a site", async () => {
-    expect(await checkSite(undefined, maps.full)).toEqual({ values: {}, problems: ["storefront.site is required by partials/base"] });
-    expect(await checkSite(undefined, maps.optional)).toEqual({ values: {}, problems: [] });
+    expect(vp(await checkSite(undefined, maps.full))).toEqual({ values: {}, problems: ["storefront.site is required by partials/base"] });
+    expect(vp(await checkSite(undefined, maps.optional))).toEqual({ values: {}, problems: [] });
   });
 
   it("refuses a site that nothing declares", async () => {
@@ -170,7 +198,7 @@ describe("checkSite — when there is nothing to check against", () => {
   });
 
   it("is fine with no site where none is declared", async () => {
-    for (const name of ["noSchema", "noSite", "noBase"]) expect(await checkSite(undefined, maps[name]), name).toEqual({ values: {}, problems: [] });
+    for (const name of ["noSchema", "noSite", "noBase"]) expect(vp(await checkSite(undefined, maps[name])), name).toEqual({ values: {}, problems: [] });
   });
 
   it("reports a schema it cannot read", async () => {
@@ -185,7 +213,7 @@ describe("checkSite — the storefront bench", () => {
     const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
     const map = (await buildDiscoveryMap(join(bench, "src", "patterns"))).discoveryMap;
     const site = validateConfig(benchConfig, "storefront-bench").storefront?.site;
-    expect(await checkSite(site, map)).toEqual({
+    expect(vp(await checkSite(site, map))).toEqual({
       values: { title: "Storefront bench", tagline: "A website written in markdown", href: "/", year: "2026", footer: "Built with Pattern Dump from the storefront bench." },
       problems: [],
     });

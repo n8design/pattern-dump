@@ -187,9 +187,24 @@ export interface StorefrontConfig {
    * Values every page of the site shares, such as its title or the line in its footer. Every layout gets
    * them as `site`; a page cannot set them. Which keys there are, and their types, is what the `site`
    * property of `partials/base`'s schema declares: they are checked against it, not inferred.
+   *
+   * One key is Pattern Dump's: `navigations`, named lists of links (a footer's, a sidebar's), each entry a
+   * page, an external link or a group, nested to any depth. Their shape is fixed (StorefrontNavEntry) and
+   * checked by Pattern Dump; the skin's schema only lists the names it uses.
    */
-  site?: Record<string, unknown>;
+  site?: Record<string, unknown> & { navigations?: Record<string, StorefrontNavEntry[]> };
 }
+
+/**
+ * One entry of a declared navigation (`storefront.site.navigations.<name>`):
+ * - a page, by its path in the pages folder (`"guides/setup.md"`), labelled with its title unless `label`;
+ * - an external link: `href` is `https:`, `http:` or `mailto:`, or a path from the site's root (`/feed.xml`);
+ * - a group: a `label` and its `children`, entries of any of the three kinds.
+ */
+export type StorefrontNavEntry =
+  | { page: string; label?: string }
+  | { href: string; label: string }
+  | { label: string; children: StorefrontNavEntry[] };
 
 export function defineConfig(config: PatternDumpConfig): PatternDumpConfig {
   return config;

@@ -144,7 +144,11 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
       "index.md: pattern:components/gone: there is no such component",
       "index.md: pattern components/nope: there is no such component",
     ]);
-    for (const p of page.problems) expect(page.html).toContain(`<li>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`);
+    // The site's problem is marked as the whole site's (a build lists it once); the page's own are not.
+    const siteWide = new Set(["storefront.site.title is required by partials/base"]);
+    for (const p of page.problems) {
+      expect(page.html).toContain(`<li${siteWide.has(p) ? " data-pd-site" : ""}>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`);
+    }
   });
 
   it("makes an unknown pattern id in a page fatal", async () => {
