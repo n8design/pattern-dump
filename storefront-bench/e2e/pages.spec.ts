@@ -1,5 +1,5 @@
 // Every storefront page, rendered in a browser — from pd dev, and from the built root on a static host.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 const PAGES: Array<[route: string, title: string, heading: string, current: string]> = [
   ["/", "Storefront bench", "Storefront bench", "Storefront bench"],

@@ -1,6 +1,6 @@
 // Adding a markdown file adds a page and a nav entry, with no other change; removing it takes both away.
 // The spec writes into the bench's pages and removes what it added after each test.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { save } from "../../test-support/save.js";

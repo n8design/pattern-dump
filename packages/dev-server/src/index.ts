@@ -284,8 +284,13 @@ export async function startDevServer(
   const dates = pagesDir
     ? createGitDates(pagesDir, async () => [...(await readPages(pagesDir)).files.values()].map(f => f.path))
     : undefined;
+  // TEST ONLY: with PD_TEST_HOOKS=1, a live server serves POST /_pd/__test/settle (routes.ts), through the
+  // watcher once it runs.
+  let settleWatcher: (() => Promise<void>) | null = null;
+  const testHooks = live && process.env["PD_TEST_HOOKS"] === "1";
   const routeCtx: RouteContext = {
     cfg, state, rendering, tracker, devUiDist, boot, now, live, site, ...(dates ? { dates } : {}),
+    ...(testHooks ? { settle: () => settleWatcher ? settleWatcher() : Promise.reject(new Error("settle: the watcher is not running yet")) } : {}),
     ...(live ? { generation: () => hotreloader.generation() } : {}),
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
     ...(opts.onStorefrontNote ? { onStorefrontNote: opts.onStorefrontNote } : {}),
@@ -316,6 +321,7 @@ export async function startDevServer(
         cfg, state, render, rendering, tracker, hotreloader, site, config, ...(dates ? { dates } : {}),
         ...(opts.configPath && opts.reloadConfig ? { configFile: { path: opts.configPath, reload: opts.reloadConfig } } : {}),
       });
+      settleWatcher = watcher.settle;
     } catch (e) {
       await hotreloader.close().catch(() => {});
       await new Promise<void>(res => httpServer.close(() => res()));

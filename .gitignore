@@ -9,6 +9,8 @@ dist
 .playwright/
 playwright-report/
 test-results/
+# The watcher barrier tests and the settle hook (PD_TEST_HOOKS) write into watched folders
+.__testOnly_barrier
 apps/dev-ui/test-results/
 
 # Local env (never commit secrets)

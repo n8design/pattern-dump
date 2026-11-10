@@ -11,7 +11,7 @@
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
 import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
@@ -40,6 +40,10 @@ export interface StaticBuildOptions {
   now?: Date;
   log?: (line: string) => void;
 }
+
+/** Not a test's watcher barrier (`.__testOnly_barrier`, which tests and the settle hook write into watched
+ *  folders, asset folders among them): those never reach the build's output. */
+const notABarrier = (path: string): boolean => basename(path) !== ".__testOnly_barrier";
 
 export interface StaticBuildReport {
   outDir: string;
@@ -205,8 +209,8 @@ export async function buildStaticSite(
       }
       const exists = await stat(rootDir).then(s => s.isDirectory(), () => false);
       if (!exists) continue;
-      await cp(rootDir, join(outDir, "assets", cfg.assetRootNames[i]), { recursive: true });
-      if (cfg.assetRoots.length === 1) await cp(rootDir, join(outDir, "assets"), { recursive: true, force: false });
+      await cp(rootDir, join(outDir, "assets", cfg.assetRootNames[i]), { recursive: true, filter: notABarrier });
+      if (cfg.assetRoots.length === 1) await cp(rootDir, join(outDir, "assets"), { recursive: true, force: false, filter: notABarrier });
     }
 
     // ---- 6. One shell page per route ----
