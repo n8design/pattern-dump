@@ -33,6 +33,23 @@ const FULL = {
   },
 };
 
+/** A site that holds objects and lists of objects. */
+const NESTED = {
+  properties: {
+    site: {
+      type: "object",
+      properties: {
+        home: { type: "object", required: ["label"], properties: { page: { type: "string" }, label: { type: "string" } } },
+        links: { type: "array", items: { type: "object", properties: { label: { type: "string" }, href: { type: "string" } } } },
+        tags: { type: "array", items: { type: "string", enum: ["a", "b"] } },
+        // An object with no type, by its properties alone; and one that declares nothing inside.
+        meta: { properties: { note: { type: "string" } } },
+        social: { type: "object" },
+      },
+    },
+  },
+};
+
 /** One project per case: name → files under its patterns folder. */
 const PROJECTS: Record<string, Record<string, string>> = {
   full: { "partials/base/base.hbs": "<div></div>", "partials/base/base.schema.json": JSON.stringify(FULL) },
@@ -41,6 +58,7 @@ const PROJECTS: Record<string, Record<string, string>> = {
   noSite: { "partials/base/base.hbs": "<div></div>", "partials/base/base.schema.json": JSON.stringify({ properties: { other: { type: "string" } } }) },
   broken: { "partials/base/base.hbs": "<div></div>", "partials/base/base.schema.json": "{ not json" },
   noBase: { "layouts/page/page.hbs": "<main></main>" },
+  nested: { "partials/base/base.hbs": "<div></div>", "partials/base/base.schema.json": JSON.stringify(NESTED) },
 };
 
 beforeAll(async () => {
@@ -90,6 +108,52 @@ describe("checkSite — values partials/base declares", () => {
         "storefront.site.title is required by partials/base",
       ],
     });
+  });
+});
+
+describe("checkSite — inside objects and lists", () => {
+  const check = async (site: Record<string, unknown>) => (await checkSite(site, maps.nested)).problems;
+
+  it("checks a nested value's type, with its path", async () => {
+    expect(await check({ home: { page: 5, label: "Home" } })).toEqual(["storefront.site.home.page must be text (got 5)"]);
+  });
+
+  it("refuses a nested key it does not declare, suggesting the one probably meant", async () => {
+    expect(await check({ home: { pgae: "/", label: "Home" } }))
+      .toEqual([`storefront.site.home.pgae is not declared by partials/base — did you mean "page"?`]);
+  });
+
+  it("requires a nested key the schema requires", async () => {
+    expect(await check({ home: { page: "/" } })).toEqual(["storefront.site.home.label is required by partials/base"]);
+  });
+
+  it("checks every item of a list, with its index", async () => {
+    expect(await check({ links: [{ label: "A", href: "/a" }, { label: 2, href: "/b" }], tags: ["a", "c"] })).toEqual([
+      "storefront.site.links[1].label must be text (got 2)",
+      `storefront.site.tags[1] must be one of "a", "b" (got "c")`,
+    ]);
+    expect(await check({ links: ["/a"] })).toEqual([`storefront.site.links[0] must be an object (got "/a")`]);
+  });
+
+  it("reports every problem, not only the first", async () => {
+    const r = await checkSite({ home: { page: 5 }, links: [{ label: 2 }, { lable: "x" }], meta: { note: 1 }, titel: "x" }, maps.nested);
+    expect(r).toEqual({
+      values: {},
+      problems: [
+        "storefront.site.home.page must be text (got 5)",
+        "storefront.site.home.label is required by partials/base",
+        "storefront.site.links[0].label must be text (got 2)",
+        `storefront.site.links[1].lable is not declared by partials/base — did you mean "label"?`,
+        "storefront.site.meta.note must be text (got 1)",
+        "storefront.site.titel is not declared by partials/base",
+      ],
+    });
+  });
+
+  it("passes nested values through as they are, and takes an object that declares nothing inside as closed", async () => {
+    const site = { home: { page: "/", label: "Home" }, links: [{ label: "A", href: "/a" }], tags: ["b"], meta: { note: "n" }, social: {} };
+    expect(await checkSite(site, maps.nested)).toEqual({ values: site, problems: [] });
+    expect(await check({ social: { x: "@pd" } })).toEqual(["storefront.site.social.x is not declared by partials/base"]);
   });
 });
 
