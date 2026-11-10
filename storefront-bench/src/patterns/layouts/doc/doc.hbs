@@ -25,6 +25,12 @@
   </nav>
   {{/if}}
   <div class="doc-body">{{{body}}}</div>
+  {{#if page.created}}
+  <p class="doc-dates">
+    Created <time class="doc-created" datetime="{{page.created}}">{{page.created}}</time>{{#if page.modified}},
+    last changed <time class="doc-modified" datetime="{{page.modified}}">{{page.modified}}</time>{{/if}}
+  </p>
+  {{/if}}
   <nav class="doc-pager" aria-label="Previous and next">
     {{#if page.prev}}<a class="doc-prev" rel="prev" href="{{page.prev.route}}">{{page.prev.title}}</a>{{/if}}
     {{#if page.next}}<a class="doc-next" rel="next" href="{{page.next.route}}">{{page.next.title}}</a>{{/if}}

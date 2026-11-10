@@ -87,7 +87,11 @@ describe("pd build — the storefront root", () => {
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
-    expect(report.notes).toEqual([`guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"`]);
+    // The bench copy is outside any repository, so its doc layout's dates are null, noted once.
+    expect(report.notes).toEqual([
+      "the pages folder is not in a git repository: no page has dates",
+      `guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"`,
+    ]);
     expect(report.warnings).toEqual([]);
     const setup = files.get("guides/setup/index.html")!.bytes.toString("utf8");
     expect(setup).toContain(`<h2 id="main-1">Main</h2>`);

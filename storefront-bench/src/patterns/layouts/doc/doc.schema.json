@@ -103,6 +103,20 @@
               "description": "The page's title"
             }
           }
+        },
+        "created": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the page was first committed (the author date, ISO 8601); null when git has no history for it"
+        },
+        "modified": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When the page was last committed, the same way; uncommitted changes are not counted"
         }
       }
     }

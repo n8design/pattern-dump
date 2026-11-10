@@ -144,7 +144,7 @@ describe("checkSampleData", () => {
     const composition = await buildCompositionRegistry(patterns, handleMap, discoveryMap);
     expect(await checkSampleData("layouts/page", discoveryMap, composition, ["title", "description"], ["title", "tagline", "href", "footer", "year"])).toEqual([]);
     expect(await checkSampleData("layouts/article", discoveryMap, composition, ["title", "description", "lede"], ["title", "tagline", "href", "footer", "year"])).toEqual([]);
-    expect(await checkSampleData("layouts/doc", discoveryMap, composition, ["title", "description", "lede", "page"], ["title", "tagline", "href", "footer", "year"], ["headings", "section", "breadcrumbs", "prev", "next"])).toEqual([]);
+    expect(await checkSampleData("layouts/doc", discoveryMap, composition, ["title", "description", "lede", "page"], ["title", "tagline", "href", "footer", "year"], ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified"])).toEqual([]);
   });
 });
 
