@@ -7,6 +7,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { save, saveInTwoSteps } from "../../test-support/save.js";
 import { existsSync } from "node:fs";
+import { WORKBENCH } from "./helpers.js";
 
 const bench = (rel: string) => fileURLToPath(new URL(`../${rel}`, import.meta.url));
 const ADDED = [
@@ -39,6 +40,8 @@ const reloaded = (page: Page) => expect.poll(
 ).toBe(true);
 
 test.beforeEach(async () => { original = await readFile(about, "utf8"); });
+// A safety net: the test itself removes what it added and waits until the server has seen it, so the
+// reloads that cleanup sends to every page land before the next test opens one (one pd dev serves them all).
 test.afterEach(async () => {
   await save(about, original);
   for (const rel of ADDED) await rm(bench(rel), { recursive: true, force: true });
@@ -91,6 +94,8 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
     await put("src/styles/site/zz-added.scss", ".site-footer {\n  letter-spacing: 0.3em;\n}\n");
     await reloaded(page);
     await expect(page.locator(".site-footer")).not.toHaveCSS("letter-spacing", "normal");
+    // As the base layer serves it: the cleanup below waits for this rule to be gone.
+    expect(await (await page.request.get("/_pd/base.css")).text()).toContain("letter-spacing: 0.3em");
   });
 
   await test.step("a new partial, its stylesheet saved before its template", async () => {
@@ -125,5 +130,27 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
     await reloaded(page);
     await expect(page.locator("h1")).toHaveClass("zz-plain-title");
     await expect(page.locator("h1")).toHaveCSS("color", "rgb(1, 2, 3)");
+  });
+
+  await test.step("everything added removed, and the server back as it was", async () => {
+    // Pages and assets are read from disk on each request, so their 404s alone would not prove the watcher
+    // has handled their removal: they go first, and the files whose removal shows in what the server holds
+    // (discovery, the base layer) after them. The watcher handles changes one at a time, in order.
+    for (const rel of ["pages/zz-new.md", "src/assets/images/zz-dot.svg", "src/styles/partials/zz-badge.scss",
+      "src/patterns/partials/zz-badge", "src/styles/layouts/zz-plain.scss", "src/styles/site/zz-added.scss",
+      "src/patterns/layouts/zz-plain"]) {
+      await rm(bench(rel), { recursive: true, force: true });
+    }
+    await expect.poll(async () => [
+      (await page.request.get(`${WORKBENCH}/api/component/layouts/zz-plain`)).status(),
+      (await page.request.get(`${WORKBENCH}/api/component/partials/zz-badge`)).status(),
+      (await (await page.request.get("/_pd/base.css")).text()).includes("letter-spacing: 0.3em"),
+      (await page.request.get("/zz-new/")).status(),
+    ], { timeout: 15_000 }).toEqual([404, 404, false, 404]);
+    // The page itself back on its own layout, last: the open page shows it, reloaded by the server.
+    await mark(page);
+    await save(about, original);
+    await reloaded(page);
+    await expect(page.locator("h1")).toHaveClass("doc-title");
   });
 });
