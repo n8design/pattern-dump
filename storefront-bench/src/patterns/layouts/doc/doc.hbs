@@ -1,0 +1,39 @@
+{{#> partials-base }}
+<article class="doc">
+  {{#if page.breadcrumbs.length}}
+  <nav class="doc-breadcrumbs" aria-label="Breadcrumbs">
+    <ol>
+      {{#each page.breadcrumbs}}
+      <li><a href="{{route}}">{{title}}</a></li>
+      {{/each}}
+      <li aria-current="page">{{title}}</li>
+    </ol>
+  </nav>
+  {{/if}}
+  <header class="doc-header">
+    {{#if page.section}}<p class="doc-section">{{page.section.title}}</p>{{/if}}
+    <h1 class="doc-title">{{title}}</h1>
+    {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
+  </header>
+  {{#if page.headings.length}}
+  <nav class="doc-toc" aria-label="On this page">
+    <ul>
+      {{#each page.headings}}
+      <li class="doc-toc-h{{level}}"><a href="#{{anchor}}">{{text}}</a></li>
+      {{/each}}
+    </ul>
+  </nav>
+  {{/if}}
+  <div class="doc-body">{{{body}}}</div>
+  {{#if page.created}}
+  <p class="doc-dates">
+    Created <time class="doc-created" datetime="{{page.created}}">{{page.created}}</time>{{#if page.modified}},
+    last changed <time class="doc-modified" datetime="{{page.modified}}">{{page.modified}}</time>{{/if}}
+  </p>
+  {{/if}}
+  <nav class="doc-pager" aria-label="Previous and next">
+    {{#if page.prev}}<a class="doc-prev" rel="prev" href="{{page.prev.route}}">{{page.prev.title}}</a>{{/if}}
+    {{#if page.next}}<a class="doc-next" rel="next" href="{{page.next.route}}">{{page.next.title}}</a>{{/if}}
+  </nav>
+</article>
+{{/partials-base}}

@@ -114,7 +114,7 @@ await writeFile(join(dist, "index.d.ts"),
   'export * from "./types/config/index.js";\n');
 await rm(dtsTmp, { recursive: true, force: true });
 
-// ---- 5. package.json, README, LICENSE, CHANGELOG -------------------------------------------------
+// ---- 5. package.json, README, LICENSE, notices, CHANGELOG -----------------------------------------
 const REPO_URL = "https://github.com/n8design/pattern-dump";
 const pkg = {
   name: NAME,
@@ -140,12 +140,13 @@ const pkg = {
     "./package.json": "./package.json",
   },
   types: "./dist/index.d.ts",
-  files: ["dist", "templates", "README.md", "LICENSE", "CHANGELOG.md"],
+  files: ["dist", "templates", "README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "CHANGELOG.md"],
   engines: { node: ">=20.10" },
   dependencies,
 };
 await writeFile(join(stage, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
 await cp(join(repo, "LICENSE"), join(stage, "LICENSE"));
+await cp(join(repo, "THIRD-PARTY-NOTICES.md"), join(stage, "THIRD-PARTY-NOTICES.md"));
 await cp(join(repo, "CHANGELOG.md"), join(stage, "CHANGELOG.md"));
 // The npm page. Written in packages/cli/PACKAGE-README.md so it can be read and reviewed as Markdown;
 // links there are absolute, because npm does not resolve links relative to the repository.

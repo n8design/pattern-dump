@@ -17,13 +17,21 @@ test.describe("storefront pages reload in pd dev", () => {
     await page.goto("/about/");
     await expect(page.locator("h1")).toHaveText("About");
     await save(about, `${original}\nAn edit made while the page was open.\n`);
-    await expect(page.locator(".page-body")).toContainText("An edit made while the page was open.", { timeout: 10_000 });
+    await expect(page.locator(".doc-body")).toContainText("An edit made while the page was open.", { timeout: 10_000 });
+  });
+
+  test("a title edit reaches another open page, whose nav shows it", async ({ page }) => {
+    await page.goto("/guides/");
+    const link = page.locator('.site-nav a[href="/about/"]');
+    await expect(link).toHaveText("About");
+    await save(about, original.replace("title: About", "title: About us"));
+    await expect(link).toHaveText("About us", { timeout: 10_000 });
   });
 
   test("a frontmatter error replaces the page with its problems, and the fix brings it back", async ({ page }) => {
     await page.goto("/about/");
     await save(about, original.replace("title: About", "title: About\nbogus: 1"));
-    await expect(page.locator(".pd-problems li")).toHaveText([`about.md:3: "bogus" is not declared by layout "page"`], { timeout: 10_000 });
+    await expect(page.locator(".pd-problems li")).toHaveText([`about.md:4: "bogus" is not declared by layout "doc"`], { timeout: 10_000 });
     expect(await page.locator("script[data-pd-live]").count()).toBe(1);
     await save(about, original);
     await expect(page.locator("h1")).toHaveText("About", { timeout: 10_000 });

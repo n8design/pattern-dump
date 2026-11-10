@@ -85,6 +85,55 @@ export function checkDeclared(prop: PropertySchema, value: unknown, mode: Declar
   return result;
 }
 
+// ─── Config values, at every level ───────────────────────────────────────────────────────────────────
+// A typed config value (storefront.site) checked as `checkDeclared`'s json mode checks one value, and then
+// inside it: an object's keys against its `properties` (a key it does not declare is a problem, as on a
+// placed component) and its `required`, a list's elements against its `items`. Every problem is reported,
+// each with its path (`storefront.site.links[2].label`, indexed from 0 as the config's own code reads it).
+// An object is looked inside where the schema declares one: its type includes "object", or it has no type
+// and declares properties.
+
+/** An object's keys, checked against what `schema` declares: the values as declared, and every problem. */
+export function checkJsonKeys(
+  schema: PropertySchema, value: Record<string, unknown>, path: string, owner: string,
+): { value: Record<string, unknown>; problems: string[] } {
+  const problems: string[] = [];
+  return { value: jsonKeys(schema, value, path, owner, problems), problems };
+}
+
+function jsonKeys(schema: PropertySchema, value: Record<string, unknown>, path: string, owner: string, problems: string[]): Record<string, unknown> {
+  const declared = schema.properties ?? {};
+  const out: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(value)) {
+    const prop = Object.hasOwn(declared, key) ? declared[key] : undefined;
+    if (!prop) {
+      const near = suggest(key, Object.keys(declared));
+      problems.push(`${path}.${key} is not declared by ${owner}${near ? ` — did you mean "${near}"?` : ""}`);
+      continue;
+    }
+    const before = problems.length;
+    const checked = jsonValue(prop, v, `${path}.${key}`, owner, problems);
+    if (problems.length === before) out[key] = checked;
+  }
+  for (const key of schema.required ?? []) {
+    if (!Object.hasOwn(value, key)) problems.push(`${path}.${key} is required by ${owner}`);
+  }
+  return out;
+}
+
+function jsonValue(prop: PropertySchema, value: unknown, path: string, owner: string, problems: string[]): unknown {
+  // The value's own type and enum first; what is inside it after, by the rules above.
+  const { items, properties: _properties, required: _required, ...own } = prop;
+  const r = checkDeclared(own, value, "json");
+  if (!r.ok) { problems.push(`${path} ${r.message}`); return undefined; }
+  if (Array.isArray(value) && items) return value.map((item, i) => jsonValue(items, item, `${path}[${i}]`, owner, problems));
+  const types = prop.type === undefined ? [] : Array.isArray(prop.type) ? prop.type : [prop.type];
+  if (isPlainObject(value) && (types.includes("object") || (prop.type === undefined && prop.properties !== undefined))) {
+    return jsonKeys(prop, value, path, owner, problems);
+  }
+  return r.value;
+}
+
 /** What a component schema file declares at its top. */
 export interface ObjectSchema {
   required?: string[]; properties?: Record<string, PropertySchema>;

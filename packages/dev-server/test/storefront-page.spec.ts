@@ -129,7 +129,7 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
     const md = "---\ntitle: T\nlayout: <img src=x onerror=alert(1)>\n---\n";
     const page = await build("/", await pagesOf({ "index.md": md }));
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`index.md:3: layout "<img src=x onerror=alert(1)>" is not a layout — the layouts are "article", "home", "page"`]);
+    expect(page.problems).toEqual([`index.md:3: layout "<img src=x onerror=alert(1)>" is not a layout — the layouts are "article", "doc", "home", "page"`]);
     expect(page.html).not.toContain("<img src=x");
     expect(page.html).toContain(`<li>index.md:3: layout &quot;&lt;img src=x onerror=alert(1)&gt;&quot; is not a layout`.replace(/&quot;/g, `"`));
   });
@@ -144,7 +144,11 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
       "index.md: pattern:components/gone: there is no such component",
       "index.md: pattern components/nope: there is no such component",
     ]);
-    for (const p of page.problems) expect(page.html).toContain(`<li>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`);
+    // The site's problem is marked as the whole site's (a build lists it once); the page's own are not.
+    const siteWide = new Set(["storefront.site.title is required by partials/base"]);
+    for (const p of page.problems) {
+      expect(page.html).toContain(`<li${siteWide.has(p) ? " data-pd-site" : ""}>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`);
+    }
   });
 
   it("makes an unknown pattern id in a page fatal", async () => {
@@ -169,6 +173,29 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
   });
 });
 
+describe("assemblePage — a layout field named like a helper", () => {
+  it("fails the page with the problem the workbench shows on the layout", async () => {
+    // A skin of its own: one layout, whose schema declares `id`, which is Pattern Dump's id helper.
+    const skin = join(tmp, "helper-skin");
+    for (const [rel, text] of Object.entries({
+      "layouts/plain/plain.hbs": `<main id="{{id}}">{{title}}{{{body}}}</main>\n`,
+      "layouts/plain/plain.schema.json": JSON.stringify({ required: ["title"], properties: { title: { type: "string" }, id: { type: "string" } } }),
+    })) {
+      await mkdir(dirname(join(skin, rel)), { recursive: true });
+      await save(join(skin, rel), text);
+    }
+    const { discoveryMap, handleMap } = await buildDiscoveryMap(skin);
+    const page = await build("/", await pagesOf({ "index.md": "---\nlayout: plain\ntitle: Home\nid: top\n---\n\nText.\n" }), {
+      discoveryMap, composition: await buildCompositionRegistry(skin, handleMap, discoveryMap),
+      render: createRenderer({ patternsDir: skin, discoveryMap, handleMap }), site: undefined,
+    });
+    expect(page.status).toBe(500);
+    expect(page.problems).toEqual([
+      `layouts/plain/plain.schema.json (#/properties/id): "id" is the name of a registered helper, so {{id}} would call the helper, not read this field`,
+    ]);
+  });
+});
+
 describe("the skin's templates", () => {
   it("use {{{body}}} as their only unescaped value", async () => {
     const found: string[] = [];
@@ -181,7 +208,7 @@ describe("the skin's templates", () => {
     };
     await walk(join(patterns, "layouts"));
     await walk(join(patterns, "partials"));
-    expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}"]);
+    expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/doc/doc.hbs: {{{body}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}"]);
   });
 });
 

@@ -4,7 +4,7 @@
 // level, and the boolean rule. The two existing modes are unchanged. Pure: the trees are built by hand.
 import { describe, expect, it } from "vitest";
 import {
-  checkDeclared, checkPlaced, type ObjectSchema, type Placed, type PlacedContext, type PlacedEntry, type Pos,
+  checkDeclared, checkJsonKeys, checkPlaced, type ObjectSchema, type Placed, type PlacedContext, type PlacedEntry, type Pos,
 } from "../src/storefront/declared-values.js";
 
 const SCHEMAS: Record<string, ObjectSchema> = {
@@ -107,10 +107,12 @@ describe("checkPlaced", () => {
 });
 
 describe("the existing modes", () => {
-  it("are unchanged: frontmatter mode still refuses an object, json mode checks nothing inside one", () => {
+  it("are unchanged: frontmatter mode still refuses an object; json mode checks one value, and checkJsonKeys looks inside it", () => {
     const meta = SCHEMAS["molecules/slider"].properties!["meta"];
     expect(checkDeclared(meta, { note: "n" }, "frontmatter")).toEqual({ ok: false, message: "has a type (object) a page cannot set in frontmatter" });
     expect(checkDeclared(meta, { note: 3 }, "json")).toEqual({ ok: true, value: { note: 3 } });
+    expect(checkJsonKeys({ properties: { meta } }, { meta: { note: 3 } }, "site", "x").problems)
+      .toEqual(["site.meta.note must be text (got 3)", "site.meta.owner is required by x"]);
     expect(checkDeclared({ type: "boolean" }, "yes", "frontmatter")).toEqual({ ok: false, message: `must be true or false (got "yes")` });
   });
 });

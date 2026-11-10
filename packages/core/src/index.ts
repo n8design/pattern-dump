@@ -5,7 +5,7 @@ import type { DevServerOptions, AuditFormat } from "@pattern-dump/dev-server";
 import { build as esbuild } from "esbuild";
 import { existsSync } from "node:fs";
 import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
-import { join, dirname, resolve, relative, isAbsolute } from "node:path";
+import { basename, join, dirname, resolve, relative, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
@@ -17,7 +17,9 @@ export async function runDev(
   configPath?: string
 ): Promise<void> {
   const config = await loadConfig(root, configPath);
-  await startDevServer(config, root, opts);
+  // The config file is watched: a change to storefront.site alone is taken live (DevServerOptions.configPath).
+  const file = configFileOf(root, configPath);
+  await startDevServer(config, root, { ...opts, configPath: file, reloadConfig: () => loadConfig(root, configPath) });
   // dev-server runs indefinitely; do not close unless signalled.
 }
 
@@ -47,6 +49,7 @@ export async function runBuild(
     console.log(`[pd build] storefront: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from /)`);
   }
   for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
+  for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
 }
 
 /**
@@ -201,15 +204,25 @@ export async function loadConfig(root: string, configPath?: string): Promise<Pat
     return validateConfig(await readConfigFile(configPath), configPath);
   }
 
-  for (const name of ["pattern-dump.config.ts", "pattern-dump.config.json"]) {
-    const path = join(root, name);
-    if (existsSync(path)) return validateConfig(await readConfigFile(path), name);
-  }
+  const path = configFileOf(root);
+  if (path) return validateConfig(await readConfigFile(path), basename(path));
 
   throw new ConfigError(
     `No pattern-dump.config.ts or pattern-dump.config.json found in ${root} (and no --config given)`
   );
 }
+
+/** The file loadConfig reads: `configPath` when given, else the root's own config file; undefined when
+ *  there is none. */
+export function configFileOf(root: string, configPath?: string): string | undefined {
+  if (configPath) return configPath;
+  for (const name of CONFIG_NAMES) {
+    const path = join(root, name);
+    if (existsSync(path)) return path;
+  }
+  return undefined;
+}
+const CONFIG_NAMES = ["pattern-dump.config.ts", "pattern-dump.config.json"] as const;
 
 /** The config file's value, not yet validated: parsed JSON, or a TS config's default export. */
 async function readConfigFile(path: string): Promise<unknown> {

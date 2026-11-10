@@ -21,6 +21,10 @@ guard();
 
 export default defineConfig({
   testDir: ".",
+  // The commit in the report, but no diff: to make one on CI, Playwright fetches the pull request's base
+  // with --depth=1, and that fetch turns the full clone shallow for every step after it (storefront
+  // dates refuse to build from a shallow clone).
+  captureGitInfo: { commit: true, diff: false },
   // Serial: the reload spec writes into the bench's vendor/ and pages/, and restores them.
   workers: 1,
   retries: process.env["CI"] ? 2 : 0,

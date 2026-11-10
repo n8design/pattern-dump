@@ -7,6 +7,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { save, saveInTwoSteps } from "../../test-support/save.js";
 import { existsSync } from "node:fs";
+import { WORKBENCH } from "./helpers.js";
 
 const bench = (rel: string) => fileURLToPath(new URL(`../${rel}`, import.meta.url));
 const ADDED = [
@@ -24,8 +25,14 @@ const put = async (rel: string, text: string) => {
   // can be missed by the watcher (open: fix/watcher-new-folder). Back to save() once that is fixed.
   await (fresh ? saveInTwoSteps : save)(bench(rel), text);
 };
-/** A marker on the open document: gone once the page has reloaded. */
-const mark = (page: Page) => page.evaluate(() => { (window as unknown as { stale: boolean }).stale = true; });
+/**
+ * A marker on the open document: gone once the page has reloaded. A step that saves two files reloads the
+ * page twice, and the second can still be on its way when the next step marks: marked again until it holds.
+ * Every step then checks its own outcome, so a marker cleared by that earlier reload proves nothing alone.
+ */
+const mark = (page: Page) => expect(
+  () => page.evaluate(() => { (window as unknown as { stale: boolean }).stale = true; }),
+).toPass({ timeout: 10_000 });
 // While the page is mid-reload there is no document to ask, which counts as not reloaded yet.
 const reloaded = (page: Page) => expect.poll(
   () => page.evaluate(() => !(window as unknown as { stale?: boolean }).stale).catch(() => false),
@@ -33,6 +40,8 @@ const reloaded = (page: Page) => expect.poll(
 ).toBe(true);
 
 test.beforeEach(async () => { original = await readFile(about, "utf8"); });
+// A safety net: the test itself removes what it added and waits until the server has seen it, so the
+// reloads that cleanup sends to every page land before the next test opens one (one pd dev serves them all).
 test.afterEach(async () => {
   await save(about, original);
   for (const rel of ADDED) await rm(bench(rel), { recursive: true, force: true });
@@ -51,8 +60,13 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
     await put("pages/zz-new.md", "---\nlayout: zz-plain\ntitle: New page\norder: 9\n---\n\nA page on a new layout.\n");
     await reloaded(page);
     await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About", "New page"]);
-    await page.locator('.site-nav a[href="/zz-new/"]').click();
-    await expect(page.locator("h1.zz-plain-title")).toHaveText("New page");
+    // The page and its layout are two saves, and each reloads every open page. The nav above can show
+    // after the first, so a click can be lost to the second: click again until the new page is shown
+    // on its new layout. Each attempt waits longer than one reload; the whole stays within reloaded()'s.
+    await expect(async () => {
+      await page.locator('.site-nav a[href="/zz-new/"]').click({ timeout: 2_000 });
+      await expect(page.locator("h1.zz-plain-title")).toHaveText("New page", { timeout: 2_000 });
+    }).toPass({ timeout: 10_000 });
   });
 
   await test.step("a new stylesheet for it", async () => {
@@ -80,6 +94,8 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
     await put("src/styles/site/zz-added.scss", ".site-footer {\n  letter-spacing: 0.3em;\n}\n");
     await reloaded(page);
     await expect(page.locator(".site-footer")).not.toHaveCSS("letter-spacing", "normal");
+    // As the base layer serves it: the cleanup below waits for this rule to be gone.
+    expect(await (await page.request.get("/_pd/base.css")).text()).toContain("letter-spacing: 0.3em");
   });
 
   await test.step("a new partial, its stylesheet saved before its template", async () => {
@@ -93,20 +109,48 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
     await reloaded(page);
     await expect(page.locator(".zz-badge")).toHaveCSS("color", "rgb(4, 5, 6)");
     // The partial's rules are its own stylesheet, linked from the page, and no longer in the base layer.
+    // The template and the layout are two saves, two reloads: one landing on this reload aborts it,
+    // which counts as not there yet.
     await expect.poll(async () => {
-      await page.reload();
-      const links = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")));
-      const base = await (await page.request.get("/_pd/base.css")).text();
-      return [links.includes("/_pd/components/partials/zz-badge.css"), base.includes(".zz-badge")];
+      try {
+        await page.reload();
+        const links = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")));
+        const base = await (await page.request.get("/_pd/base.css")).text();
+        return [links.includes("/_pd/components/partials/zz-badge.css"), base.includes(".zz-badge")];
+      } catch {
+        return null;
+      }
     }, { timeout: 10_000 }).toEqual([true, false]);
   });
 
   await test.step("an existing page switched to the new layout", async () => {
     await page.goto("/about/");
     await mark(page);
-    await save(about, original.replace("title: About", "layout: zz-plain\ntitle: About"));
+    await save(about, original.replace("layout: doc", "layout: zz-plain"));
     await reloaded(page);
     await expect(page.locator("h1")).toHaveClass("zz-plain-title");
     await expect(page.locator("h1")).toHaveCSS("color", "rgb(1, 2, 3)");
+  });
+
+  await test.step("everything added removed, and the server back as it was", async () => {
+    // Pages and assets are read from disk on each request, so their 404s alone would not prove the watcher
+    // has handled their removal: they go first, and the files whose removal shows in what the server holds
+    // (discovery, the base layer) after them. The watcher handles changes one at a time, in order.
+    for (const rel of ["pages/zz-new.md", "src/assets/images/zz-dot.svg", "src/styles/partials/zz-badge.scss",
+      "src/patterns/partials/zz-badge", "src/styles/layouts/zz-plain.scss", "src/styles/site/zz-added.scss",
+      "src/patterns/layouts/zz-plain"]) {
+      await rm(bench(rel), { recursive: true, force: true });
+    }
+    await expect.poll(async () => [
+      (await page.request.get(`${WORKBENCH}/api/component/layouts/zz-plain`)).status(),
+      (await page.request.get(`${WORKBENCH}/api/component/partials/zz-badge`)).status(),
+      (await (await page.request.get("/_pd/base.css")).text()).includes("letter-spacing: 0.3em"),
+      (await page.request.get("/zz-new/")).status(),
+    ], { timeout: 15_000 }).toEqual([404, 404, false, 404]);
+    // The page itself back on its own layout, last: the open page shows it, reloaded by the server.
+    await mark(page);
+    await save(about, original);
+    await reloaded(page);
+    await expect(page.locator("h1")).toHaveClass("doc-title");
   });
 });

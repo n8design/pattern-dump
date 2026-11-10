@@ -17,6 +17,10 @@ const WORKBENCH_OUT = path.join(os.tmpdir(), "pd-e2e-storefront-workbench");
 
 export default defineConfig({
   testDir: ".",
+  // The commit in the report, but no diff: to make one on CI, Playwright fetches the pull request's base
+  // with --depth=1, and that fetch turns the full clone shallow for every step after it (storefront
+  // dates refuse to build from a shallow clone).
+  captureGitInfo: { commit: true, diff: false },
   // Serial: the HMR specs write into the bench's pages and restore them, and the one dev server
   // broadcasts every reload to every page.
   workers: 1,
@@ -28,10 +32,10 @@ export default defineConfig({
   use: { trace: "on-first-retry", video: "retain-on-failure" },
   projects: [
     // pd dev, on the storefront host. dom-parity also reads the static root.
-    { name: "storefront", testMatch: /\b(pages|js-off|workbench-links|hmr|live-handshake|add-page|new-files|workbench|dom-parity|placed)\.spec\.ts$/,
+    { name: "storefront", testMatch: /\b(pages|js-off|workbench-links|hmr|live-handshake|add-page|new-files|workbench|dom-parity|placed|config-reload|derived-page|headings|position|dates|navigations)\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: `http://live.localhost:${DEV_PORT}` } },
     // The built storefront root, from a static host.
-    { name: "storefront-static", testMatch: /\b(pages|js-off|workbench-links|static|placed)\.spec\.ts$/,
+    { name: "storefront-static", testMatch: /\b(pages|js-off|workbench-links|static|placed|headings|position|dates|navigations)\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: `http://127.0.0.1:${STATIC_PORT}` } },
   ],
   webServer: [{
