@@ -23,7 +23,7 @@ import { checkPageFrontmatter } from "./frontmatter-contract.js";
 import type { PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { checkSampleData } from "./sample-data.js";
-import { checkPageDeclaration, pageValue, type PageHeading } from "./derived.js";
+import { checkPageDeclaration, pageValue, positionOf, type PageHeading } from "./derived.js";
 import { collidingHeadings, idsBesides } from "./anchors.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
@@ -200,7 +200,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     body,
     nav: markCurrent(model.nav, route),
     site: withDeclaredAbsentAsNull(site.values, siteDeclared),
-    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings }) } : {}),
+    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model) }) } : {}),
   });
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
