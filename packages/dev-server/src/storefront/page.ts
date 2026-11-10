@@ -15,6 +15,7 @@
 import { createHeightFitter, generationBehind, type DiscoveryMap, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
 import { frontmatterBody, frontmatterBodyOffset } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
+import { isHelperNameProblem } from "@pattern-dump/renderer";
 import { renderDoc } from "../markdown.js";
 import { readSchema, type PlacedProblem } from "./declared-values.js";
 import { checkPageFrontmatter } from "./frontmatter-contract.js";
@@ -189,13 +190,20 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   };
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
-  let html: string;
+  let rendered: Awaited<ReturnType<Render>>;
   try {
-    ({ html } = await a.render({ component: checked.layoutId, data }));
+    rendered = await a.render({ component: checked.layoutId, data });
   } catch (e) {
     return fail([`${page.path}: ${e instanceof Error ? e.message : String(e)}`]);
   }
+  // A layout field named like a registered helper can never be shown by its name: the page fails, as the
+  // workbench shows the same SCHEMA_INVALID on the layout.
+  const helperNamed = (rendered.meta?.diagnostics ?? []).filter(d => d.kind === "SCHEMA_INVALID" && isHelperNameProblem(d.message));
+  if (helperNamed.length) {
+    return fail(helperNamed.map(d => `${d.location?.file ?? checked.layoutId} (${d.path ?? "#"}): ${d.message}`));
+  }
 
+  const html = rendered.html;
   const title = typeof checked.values["title"] === "string" ? checked.values["title"] : route;
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;

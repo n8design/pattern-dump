@@ -8,7 +8,7 @@
       "items": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
+          "key": { "type": "string" },
           "patches": {
             "type": "array",
             "items": {
