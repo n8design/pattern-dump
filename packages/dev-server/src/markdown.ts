@@ -28,6 +28,8 @@ import { escapeAttr, escapeHtml } from "./http-utils.js";
 import { usePlacedTags, type PlacedBlock } from "./placed-tags.js";
 import { placeBlock, type PlacementDeps } from "./storefront/placed.js";
 import type { PlacedProblem } from "./storefront/declared-values.js";
+import type { PageHeading } from "./storefront/derived.js";
+import { slug, Slugger } from "./storefront/slug.js";
 
 /**
  * How a doc's live examples are embedded.
@@ -38,10 +40,12 @@ import type { PlacedProblem } from "./storefront/declared-values.js";
  *    component (the preview is its own document). `pattern:` links go to `workbenchUrl` (which ends
  *    with "/"). A component that does not exist is still marked in the page, and is also added to
  *    `problems`: a storefront page with a broken example or link is a page that fails to build.
+ *    Every heading gets an `id` (its anchor, headingAnchors below), and when `headings` is passed each one
+ *    is added to it, in document order. Inline mode sets no ids.
  */
 export type DocEmbed =
   | { embed: "inline" }
-  | { embed: "frame"; workbenchUrl: string; problems: string[]; placed?: DocPlacing };
+  | { embed: "frame"; workbenchUrl: string; problems: string[]; placed?: DocPlacing; headings?: PageHeading[] };
 
 /**
  * Components placed with values (`pd-` tags, placed-tags.ts): on where a caller passes this, off
@@ -168,6 +172,12 @@ export async function renderDoc(
   // Resolve pattern: cross-links synchronously (discoveryMap.has is sync).
   _resolvePatternLinks(tokens, discoveryMap, embed);
 
+  // Frame mode only (a storefront page): every heading gets its anchor as its id.
+  if (embed.embed === "frame") {
+    const headings = headingAnchors(tokens);
+    embed.headings?.push(...headings);
+  }
+
   // Resolve all fence tokens asynchronously — identification via markdown-it's tokenizer,
   // not a regex pre-scan (which breaks on indented fences, fences inside blockquotes, etc.).
   const resolvedFences = new Map<number, string>();
@@ -189,6 +199,32 @@ export async function renderDoc(
   }
 
   return md.renderer.render(tokens, md.options, { resolvedFences, resolvedPlaced });
+}
+
+/** The text a heading reads as: its text and inline code; emphasis and link text kept, markup dropped. */
+function headingText(inline: { children: { type: string; content: string }[] | null } | undefined): string {
+  return (inline?.children ?? [])
+    .filter(c => c.type === "text" || c.type === "text_special" || c.type === "code_inline")
+    .map(c => c.content)
+    .join("");
+}
+
+/**
+ * Sets an `id` on every heading, h1 to h6, and returns them in document order: the anchor is the
+ * GitHub slug of its text (slug.ts), deduplicated across the page; a heading whose slug is empty (only
+ * emoji, say) is `section`, deduplicated like any other.
+ */
+function headingAnchors(tokens: ReturnType<MarkdownIt["parse"]>): PageHeading[] {
+  const slugger = new Slugger();
+  const headings: PageHeading[] = [];
+  for (const [i, tok] of tokens.entries()) {
+    if (tok.type !== "heading_open") continue;
+    const text = headingText(tokens[i + 1]);
+    const anchor = slugger.slug(slug(text) === "" ? "section" : text);
+    tok.attrSet("id", anchor);
+    headings.push({ level: Number(tok.tag.slice(1)), text, anchor });
+  }
+  return headings;
 }
 
 // renderer throws "[renderer] Component not found: ..." / "[renderer] Variant not found: ..." for

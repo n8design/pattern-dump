@@ -27,10 +27,13 @@ describe("checkPageDeclaration", () => {
     });
   });
 
-  it("today Pattern Dump fills nothing, and says so", () => {
-    expect(FILLED).toEqual([]);
+  it("names what Pattern Dump fills today", () => {
+    expect(FILLED).toEqual(["headings"]);
     expect(checkPageDeclaration({ properties: { page: { properties: { prev: {} } } } }, "layouts/doc").problems).toEqual([
-      `layouts/doc declares "page.prev", which Pattern Dump does not fill (it fills none yet)`,
+      `layouts/doc declares "page.prev", which Pattern Dump does not fill (it fills page.headings)`,
+    ]);
+    expect(checkPageDeclaration({ properties: { page: { properties: { toc: {} } } } }, "layouts/doc", []).problems).toEqual([
+      `layouts/doc declares "page.toc", which Pattern Dump does not fill (it fills none yet)`,
     ]);
   });
 
@@ -71,7 +74,7 @@ describe("assemblePage — page", () => {
 
   let n = 0;
   /** A one-layout project and one page; returns the page and the data the layout was rendered with. */
-  const assemble = async (schema: unknown, frontmatter = "title: Home") => {
+  const assemble = async (schema: unknown, frontmatter = "title: Home", markdown = "Hello.") => {
     const dir = join(tmp, `p${n++}`);
     const patterns = join(dir, "patterns");
     for (const [rel, body] of Object.entries({
@@ -82,7 +85,7 @@ describe("assemblePage — page", () => {
       await save(join(patterns, rel), body);
     }
     await mkdir(join(dir, "pages"), { recursive: true });
-    await save(join(dir, "pages", "index.md"), `---\n${frontmatter}\n---\nHello.\n`);
+    await save(join(dir, "pages", "index.md"), `---\n${frontmatter}\n---\n${markdown}\n`);
     const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
     const render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap });
     const inputs: RenderInput[] = [];
@@ -110,7 +113,26 @@ describe("assemblePage — page", () => {
   it("a declared sub-key Pattern Dump does not fill fails the page, named", async () => {
     const { page } = await assemble({ properties: { title: { type: "string" }, page: { type: "object", properties: { toc: { type: "array" } } } } });
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`layouts/page declares "page.toc", which Pattern Dump does not fill (it fills none yet)`]);
+    expect(page.problems).toEqual([`layouts/page declares "page.toc", which Pattern Dump does not fill (it fills page.headings)`]);
+  });
+
+  it("a layout that declares page.headings gets every heading, with the anchor its id carries", async () => {
+    const { page, data } = await assemble({ properties: { title: { type: "string" }, page: { type: "object", properties: { headings: { type: "array" } } } } },
+      "title: Home", "## Pages\n\n### Größe & Übersicht\n\n## Pages\n");
+    expect(page.status).toBe(200);
+    expect(data!["page"]).toEqual({ headings: [
+      { level: 2, text: "Pages", anchor: "pages" },
+      { level: 3, text: "Größe & Übersicht", anchor: "größe--übersicht" },
+      { level: 2, text: "Pages", anchor: "pages-1" },
+    ] });
+    expect(page.html).toContain(`<h2 id="pages">Pages</h2>`);
+    expect(page.html).toContain(`<h3 id="größe--übersicht">Größe &amp; Übersicht</h3>`);
+    expect(page.html).toContain(`<h2 id="pages-1">Pages</h2>`);
+  });
+
+  it("a page with no headings gets an empty list", async () => {
+    const { data } = await assemble({ properties: { title: { type: "string" }, page: { type: "object", properties: { headings: { type: "array" } } } } });
+    expect(data!["page"]).toEqual({ headings: [] });
   });
 
   it("a page's frontmatter cannot set page", async () => {

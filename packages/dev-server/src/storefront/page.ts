@@ -23,7 +23,7 @@ import { checkPageFrontmatter } from "./frontmatter-contract.js";
 import type { PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { checkSampleData } from "./sample-data.js";
-import { checkPageDeclaration, pageValue } from "./derived.js";
+import { checkPageDeclaration, pageValue, type PageHeading } from "./derived.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 
@@ -152,12 +152,13 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
 
   const docProblems: string[] = [];
   const placedProblems: PlacedProblem[] = [];
+  const headings: PageHeading[] = [];
   const body = await renderDoc(
     frontmatterBody(source),
     (id, variant) => a.render({ component: id, variant }).then(r => r.html),
     a.discoveryMap,
     {
-      embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems,
+      embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings,
       // Components placed with values (pd- tags): checked against their schemas, rendered into the page.
       placed: {
         lineOffset: frontmatterBodyOffset(source),
@@ -191,7 +192,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     body,
     nav: markCurrent(model.nav, route),
     site: withDeclaredAbsentAsNull(site.values, siteDeclared),
-    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, {}) } : {}),
+    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings }) } : {}),
   };
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
