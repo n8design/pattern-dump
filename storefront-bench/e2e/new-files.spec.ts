@@ -24,8 +24,14 @@ const put = async (rel: string, text: string) => {
   // can be missed by the watcher (open: fix/watcher-new-folder). Back to save() once that is fixed.
   await (fresh ? saveInTwoSteps : save)(bench(rel), text);
 };
-/** A marker on the open document: gone once the page has reloaded. */
-const mark = (page: Page) => page.evaluate(() => { (window as unknown as { stale: boolean }).stale = true; });
+/**
+ * A marker on the open document: gone once the page has reloaded. A step that saves two files reloads the
+ * page twice, and the second can still be on its way when the next step marks: marked again until it holds.
+ * Every step then checks its own outcome, so a marker cleared by that earlier reload proves nothing alone.
+ */
+const mark = (page: Page) => expect(
+  () => page.evaluate(() => { (window as unknown as { stale: boolean }).stale = true; }),
+).toPass({ timeout: 10_000 });
 // While the page is mid-reload there is no document to ask, which counts as not reloaded yet.
 const reloaded = (page: Page) => expect.poll(
   () => page.evaluate(() => !(window as unknown as { stale?: boolean }).stale).catch(() => false),
@@ -51,8 +57,13 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
     await put("pages/zz-new.md", "---\nlayout: zz-plain\ntitle: New page\norder: 9\n---\n\nA page on a new layout.\n");
     await reloaded(page);
     await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About", "New page"]);
-    await page.locator('.site-nav a[href="/zz-new/"]').click();
-    await expect(page.locator("h1.zz-plain-title")).toHaveText("New page");
+    // The page and its layout are two saves, and each reloads every open page. The nav above can show
+    // after the first, so a click can be lost to the second: click again until the new page is shown
+    // on its new layout. Each attempt waits longer than one reload; the whole stays within reloaded()'s.
+    await expect(async () => {
+      await page.locator('.site-nav a[href="/zz-new/"]').click({ timeout: 2_000 });
+      await expect(page.locator("h1.zz-plain-title")).toHaveText("New page", { timeout: 2_000 });
+    }).toPass({ timeout: 10_000 });
   });
 
   await test.step("a new stylesheet for it", async () => {
@@ -93,11 +104,17 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
     await reloaded(page);
     await expect(page.locator(".zz-badge")).toHaveCSS("color", "rgb(4, 5, 6)");
     // The partial's rules are its own stylesheet, linked from the page, and no longer in the base layer.
+    // The template and the layout are two saves, two reloads: one landing on this reload aborts it,
+    // which counts as not there yet.
     await expect.poll(async () => {
-      await page.reload();
-      const links = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")));
-      const base = await (await page.request.get("/_pd/base.css")).text();
-      return [links.includes("/_pd/components/partials/zz-badge.css"), base.includes(".zz-badge")];
+      try {
+        await page.reload();
+        const links = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")));
+        const base = await (await page.request.get("/_pd/base.css")).text();
+        return [links.includes("/_pd/components/partials/zz-badge.css"), base.includes(".zz-badge")];
+      } catch {
+        return null;
+      }
     }, { timeout: 10_000 }).toEqual([true, false]);
   });
 
