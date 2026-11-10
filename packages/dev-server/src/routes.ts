@@ -58,6 +58,9 @@ import type { RenderingHandle } from "./rendering.js";
 import type { SiteValuesHandle } from "./storefront/site-values.js";
 
 /** Everything the routes need, handed in explicitly rather than captured from a closure. */
+/** TEST ONLY (PD_TEST_HOOKS=1): where a test asks the watcher to settle. Not part of PD_ROUTES. */
+export const TEST_SETTLE_ROUTE = "/_pd/__test/settle";
+
 /** The storefront notes a server has printed (pd dev), so each is printed once. */
 const printedNotes = new WeakMap<RouteContext, Set<string>>();
 
@@ -85,6 +88,8 @@ export interface RouteContext {
   readonly onStorefrontNote?: (note: string) => void;
   /** The storefront pages' dates from git, when there is a storefront (git-dates.ts). */
   readonly dates?: GitDates;
+  /** TEST ONLY: set when PD_TEST_HOOKS=1 on a live server; resolves once every change so far is handled. */
+  readonly settle?: () => Promise<void>;
   /** storefront.site as the server holds it now (the watcher replaces it when the config changes only it). */
   readonly site: SiteValuesHandle;
 }
@@ -121,6 +126,16 @@ export async function handleRequest(
   try {
     const url      = new URL(req.url ?? "/", "http://x");
     const pathname = url.pathname;
+
+    // TEST ONLY, not a route of the dev-server protocol (not in contracts): with PD_TEST_HOOKS=1, a live
+    // server answers POST /_pd/__test/settle once every change made before it is handled (watch.ts settle).
+    // On every host, so a storefront test can call it on its own origin. Without the flag it does not exist.
+    if (ctx.settle && pathname === TEST_SETTLE_ROUTE) {
+      if (req.method !== "POST") { res.writeHead(405, { Allow: "POST" }); res.end(); return; }
+      try { await ctx.settle(); res.writeHead(204); res.end(); }
+      catch (e) { res.writeHead(500, { "Content-Type": "text/plain" }); res.end(e instanceof Error ? e.message : String(e)); }
+      return;
+    }
 
     // --- Dev-UI SPA static assets (/_pd/ prefix) ---
     if (pathname === PD_ROUTES.mainJs) {

@@ -19,7 +19,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { readdir } from "node:fs/promises";
+import { appendFile, readdir } from "node:fs/promises";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
 import { componentCssUrl, type DiscoveryResult, type HmrMessage } from "@pattern-dump/contracts";
@@ -158,6 +158,8 @@ export const CLOSE_DRAIN_MS = 3_000;
  *  and every recheck still pending. */
 export interface WatchHandle {
   close(): Promise<void>;
+  /** TEST ONLY (PD_TEST_HOOKS=1, see settle below): resolves once every change made before it is handled. */
+  settle(): Promise<void>;
 }
 
 /** A file as a change is judged by: its stamp (inode, change and modification times, size) and a hash of its content. */
@@ -220,6 +222,47 @@ const watchDirs = [
   ...watched.data, ...watched.assets, ...watched.helpers.map(h => h.scope), ...(pagesDir ? [pagesDir] : []),
 ];
 const watcher   = chokidar.watch(watchDirs, { ignoreInitial: true, persistent: true });
+
+// TEST ONLY, not a feature: settle, behind PD_TEST_HOOKS=1 (routes.ts serves it as POST /_pd/__test/settle;
+// documented in packages/dev-server/test/watch-harness.ts). It appends to `.__testOnly_barrier` in every
+// watched folder, as the watch harness does, and resolves once each of those writes is handled and nothing
+// is left: no event queued or running, no recheck pending, no new folder's rescan open. chokidar reports the
+// changes in one folder in order and the queue handles events in order, so by then every change made in a
+// watched folder before settle was called is handled, and its reload messages are sent. A barrier is
+// reported but never handled (it sends nothing, so it reloads no page); the files are left in place,
+// ignored by git, and never copied into pd build output.
+const BARRIER = ".__testOnly_barrier";
+/** Waiting for barrier writes to be handled, each told the barrier's path. */
+const barrierWaiters = new Set<(path: string) => void>();
+/** How long settle waits for its barriers, and then for the queue to empty, before it gives up, named. */
+const SETTLE_MS = 10_000;
+async function settle(): Promise<void> {
+  const files = [...new Set(watchDirs)].filter(d => existsSync(d)).map(d => join(d, BARRIER));
+  const waiting = new Set(files);
+  const handled = new Promise<void>((resolve, reject) => {
+    if (!waiting.size) { resolve(); return; }
+    const seen = (path: string): void => {
+      waiting.delete(path);
+      if (waiting.size) return;
+      clearTimeout(timer);
+      barrierWaiters.delete(seen);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      barrierWaiters.delete(seen);
+      reject(new Error(`settle: barriers not handled within ${SETTLE_MS} ms: ${[...waiting].map(shown).join(", ")}`));
+    }, SETTLE_MS);
+    barrierWaiters.add(seen);
+  });
+  for (const file of files) await appendFile(file, ".");
+  await handled;
+  const idle = (): boolean => current === null && queue.length === 0 && rechecks.size === 0 && cycles.size === 0;
+  const deadline = Date.now() + SETTLE_MS;
+  while (!idle()) {
+    if (Date.now() > deadline) throw new Error(`settle: the watcher did not go idle within ${SETTLE_MS} ms`);
+    await new Promise(r => setTimeout(r, 10));
+  }
+}
 // The config file (handleConfig), by a watcher of its own, without fsevents: chokidar watches a file with
 // fsevents through a stream on its whole folder, here the project's root, which would carry every write under
 // it (build output, test traces) into the watcher's callbacks. Its events join the one queue below.
@@ -437,7 +480,7 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
         if (now !== null && !unchanged(now, seen ?? undefined)) dispatch(path, true);
       }, CHANGE_RECHECK_MS));
     };
-    if (basename(path) === ".__testOnly_barrier") { done(); return; }
+    if (basename(path) === BARRIER) { barrierWaiters.forEach(w => w(path)); done(); return; }
     outbox = [];
     // A handler that fails (a file it cannot read, a folder gone mid-walk) is a problem in the terminal and
     // on the open pages, like any other, and pd dev keeps running: nothing is left to reject unhandled.
@@ -1217,5 +1260,5 @@ on("unlinkDir", async (dirPath) => {
     (event, path) => { watcher.emit(event, path); },
     path => { watcher.unwatch(path); },
   );
-  return { close };
+  return { close, settle };
 }
