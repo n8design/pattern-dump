@@ -28,9 +28,9 @@ describe("checkPageDeclaration", () => {
   });
 
   it("names what Pattern Dump fills today", () => {
-    expect(FILLED).toEqual(["headings"]);
-    expect(checkPageDeclaration({ properties: { page: { properties: { prev: {} } } } }, "layouts/doc").problems).toEqual([
-      `layouts/doc declares "page.prev", which Pattern Dump does not fill (it fills page.headings)`,
+    expect(FILLED).toEqual(["headings", "section", "breadcrumbs", "prev", "next"]);
+    expect(checkPageDeclaration({ properties: { page: { properties: { created: {} } } } }, "layouts/doc").problems).toEqual([
+      `layouts/doc declares "page.created", which Pattern Dump does not fill (it fills page.headings, page.section, page.breadcrumbs, page.prev, page.next)`,
     ]);
     expect(checkPageDeclaration({ properties: { page: { properties: { toc: {} } } } }, "layouts/doc", []).problems).toEqual([
       `layouts/doc declares "page.toc", which Pattern Dump does not fill (it fills none yet)`,
@@ -113,7 +113,7 @@ describe("assemblePage — page", () => {
   it("a declared sub-key Pattern Dump does not fill fails the page, named", async () => {
     const { page } = await assemble({ properties: { title: { type: "string" }, page: { type: "object", properties: { toc: { type: "array" } } } } });
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`layouts/page declares "page.toc", which Pattern Dump does not fill (it fills page.headings)`]);
+    expect(page.problems).toEqual([`layouts/page declares "page.toc", which Pattern Dump does not fill (it fills page.headings, page.section, page.breadcrumbs, page.prev, page.next)`]);
   });
 
   it("a layout that declares page.headings gets every heading, with the anchor its id carries", async () => {
@@ -128,6 +128,15 @@ describe("assemblePage — page", () => {
     expect(page.html).toContain(`<h2 id="pages">Pages</h2>`);
     expect(page.html).toContain(`<h3 id="größe--übersicht">Größe &amp; Übersicht</h3>`);
     expect(page.html).toContain(`<h2 id="pages-1">Pages</h2>`);
+  });
+
+  it("a layout that declares the position gets it: on the only page, no neighbours, its own section", async () => {
+    const link = { type: "object", properties: { route: { type: "string" }, title: { type: "string" } } };
+    const { page, data } = await assemble({ properties: { title: { type: "string" }, page: { type: "object", properties: {
+      section: link, breadcrumbs: { type: "array", items: link }, prev: link, next: link,
+    } } } });
+    expect(page.status).toBe(200);
+    expect(data!["page"]).toEqual({ section: { route: "/", title: "Home" }, breadcrumbs: [], prev: null, next: null });
   });
 
   it("a page with no headings gets an empty list", async () => {

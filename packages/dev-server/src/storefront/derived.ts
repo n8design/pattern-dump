@@ -9,6 +9,8 @@
 // beneath a page's values key by key, so a sample key outside this shape, at any depth, would show on
 // every page using the layout.
 
+import type { StorefrontNavItem, StorefrontPagesResponse } from "@pattern-dump/contracts";
+
 /** A link to another page. */
 export interface PageLink { route: string; title: string }
 /** A heading in the page's markdown, with the id it carries. */
@@ -44,7 +46,44 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = ["headings"];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next"];
+
+/** A page's place in the site. */
+export type Position = Pick<DerivedPage, "section" | "breadcrumbs" | "prev" | "next">;
+
+/**
+ * Where `route` sits, from the pages and the nav alone (the inputs the watcher's pages fingerprint covers,
+ * so a change to any of them reloads every page):
+ *  - `section`: the top-level nav entry the page falls under (a folder's entry is its index.md), by the
+ *    page's first path segment; a top-level page is its own section. Null when no entry holds it.
+ *  - `breadcrumbs`: Home, then each folder above the page, by its index.md, down to its parent; the
+ *    page itself is not one. Empty for the home page. From the folders, so it reaches pages the nav
+ *    does not (the nav is one level deep).
+ *  - `prev` and `next`: the neighbours in the nav read depth first (an entry, then its children), across
+ *    sections. Null at either end, and for a page the nav does not list.
+ */
+export function positionOf(route: string, site: Pick<StorefrontPagesResponse, "pages" | "nav">): Position {
+  const titles = new Map(site.pages.map(p => [p.route, p.title]));
+  const link = (r: string): PageLink | null => titles.has(r) ? { route: r, title: titles.get(r)! } : null;
+
+  const segments = route.split("/").filter(Boolean);
+  const breadcrumbs = segments
+    .map((_, i) => link(i === 0 ? "/" : `/${segments.slice(0, i).join("/")}/`))
+    .filter((l): l is PageLink => l !== null);
+
+  const top = segments.length ? `/${segments[0]}/` : "/";
+  const entry = site.nav.find(n => n.route === top) ?? null;
+
+  const flat: StorefrontNavItem[] = site.nav.flatMap(n => [n, ...(n.children ?? [])]);
+  const at = flat.findIndex(n => n.route === route);
+  const linkOf = (n: StorefrontNavItem | undefined): PageLink | null => n ? { route: n.route, title: n.title } : null;
+  return {
+    section: entry ? { route: entry.route, title: entry.title } : null,
+    breadcrumbs,
+    prev: at > 0 ? linkOf(flat[at - 1]) : null,
+    next: at >= 0 ? linkOf(flat[at + 1]) : null,
+  };
+}
 
 type Prop = Record<string, unknown>;
 const isObject = (v: unknown): v is Prop => typeof v === "object" && v !== null && !Array.isArray(v);
