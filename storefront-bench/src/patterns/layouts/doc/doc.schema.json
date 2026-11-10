@@ -3,11 +3,22 @@
   "title": "Doc layout",
   "description": "The frontmatter a page using layout: doc may set, besides layout and order. It also shows what the storefront derives for the page.",
   "type": "object",
-  "required": ["title"],
+  "required": [
+    "title"
+  ],
   "properties": {
-    "title":       { "type": "string", "description": "The page's heading, and its title in the nav" },
-    "description": { "type": "string", "description": "The page's meta description" },
-    "lede":        { "type": "string", "description": "An opening paragraph, set larger than the body" },
+    "title": {
+      "type": "string",
+      "description": "The page's heading, and its title in the nav"
+    },
+    "description": {
+      "type": "string",
+      "description": "The page's meta description"
+    },
+    "lede": {
+      "type": "string",
+      "description": "An opening paragraph, set larger than the body"
+    },
     "page": {
       "type": "object",
       "description": "Derived by the storefront for each page; a page cannot set it",
@@ -18,9 +29,78 @@
           "items": {
             "type": "object",
             "properties": {
-              "level":  { "type": "integer", "description": "1 to 6" },
-              "text":   { "type": "string", "description": "The heading as it reads" },
-              "anchor": { "type": "string", "description": "The heading's id, for #anchor links" }
+              "level": {
+                "type": "integer",
+                "description": "1 to 6"
+              },
+              "text": {
+                "type": "string",
+                "description": "The heading as it reads"
+              },
+              "anchor": {
+                "type": "string",
+                "description": "The heading's id, for #anchor links"
+              }
+            }
+          }
+        },
+        "section": {
+          "type": "object",
+          "description": "The top-level nav entry the page falls under; null when none holds it",
+          "properties": {
+            "route": {
+              "type": "string",
+              "description": "The page's URL"
+            },
+            "title": {
+              "type": "string",
+              "description": "The page's title"
+            }
+          }
+        },
+        "breadcrumbs": {
+          "type": "array",
+          "description": "Home, then each folder above the page, by its index page; empty on the home page",
+          "items": {
+            "type": "object",
+            "description": "A folder's index page",
+            "properties": {
+              "route": {
+                "type": "string",
+                "description": "The page's URL"
+              },
+              "title": {
+                "type": "string",
+                "description": "The page's title"
+              }
+            }
+          }
+        },
+        "prev": {
+          "type": "object",
+          "description": "The page before this one in the nav, read depth first across sections; null at the start and for a page the nav does not list",
+          "properties": {
+            "route": {
+              "type": "string",
+              "description": "The page's URL"
+            },
+            "title": {
+              "type": "string",
+              "description": "The page's title"
+            }
+          }
+        },
+        "next": {
+          "type": "object",
+          "description": "The page after this one, the same way; null at the end",
+          "properties": {
+            "route": {
+              "type": "string",
+              "description": "The page's URL"
+            },
+            "title": {
+              "type": "string",
+              "description": "The page's title"
             }
           }
         }
