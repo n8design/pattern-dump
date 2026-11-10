@@ -121,7 +121,7 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
   await test.step("an existing page switched to the new layout", async () => {
     await page.goto("/about/");
     await mark(page);
-    await save(about, original.replace("title: About", "layout: zz-plain\ntitle: About"));
+    await save(about, original.replace("layout: doc", "layout: zz-plain"));
     await reloaded(page);
     await expect(page.locator("h1")).toHaveClass("zz-plain-title");
     await expect(page.locator("h1")).toHaveCSS("color", "rgb(1, 2, 3)");

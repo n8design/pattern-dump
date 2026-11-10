@@ -5,9 +5,39 @@
   "body": "<h2 id=\"pages\">Pages</h2><p>Each markdown file in <code>pages/</code> is a page at the URL its path names.</p><h2 id=\"layouts\">Layouts</h2><p>A page picks its layout in its frontmatter.</p>",
   "page": {
     "headings": [
-      { "level": 2, "text": "Pages", "anchor": "pages" },
-      { "level": 2, "text": "Layouts", "anchor": "layouts" }
-    ]
+      {
+        "level": 2,
+        "text": "Pages",
+        "anchor": "pages"
+      },
+      {
+        "level": 2,
+        "text": "Layouts",
+        "anchor": "layouts"
+      }
+    ],
+    "section": {
+      "route": "/guides/",
+      "title": "Guides"
+    },
+    "breadcrumbs": [
+      {
+        "route": "/",
+        "title": "Storefront bench"
+      },
+      {
+        "route": "/guides/",
+        "title": "Guides"
+      }
+    ],
+    "prev": {
+      "route": "/guides/",
+      "title": "Guides"
+    },
+    "next": {
+      "route": "/about/",
+      "title": "Sample next page"
+    }
   },
   "site": {
     "title": "Storefront bench",
@@ -16,8 +46,24 @@
     "footer": "Built with Pattern Dump from the storefront bench."
   },
   "nav": [
-    { "route": "/", "title": "Home" },
-    { "route": "/guides/", "title": "Guides", "children": [{ "route": "/guides/setup/", "title": "Setup", "current": true }] },
-    { "route": "/about/", "title": "About" }
+    {
+      "route": "/",
+      "title": "Home"
+    },
+    {
+      "route": "/guides/",
+      "title": "Guides",
+      "children": [
+        {
+          "route": "/guides/setup/",
+          "title": "Setup",
+          "current": true
+        }
+      ]
+    },
+    {
+      "route": "/about/",
+      "title": "About"
+    }
   ]
 }

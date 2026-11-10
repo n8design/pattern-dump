@@ -1,4 +1,5 @@
 ---
+layout: doc
 title: About
 description: What the bench is for.
 order: 2

@@ -1,6 +1,17 @@
 {{#> partials-base }}
 <article class="doc">
+  {{#if page.breadcrumbs.length}}
+  <nav class="doc-breadcrumbs" aria-label="Breadcrumbs">
+    <ol>
+      {{#each page.breadcrumbs}}
+      <li><a href="{{route}}">{{title}}</a></li>
+      {{/each}}
+      <li aria-current="page">{{title}}</li>
+    </ol>
+  </nav>
+  {{/if}}
   <header class="doc-header">
+    {{#if page.section}}<p class="doc-section">{{page.section.title}}</p>{{/if}}
     <h1 class="doc-title">{{title}}</h1>
     {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
   </header>
@@ -14,5 +25,9 @@
   </nav>
   {{/if}}
   <div class="doc-body">{{{body}}}</div>
+  <nav class="doc-pager" aria-label="Previous and next">
+    {{#if page.prev}}<a class="doc-prev" rel="prev" href="{{page.prev.route}}">{{page.prev.title}}</a>{{/if}}
+    {{#if page.next}}<a class="doc-next" rel="next" href="{{page.next.route}}">{{page.next.title}}</a>{{/if}}
+  </nav>
 </article>
 {{/partials-base}}
