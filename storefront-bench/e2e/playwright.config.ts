@@ -28,10 +28,10 @@ export default defineConfig({
   use: { trace: "on-first-retry", video: "retain-on-failure" },
   projects: [
     // pd dev, on the storefront host. dom-parity also reads the static root.
-    { name: "storefront", testMatch: /\b(pages|js-off|workbench-links|hmr|live-handshake|add-page|new-files|workbench|dom-parity|placed|config-reload|derived-page)\.spec\.ts$/,
+    { name: "storefront", testMatch: /\b(pages|js-off|workbench-links|hmr|live-handshake|add-page|new-files|workbench|dom-parity|placed|config-reload|derived-page|headings)\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: `http://live.localhost:${DEV_PORT}` } },
     // The built storefront root, from a static host.
-    { name: "storefront-static", testMatch: /\b(pages|js-off|workbench-links|static|placed)\.spec\.ts$/,
+    { name: "storefront-static", testMatch: /\b(pages|js-off|workbench-links|static|placed|headings)\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: `http://127.0.0.1:${STATIC_PORT}` } },
   ],
   webServer: [{
