@@ -18,6 +18,7 @@
 // stays in index.ts with the other orchestration, following the export.ts precedent: pure shaping
 // moves out, I/O orchestration stays.
 
+import { checkCodeDigest } from "./check-code.js";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -233,8 +234,9 @@ async function writeDiagnosticsArtifact(root: string, art: PersistedDiagnostics)
 }
 
 /**
- * Per-component content hash = hash(id + template source + own data + global-data digest). A matching
- * hash means the static findings cannot have changed.
+ * Per-component content hash = hash(id + template source + own data + global-data digest + check-code
+ * digest). A matching hash means the static findings cannot have changed: the same input, judged by the
+ * same check code (renderer, a11y, contracts; check-code.ts).
  *
  * NOTE (recon corrects section 4): the spec's hash includes "relevant CSS", but the covered static
  * engines - structural axe (alwaysOn, jsdom, no CSS), html-validate, schema, render - do NOT read CSS.
@@ -244,13 +246,15 @@ async function writeDiagnosticsArtifact(root: string, art: PersistedDiagnostics)
  * coarse behaviour section 3/4 intend, falling out of the hash for free).
  */
 export async function componentContentHash(
-  id: string, discoveryMap: DiscoveryMap, globalDataDigest: string,
+  id: string, discoveryMap: DiscoveryMap, globalDataDigest: string, checkCode: string = checkCodeDigest(),
 ): Promise<string> {
   const entry = discoveryMap.get(id);
   const hbs = entry?.hbsPath ? await readFile(entry.hbsPath, "utf-8").catch(() => "") : "";
   const json = entry?.jsonPath ? await readFile(entry.jsonPath, "utf-8").catch(() => "") : "";
+  // The check code too (check-code.ts): a verdict cached by other code is not this code's verdict.
   return createHash("sha1")
     .update(id).update(" ").update(hbs).update(" ").update(json).update(" ").update(globalDataDigest)
+    .update(" ").update(checkCode)
     .digest("hex");
 }
 
