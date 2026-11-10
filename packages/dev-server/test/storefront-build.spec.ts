@@ -185,6 +185,16 @@ describe("pd build — a storefront with problems writes nothing", () => {
     expect(await exists(join(root, ".out", "storefront"))).toBe(false);
   }, 120_000);
 
+  it("lists a problem of the whole site once, not once for every page that shows it", async () => {
+    const root = await benchCopy();
+    const site = { ...benchConfig.storefront!.site!, navigations: { footer: [{ page: "nope.md" }] } };
+    const out = join(root, "..", "wb-nav");
+    const error = await build(root, out, config({ site })).then(() => "", (e: Error) => e.message);
+    const problem = `storefront.site.navigations.footer[0]: "nope.md" is not a page in the pages folder`;
+    expect(error).toBe(`pd build: the storefront has problems, so nothing was written:\n  - ${problem}`);
+    expect(await exists(out)).toBe(false);
+  }, 120_000);
+
   it("leaves both roots of an earlier build untouched", async () => {
     const root = await benchCopy();
     const out = join(root, "..", "wb-kept");

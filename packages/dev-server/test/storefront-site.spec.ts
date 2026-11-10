@@ -11,6 +11,7 @@ import { validateConfig } from "@pattern-dump/config";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { checkSite } from "../src/storefront/site.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
+import { readPages } from "../src/storefront/pages.js";
 import { save } from "../../../test-support/save.js";
 
 /** What these cases compare: the values and the problems (navigations have their own spec). */
@@ -213,9 +214,13 @@ describe("checkSite — the storefront bench", () => {
     const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
     const map = (await buildDiscoveryMap(join(bench, "src", "patterns"))).discoveryMap;
     const site = validateConfig(benchConfig, "storefront-bench").storefront?.site;
-    expect(vp(await checkSite(site, map))).toEqual({
+    const pages = new Set([...(await readPages(join(bench, "pages"))).files.values()].map(f => f.path));
+    const r = await checkSite(site, map, pages);
+    expect(vp(r)).toEqual({
       values: { title: "Storefront bench", tagline: "A website written in markdown", href: "/", year: "2026", footer: "Built with Pattern Dump from the storefront bench." },
       problems: [],
     });
+    expect(r.listed).toEqual(["footer"]);
+    expect(Object.keys(r.navigations)).toEqual(["footer"]);
   });
 });

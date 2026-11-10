@@ -1,1 +1,33 @@
-{"site": {"footer": "Built with Pattern Dump from the storefront bench.", "year": "2026"}}
+{
+  "site": {
+    "footer": "Built with Pattern Dump from the storefront bench.",
+    "year": "2026",
+    "navigations": {
+      "footer": [
+        {
+          "label": "About",
+          "route": "/about/"
+        },
+        {
+          "label": "Source",
+          "href": "https://example.test/source"
+        },
+        {
+          "label": "Guides",
+          "children": [
+            {
+              "label": "Setup",
+              "route": "/guides/setup/",
+              "current": true
+            },
+            {
+              "label": "All guides",
+              "route": "/guides/"
+            }
+          ],
+          "ancestor": true
+        }
+      ]
+    }
+  }
+}
