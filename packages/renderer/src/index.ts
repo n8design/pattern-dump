@@ -503,7 +503,8 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         const val = data[key];
         if (val === undefined || val === null || !def.type) continue;
         const types = Array.isArray(def.type) ? def.type : [def.type];
-        const jsType = typeof val;
+        // A list is JSON's array, not an object: typeof [] is "object", so it is told apart first.
+        const jsType = Array.isArray(val) ? "array" : typeof val;
         const jsonType = jsType === "number" ? (Number.isInteger(val) ? "integer" : "number") : jsType;
         if (!types.includes(jsonType) && !types.includes(jsType)) {
           diagnostics.push({
