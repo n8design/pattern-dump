@@ -8,6 +8,7 @@ npm run audit   # static defects across every component
 npm run typecheck      # type-check the behaviour scripts
 npm run build:scripts  # compile them to lib/scripts (JavaScript + type declarations)
 ```
+__PD_STOREFRONT_README__
 
 ## Layout
 
