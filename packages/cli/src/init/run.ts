@@ -85,7 +85,7 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   const git = cmd.git ?? (prompt && gitDefault ? await io.confirm("Initialise a git repository", true) : gitDefault);
   const install = cmd.install ?? (prompt ? await io.confirm("Run npm install", true) : true);
 
-  const answers: InitAnswers = { name, brand, examples, dependency };
+  const answers: InitAnswers = { name, brand, examples, storefront: false, dependency };
   const templates = await readTemplates(io.templatesDir);
   const result = planInit(templates, answers, { packageJson, exists: p => existsSync(join(target, p)) }, PD_PACKAGE_NAME);
   if (!result.ok) {

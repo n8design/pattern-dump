@@ -29,7 +29,7 @@ async function scaffold(examples: boolean): Promise<string> {
   const templates = await readTemplates(join(cliDir, "templates"));
   const r = planInit(
     templates,
-    { name: "starter-check", brand: "Starter Check", examples, dependency: "^0.0.0" },
+    { name: "starter-check", brand: "Starter Check", examples, storefront: false, dependency: "^0.0.0" },
     { packageJson: null, exists: () => false },
     "@pattern-dump/config",
   );

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Page",
+  "description": "The layout every page renders with. Its properties are what a page's frontmatter may set.",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "title": { "type": "string", "description": "The page's heading, its title in the navigation and in search results" },
+    "description": { "type": "string", "description": "One sentence under the heading, and the page's description for search results" },
+    "page": {
+      "type": "object",
+      "description": "What the storefront works out for the page",
+      "properties": {
+        "next": { "description": "The page after this one in the navigation" }
+      }
+    }
+  }
+}
