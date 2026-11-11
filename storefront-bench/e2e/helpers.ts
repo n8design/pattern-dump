@@ -6,6 +6,8 @@ export const WORKBENCH = `http://pd.localhost:${DEV_PORT}`;
 export const STATIC = `http://127.0.0.1:${process.env["SF_STATIC_PORT"] ?? "4400"}`;
 /** storefront.workbenchUrl in the bench's config: what built pages link to. */
 export const BUILD_WORKBENCH_URL = "https://workbench.example.test/";
+/** storefront.url in the bench's config: the address built pages give as their own. */
+export const SITE_URL = "https://bench.example.test/";
 
 /** Whether this test runs against pd dev (true) or the built root on a static host (false). */
 export const isDev = (info: TestInfo): boolean => info.project.name === "storefront";

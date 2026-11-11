@@ -29,7 +29,7 @@ import { collidingHeadings, idsBesides } from "./anchors.js";
 import type { GitDates, PageDates } from "./git-dates.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
-import type { PageImageCheck } from "./page-image.js";
+import type { PageImage, PageImageCheck } from "./page-image.js";
 
 export interface PageAssembly {
   discoveryMap: DiscoveryMap;
@@ -54,6 +54,13 @@ export interface PageAssembly {
   image(path: string): Promise<PageImageCheck>;
   /** storefront.image: the image of every page that names none. */
   siteImage?: string;
+  /** The site's address, ending with "/", when storefront.url is set: canonical, og:url, og:image and
+   *  JSON-LD are built from it. Without it they are left out. */
+  siteUrl?: string;
+  /** <html lang>. Default: "en". */
+  lang?: string;
+  /** storefront.index: false gives every page noindex. Default: true. */
+  siteIndex?: boolean;
 }
 
 export interface AssembledPage {
@@ -101,9 +108,9 @@ export function liveScript(wsPort: number, generation = ""): string {
     + `})();</script>`;
 }
 
-function document(head: string, body: string, live: PageAssembly["live"]): string {
+function document(head: string, body: string, live: PageAssembly["live"], lang = "en"): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeAttr(lang)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -114,6 +121,39 @@ ${body}
 ${live ? liveScript(live.wsPort, live.generation) : ""}
 </body>
 </html>`;
+}
+
+/**
+ * A page's search and link-preview tags, after its title and description. Without the site's address only
+ * what needs none: robots. With it: canonical, Open Graph (og:image with its size when the page has an
+ * image) and the Twitter card, large only with an image.
+ */
+export function seoTags(p: {
+  route: string; title: string; description: string | undefined; siteTitle: string | undefined;
+  siteUrl: string | undefined; image: PageImage | undefined; index: boolean;
+}): string[] {
+  const tags: string[] = [];
+  if (!p.index) tags.push(`<meta name="robots" content="noindex">`);
+  if (p.siteUrl === undefined) return tags;
+  const abs = (path: string) => new URL(path.replace(/^\//, ""), p.siteUrl).href;
+  const url = abs(p.route);
+  tags.push(
+    `<link rel="canonical" href="${escapeAttr(url)}">`,
+    `<meta property="og:type" content="website">`,
+    ...(p.siteTitle ? [`<meta property="og:site_name" content="${escapeAttr(p.siteTitle)}">`] : []),
+    `<meta property="og:title" content="${escapeAttr(p.title)}">`,
+    ...(p.description ? [`<meta property="og:description" content="${escapeAttr(p.description)}">`] : []),
+    `<meta property="og:url" content="${escapeAttr(url)}">`,
+  );
+  if (p.image) {
+    tags.push(
+      `<meta property="og:image" content="${escapeAttr(abs(p.image.path))}">`,
+      `<meta property="og:image:width" content="${p.image.width}">`,
+      `<meta property="og:image:height" content="${p.image.height}">`,
+    );
+  }
+  tags.push(`<meta name="twitter:card" content="${p.image ? "summary_large_image" : "summary"}">`);
+  return tags;
 }
 
 /** The document shown instead of a page that has problems: every problem, escaped. */
@@ -288,7 +328,12 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} — ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
+    ...seoTags({
+      route, title, description, siteTitle, siteUrl: a.siteUrl,
+      image: imageCheck?.ok ? imageCheck.image : undefined,
+      index: a.siteIndex !== false && checked.build.index !== false,
+    }),
     await a.head(checked.layoutId, html),
   ].join("\n");
-  return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live), problems: [], notes };
+  return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
 }

@@ -248,6 +248,10 @@ export async function buildStaticSite(
       counts.files++;
       const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u)).length;
       report.storefront = { outDir: sfOut, pages, files: counts.files, bytes: counts.bytes };
+      if (storefront.url === undefined) {
+        report.notes.push("storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
+          + "and there is no sitemap: set storefront.url to the site's address, such as \"https://example.com/\"");
+      }
       report.notes.push(...storefrontNotes);
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
