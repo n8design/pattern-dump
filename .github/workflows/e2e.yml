@@ -68,13 +68,14 @@ jobs:
       - name: Burn-in script tests
         run: npm run test:scripts
 
-      # Pattern Dump packed as it is published, installed into a fresh project outside the repository
-      # (pd init), then booted, audited and built there: what a user installing it gets.
-      - name: Check the packed package in a fresh project
-        run: npm run verify:install
-
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
+
+      # Pattern Dump packed as it is published, installed into a fresh project outside the repository
+      # (pd init), then booted, audited and built there: what a user installing it gets. After the browsers:
+      # it reads the website starter's built pages with axe in Chromium.
+      - name: Check the packed package in a fresh project
+        run: npm run verify:install
 
       - name: Run E2E tests
         run: npm run e2e --workspace @pattern-dump/dev-ui

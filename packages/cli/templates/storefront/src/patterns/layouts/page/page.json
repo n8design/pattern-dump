@@ -1,0 +1,8 @@
+{
+  "title": "A page",
+  "description": "Its one-sentence description.",
+  "body": "<p>The page's markdown, rendered.</p>",
+  "site": { "title": __PD_BRAND_JSON__, "footer": "Made with Pattern Dump." },
+  "nav": [{ "route": "/", "title": "Home", "current": true }, { "route": "/about/", "title": "About" }],
+  "page": { "next": { "route": "/about/", "title": "About" } }
+}

@@ -1,0 +1,8 @@
+{{#> partials-base }}
+<article class="page">
+  <h1 class="page-title">{{title}}</h1>
+  {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
+  <div class="page-body">{{{body}}}</div>
+  {{#if page.next}}<p class="page-next"><a rel="next" href="{{page.next.route}}">Next: {{page.next.title}}</a></p>{{/if}}
+</article>
+{{/partials-base}}
