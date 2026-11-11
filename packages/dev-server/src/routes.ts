@@ -52,6 +52,8 @@ import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages } from "./storefront/pages.js";
+import { assetFileFor } from "./asset-file.js";
+import { checkPageImage } from "./storefront/page-image.js";
 import { assemblePage } from "./storefront/page.js";
 import { pageStylesheets } from "./storefront/page-head.js";
 import type { RenderingHandle } from "./rendering.js";
@@ -225,14 +227,8 @@ export async function handleRequest(
     }
 
     // --- Project asset serving (/assets/*) ---
-    if (pathname.startsWith(PD_ROUTE_PREFIX.assets) && assetRoots.length > 0) {
-      const tail = decodeURIComponent(pathname.slice(PD_ROUTE_PREFIX.assets.length));
-      const firstSeg = tail.split("/")[0];
-      // Multi-root: /assets/<rootBasename>/<rest> serves from the matching root.
-      const namedIdx = assetRootNames.indexOf(firstSeg);
-      const assetPath = namedIdx >= 0
-        ? join(assetRoots[namedIdx], tail.slice(firstSeg.length + 1))
-        : join(assetRoots[0], tail); // single-root mirror
+    const assetPath = assetFileFor(pathname, assetRoots, assetRootNames);
+    if (assetPath !== null) {
       try {
         await stat(assetPath); // verify it exists
         return await serveFile(res, assetPath, mimeType(extname(assetPath)));
@@ -514,6 +510,8 @@ export async function handleRequest(
         head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
         ...(ctx.dates ? { dates: ctx.dates } : {}),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
+        image: path => checkPageImage(path, assetRoots, assetRootNames),
+        ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
       });
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
       for (const note of page.notes) {

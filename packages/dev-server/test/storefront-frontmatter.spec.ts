@@ -21,6 +21,9 @@ const SCHEMAS: Record<string, unknown> = {
     required: ["title"],
     properties: { title: { type: "string" }, description: { type: "string" } },
   },
+  "layouts/claims/claims.schema.json": {
+    properties: { title: { type: "string" }, image: { type: "string" }, order: { type: "number" } },
+  },
   "layouts/typed/typed.schema.json": {
     required: ["title", "body"],
     properties: {
@@ -44,6 +47,7 @@ beforeAll(async () => {
     "layouts/page/page.json": `{ "title": "Sample", "brand": { "name": "Sample brand" } }`,
     "layouts/page/page~x.json": `{ "title": "A variant" }`,
     "layouts/typed/typed.hbs": "<main>{{title}}</main>",
+    "layouts/claims/claims.hbs": "<main>{{title}}</main>",
     "layouts/bare/bare.hbs": "<main>{{{body}}}</main>",
     "layouts/broken/broken.hbs": "<main></main>",
     "layouts/broken/broken.schema.json": "{ not json",
@@ -67,14 +71,14 @@ const P = (line: number | undefined, message: string) => ({ file: "guides/setup.
 
 describe("layoutNames", () => {
   it("lists the base components directly under layouts/, not variants or partials", () => {
-    expect(layoutNames(map)).toEqual(["bare", "broken", "page", "typed"]);
+    expect(layoutNames(map)).toEqual(["bare", "broken", "claims", "page", "typed"]);
   });
 });
 
 describe("checkPageFrontmatter — a valid page", () => {
   it("uses the page layout when none is named, and passes the declared values on, without layout or order", async () => {
     expect(await check("---\ntitle: Setup\ndescription: How\norder: 2\n---\n")).toEqual({
-      layoutId: "layouts/page", values: { title: "Setup", description: "How" }, problems: [],
+      layoutId: "layouts/page", values: { title: "Setup", description: "How" }, build: {}, problems: [],
     });
   });
 
@@ -86,7 +90,7 @@ describe("checkPageFrontmatter — a valid page", () => {
 });
 
 describe("checkPageFrontmatter — the layout", () => {
-  const known = `the layouts are "bare", "broken", "page", "typed"`;
+  const known = `the layouts are "bare", "broken", "claims", "page", "typed"`;
   for (const [label, value] of [["an unknown name", "nope"], ["a partial", "base"], ["a variant", "page~x"], ["a path", "../partials/base"]] as const) {
     it(`refuses ${label}, naming the layouts there are`, async () => {
       expect((await check(`---\ntitle: T\nlayout: ${value}\n---\n`)).problems).toEqual([P(3, `layout "${value}" is not a layout — ${known}`)]);
@@ -141,7 +145,7 @@ describe("checkPageFrontmatter — keys", () => {
 
   it("declares nothing for a layout with no schema", async () => {
     expect((await check("---\nlayout: bare\ntitle: T\n---\n")).problems).toEqual([P(3, `"title" is not declared by layout "bare", which has no schema`)]);
-    expect(await check("---\nlayout: bare\norder: 3\n---\n")).toEqual({ layoutId: "layouts/bare", values: {}, problems: [] });
+    expect(await check("---\nlayout: bare\norder: 3\n---\n")).toEqual({ layoutId: "layouts/bare", values: {}, build: {}, problems: [] });
   });
 });
 
@@ -151,6 +155,7 @@ describe("checkPageFrontmatter — declared types", () => {
     expect(await check(md)).toEqual({
       layoutId: "layouts/typed",
       values: { title: "T", count: 2.5, n: -4, draft: true, tags: ["a", "b"], scores: [1, 2.5], tone: "info", either: 7, free: "anything" },
+      build: {},
       problems: [],
     });
   });
@@ -177,6 +182,51 @@ describe("checkPageFrontmatter — declared types", () => {
 
   it("keeps a value that failed out of the values passed on", async () => {
     expect((await check("---\nlayout: typed\ntitle: T\ncount: three\n---\n")).values).toEqual({ title: "T" });
+  });
+});
+
+describe("checkPageFrontmatter — the build's own keys: redirectFrom, index, image", () => {
+  it("reads them for the build and never passes them to the layout", async () => {
+    const r = await check("---\ntitle: T\nredirectFrom: [/old/, /older/page/]\nindex: false\nimage: /assets/images/share.png\n---\n");
+    expect(r.problems).toEqual([]);
+    expect(r.values).toEqual({ title: "T" });
+    expect(r.build).toEqual({ redirectFrom: ["/old/", "/older/page/"], index: false, image: "/assets/images/share.png" });
+  });
+
+  it("takes one old route written alone, and index: true", async () => {
+    const r = await check("---\ntitle: T\nredirectFrom: /old/\nindex: true\n---\n");
+    expect(r.build).toEqual({ redirectFrom: ["/old/"], index: true });
+  });
+
+  it("refuses old routes that are not root-relative, slash-wrapped plain paths, with the line", async () => {
+    const r = await check("---\ntitle: T\nredirectFrom: [old/, /old, /a?b/, /a/../b/, /, //x/]\n---\n");
+    expect(r.problems).toEqual([P(3, `redirectFrom: "old/", "/old", "/a?b/", "/a/../b/", "/", "//x/" are not a route: `
+      + `each old route starts and ends with "/", such as "/old/page/", with no query or fragment`)]);
+    expect(r.build).toEqual({});
+  });
+
+  it("refuses an index that is not true or false", async () => {
+    expect((await check("---\ntitle: T\nindex: no\n---\n")).problems).toEqual([P(3, "index must be true or false")]);
+  });
+
+  it("refuses an image that is not a path in the assets", async () => {
+    for (const bad of ["images/share.png", "/images/share.png", "https://example.com/share.png", "/assets/", "[/assets/a.png, /assets/b.png]"]) {
+      expect((await check(`---\ntitle: T\nimage: ${bad}\n---\n`)).problems, bad)
+        .toEqual([P(3, `image must be a path to a file in the assets, such as "/assets/images/share.png"`)]);
+    }
+  });
+
+  it("refuses a layout that declares a key the build owns", async () => {
+    const r = await check("---\nlayout: claims\ntitle: T\n---\n");
+    expect(r.problems).toEqual([
+      P(undefined, `layout "claims" declares "order", which a page sets for the build, not for its layout: rename it in the layout's schema`),
+      P(undefined, `layout "claims" declares "image", which a page sets for the build, not for its layout: rename it in the layout's schema`),
+    ]);
+  });
+
+  it("checks them even when the layout does not exist", async () => {
+    const r = await check("---\nlayout: nope\nindex: maybe\n---\n");
+    expect(r.problems).toContainEqual(P(3, "index must be true or false"));
   });
 });
 

@@ -80,6 +80,8 @@ export interface ResolvedConfig {
     readonly host: string;
     readonly site: Record<string, unknown> | undefined;
     readonly workbenchUrl: string | undefined;
+    /** storefront.image: the link-preview image of every page that names none (a /assets/… path). */
+    readonly image: string | undefined;
   } | null;
 
   readonly overviewsEnabled: boolean;
@@ -209,6 +211,7 @@ export function resolveServerConfig(
       host: (config.storefront.host ?? PD_HOSTS.storefront).toLowerCase(),
       site: config.storefront.site,
       workbenchUrl: config.storefront.workbenchUrl,
+      image: config.storefront.image,
     } : null,
     overviewsEnabled:    config.overviews !== false,
     documentBaseEnabled,
