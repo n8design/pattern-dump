@@ -111,23 +111,23 @@ describe("the pass, on a repository with history", () => {
   });
 
   it("dates a renamed page from its first add", async () => {
-    expect(await of("setup.md")).toEqual({ dates: { created: "2026-01-10T10:00:00+01:00", modified: "2026-02-10T10:00:00+01:00" }, notes: [], problems: [] });
+    expect(await of("setup.md")).toEqual({ dates: { created: "2026-01-10T10:00:00+01:00", modified: "2026-02-10T10:00:00+01:00" }, notes: [], problems: [], shallow: false });
   });
 
   it("gives a page with uncommitted edits its last commit's dates, with a note in pd build and none in pd dev", async () => {
     const dates = { created: "2026-02-10T10:00:00+01:00", modified: "2026-02-10T10:00:00+01:00" };
-    expect(await of("draft.md")).toEqual({ dates, notes: ["draft.md: has uncommitted changes; its dates are its last commit's"], problems: [] });
-    expect(await of("draft.md", "dev")).toEqual({ dates, notes: [], problems: [] });
+    expect(await of("draft.md")).toEqual({ dates, notes: ["draft.md: has uncommitted changes; its dates are its last commit's"], problems: [], shallow: false });
+    expect(await of("draft.md", "dev")).toEqual({ dates, notes: [], problems: [], shallow: false });
   });
 
   it("gives an untracked page no dates, and says so", async () => {
-    expect(await of("new.md")).toEqual({ dates: { created: null, modified: null }, notes: ["new.md: not committed yet, so it has no dates"], problems: [] });
+    expect(await of("new.md")).toEqual({ dates: { created: null, modified: null }, notes: ["new.md: not committed yet, so it has no dates"], problems: [], shallow: false });
   });
 
   it("gives an ignored page no dates, and says it has no history", async () => {
     expect(await of("ignored.md")).toEqual({
       dates: { created: null, modified: null },
-      notes: ["ignored.md: no git history (ignored, or outside the repository), so it has no dates"], problems: [],
+      notes: ["ignored.md: no git history (ignored, or outside the repository), so it has no dates"], problems: [], shallow: false,
     });
   });
 
@@ -152,10 +152,11 @@ describe("the pass, on a repository with history", () => {
       const page = await ofClone("setup.md", "build");
       expect(page.dates).toEqual({ created: "2026-04-25T09:00:00+02:00", modified: "2026-04-25T09:00:00+02:00" });
       expect(page.problems).toEqual([`setup.md: ${why}; build from the full history (in CI, check out with fetch-depth: 0)`]);
+      expect(page.shallow).toBe(true);
     });
 
     it("is a note in pd dev", async () => {
-      expect(await ofClone("setup.md", "dev")).toMatchObject({ notes: [`setup.md: ${why}`], problems: [] });
+      expect(await ofClone("setup.md", "dev")).toMatchObject({ notes: [`setup.md: ${why}`], problems: [], shallow: true });
     });
   });
 });
@@ -166,7 +167,7 @@ describe("the pass, with no history to read", () => {
     await put(join(pages, "index.md"), "x\n");
     const h = await readHistory(pages, ["index.md"], git);
     expect(datesOf("index.md", h, await readStatus(h, git), "build")).toEqual({
-      dates: { created: null, modified: null }, notes: ["the pages folder is not in a git repository: no page has dates"], problems: [],
+      dates: { created: null, modified: null }, notes: ["the pages folder is not in a git repository: no page has dates"], problems: [], shallow: false,
     });
   });
 

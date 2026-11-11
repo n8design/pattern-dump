@@ -142,11 +142,13 @@ export interface DatedPage {
   notes: string[];
   /** A problem that stops the page (pd build from a shallow clone). */
   problems: string[];
+  /** The history is a shallow clone's: a date may be the clone's boundary, not the page's own. */
+  shallow: boolean;
 }
 
 /** The dates of the page at `path`, and what to say about them. */
 export function datesOf(path: string, history: GitHistory, status: { untracked: Set<string>; changed: Set<string> }, mode: DatesMode): DatedPage {
-  if (history.none) return { dates: { created: null, modified: null }, notes: [`${history.none}: no page has dates`], problems: [] };
+  if (history.none) return { dates: { created: null, modified: null }, notes: [`${history.none}: no page has dates`], problems: [], shallow: false };
   const dates = history.dates.get(path) ?? { created: null, modified: null };
   const notes: string[] = [], problems: string[] = [];
   const repo = history.repoPath(path);
@@ -158,7 +160,7 @@ export function datesOf(path: string, history: GitHistory, status: { untracked: 
   if (status.untracked.has(repo)) notes.push(`${path}: not committed yet, so it has no dates`);
   else if (dates.modified === null) notes.push(`${path}: no git history (ignored, or outside the repository), so it has no dates`);
   else if (mode === "build" && status.changed.has(repo)) notes.push(`${path}: has uncommitted changes; its dates are its last commit's`);
-  return { dates, notes, problems };
+  return { dates, notes, problems, shallow: history.shallow };
 }
 
 /**

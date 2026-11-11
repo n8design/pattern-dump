@@ -30,6 +30,11 @@ import type { GitDates, PageDates } from "./git-dates.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 import type { PageImage, PageImageCheck } from "./page-image.js";
+import { jsonLdScript } from "./json-ld.js";
+
+/** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
+export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
+  + "and no lastmod in the sitemap: build from the full history (in CI, check out with fetch-depth: 0)";
 
 export interface PageAssembly {
   discoveryMap: DiscoveryMap;
@@ -255,14 +260,22 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const siteDeclared = Object.keys(siteSchema?.properties?.site?.properties ?? {});
   const pageDeclaration = checkPageDeclaration(layoutSchema, checked.layoutId);
   problems.push(...pageDeclaration.problems);
-  // Dates only for a layout that declares one: the git pass never runs for a site that shows none.
+  // Dates for a layout that shows them, and for the JSON-LD of a site with an address; the git pass never
+  // runs for a site that needs neither. Only a layout that shows dates is stopped by an unreliable one (a
+  // shallow clone in pd build) or noted about a missing one: the JSON-LD just leaves the date out.
   const notes: string[] = [];
   let dates: Partial<PageDates> = {};
-  if (a.dates && pageDeclaration.declared?.some(k => k === "created" || k === "modified")) {
+  let modified: string | null = null;
+  const showsDates = pageDeclaration.declared?.some(k => k === "created" || k === "modified") ?? false;
+  if (a.dates && (showsDates || a.siteUrl !== undefined)) {
     const dated = await a.dates.of(page.path, a.live ? "dev" : "build");
-    dates = dated.dates;
-    notes.push(...dated.notes);
-    problems.push(...dated.problems);
+    if (showsDates) {
+      dates = dated.dates;
+      notes.push(...dated.notes);
+      problems.push(...dated.problems);
+    }
+    if (dated.shallow) notes.push(SHALLOW_SEO_NOTE);
+    else modified = dated.dates.modified;
   }
   if (a.discoveryMap.has(checked.layoutId)) {
     problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed));
@@ -333,6 +346,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       image: imageCheck?.ok ? imageCheck.image : undefined,
       index: a.siteIndex !== false && checked.build.index !== false,
     }),
+    ...(a.siteUrl !== undefined
+      ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified })]
+      : []),
     await a.head(checked.layoutId, html),
   ].join("\n");
   return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
