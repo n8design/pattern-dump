@@ -26,6 +26,7 @@ import type {
 import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
+import { sameHostWorkbenchPath } from "@pattern-dump/config";
 import type { ResolvedConfig } from "./server-config.js";
 import { compositionFor, currentDiscovery, scriptFor, type ServerState } from "./server-state.js";
 import { createDisplayPath } from "./display-path.js";
@@ -515,7 +516,7 @@ export async function handleRequest(
         : ctx.live ? `http://${req.headers.host ?? cfg.storefront.host}/` : cfg.storefront.url;
       if (pathname === PD_ROUTES.robots) {
         res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end(storefrontRobotsTxt({ siteUrl, index: cfg.storefront.index }));
+        res.end(storefrontRobotsTxt({ siteUrl, index: cfg.storefront.index, workbenchPath: sameHostWorkbenchPath(cfg.storefront) }));
         return;
       }
       // The sitemap needs the site's address, and a site kept out of search engines has none.

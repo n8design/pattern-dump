@@ -12,7 +12,7 @@
 
 import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
-import type { PatternDumpConfig } from "@pattern-dump/config";
+import { sameHostWorkbenchPath, type PatternDumpConfig } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
   staticPathFor, themeCssUrl,
@@ -238,7 +238,9 @@ export async function buildStaticSite(
     // Crawlers: the workbench is searchable, its previews are not.
     await writeFile(join(outDir, "robots.txt"), workbenchRobotsTxt(basePath));
     report.files++;
-    if (basePath !== "/") {
+    // Unless the storefront's own robots.txt, at this host's root, already keeps these previews out: a
+    // workbench published on the storefront's host at this base path (with index: false, it keeps out everything).
+    if (basePath !== "/" && sameHostWorkbenchPath(storefront ?? undefined) !== basePath) {
       report.notes.push(`robots.txt is written to the workbench's root, but crawlers read it only at a host's root: `
         + `with the base path ${basePath}, add its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
     }
