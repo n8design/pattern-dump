@@ -45,4 +45,16 @@ describe("storefrontRobotsTxt", () => {
   it("keeps a site with index: false out entirely, with no sitemap", () => {
     expect(storefrontRobotsTxt({ siteUrl: "https://example.test/", index: false })).toBe("User-agent: *\nDisallow: /\n");
   });
+
+  it("keeps a workbench on the same host out of its previews too, before the sitemap", () => {
+    expect(storefrontRobotsTxt({ siteUrl: "https://example.test/", index: true, workbenchPath: "/workbench/" }))
+      .toBe("User-agent: *\nDisallow: /preview/\nDisallow: /workbench/preview/\n\nSitemap: https://example.test/sitemap.xml\n");
+    expect(storefrontRobotsTxt({ siteUrl: undefined, index: true, workbenchPath: "/docs/workbench/" }))
+      .toBe("User-agent: *\nDisallow: /preview/\nDisallow: /docs/workbench/preview/\n");
+  });
+
+  it("has no workbench line for a workbench on its own host, and none to add when the site is kept out", () => {
+    expect(storefrontRobotsTxt({ siteUrl: undefined, index: true, workbenchPath: undefined })).toBe("User-agent: *\nDisallow: /preview/\n");
+    expect(storefrontRobotsTxt({ siteUrl: undefined, index: false, workbenchPath: "/workbench/" })).toBe("User-agent: *\nDisallow: /\n");
+  });
 });

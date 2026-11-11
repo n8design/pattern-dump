@@ -18,7 +18,7 @@
 //   /source/:id/data             — Shiki-highlighted JSON data fragment
 //   *                            — SPA shell
 import type { PatternDumpConfig } from "@pattern-dump/config";
-import type { Render } from "@pattern-dump/contracts";
+import { PD_HOSTS, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 // Re-exported so the export/CLI orchestration (core) can key its report on the SAME handle derivation
 // as discovery/export, without core depending on discovery directly.
@@ -315,6 +315,12 @@ export async function startDevServer(
   const actualPort = (httpServer.address() as import("node:net").AddressInfo).port;
   httpPort = actualPort;
   console.log(`[dev-server] Listening at http://127.0.0.1:${actualPort}`);
+  // Where to open it, for a person reading the terminal (pd dev only; pd build runs this server too). The
+  // storefront and the workbench are told apart by host name, so these are the addresses to use, not 127.0.0.1.
+  if (live) {
+    if (cfg.storefront) console.log(`[dev-server] Website:   http://${cfg.storefront.host}:${actualPort}/`);
+    console.log(`[dev-server] Workbench: http://${cfg.storefront ? PD_HOSTS.workbench : "localhost"}:${actualPort}/`);
+  }
   const startupDiscovery = await cachedDiscovery(state);
   const componentCount = startupDiscovery ? [...startupDiscovery.discoveryMap.keys()].filter(id => !id.includes("~")).length : 0;
   console.log(`[dev-server] Ready in ${Math.round(performance.now() - startTime)}ms — ${componentCount} components`);

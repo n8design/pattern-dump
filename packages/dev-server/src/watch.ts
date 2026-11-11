@@ -41,7 +41,7 @@ import { auditWithHash, globalDataDigest } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
-import type { PatternDumpConfig } from "@pattern-dump/config";
+import { sameHostWorkbenchPath, type PatternDumpConfig } from "@pattern-dump/config";
 import { classifyConfigChange } from "./config-change.js";
 import type { SiteValuesHandle } from "./storefront/site-values.js";
 import type { GitDates } from "./storefront/git-dates.js";
@@ -214,6 +214,8 @@ export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
 const pagesDir = cfg.storefront?.pagesDir ?? null;
+// Where a same-host workbench is published, which no page may claim (readPages reports it).
+const workbenchPath = sameHostWorkbenchPath(cfg.storefront ?? undefined);
 // What every page shows of the others (handlePages): read before the watcher starts, then after each event
 // in the pages folder.
 let pagesPrint = await pagesFingerprint();
@@ -1018,7 +1020,7 @@ const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p)
  *  storefront. Compared, never parsed. */
 async function pagesFingerprint(): Promise<string | null> {
   if (!pagesDir) return null;
-  const model = await readPages(pagesDir);
+  const model = await readPages(pagesDir, { workbenchPath });
   return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems });
 }
 
@@ -1208,7 +1210,7 @@ async function handleComponentJson(filePath: string, event: "add" | "unlink"): P
 
 /** Every storefront page changed: one page-changed per page (none without a storefront). */
 async function everyPageChanged(): Promise<void> {
-  if (pagesDir) for (const { route } of (await readPages(pagesDir)).pages) hmr.push({ type: "page-changed", route });
+  if (pagesDir) for (const { route } of (await readPages(pagesDir, { workbenchPath })).pages) hmr.push({ type: "page-changed", route });
 }
 
 on("add", async (filePath) => {

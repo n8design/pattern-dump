@@ -2,7 +2,7 @@
 // Load and validate pattern-dump.config (.ts/.json, TS wins). Shared config types.
 import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/contracts";
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
-export { ConfigError, configProblems, suggest, validateConfig } from "./validate.js";
+export { ConfigError, configProblems, sameHostWorkbenchPath, suggest, validateConfig } from "./validate.js";
 
 export interface AssetsConfig {
   /** Where assets live. Only 'central' (the default: one assets dir, served at /assets/) is supported
@@ -176,8 +176,10 @@ export interface StorefrontConfig {
   /** The host name `pd dev` serves the storefront on. Default: `live.localhost`. */
   host?: string;
   /**
-   * Where the built workbench will be hosted, e.g. `https://workbench.example.com/` or
-   * `https://htwoo.io/workbench/`: an absolute http(s) URL, with no query or fragment. Loaded with exactly
+   * Where the built workbench will be hosted: an absolute http(s) URL with no query or fragment, e.g.
+   * `https://workbench.example.com/`, or, for a workbench on the storefront's own host, a path such as
+   * `/workbench/` (then built with that base path, and its previews kept out of the storefront's
+   * `robots.txt`; an absolute URL on `url`'s origin counts as the same host too). Loaded with exactly
    * one trailing slash, whether written with one or not; links from storefront pages to the workbench are
    * this value followed by a path. Used by `pd build` only: in `pd dev` those links always go to
    * `http://pd.localhost:<port>`, the workbench of the same process.
