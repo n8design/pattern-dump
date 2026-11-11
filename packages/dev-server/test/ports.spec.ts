@@ -17,8 +17,8 @@ const config = defineConfig({
 let blocker: Server | undefined;
 afterEach(async () => { await new Promise<void>(r => blocker ? blocker.close(() => r()) : r()); blocker = undefined; });
 
-/** Occupy a free port the way another `pd dev` would, and return it. The workbench binds 127.0.0.1
- *  and live reload binds every interface, so each is blocked on its own address. */
+/** Occupy a free port the way another `pd dev` would, and return it. The workbench and live reload both
+ *  bind 127.0.0.1, so that is where each is blocked. */
 async function occupy(host?: string): Promise<number> {
   blocker = createServer();
   await new Promise<void>(r => host ? blocker!.listen(0, host, r) : blocker!.listen(0, r));
@@ -52,7 +52,7 @@ describe("describeBindError", () => {
 
 describe("startDevServer on a taken port", () => {
   it("rejects with PortInUseError when the live-reload port is taken", async () => {
-    const taken = await occupy();
+    const taken = await occupy("127.0.0.1");
     await expect(startDevServer(config, testBench, { port: 0, wsPort: taken }))
       .rejects.toMatchObject({ name: "PortInUseError", port: taken, message: expect.stringContaining("live reload cannot start") });
   }, 60_000);
@@ -62,9 +62,10 @@ describe("startDevServer on a taken port", () => {
     const ws = await (async () => { const s = createServer(); await new Promise<void>(r => s.listen(0, r)); const p = (s.address() as { port: number }).port; await new Promise<void>(r => s.close(() => r())); return p; })();
     await expect(startDevServer(config, testBench, { port: taken, wsPort: ws }))
       .rejects.toMatchObject({ name: "PortInUseError", port: taken, message: expect.stringContaining("the workbench cannot start") });
-    // The live-reload socket opened before the failure was closed again: its port is free.
+    // The live-reload socket opened before the failure was closed again: its port is free on the address it
+    // used (a probe on every interface could bind beside a socket still holding 127.0.0.1).
     const probe = createServer();
-    await new Promise<void>((resolve, reject) => { probe.once("error", reject); probe.listen(ws, resolve); });
+    await new Promise<void>((resolve, reject) => { probe.once("error", reject); probe.listen(ws, "127.0.0.1", resolve); });
     await new Promise<void>(r => probe.close(() => r()));
   }, 60_000);
 });

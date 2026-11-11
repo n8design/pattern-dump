@@ -3,8 +3,8 @@
 // can't be used.
 
 import { readFile } from "node:fs/promises";
-import { relative, isAbsolute } from "node:path";
-import { assetFileFor } from "../asset-file.js";
+import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
+import { assetFile } from "../asset-file.js";
 import { imageInfo, type RasterFormat } from "./image-info.js";
 
 export type PageImage = { path: string; format: RasterFormat; width: number; height: number };
@@ -14,23 +14,16 @@ const FORMATS = "PNG, JPEG, GIF or WebP";
 
 /** Check the image at `path` (a /assets/… URL path) against the project's asset roots. */
 export async function checkPageImage(path: string, roots: readonly string[], names: readonly string[]): Promise<PageImageCheck> {
-  const file = assetFileFor(path, roots, names);
-  if (file === null) {
-    return { ok: false, message: roots.length === 0
-      ? `image "${path}": the project has no assets folder (assets.dir in the config)`
-      : `image "${path}" is not in the assets: it must start with /assets/` };
-  }
-  // The file must be inside an asset root: "/assets/../secret.png" names no asset.
-  const inside = roots.some(root => { const rel = relative(root, file); return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel); });
-  if (!inside) return { ok: false, message: `image "${path}" is outside the assets folder` };
+  if (roots.length === 0) return { ok: false, message: `image "${path}": the project has no assets folder (assets.dir in the config)` };
+  if (!path.startsWith(PD_ROUTE_PREFIX.assets)) return { ok: false, message: `image "${path}" is not in the assets: it must start with /assets/` };
+  // The same lookup as the asset route: a file inside an asset root, as the file system resolves it.
+  const file = await assetFile(path, roots, names);
+  if (file === null) return { ok: false, message: `image "${path}" does not exist in the assets` };
   let bytes: Buffer;
   try {
     bytes = await readFile(file);
   } catch (e) {
-    const code = (e as NodeJS.ErrnoException).code;
-    return { ok: false, message: code === "ENOENT" || code === "EISDIR"
-      ? `image "${path}" does not exist in the assets`
-      : `image "${path}" cannot be read: ${(e as Error).message}` };
+    return { ok: false, message: `image "${path}" cannot be read: ${(e as Error).message}` };
   }
   const info = imageInfo(bytes);
   if (!info.raster) {
