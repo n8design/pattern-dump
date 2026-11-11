@@ -47,6 +47,7 @@ a TypeScript setup, and optional starter components. It asks for each choice unl
 | `--name <name>` | Package name. Default: the folder name |
 | `--brand <title>` | Title shown in the Nav Rail. Default: the name |
 | `--no-examples` | Structure, config and themes only, without starter components |
+| `--storefront` | Also a website: two pages, a small skin, a component of its own and a GitHub Pages workflow ([storefront.md](storefront.md#quick-start)). Default: no |
 | `--no-install` | Skip `npm install` |
 | `--git` / `--no-git` | Run `git init`. Default: yes, unless already inside a repository |
 | `--pd-source <src>` | Where to install Pattern Dump from: a `.tgz` file or an npm spec |
@@ -57,7 +58,12 @@ overwritten, an existing script name gets a `pd:` variant instead, and existing 
 `typescript` versions are kept. It refuses a folder that already has a Pattern Dump config.
 
 It adds these scripts: `dev` (`pd dev`), `audit` (`pd audit`), `typecheck` (`tsc --noEmit`) and
-`build:scripts` (`tsc`).
+`build:scripts` (`tsc`), and with `--storefront` also `build` (`pd build`).
+
+With `--storefront`, the skin (`src/patterns/layouts/`, `src/patterns/partials/` and their styles) is written
+as a whole or not at all: if one of its files is already there, `pd init` leaves the skin out and says so,
+so it is never mixed with a skin the project has. When Pattern Dump is installed from a local `.tgz`, it
+warns that the GitHub Pages workflow can't install it (`npm ci` runs on GitHub's machines).
 
 ---
 
