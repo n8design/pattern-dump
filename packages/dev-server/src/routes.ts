@@ -17,8 +17,7 @@
 import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
-import { readFile, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview,
@@ -52,7 +51,8 @@ import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages } from "./storefront/pages.js";
-import { assetFileFor } from "./asset-file.js";
+import { assetFile } from "./asset-file.js";
+import { containedFile, decodePath } from "./contained-file.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
 import { assemblePage } from "./storefront/page.js";
@@ -202,11 +202,15 @@ export async function handleRequest(
         res.end("No scriptsDir configured");
         return;
       }
-      const scriptId = normalizeScriptId(decodeURIComponent(basename(pathname, ".js")));
+      const decoded = decodePath(basename(pathname, ".js"));
+      if (decoded === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end("Script not found"); return; }
+      const scriptId = normalizeScriptId(decoded);
       try {
         const js = await scriptFor(state, scriptId).get(async () => {
-          // The project's scripts first, then each package's — a project script replaces a package's.
-          const entryPoint = scriptsDirs.map(d => join(d, `${scriptId}.ts`)).find(f => existsSync(f));
+          // The project's scripts first, then each package's — a project script replaces a package's. Each
+          // entry point must be inside its scripts folder.
+          let entryPoint: string | undefined;
+          for (const d of scriptsDirs) { entryPoint = (await containedFile(d, `${scriptId}.ts`)) ?? undefined; if (entryPoint) break; }
           // Say what is missing. Compiling a path we know is absent would report it as an ENOENT
           // compile error inside the preview, naming neither the id nor where it was looked for.
           if (entryPoint === undefined) throw new ScriptMissing(scriptId);
@@ -228,16 +232,14 @@ export async function handleRequest(
     }
 
     // --- Project asset serving (/assets/*) ---
-    const assetPath = assetFileFor(pathname, assetRoots, assetRootNames);
-    if (assetPath !== null) {
-      try {
-        await stat(assetPath); // verify it exists
-        return await serveFile(res, assetPath, mimeType(extname(assetPath)));
-      } catch {
+    if (pathname.startsWith(PD_ROUTE_PREFIX.assets) && assetRoots.length > 0) {
+      const assetPath = await assetFile(pathname, assetRoots, assetRootNames);
+      if (assetPath === null) {
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end("Asset not found");
         return;
       }
+      return await serveFile(res, assetPath, mimeType(extname(assetPath)));
     }
 
     // --- JSON API ---
