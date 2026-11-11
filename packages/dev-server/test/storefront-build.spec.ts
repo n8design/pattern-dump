@@ -11,6 +11,7 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
 import { buildStaticSite, startDevServer } from "@pattern-dump/dev-server";
+import { relativeUrls } from "../src/storefront/page.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
 
@@ -67,6 +68,8 @@ describe("pd build — the storefront root", () => {
   it("writes one HTML file per page at its route, the previews they embed, and what those reference", () => {
     expect([...files.keys()].sort()).toEqual([
       ".nojekyll",
+      // The bench has no 404.md: the built-in page, through layouts/page.
+      "404.html",
       "_pd/base.css",
       "_pd/components/components/callout.css",
       "_pd/components/components/slide.css",
@@ -79,6 +82,8 @@ describe("pd build — the storefront root", () => {
       // The link-preview images: the site's, and about.md's own (crawled from og:image).
       "assets/images/about.png",
       "assets/images/bench-blocks.svg",
+      // The favicon the skin's head partial links on every page.
+      "assets/images/favicon.png",
       "assets/images/share.png",
       "guides/index.html",
       "guides/setup/index.html",
@@ -86,9 +91,12 @@ describe("pd build — the storefront root", () => {
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
       "robots.txt",
+      // The pages that forward from guides/setup.md's old routes.
+      "setup/index.html",
       "sitemap.xml",
+      "start/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 20, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 24, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
@@ -147,6 +155,15 @@ describe("pd build — the storefront root", () => {
     }
   });
 
+  it("writes the 404 page with no relative URL in it, since a host serves it at every depth", () => {
+    const html = files.get("404.html")!.bytes.toString("utf8");
+    expect(html).toContain("There is no page at this address.");
+    expect(relativeUrls(html)).toEqual([]);
+    // It does reference stylesheets and links, all from the root.
+    expect(html).toMatch(/<link rel="stylesheet" href="\/_pd\//);
+    expect(html).toContain(`<a href="/">home page</a>`);
+  });
+
   it("writes robots.txt, keeping crawlers out of the previews, and a sitemap of every page in route order", () => {
     expect(files.get("robots.txt")!.bytes.toString("utf8"))
       .toBe("User-agent: *\nDisallow: /preview/\n\nSitemap: https://bench.example.test/sitemap.xml\n");
@@ -158,6 +175,17 @@ describe("pd build — the storefront root", () => {
     expect(locs).toEqual(["https://bench.example.test/", "https://bench.example.test/about/", "https://bench.example.test/guides/", "https://bench.example.test/guides/setup/"]);
     expect(sitemap.match(/<url>/g)).toHaveLength(locs.length);
     for (const loc of locs) expect(loc.length).toBeLessThanOrEqual(2048);
+  });
+
+  it("writes a page that forwards at each of a page's old routes, out of the sitemap", () => {
+    for (const old of ["setup", "start"]) {
+      const html = files.get(`${old}/index.html`)!.bytes.toString("utf8");
+      expect(html).toContain(`<meta http-equiv="refresh" content="0; url=/guides/setup/">`);
+      expect(html).toContain(`<link rel="canonical" href="https://bench.example.test/guides/setup/">`);
+      expect(html).toContain(`<meta name="robots" content="noindex">`);
+    }
+    const sitemap = files.get("sitemap.xml")!.bytes.toString("utf8");
+    for (const old of ["setup", "start"]) expect(sitemap).not.toContain(`<loc>https://bench.example.test/${old}/</loc>`);
   });
 
   it("is what pd dev serves, apart from the live-reload client, the workbench's address and the site's", async () => {
@@ -177,9 +205,10 @@ describe("pd build — the storefront root", () => {
           .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!);
         expect(normalized, route).toBe(files.get(file)!.bytes.toString("utf8"));
       }
-      for (const file of ["robots.txt", "sitemap.xml"]) {
+      for (const file of ["robots.txt", "sitemap.xml", "setup/index.html", "start/index.html"]) {
+        const path = `/${file.replace(/index\.html$/, "")}`;
         const live = await new Promise<string>((resolve, reject) => {
-          const req = request({ host: "127.0.0.1", port: server.port, path: `/${file}`, headers: { host: `live.localhost:${server.port}` } }, res => {
+          const req = request({ host: "127.0.0.1", port: server.port, path, headers: { host: `live.localhost:${server.port}` } }, res => {
             let body = ""; res.setEncoding("utf8"); res.on("data", c => { body += c; }); res.on("end", () => resolve(body));
           });
           req.on("error", reject); req.end();
@@ -281,6 +310,24 @@ describe("pd build — the storefront's settings", () => {
     for (const [file, { bytes }] of pages) {
       if (file.endsWith(".html")) expect(bytes.toString("utf8"), file).not.toMatch(/rel="canonical"|property="og:|name="twitter:/);
     }
+  }, 60_000);
+
+  it("fails on an old route that is a page, naming it, and writes nothing", async () => {
+    const root = await benchCopy();
+    const about = join(root, "pages", "about.md");
+    await save(about, (await readFile(about, "utf8")).replace("title: About\n", "title: About\nredirectFrom: /guides/\n"));
+    const out = join(root, "..", "wb-redirect-page");
+    await expect(build(root, out)).rejects.toThrow(`about.md:4: redirectFrom "/guides/" is the page guides/index.md: a route can't both be a page and forward to one`);
+    expect(await exists(out)).toBe(false);
+  }, 60_000);
+
+  it("fails on a 404 page with a relative URL, naming it, and writes nothing", async () => {
+    const root = await benchCopy();
+    await save(join(root, "pages", "404.md"), "---\ntitle: Lost\n---\n\nTry [the guides](./guides/).\n");
+    const out = join(root, "..", "wb-rel404");
+    await expect(build(root, out)).rejects.toThrow(`the 404 page (404.md): the URL "./guides/" is relative, and the 404 page is served at every address, `
+      + `so it only works from the site's root: use "/guides/" instead`);
+    expect(await exists(out)).toBe(false);
   }, 60_000);
 
   it("leaves a page with index: false out of the sitemap", async () => {

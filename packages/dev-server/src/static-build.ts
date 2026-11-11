@@ -16,7 +16,7 @@ import type { PatternDumpConfig } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
   staticPathFor, themeCssUrl,
-  type ComponentDetailResponse, type ComponentTree, type ShellRuntime, type ThemeSummary, type TreeNode,
+  type ComponentDetailResponse, type ComponentTree, type ShellRuntime, type StorefrontPagesResponse, type ThemeSummary, type TreeNode,
 } from "@pattern-dump/contracts";
 import { startDevServer } from "./index.js";
 import { buildShellHtml } from "./http-utils.js";
@@ -120,7 +120,7 @@ export async function buildStaticSite(
   // output roots as they were.
   const sfGet = storefront ? hostTransport(server.port, storefront.host) : null;
   // The crawler files: robots.txt always; the sitemap when the site has an address and is indexed.
-  const sfFiles: string[] = storefront ? [PD_ROUTES.robots, ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
+  const sfFiles: string[] = storefront ? [PD_ROUTES.robots, PD_ROUTES.notFound, ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
   const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles) : null;
   if (sfCrawl && sfCrawl.problems.length) {
     await server.close();
@@ -256,7 +256,8 @@ export async function buildStaticSite(
       }
       await writeFile(join(sfOut, ".nojekyll"), "");
       counts.files++;
-      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u)).length;
+      const stubs = new Set((await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse).pages.flatMap(p => p.redirectFrom ?? []));
+      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u) && !stubs.has(u)).length;
       report.storefront = { outDir: sfOut, pages, files: counts.files, bytes: counts.bytes };
       if (storefront.url === undefined) {
         report.notes.push("storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
