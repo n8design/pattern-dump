@@ -1,6 +1,6 @@
 // The storefront's files for crawlers (site-files.ts): sitemap.xml and robots.txt, as text.
 import { describe, expect, it } from "vitest";
-import { sitemapXml, storefrontRobotsTxt } from "../src/storefront/site-files.js";
+import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "../src/storefront/site-files.js";
 
 describe("sitemapXml", () => {
   it("lists each page once, in the order given, with lastmod only where it is known", () => {
@@ -22,6 +22,13 @@ describe("sitemapXml", () => {
 
   it("is a valid empty sitemap for a site with no page to list", () => {
     expect(sitemapXml([])).toBe(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n</urlset>\n`);
+  });
+});
+
+describe("workbenchRobotsTxt", () => {
+  it("keeps crawlers out of the previews only, under the base path", () => {
+    expect(workbenchRobotsTxt("/")).toBe("User-agent: *\nDisallow: /preview/\n");
+    expect(workbenchRobotsTxt("/pd/")).toBe("User-agent: *\nDisallow: /pd/preview/\n");
   });
 });
 

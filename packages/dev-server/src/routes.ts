@@ -54,7 +54,7 @@ import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages } from "./storefront/pages.js";
 import { assetFileFor } from "./asset-file.js";
 import { checkPageImage } from "./storefront/page-image.js";
-import { sitemapXml, storefrontRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
+import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
 import { assemblePage } from "./storefront/page.js";
 import { pageStylesheets } from "./storefront/page-head.js";
 import type { RenderingHandle } from "./rendering.js";
@@ -550,6 +550,13 @@ export async function handleRequest(
       }
       res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });
       res.end(page.html);
+      return;
+    }
+
+    // --- The workbench's robots.txt: searchable, its previews not ---
+    if (pathname === PD_ROUTES.robots) {
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end(workbenchRobotsTxt("/"));
       return;
     }
 

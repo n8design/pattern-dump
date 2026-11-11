@@ -186,6 +186,14 @@ describe("pd build — the storefront root", () => {
         });
         expect(live.replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!), file).toBe(files.get(file)!.bytes.toString("utf8"));
       }
+      // The workbench's own robots.txt, on its host: searchable, its previews not.
+      const workbench = await new Promise<string>((resolve, reject) => {
+        const req = request({ host: "127.0.0.1", port: server.port, path: "/robots.txt", headers: { host: `pd.localhost:${server.port}` } }, res => {
+          let body = ""; res.setEncoding("utf8"); res.on("data", c => { body += c; }); res.on("end", () => resolve(body));
+        });
+        req.on("error", reject); req.end();
+      });
+      expect(workbench).toBe("User-agent: *\nDisallow: /preview/\n");
     } finally { await server.close(); }
   }, 60_000);
 
