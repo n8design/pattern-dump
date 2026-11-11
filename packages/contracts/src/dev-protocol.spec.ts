@@ -18,7 +18,7 @@ import {
   buildAuditRollup, AUDIT_SCOPE, PD_PROTOCOL_VERSION,
   type DiagnosticsGraph, type HmrMessage,
   type DiagnosticComponentNode, type DiagnosticOccurrence,
-  type DiagnosticEngine, type RenderOutcome,
+  type DiagnosticEngine, type RenderOutcome, type StorefrontPage, type StorefrontPagesResponse,
 } from "./dev-protocol.js";
 import type { RendererOptions } from "./index.js";
 
@@ -375,6 +375,12 @@ describe("staticPathFor — every builder's URL maps to one file", () => {
     expect(staticPathFor(PD_ROUTES.mainJs)).toBe("_pd/main.js");
   });
 
+  it("writes the storefront's root files under their own names, not as folders", () => {
+    expect(staticPathFor(PD_ROUTES.sitemap)).toBe("sitemap.xml");
+    expect(staticPathFor(PD_ROUTES.robots)).toBe("robots.txt");
+    expect(staticPathFor(PD_ROUTES.notFound)).toBe("404.html");
+  });
+
   it("maps shell routes to one index.html each", () => {
     expect(staticPathFor("/")).toBe("index.html");
     expect(staticPathFor("/atoms/button")).toBe("atoms/button/index.html");
@@ -386,10 +392,22 @@ describe("staticPathFor — every builder's URL maps to one file", () => {
       componentUrl("atoms/button"), componentUrl("atoms/button", "a"), previewUrl("atoms/button"),
       previewUrl("atoms/button", "a"), renderedSourceUrl("atoms/button"), renderedSourceUrl("atoms/button", "a"),
       dataSourceUrl("atoms/button"), overviewUrl("atoms"), "/atoms/button", PD_ROUTES.tree,
-      PD_ROUTES.pages, "/preview/atoms/button~a",
+      PD_ROUTES.pages, "/preview/atoms/button~a", PD_ROUTES.sitemap, PD_ROUTES.robots, PD_ROUTES.notFound,
+      "/404/",
     ];
     const files = urls.map(staticPathFor);
     expect(new Set(files).size).toBe(files.length);
+  });
+});
+
+describe("StorefrontPage", () => {
+  // Annotated with the contract type: a page without redirectFrom must still compile, since the field is
+  // optional (vitest does not typecheck; the workspace typecheck does).
+  it("takes redirectFrom as an optional list of routes", () => {
+    const plain: StorefrontPage = { route: "/about/", title: "About", layout: "page" };
+    const moved: StorefrontPage = { ...plain, redirectFrom: ["/old/about/"] };
+    const response: StorefrontPagesResponse = { pages: [plain, moved], nav: [] };
+    expect(response.pages.map(p => p.redirectFrom ?? [])).toEqual([[], ["/old/about/"]]);
   });
 });
 

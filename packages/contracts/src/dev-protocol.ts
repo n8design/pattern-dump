@@ -613,6 +613,12 @@ export const PD_ROUTES = {
   config: "/api/config",
   /** GET → StorefrontPagesResponse, on the storefront host. What `pd build` crawls for storefront pages. */
   pages: "/api/pages",
+  /** GET → the storefront's sitemap (XML), on the storefront host; only when `storefront.url` is set. */
+  sitemap: "/sitemap.xml",
+  /** GET → robots.txt (text): the storefront's on the storefront host, the workbench's on every other host. */
+  robots: "/robots.txt",
+  /** GET → the storefront's 404 page (HTML, status 404), on the storefront host. `pd build` writes it as is. */
+  notFound: "/404.html",
   /** The shell bundle, stylesheet and vendored assets. */
   mainJs: "/_pd/main.js",
   mainCss: "/_pd/main.css",
@@ -693,6 +699,9 @@ export interface StorefrontPage {
   title: string;
   /** The layout it renders with: the component `layouts/<layout>`. */
   layout: string;
+  /** Old routes that forward to this page (frontmatter `redirectFrom`), each root-relative and slash-wrapped.
+   *  `pd build` writes a forwarding page at each. Absent when the page has none. */
+  redirectFrom?: string[];
 }
 
 /** A nav entry. Top-level pages and folders; a folder's pages are its children (one level only). */
@@ -807,6 +816,8 @@ export function staticPathFor(liveUrl: string): string {
     }
   }
   if (path.startsWith("/_pd/") || path.startsWith(PD_ROUTE_PREFIX.assets)) return path.slice(1);
+  // The root files a static host reads by name, written under that name, never as a folder.
+  if (path === PD_ROUTES.sitemap || path === PD_ROUTES.robots || path === PD_ROUTES.notFound) return path.slice(1);
   // Anything else is a shell route: one index.html per route, so deep links load without rewrites.
   const route = path.replace(/^\/+|\/+$/g, "");
   return route ? `${route}/index.html` : "index.html";
