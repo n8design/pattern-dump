@@ -91,9 +91,12 @@ describe("pd build — the storefront root", () => {
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
       "robots.txt",
+      // The pages that forward from guides/setup.md's old routes.
+      "setup/index.html",
       "sitemap.xml",
+      "start/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 22, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 24, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
@@ -174,6 +177,17 @@ describe("pd build — the storefront root", () => {
     for (const loc of locs) expect(loc.length).toBeLessThanOrEqual(2048);
   });
 
+  it("writes a page that forwards at each of a page's old routes, out of the sitemap", () => {
+    for (const old of ["setup", "start"]) {
+      const html = files.get(`${old}/index.html`)!.bytes.toString("utf8");
+      expect(html).toContain(`<meta http-equiv="refresh" content="0; url=/guides/setup/">`);
+      expect(html).toContain(`<link rel="canonical" href="https://bench.example.test/guides/setup/">`);
+      expect(html).toContain(`<meta name="robots" content="noindex">`);
+    }
+    const sitemap = files.get("sitemap.xml")!.bytes.toString("utf8");
+    for (const old of ["setup", "start"]) expect(sitemap).not.toContain(`<loc>https://bench.example.test/${old}/</loc>`);
+  });
+
   it("is what pd dev serves, apart from the live-reload client, the workbench's address and the site's", async () => {
     const server = await startDevServer(config(), root, { port: 0, wsPort: 0 });
     try {
@@ -191,9 +205,10 @@ describe("pd build — the storefront root", () => {
           .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!);
         expect(normalized, route).toBe(files.get(file)!.bytes.toString("utf8"));
       }
-      for (const file of ["robots.txt", "sitemap.xml"]) {
+      for (const file of ["robots.txt", "sitemap.xml", "setup/index.html", "start/index.html"]) {
+        const path = `/${file.replace(/index\.html$/, "")}`;
         const live = await new Promise<string>((resolve, reject) => {
-          const req = request({ host: "127.0.0.1", port: server.port, path: `/${file}`, headers: { host: `live.localhost:${server.port}` } }, res => {
+          const req = request({ host: "127.0.0.1", port: server.port, path, headers: { host: `live.localhost:${server.port}` } }, res => {
             let body = ""; res.setEncoding("utf8"); res.on("data", c => { body += c; }); res.on("end", () => resolve(body));
           });
           req.on("error", reject); req.end();
@@ -295,6 +310,15 @@ describe("pd build — the storefront's settings", () => {
     for (const [file, { bytes }] of pages) {
       if (file.endsWith(".html")) expect(bytes.toString("utf8"), file).not.toMatch(/rel="canonical"|property="og:|name="twitter:/);
     }
+  }, 60_000);
+
+  it("fails on an old route that is a page, naming it, and writes nothing", async () => {
+    const root = await benchCopy();
+    const about = join(root, "pages", "about.md");
+    await save(about, (await readFile(about, "utf8")).replace("title: About\n", "title: About\nredirectFrom: /guides/\n"));
+    const out = join(root, "..", "wb-redirect-page");
+    await expect(build(root, out)).rejects.toThrow(`about.md:4: redirectFrom "/guides/" is the page guides/index.md: a route can't both be a page and forward to one`);
+    expect(await exists(out)).toBe(false);
   }, 60_000);
 
   it("fails on a 404 page with a relative URL, naming it, and writes nothing", async () => {

@@ -62,6 +62,8 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
   const queue: string[] = [];
   const add = (url: string): void => { if (!seen.has(url)) { seen.add(url); queue.push(url); } };
   for (const p of pages) add(p.route);
+  // Each old route a page lists: the page that forwards from it.
+  for (const p of pages) for (const old of p.redirectFrom ?? []) add(old);
   for (const f of files) add(f);
 
   while (queue.length) {

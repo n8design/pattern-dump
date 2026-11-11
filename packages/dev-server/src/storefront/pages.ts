@@ -28,6 +28,7 @@ import { join, relative, sep } from "node:path";
 import { PD_ROUTES, type StorefrontNavItem, type StorefrontPage, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
+import { redirectProblems, redirectsOf } from "./redirects.js";
 
 /** The layout a page uses when its frontmatter names none. */
 export const DEFAULT_LAYOUT = "page";
@@ -108,11 +109,15 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
     files.set(route, { route, file, path, frontmatter: readFrontmatterStrict(text) });
   }
 
-  const pageOf = (f: PageFile): StorefrontPage => ({
-    route: f.route,
-    title: scalar(f.frontmatter.values["title"]) ?? f.route,
-    layout: scalar(f.frontmatter.values["layout"]) ?? DEFAULT_LAYOUT,
-  });
+  const pageOf = (f: PageFile): StorefrontPage => {
+    const redirectFrom = redirectsOf(f);
+    return {
+      route: f.route,
+      title: scalar(f.frontmatter.values["title"]) ?? f.route,
+      layout: scalar(f.frontmatter.values["layout"]) ?? DEFAULT_LAYOUT,
+      ...(redirectFrom.length ? { redirectFrom } : {}),
+    };
+  };
   /** A nav entry's page fields: its route and title, and its description when it has one. */
   const entryOf = (f: PageFile): StorefrontNavItem => {
     const description = scalar(f.frontmatter.values["description"]);
@@ -183,5 +188,7 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
   const rest = [...files.keys()].filter(r => !inNav.includes(r)).sort();
   const routes = [...inNav, ...rest];
   const pages = routes.map(r => pageOf(files.get(r)!));
+  // Redirects across pages: an old route that is a page, or that two pages claim.
+  problems.push(...redirectProblems(files));
   return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), problems, ...(notFound ? { notFound } : {}) };
 }
