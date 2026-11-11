@@ -76,14 +76,19 @@ describe("pd build — the storefront root", () => {
       "_pd/components/partials/header.css",
       "_pd/components/partials/nav.css",
       "about/index.html",
+      // The link-preview images: the site's, and about.md's own (crawled from og:image).
+      "assets/images/about.png",
       "assets/images/bench-blocks.svg",
+      "assets/images/share.png",
       "guides/index.html",
       "guides/setup/index.html",
       "index.html",
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
+      "robots.txt",
+      "sitemap.xml",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 16, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 20, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
@@ -133,7 +138,29 @@ describe("pd build — the storefront root", () => {
     }
   });
 
-  it("is what pd dev serves, apart from the live-reload client and the workbench's address", async () => {
+  it("with storefront.url: canonical and og:url on every page at the configured address, and no note about it", () => {
+    expect(report.notes.some(n => n.startsWith("storefront.url is not set"))).toBe(false);
+    for (const [route, file] of [["", "index.html"], ["about/", "about/index.html"], ["guides/setup/", "guides/setup/index.html"]]) {
+      const html = files.get(file)!.bytes.toString("utf8");
+      expect(html, file).toContain(`<link rel="canonical" href="https://bench.example.test/${route}">`);
+      expect(html, file).toContain(`<meta property="og:url" content="https://bench.example.test/${route}">`);
+    }
+  });
+
+  it("writes robots.txt, keeping crawlers out of the previews, and a sitemap of every page in route order", () => {
+    expect(files.get("robots.txt")!.bytes.toString("utf8"))
+      .toBe("User-agent: *\nDisallow: /preview/\n\nSitemap: https://bench.example.test/sitemap.xml\n");
+    const sitemap = files.get("sitemap.xml")!.bytes.toString("utf8");
+    // The schema's rules (sitemaps.org 0.9): its namespace, a <loc> per URL, absolute and at most 2048
+    // characters. The copy is outside any repository, so no page has a date and none has a <lastmod>.
+    expect(sitemap.startsWith(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`)).toBe(true);
+    const locs = [...sitemap.matchAll(/<url><loc>([^<]+)<\/loc><\/url>/g)].map(m => m[1]!);
+    expect(locs).toEqual(["https://bench.example.test/", "https://bench.example.test/about/", "https://bench.example.test/guides/", "https://bench.example.test/guides/setup/"]);
+    expect(sitemap.match(/<url>/g)).toHaveLength(locs.length);
+    for (const loc of locs) expect(loc.length).toBeLessThanOrEqual(2048);
+  });
+
+  it("is what pd dev serves, apart from the live-reload client, the workbench's address and the site's", async () => {
     const server = await startDevServer(config(), root, { port: 0, wsPort: 0 });
     try {
       for (const [route, file] of [["/", "index.html"], ["/about/", "about/index.html"], ["/guides/", "guides/index.html"], ["/guides/setup/", "guides/setup/index.html"]]) {
@@ -145,9 +172,28 @@ describe("pd build — the storefront root", () => {
         });
         const normalized = live
           .replace(/\n<script data-pd-live>[\s\S]*?<\/script>/, "\n")
-          .replaceAll(`http://pd.localhost:${server.port}/`, WB);
+          .replaceAll(`http://pd.localhost:${server.port}/`, WB)
+          // pd dev's absolute URLs are the address the browser is on; the build's, storefront.url.
+          .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!);
         expect(normalized, route).toBe(files.get(file)!.bytes.toString("utf8"));
       }
+      for (const file of ["robots.txt", "sitemap.xml"]) {
+        const live = await new Promise<string>((resolve, reject) => {
+          const req = request({ host: "127.0.0.1", port: server.port, path: `/${file}`, headers: { host: `live.localhost:${server.port}` } }, res => {
+            let body = ""; res.setEncoding("utf8"); res.on("data", c => { body += c; }); res.on("end", () => resolve(body));
+          });
+          req.on("error", reject); req.end();
+        });
+        expect(live.replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!), file).toBe(files.get(file)!.bytes.toString("utf8"));
+      }
+      // The workbench's own robots.txt, on its host: searchable, its previews not.
+      const workbench = await new Promise<string>((resolve, reject) => {
+        const req = request({ host: "127.0.0.1", port: server.port, path: "/robots.txt", headers: { host: `pd.localhost:${server.port}` } }, res => {
+          let body = ""; res.setEncoding("utf8"); res.on("data", c => { body += c; }); res.on("end", () => resolve(body));
+        });
+        req.on("error", reject); req.end();
+      });
+      expect(workbench).toBe("User-agent: *\nDisallow: /preview/\n");
     } finally { await server.close(); }
   }, 60_000);
 
@@ -222,6 +268,49 @@ describe("pd build — the storefront's settings", () => {
       .rejects.toThrow("pd build: storefront.workbenchUrl is required to build the storefront — its pages link into the workbench at that address");
     expect(await exists(out)).toBe(false);
   });
+
+  it("without storefront.url: no canonical, Open Graph or card, and one note for the whole build", async () => {
+    const root = await benchCopy();
+    const { url: _u, ...rest } = benchConfig.storefront!;
+    const report = await buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root,
+      { outDir: join(root, "..", "wb-nosite"), pdVersion: "x", now: NOW });
+    const note = `storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, `
+      + `and there is no sitemap: set storefront.url to the site's address, such as "https://example.com/"`;
+    expect(report.notes.filter(n => n === note)).toHaveLength(1);
+    const pages = await tree(join(root, ".out", "storefront"));
+    for (const [file, { bytes }] of pages) {
+      if (file.endsWith(".html")) expect(bytes.toString("utf8"), file).not.toMatch(/rel="canonical"|property="og:|name="twitter:/);
+    }
+  }, 60_000);
+
+  it("leaves a page with index: false out of the sitemap", async () => {
+    const root = await benchCopy();
+    const setup = join(root, "pages", "guides", "setup.md");
+    await save(setup, (await readFile(setup, "utf8")).replace("title: Setup\n", "title: Setup\nindex: false\n"));
+    await build(root, join(root, "..", "wb-noindex"));
+    const out = join(root, ".out", "storefront");
+    const sitemap = await readFile(join(out, "sitemap.xml"), "utf8");
+    expect(sitemap).not.toContain("/guides/setup/");
+    expect(sitemap).toContain("<loc>https://bench.example.test/guides/</loc>");
+    expect(await readFile(join(out, "guides", "setup", "index.html"), "utf8")).toContain(`<meta name="robots" content="noindex">`);
+  }, 60_000);
+
+  it("a site with index: false: no sitemap, and robots.txt keeps everything out", async () => {
+    const root = await benchCopy();
+    await build(root, join(root, "..", "wb-staging"), config({ index: false }));
+    const out = join(root, ".out", "storefront");
+    expect(await exists(join(out, "sitemap.xml"))).toBe(false);
+    expect(await readFile(join(out, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /\n");
+  }, 60_000);
+
+  it("without storefront.url: no sitemap, and robots.txt names none", async () => {
+    const root = await benchCopy();
+    const { url: _u, ...rest } = benchConfig.storefront!;
+    await buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root, { outDir: join(root, "..", "wb-nourl2"), pdVersion: "x", now: NOW });
+    const out = join(root, ".out", "storefront");
+    expect(await exists(join(out, "sitemap.xml"))).toBe(false);
+    expect(await readFile(join(out, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /preview/\n");
+  }, 60_000);
 
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
     const root = await benchCopy();

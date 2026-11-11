@@ -52,6 +52,9 @@ import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages } from "./storefront/pages.js";
+import { assetFileFor } from "./asset-file.js";
+import { checkPageImage } from "./storefront/page-image.js";
+import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
 import { assemblePage } from "./storefront/page.js";
 import { pageStylesheets } from "./storefront/page-head.js";
 import type { RenderingHandle } from "./rendering.js";
@@ -225,14 +228,8 @@ export async function handleRequest(
     }
 
     // --- Project asset serving (/assets/*) ---
-    if (pathname.startsWith(PD_ROUTE_PREFIX.assets) && assetRoots.length > 0) {
-      const tail = decodeURIComponent(pathname.slice(PD_ROUTE_PREFIX.assets.length));
-      const firstSeg = tail.split("/")[0];
-      // Multi-root: /assets/<rootBasename>/<rest> serves from the matching root.
-      const namedIdx = assetRootNames.indexOf(firstSeg);
-      const assetPath = namedIdx >= 0
-        ? join(assetRoots[namedIdx], tail.slice(firstSeg.length + 1))
-        : join(assetRoots[0], tail); // single-root mirror
+    const assetPath = assetFileFor(pathname, assetRoots, assetRootNames);
+    if (assetPath !== null) {
       try {
         await stat(assetPath); // verify it exists
         return await serveFile(res, assetPath, mimeType(extname(assetPath)));
@@ -501,6 +498,30 @@ export async function handleRequest(
         json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);
         return;
       }
+      // With storefront.url set, pages carry absolute URLs: the configured address in a build, and in
+      // pd dev the address the browser is on, so every link it shows works there.
+      const siteUrl = cfg.storefront.url === undefined ? undefined
+        : ctx.live ? `http://${req.headers.host ?? cfg.storefront.host}/` : cfg.storefront.url;
+      if (pathname === PD_ROUTES.robots) {
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end(storefrontRobotsTxt({ siteUrl, index: cfg.storefront.index }));
+        return;
+      }
+      // The sitemap needs the site's address, and a site kept out of search engines has none.
+      if (pathname === PD_ROUTES.sitemap && siteUrl !== undefined && cfg.storefront.index) {
+        if (model.problems.length) { res.writeHead(500, { "Content-Type": "text/plain" }); res.end(model.problems.join("\n")); return; }
+        const entries: SitemapEntry[] = [];
+        for (const p of [...model.pages].sort((a, b) => a.route.localeCompare(b.route))) {
+          const file = model.files.get(p.route);
+          if (!file || file.frontmatter.values["index"] === "false") continue;
+          // A date only where git has a reliable one; a shallow clone's are left out (pages note it).
+          const dated = ctx.dates ? await ctx.dates.of(file.path, ctx.live ? "dev" : "build") : undefined;
+          entries.push({ url: new URL(p.route.slice(1), siteUrl).href, lastmod: dated && !dated.shallow ? dated.dates.modified : null });
+        }
+        res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+        res.end(sitemapXml(entries));
+        return;
+      }
       // A page route is a folder path; /about is /about/, as a static host serves it.
       const route = /\.[a-z0-9]+$/i.test(pathname) ? null : pathname.endsWith("/") ? pathname : `${pathname}/`;
       if (route === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end(`Not found: ${pathname}`); return; }
@@ -514,6 +535,10 @@ export async function handleRequest(
         head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
         ...(ctx.dates ? { dates: ctx.dates } : {}),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
+        image: path => checkPageImage(path, assetRoots, assetRootNames),
+        ...(siteUrl !== undefined ? { siteUrl } : {}),
+        lang: cfg.storefront.lang, siteIndex: cfg.storefront.index,
+        ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
       });
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
       for (const note of page.notes) {
@@ -525,6 +550,13 @@ export async function handleRequest(
       }
       res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });
       res.end(page.html);
+      return;
+    }
+
+    // --- The workbench's robots.txt: searchable, its previews not ---
+    if (pathname === PD_ROUTES.robots) {
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end(workbenchRobotsTxt("/"));
       return;
     }
 

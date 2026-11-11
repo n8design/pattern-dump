@@ -28,9 +28,12 @@ export function hostTransport(port: number, host: string): (liveUrl: string) => 
 
 const unescapeHtml = (s: string): string => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, `"`).replace(/&amp;/g, "&");
 
-/** Root-relative references a document makes to files PD serves. Page routes are crawled from the page list. */
-const markupRefs = (html: string): string[] =>
-  [...html.matchAll(/(?:href|src)="(\/(?:_pd|assets|preview)\/[^"]+)"/g)].map(m => unescapeHtml(m[1]));
+/** Root-relative references a document makes to files PD serves, and the page's link-preview image (an
+ *  absolute URL on the site's own address, so its path is taken). Page routes are crawled from the page list. */
+const markupRefs = (html: string): string[] => [
+  ...[...html.matchAll(/(?:href|src)="(\/(?:_pd|assets|preview)\/[^"]+)"/g)].map(m => unescapeHtml(m[1])),
+  ...[...html.matchAll(/<meta property="og:image" content="https?:\/\/[^/"]+(\/assets\/[^"]+)">/g)].map(m => unescapeHtml(m[1])),
+];
 const cssRefs = (css: string): string[] =>
   [...css.matchAll(/url\(\s*(['"]?)(\/(?:_pd|assets)\/[^'")\s]+)\1\s*\)/g)].map(m => m[2]);
 
@@ -41,7 +44,8 @@ export interface StorefrontCrawl {
   problems: string[];
 }
 
-export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>): Promise<StorefrontCrawl> {
+/** `files`: the root files to write besides the pages and what they reference (robots.txt, sitemap.xml). */
+export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>, files: readonly string[] = []): Promise<StorefrontCrawl> {
   const problems: string[] = [];
   const siteProblems = new Set<string>();
   const list = await get(PD_ROUTES.pages);
@@ -58,6 +62,7 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
   const queue: string[] = [];
   const add = (url: string): void => { if (!seen.has(url)) { seen.add(url); queue.push(url); } };
   for (const p of pages) add(p.route);
+  for (const f of files) add(f);
 
   while (queue.length) {
     const url = queue.shift()!;

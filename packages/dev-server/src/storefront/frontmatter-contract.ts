@@ -1,7 +1,10 @@
 // A storefront page's frontmatter, checked against the layout it uses.
 //
-// Two keys belong to the build, not to a layout: `layout` (which layout; `page` when absent) and `order`
-// (where in the nav). Every other key must be declared by the chosen layout's schema — the
+// Five keys belong to the build, not to a layout: `layout` (which layout; `page` when absent), `order`
+// (where in the nav), and the page's search and link-preview keys — `redirectFrom` (old routes that forward
+// here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
+// image, a raster file in the assets; checked against the files in page-image.ts). A layout cannot declare
+// any of the five. Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
 // declares. Nothing is inferred: a key the schema does not declare is an error, and a layout with no
 // schema declares nothing. Four more keys are filled by the storefront itself (`body`, the rendered
@@ -17,7 +20,7 @@ import { checkDeclared, readSchema, type PropertySchema } from "./declared-value
 import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
-export const RESERVED_KEYS = ["layout", "order"] as const;
+export const RESERVED_KEYS = ["layout", "order", "redirectFrom", "index", "image"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
 export const ASSEMBLY_KEYS = ["body", "nav", "site", "page"] as const;
 
@@ -29,11 +32,52 @@ export interface PageProblem {
   message: string;
 }
 
+/** The page's own search and link-preview keys, checked for their shape (the image file is checked later). */
+export interface BuildKeys {
+  /** Old routes that forward to this page, root-relative and slash-wrapped. */
+  redirectFrom?: string[];
+  /** false: noindex, and no sitemap entry. */
+  index?: boolean;
+  /** A /assets/… path. */
+  image?: string;
+}
+
+/** An old route: root-relative, slash-wrapped, plain segments only (no query, fragment, "." or ".."). */
+const OLD_ROUTE = /^\/(?:(?!\.\.?\/)[^/?#\s]+\/)+$/;
+/** The same rule as storefront.image in the config. */
+const ASSET_PATH = /^\/assets\/[^?#]+[^/?#]$/;
+
+function checkBuildKeys(values: Record<string, unknown>, at: (key: string, message: string) => void): BuildKeys {
+  const out: BuildKeys = {};
+  const redirect = values["redirectFrom"];
+  if (redirect !== undefined) {
+    const list = Array.isArray(redirect) ? redirect : [redirect];
+    const bad = list.filter(r => typeof r !== "string" || !OLD_ROUTE.test(r));
+    if (bad.length) {
+      at("redirectFrom", `redirectFrom: ${bad.map(r => `"${String(r)}"`).join(", ")} ${bad.length === 1 ? "is" : "are"} not `
+        + `a route: each old route starts and ends with "/", such as "/old/page/", with no query or fragment`);
+    } else if (list.length) out.redirectFrom = list as string[];
+  }
+  const index = values["index"];
+  if (index !== undefined) {
+    if (index === "true" || index === "false") out.index = index === "true";
+    else at("index", `index must be true or false`);
+  }
+  const image = values["image"];
+  if (image !== undefined) {
+    if (typeof image === "string" && ASSET_PATH.test(image)) out.image = image;
+    else at("image", `image must be a path to a file in the assets, such as "/assets/images/share.png"`);
+  }
+  return out;
+}
+
 export interface CheckedPage {
   /** The layout component, e.g. "layouts/article". Set even when it does not exist. */
   layoutId: string;
   /** The frontmatter for the layout: declared keys only, coerced to their declared types. */
   values: Record<string, unknown>;
+  /** The page's search and link-preview keys, for the build (never passed to the layout). */
+  build: BuildKeys;
   problems: PageProblem[];
 }
 
@@ -68,18 +112,26 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
         ? `layout "${layout}" is not a layout — the layouts are ${known.map(n => `"${n}"`).join(", ")}`
         : `layout "${layout}" is not a layout — the project has no layouts (components in a layouts/ folder of its patterns)`);
     }
-    return { layoutId, values: {}, problems };
+    return { layoutId, values: {}, build: checkBuildKeys(values, at), problems };
   }
 
   // ---- the layout's schema: what a page may set ----
   const read = await readSchema(entry.schemaPath);
   if (read.error !== undefined) {
     problems.push({ file: page.path, message: `the schema of layout "${layout}" cannot be read: ${read.error}` });
-    return { layoutId, values: {}, problems };
+    return { layoutId, values: {}, build: checkBuildKeys(values, at), problems };
   }
   const schema: LayoutSchema = read.schema ?? {};
   const hasSchema = read.schema !== undefined;
   const declared = schema.properties ?? {};
+  // A key the build owns can't also be the layout's: a page would set one value for two readers.
+  for (const key of RESERVED_KEYS) {
+    if (Object.hasOwn(declared, key)) {
+      problems.push({ file: page.path, message: `layout "${layout}" declares "${key}", which a page sets for the build, `
+        + `not for its layout: rename it in the layout's schema` });
+    }
+  }
+  const build = checkBuildKeys(values, at);
 
   // ---- every key the page sets ----
   const out: Record<string, unknown> = {};
@@ -104,5 +156,5 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     if (!(key in values)) problems.push({ file: page.path, message: `"${key}" is required by layout "${layout}"` });
   }
 
-  return { layoutId, values: out, problems };
+  return { layoutId, values: out, build, problems };
 }

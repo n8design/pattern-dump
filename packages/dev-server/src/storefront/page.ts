@@ -29,6 +29,12 @@ import { collidingHeadings, idsBesides } from "./anchors.js";
 import type { GitDates, PageDates } from "./git-dates.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
+import type { PageImage, PageImageCheck } from "./page-image.js";
+import { jsonLdScript } from "./json-ld.js";
+
+/** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
+export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
+  + "and no lastmod in the sitemap: build from the full history (in CI, check out with fetch-depth: 0)";
 
 export interface PageAssembly {
   discoveryMap: DiscoveryMap;
@@ -49,6 +55,17 @@ export interface PageAssembly {
   live?: { wsPort: number; generation: string };
   /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created and page.modified are null. */
   dates?: GitDates;
+  /** Checks a link-preview image path against the project's assets (page-image.ts). */
+  image(path: string): Promise<PageImageCheck>;
+  /** storefront.image: the image of every page that names none. */
+  siteImage?: string;
+  /** The site's address, ending with "/", when storefront.url is set: canonical, og:url, og:image and
+   *  JSON-LD are built from it. Without it they are left out. */
+  siteUrl?: string;
+  /** <html lang>. Default: "en". */
+  lang?: string;
+  /** storefront.index: false gives every page noindex. Default: true. */
+  siteIndex?: boolean;
 }
 
 export interface AssembledPage {
@@ -96,9 +113,9 @@ export function liveScript(wsPort: number, generation = ""): string {
     + `})();</script>`;
 }
 
-function document(head: string, body: string, live: PageAssembly["live"]): string {
+function document(head: string, body: string, live: PageAssembly["live"], lang = "en"): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeAttr(lang)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -109,6 +126,39 @@ ${body}
 ${live ? liveScript(live.wsPort, live.generation) : ""}
 </body>
 </html>`;
+}
+
+/**
+ * A page's search and link-preview tags, after its title and description. Without the site's address only
+ * what needs none: robots. With it: canonical, Open Graph (og:image with its size when the page has an
+ * image) and the Twitter card, large only with an image.
+ */
+export function seoTags(p: {
+  route: string; title: string; description: string | undefined; siteTitle: string | undefined;
+  siteUrl: string | undefined; image: PageImage | undefined; index: boolean;
+}): string[] {
+  const tags: string[] = [];
+  if (!p.index) tags.push(`<meta name="robots" content="noindex">`);
+  if (p.siteUrl === undefined) return tags;
+  const abs = (path: string) => new URL(path.replace(/^\//, ""), p.siteUrl).href;
+  const url = abs(p.route);
+  tags.push(
+    `<link rel="canonical" href="${escapeAttr(url)}">`,
+    `<meta property="og:type" content="website">`,
+    ...(p.siteTitle ? [`<meta property="og:site_name" content="${escapeAttr(p.siteTitle)}">`] : []),
+    `<meta property="og:title" content="${escapeAttr(p.title)}">`,
+    ...(p.description ? [`<meta property="og:description" content="${escapeAttr(p.description)}">`] : []),
+    `<meta property="og:url" content="${escapeAttr(url)}">`,
+  );
+  if (p.image) {
+    tags.push(
+      `<meta property="og:image" content="${escapeAttr(abs(p.image.path))}">`,
+      `<meta property="og:image:width" content="${p.image.width}">`,
+      `<meta property="og:image:height" content="${p.image.height}">`,
+    );
+  }
+  tags.push(`<meta name="twitter:card" content="${p.image ? "summary_large_image" : "summary"}">`);
+  return tags;
 }
 
 /** The document shown instead of a page that has problems: every problem, escaped. */
@@ -161,6 +211,19 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   siteWide = site.problems;
   problems.push(...site.problems);
 
+  // The link-preview image: the page's own, else the site's. A bad site image is the whole site's problem.
+  const imageLine = page.frontmatter.lines["image"];
+  const imageCheck = checked.build.image !== undefined ? await a.image(checked.build.image)
+    : a.siteImage !== undefined ? await a.image(a.siteImage) : undefined;
+  if (imageCheck && !imageCheck.ok) {
+    if (checked.build.image !== undefined) problems.push(`${page.path}${imageLine !== undefined ? `:${imageLine}` : ""}: ${imageCheck.message}`);
+    else {
+      const p = `storefront.image: ${imageCheck.message}`;
+      siteWide = [...siteWide, p];
+      problems.push(p);
+    }
+  }
+
   /** The page's markdown, rendered; its headings' anchors never take one of `takenIds`. */
   const renderBody = async (takenIds: string[] = []) => {
     const docProblems: string[] = [];
@@ -197,14 +260,22 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const siteDeclared = Object.keys(siteSchema?.properties?.site?.properties ?? {});
   const pageDeclaration = checkPageDeclaration(layoutSchema, checked.layoutId);
   problems.push(...pageDeclaration.problems);
-  // Dates only for a layout that declares one: the git pass never runs for a site that shows none.
+  // Dates for a layout that shows them, and for the JSON-LD of a site with an address; the git pass never
+  // runs for a site that needs neither. Only a layout that shows dates is stopped by an unreliable one (a
+  // shallow clone in pd build) or noted about a missing one: the JSON-LD just leaves the date out.
   const notes: string[] = [];
   let dates: Partial<PageDates> = {};
-  if (a.dates && pageDeclaration.declared?.some(k => k === "created" || k === "modified")) {
+  let modified: string | null = null;
+  const showsDates = pageDeclaration.declared?.some(k => k === "created" || k === "modified") ?? false;
+  if (a.dates && (showsDates || a.siteUrl !== undefined)) {
     const dated = await a.dates.of(page.path, a.live ? "dev" : "build");
-    dates = dated.dates;
-    notes.push(...dated.notes);
-    problems.push(...dated.problems);
+    if (showsDates) {
+      dates = dated.dates;
+      notes.push(...dated.notes);
+      problems.push(...dated.problems);
+    }
+    if (dated.shallow) notes.push(SHALLOW_SEO_NOTE);
+    else modified = dated.dates.modified;
   }
   if (a.discoveryMap.has(checked.layoutId)) {
     problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed));
@@ -270,7 +341,15 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} — ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
+    ...seoTags({
+      route, title, description, siteTitle, siteUrl: a.siteUrl,
+      image: imageCheck?.ok ? imageCheck.image : undefined,
+      index: a.siteIndex !== false && checked.build.index !== false,
+    }),
+    ...(a.siteUrl !== undefined
+      ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified })]
+      : []),
     await a.head(checked.layoutId, html),
   ].join("\n");
-  return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live), problems: [], notes };
+  return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
 }

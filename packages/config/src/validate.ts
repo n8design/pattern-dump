@@ -10,7 +10,7 @@ type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo" | "http-url" | "host" | "plain-object";
+  | "packages" | "logo" | "http-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object";
 type Shape = Readonly<Record<string, Rule>>;
 
 const SHAPE: Shape = {
@@ -55,7 +55,10 @@ const SHAPE: Shape = {
   exclude: "strings",
   build: { keys: { outDir: "string", basePath: "string", audit: "boolean" } },
   storefront: {
-    keys: { pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "http-url", site: "plain-object" },
+    keys: {
+      pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "http-url", site: "plain-object",
+      url: "site-url", lang: "lang", index: "boolean", image: "asset-path",
+    },
     required: ["pagesDir", "outDir"],
   },
 };
@@ -152,6 +155,33 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     if (!ok) fail(`an absolute http(s) URL with no query or fragment, such as "https://workbench.example.com/"`);
     return;
   }
+  if (rule === "site-url") {
+    // The storefront is served from the root of its host: canonical URLs, og:url and the sitemap are this
+    // value followed by a page's route, so it is an origin, with no path, query or fragment.
+    let ok = false;
+    if (typeof value === "string") {
+      try {
+        const url = new URL(value);
+        ok = /^https?:$/.test(url.protocol) && url.pathname === "/" && url.search === "" && url.hash === "" && !/[?#]/.test(value);
+      } catch { ok = false; }
+    }
+    if (!ok) fail(`the site's absolute http(s) address, with no path, query or fragment, such as "https://example.com/"`);
+    return;
+  }
+  if (rule === "lang") {
+    // A BCP 47 tag's shape (language, then optional script, region and variants), as <html lang> takes it.
+    if (typeof value !== "string" || !/^[a-z]{2,3}(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*$/i.test(value)) {
+      fail(`a language tag, such as "en", "de-AT" or "zh-Hant-TW"`);
+    }
+    return;
+  }
+  if (rule === "asset-path") {
+    // A file the site serves from its assets; that it exists, and its format, are checked by the storefront.
+    if (typeof value !== "string" || !/^\/assets\/[^?#]+[^/?#]$/.test(value)) {
+      fail(`a path to a file in the assets, such as "/assets/images/share.png"`);
+    }
+    return;
+  }
   if (rule === "plain-object") {
     // Its keys are checked where the patterns are known: against what the site's layouts declare.
     if (!isObject(value)) fail(`an object of the site's values, such as { title: "My site" }`);
@@ -236,9 +266,13 @@ export function validateConfig(raw: unknown, source: string): PatternDumpConfig 
   // Normalized here, once, so every reader gets the same form: links are `<workbenchUrl><path>`.
   // The input is never changed: a config that needs no normalizing is returned as it is, one that does
   // is returned as a copy.
-  const url = config.storefront?.workbenchUrl;
-  if (config.storefront && url !== undefined && withOneTrailingSlash(url) !== url) {
-    return { ...config, storefront: { ...config.storefront, workbenchUrl: withOneTrailingSlash(url) } };
-  }
-  return config;
+  const sf = config.storefront;
+  if (!sf) return config;
+  const workbenchUrl = sf.workbenchUrl !== undefined ? withOneTrailingSlash(sf.workbenchUrl) : undefined;
+  // The site URL has no path, so its one form is the origin with "/": "https://example.com" → "https://example.com/".
+  const url = sf.url !== undefined ? `${new URL(sf.url).origin}/` : undefined;
+  if (workbenchUrl === sf.workbenchUrl && url === sf.url) return config;
+  return { ...config, storefront: {
+    ...sf, ...(workbenchUrl !== undefined ? { workbenchUrl } : {}), ...(url !== undefined ? { url } : {}),
+  } };
 }

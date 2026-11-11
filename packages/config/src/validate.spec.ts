@@ -117,6 +117,46 @@ describe("configProblems — storefront", () => {
     }
   });
 
+  it("takes the site's address as an origin only: no path, query or fragment", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    for (const ok of ["https://example.com", "https://example.com/", "http://localhost:4300", "https://docs.example.com/"]) {
+      expect(storefront({ ...base, url: ok }), ok).toEqual([]);
+    }
+    const message = `"storefront.url" must be the site's absolute http(s) address, with no path, query or fragment, such as "https://example.com/"`;
+    for (const bad of ["example.com", "/", "ftp://example.com", "", 42, "https://example.com/docs/", "https://example.com/docs",
+      "https://example.com/?v=1", "https://example.com/#top", "https://example.com?"]) {
+      expect(storefront({ ...base, url: bad }), String(bad)).toEqual([message]);
+    }
+  });
+
+  it("takes a language tag for lang", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    for (const ok of ["en", "de", "de-AT", "zh-Hant-TW", "es-419", "sl-rozaj", "de-CH-1901"]) {
+      expect(storefront({ ...base, lang: ok }), ok).toEqual([]);
+    }
+    const message = `"storefront.lang" must be a language tag, such as "en", "de-AT" or "zh-Hant-TW"`;
+    for (const bad of ["", "english", "e", "de_AT", "de-", "-de", "de AT", 7]) {
+      expect(storefront({ ...base, lang: bad }), String(bad)).toEqual([message]);
+    }
+  });
+
+  it("takes true or false for index", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    expect(storefront({ ...base, index: false })).toEqual([]);
+    expect(storefront({ ...base, index: true })).toEqual([]);
+    expect(storefront({ ...base, index: "no" })).toEqual([`"storefront.index" must be true or false`]);
+  });
+
+  it("takes a path to a file in the assets for image", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    expect(storefront({ ...base, image: "/assets/images/share.png" })).toEqual([]);
+    const message = `"storefront.image" must be a path to a file in the assets, such as "/assets/images/share.png"`;
+    for (const bad of ["images/share.png", "/images/share.png", "https://example.com/share.png", "/assets/", "/assets/images/",
+      "/assets/share.png?v=1", 3]) {
+      expect(storefront({ ...base, image: bad }), String(bad)).toEqual([message]);
+    }
+  });
+
   it("accepts a workbench URL with a subpath", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, workbenchUrl: "https://htwoo.io/workbench/" })).toEqual([]);
@@ -229,6 +269,24 @@ describe("validateConfig — storefront.workbenchUrl is stored with exactly one 
     const { storefront: _sf, ...rest } = validateConfig(valid, "test");
     const { storefront: _vsf, ...validRest } = valid;
     expect(rest).toEqual(validRest);
+  });
+});
+
+describe("validateConfig — storefront.url is stored as its origin with one slash", () => {
+  const load = (url: string) =>
+    validateConfig({ ...valid, storefront: { pagesDir: "./pages", outDir: "./www", url } }, "test").storefront?.url;
+
+  it("adds the root slash, and keeps it when it is there", () => {
+    expect(load("https://example.com")).toBe("https://example.com/");
+    expect(load("https://example.com/")).toBe("https://example.com/");
+    expect(load("http://localhost:4300")).toBe("http://localhost:4300/");
+  });
+
+  it("returns a copy when it normalizes, and never changes the config it was given", () => {
+    const raw = { ...valid, storefront: { pagesDir: "./pages", outDir: "./www", url: "https://example.com" } };
+    const before = JSON.stringify(raw);
+    expect(validateConfig(raw, "test")).not.toBe(raw);
+    expect(JSON.stringify(raw)).toBe(before);
   });
 });
 
