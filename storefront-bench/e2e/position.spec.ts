@@ -3,6 +3,7 @@
 // (its workbench preview), so a value missing on a real page would show the sample's instead.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
+import { examplesFitted } from "./helpers.js";
 
 const links = (page: Page, selector: string) =>
   page.locator(selector).evaluateAll(as => as.map(a => [a.getAttribute("href"), a.textContent?.trim()]));
@@ -29,6 +30,8 @@ test("the last page in the nav: its own section, Home as its breadcrumb, and no 
 
 test("previous and next walk the nav across sections", async ({ page }) => {
   await page.goto("/guides/setup/");
+  // The pager sits below this page's example: click once the example has its height, so the pager no longer moves.
+  await examplesFitted(page);
   await page.locator(".doc-next").click();
   await expect(page).toHaveURL(/\/about\/$/);
   await expect(page.locator("h1")).toHaveText("About");
