@@ -45,14 +45,28 @@ for (const [route, title, [image, width, height]] of PAGES) {
     // The structured data, as the browser holds it: one script, parsed as it is.
     const scripts = await page.locator(`script[type="application/ld+json"]`).allTextContents();
     expect(scripts).toHaveLength(1);
-    const graph = (JSON.parse(scripts[0]!) as { "@graph": Array<Record<string, any>> })["@graph"];
+    type Node = Record<string, unknown> & { breadcrumb?: { itemListElement: Array<{ name: string; item: string }> } };
+    const graph = (JSON.parse(scripts[0]!) as { "@graph": Node[] })["@graph"];
     expect(graph.map(n => n["@type"])).toEqual(["WebSite", "WebPage"]);
     expect(graph[0]).toMatchObject({ url: site, name: "Storefront bench" });
     expect(graph[1]).toMatchObject({ url, name: title });
     // Every bench page is committed, so git dates it (the checkout has its full history, in CI too).
     expect(graph[1]!["dateModified"]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/);
-    const trail = graph[1]!["breadcrumb"]?.itemListElement ?? [];
-    expect(trail.map((i: { name: string }) => i.name)).toEqual(TRAILS[route]);
-    if (trail.length) expect(trail.at(-1).item).toBe(url);
+    const trail = graph[1]!.breadcrumb?.itemListElement ?? [];
+    expect(trail.map(i => i.name)).toEqual(TRAILS[route]);
+    if (trail.length) expect(trail.at(-1)!.item).toBe(url);
   });
 }
+
+test("robots.txt keeps crawlers out of the previews and names the sitemap; the sitemap lists every page, dated", async ({ request }, info) => {
+  const site = isDev(info) ? `${DEV}/` : SITE_URL;
+  const robots = await request.get("/robots.txt");
+  expect(robots.status()).toBe(200);
+  expect(await robots.text()).toBe(`User-agent: *\nDisallow: /preview/\n\nSitemap: ${site}sitemap.xml\n`);
+  const sitemap = await request.get("/sitemap.xml");
+  expect(sitemap.status()).toBe(200);
+  const entries = [...(await sitemap.text()).matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?<\/url>/g)];
+  expect(entries.map(m => m[1])).toEqual(PAGES.map(([route]) => new URL(route.slice(1), site).href).sort());
+  // Every bench page is committed, so each has its last change (the checkout has its full history).
+  for (const m of entries) expect(m[2], m[1]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/);
+});
