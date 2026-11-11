@@ -49,6 +49,8 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
     ["Storefront bench", "A website written in markdown"]],
   ["partials/nav", "Nav", "The site navigation, one level deep, with the current page marked by aria-current.", "centered",
     ["Home", "Guides", "Setup", "About"]],
+  // Its sample-free markup is all head elements, so the preview shows no text.
+  ["partials/head", "Head", "The site's icon and theme colour, in every page's head.", "centered", []],
   ["partials/footer", "Footer", "The footer navigation, the line at the bottom of every page, and the year.", "centered",
     ["Built with Pattern Dump from the storefront bench.", "© 2026"]],
   ["components/callout", "Callout", "A short note set apart from the text around it.", "centered",

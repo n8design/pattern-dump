@@ -79,6 +79,8 @@ describe("pd build — the storefront root", () => {
       // The link-preview images: the site's, and about.md's own (crawled from og:image).
       "assets/images/about.png",
       "assets/images/bench-blocks.svg",
+      // The favicon the skin's head partial links on every page.
+      "assets/images/favicon.png",
       "assets/images/share.png",
       "guides/index.html",
       "guides/setup/index.html",
@@ -88,7 +90,7 @@ describe("pd build — the storefront root", () => {
       "robots.txt",
       "sitemap.xml",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 20, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 21, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
