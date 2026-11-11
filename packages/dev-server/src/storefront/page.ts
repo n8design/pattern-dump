@@ -29,6 +29,7 @@ import { collidingHeadings, idsBesides } from "./anchors.js";
 import type { GitDates, PageDates } from "./git-dates.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
+import type { PageImageCheck } from "./page-image.js";
 
 export interface PageAssembly {
   discoveryMap: DiscoveryMap;
@@ -49,6 +50,10 @@ export interface PageAssembly {
   live?: { wsPort: number; generation: string };
   /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created and page.modified are null. */
   dates?: GitDates;
+  /** Checks a link-preview image path against the project's assets (page-image.ts). */
+  image(path: string): Promise<PageImageCheck>;
+  /** storefront.image: the image of every page that names none. */
+  siteImage?: string;
 }
 
 export interface AssembledPage {
@@ -160,6 +165,19 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const site = await checkSite(a.site, a.discoveryMap, new Set([...model.files.values()].map(f => f.path)));
   siteWide = site.problems;
   problems.push(...site.problems);
+
+  // The link-preview image: the page's own, else the site's. A bad site image is the whole site's problem.
+  const imageLine = page.frontmatter.lines["image"];
+  const imageCheck = checked.build.image !== undefined ? await a.image(checked.build.image)
+    : a.siteImage !== undefined ? await a.image(a.siteImage) : undefined;
+  if (imageCheck && !imageCheck.ok) {
+    if (checked.build.image !== undefined) problems.push(`${page.path}${imageLine !== undefined ? `:${imageLine}` : ""}: ${imageCheck.message}`);
+    else {
+      const p = `storefront.image: ${imageCheck.message}`;
+      siteWide = [...siteWide, p];
+      problems.push(p);
+    }
+  }
 
   /** The page's markdown, rendered; its headings' anchors never take one of `takenIds`. */
   const renderBody = async (takenIds: string[] = []) => {
