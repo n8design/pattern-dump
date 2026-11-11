@@ -191,8 +191,8 @@ describe("rendering a page leaves the workbench's selection alone (state.lastCom
   }, 120_000);
 });
 
-describe("without a storefront config, every host is the workbench, as before", () => {
-  it("answers every host the same on test-bench", async () => {
+describe("without a storefront config, every host of its own is the workbench", () => {
+  it("answers the workbench's hosts the same on test-bench, and the storefront's host not at all", async () => {
     const testBench = join(repo, "test-bench");
     const tbConfig = defineConfig({
       sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
@@ -203,9 +203,11 @@ describe("without a storefront config, every host is the workbench, as before", 
     });
     const { port } = await serve(testBench, tbConfig);
     for (const path of ["/", "/about/", "/atoms/button", "/api/pages", "/preview/atoms/button"]) {
-      const answers = await Promise.all(["localhost", "live.localhost", "pd.localhost", "127.0.0.1"].map(h => get(port, h, path)));
+      const answers = await Promise.all(["localhost", "pd.localhost", "127.0.0.1"].map(h => get(port, h, path)));
       for (const a of answers.slice(1)) expect({ path, status: a.status, body: a.body }).toEqual({ path, status: answers[0].status, body: answers[0].body });
+      // live.localhost is the storefront's default host: without a storefront it is none of pd dev's own.
+      expect((await get(port, "live.localhost", path)).status, path).toBe(403);
     }
-    expect((await get(port, "live.localhost", "/api/pages")).status).toBe(404);
+    expect((await get(port, "localhost", "/api/pages")).status).toBe(404);
   }, 120_000);
 });

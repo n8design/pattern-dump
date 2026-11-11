@@ -24,7 +24,8 @@ function runPd(args: string[]): Promise<{ code: number | null; stderr: string }>
 describe("pd dev on a taken live-reload port", () => {
   it("exits 1 with one readable message and no stack trace", async () => {
     const blocker = createServer();
-    await new Promise<void>(r => blocker.listen(0, r));
+    // On the loopback, where live reload binds, as a running `pd dev` holds it.
+    await new Promise<void>(r => blocker.listen(0, "127.0.0.1", r));
     const port = (blocker.address() as { port: number }).port;
     try {
       // --port P makes live reload P + 1; take exactly that port, as a running `pd dev` would.

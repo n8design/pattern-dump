@@ -97,9 +97,9 @@ describe("checkPageImage — the file in the assets", () => {
     expect(await check("/assets/images/gone.png")).toEqual({ ok: false, message: `image "/assets/images/gone.png" does not exist in the assets` });
     expect(await check("/assets/images/x/../")).toMatchObject({ ok: false });
   });
-  it("refuses a path that leaves the assets", async () => {
-    expect(await check("/assets/../secret.png")).toEqual({ ok: false, message: `image "/assets/../secret.png" is outside the assets folder` });
-    expect(await check("/assets/%2e%2e/secret.png")).toEqual({ ok: false, message: `image "/assets/%2e%2e/secret.png" is outside the assets folder` });
+  it("refuses a path that leaves the assets: no file of the assets has that name", async () => {
+    expect(await check("/assets/../secret.png")).toEqual({ ok: false, message: `image "/assets/../secret.png" does not exist in the assets` });
+    expect(await check("/assets/%2e%2e/secret.png")).toEqual({ ok: false, message: `image "/assets/%2e%2e/secret.png" does not exist in the assets` });
   });
   it("says so when the project has no assets", async () => {
     expect(await checkPageImage("/assets/a.png", [], [])).toEqual({ ok: false,
