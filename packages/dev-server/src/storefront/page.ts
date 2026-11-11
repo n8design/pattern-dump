@@ -31,6 +31,7 @@ import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 import type { PageImage, PageImageCheck } from "./page-image.js";
 import { jsonLdScript } from "./json-ld.js";
+import { checkHeadMarkup, HEAD_PARTIAL } from "./head-partial.js";
 
 /** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
 export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
@@ -280,17 +281,25 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (a.discoveryMap.has(checked.layoutId)) {
     problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed));
   }
+  // The skin's head partial: the same for every page, so its problems are the whole site's.
+  const hasHead = a.discoveryMap.has(HEAD_PARTIAL);
+  if (hasHead) {
+    const headSample = await checkSampleData(HEAD_PARTIAL, a.discoveryMap, a.composition, [], siteDeclared, undefined, site.listed);
+    siteWide = [...siteWide, ...headSample];
+    problems.push(...headSample);
+  }
   if (problems.length) return fail(problems);
 
   // What the layout gets: its declared values, null where the page sets none, then what the storefront fills.
+  const siteData = {
+    ...withDeclaredAbsentAsNull(site.values, siteDeclared),
+    ...(site.listed.length ? { navigations: resolveNavigations(site.navigations, site.listed, model, route) } : {}),
+  };
   const dataFor = (body: string, headings: PageHeading[]) => ({
     ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),
     body,
     nav: markCurrent(model.nav, route),
-    site: {
-      ...withDeclaredAbsentAsNull(site.values, siteDeclared),
-      ...(site.listed.length ? { navigations: resolveNavigations(site.navigations, site.listed, model, route) } : {}),
-    },
+    site: siteData,
     ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates }) } : {}),
   });
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
@@ -335,6 +344,19 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
 
   const html = rendered.html;
+  // The skin's head partial: the site's values, and body and nav as null so no sample of them can show.
+  let headExtra = "";
+  if (hasHead) {
+    try {
+      headExtra = (await a.render({ component: HEAD_PARTIAL, data: { site: siteData, body: null, nav: null } })).html.trim();
+    } catch (e) {
+      const p = `${HEAD_PARTIAL}: ${e instanceof Error ? e.message : String(e)}`;
+      siteWide = [...siteWide, p];
+      return fail([p]);
+    }
+    const markup = checkHeadMarkup(headExtra);
+    if (markup.length) { siteWide = [...siteWide, ...markup]; return fail(markup); }
+  }
   const title = typeof checked.values["title"] === "string" ? checked.values["title"] : route;
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
@@ -349,6 +371,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     ...(a.siteUrl !== undefined
       ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified })]
       : []),
+    ...(headExtra ? [headExtra] : []),
     await a.head(checked.layoutId, html),
   ].join("\n");
   return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };

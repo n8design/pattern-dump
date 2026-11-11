@@ -155,13 +155,13 @@ describe("assemblePage — the head", () => {
     "draft.md": "---\ntitle: Draft\nindex: false\n---\n\nNot yet.\n",
   });
 
-  it("with the site's address: canonical, Open Graph with the page's image, after the description, before the stylesheets", async () => {
+  it("with the site's address: canonical, Open Graph with the page's image, after the description, then the skin's head partial, then the stylesheets", async () => {
     const page = await assemblePage("/", await readPages(await pages()), assembly({ siteUrl: URL_ }));
     expect(page.problems).toEqual([]);
     const head = headOf(page.html);
     expect(head).toContain(`<meta name="description" content="The start.">\n<link rel="canonical" href="https://example.test/">`);
     expect(head).toContain(`<meta property="og:image" content="https://example.test/assets/share.png">`);
-    expect(head).toMatch(/<meta name="twitter:card" content="summary_large_image">\n<script type="application\/ld\+json">[^\n]*<\/script>\n<link rel="stylesheet" href="\/_pd\/x.css">/);
+    expect(head).toMatch(/<meta name="twitter:card" content="summary_large_image">\n<script type="application\/ld\+json">[^\n]*<\/script>\n<link rel="icon" href="\/assets\/images\/favicon.png">\n<meta name="theme-color" content="#1e3c78">\n<link rel="stylesheet" href="\/_pd\/x.css">/);
   });
 
   it("without it: none of the tags that need it", async () => {

@@ -19,7 +19,17 @@ test.describe("the skin in the workbench", () => {
     await page.goto(`${WORKBENCH}/layouts/page`);
     await page.waitForSelector("#preview-frame[srcdoc]");
     const hrefs = await page.locator(".sidebar-tree a.tree-link").evaluateAll(as => as.map(a => a.getAttribute("href")));
-    expect(hrefs.sort()).toEqual(["/components/callout", "/components/slide", "/components/slider", "/layouts/article", "/layouts/doc", "/layouts/home", "/layouts/page", "/partials/base", "/partials/footer", "/partials/header", "/partials/nav"]);
+    expect(hrefs.sort()).toEqual(["/components/callout", "/components/slide", "/components/slider", "/layouts/article", "/layouts/doc", "/layouts/home", "/layouts/page", "/partials/base", "/partials/footer", "/partials/head", "/partials/header", "/partials/nav"]);
+  });
+
+  test("documents partials/head, whose preview shows nothing: its markup all belongs in a head", async ({ page }) => {
+    await page.goto(`${WORKBENCH}/partials/head`);
+    await page.waitForFunction(() => !!(document.getElementById("preview-frame") as HTMLIFrameElement | null)
+      ?.contentDocument?.querySelector("body[data-component-id='partials/head']"));
+    await expect(page.locator(".panel")).toContainText("What the skin adds to every page's");
+    const body = page.frameLocator("#preview-frame").locator("body");
+    expect((await body.innerText()).trim()).toBe("");
+    await expect(body.locator(`link[rel="icon"]`)).toHaveCount(1);
   });
 
   for (const [id, docs] of SKIN) {
