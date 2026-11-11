@@ -159,6 +159,10 @@ in [storefront.md](storefront.md).
 | `storefront.outDir` | string | required | Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench snapshot |
 | `storefront.host` | string | `live.localhost` | The host name `pd dev` serves the storefront on. A bare name, with no scheme, port or path |
 | `storefront.workbenchUrl` | string | — | Where the built workbench will be hosted, such as `https://workbench.example.com/` or `https://htwoo.io/workbench/`: an absolute http(s) URL with no query or fragment. A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
+| `storefront.url` | string | — | The site's address, such as `https://example.com/`: an absolute http(s) URL with no path, query or fragment (loaded with one trailing slash). With it, pages get canonical URLs, Open Graph and JSON-LD, and `pd build` writes `sitemap.xml`; without it, those are left out ([storefront.md](storefront.md#search-engines-and-link-previews)) |
+| `storefront.lang` | string | `en` | The language of every page, for `<html lang>`: a language tag such as `de-AT` |
+| `storefront.index` | boolean | `true` | `false` keeps the whole site out of search engines, for a staging site: every page `noindex`, `robots.txt` disallows everything, no sitemap |
+| `storefront.image` | string | — | The link-preview image of every page that names none: a PNG, JPEG, GIF or WebP file in the assets, such as `/assets/images/share.png` |
 | `storefront.site` | object | — | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
 
 ## When changes take effect

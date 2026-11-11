@@ -103,7 +103,13 @@ lede: Three folders make a site.
 |---|---|
 | `layout` | The layout the page renders with: `layouts/<name>` in the skin. `page` when it has none |
 | `order` | Its position in the navigation, see [Pages](#pages) |
+| `image` | Its link-preview image: a raster file in the assets (PNG, JPEG, GIF or WebP), such as `/assets/images/setup.png`. An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `storefront.image` |
+| `index` | `false` keeps the page out of search engines: `noindex`, and no sitemap entry |
+| `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. See [Redirects](#redirects) |
 | any other key | Must be declared by the layout's schema |
+
+`layout`, `order`, `image`, `index` and `redirectFrom` belong to the build: they never reach the layout, and a
+layout's schema may not declare any of them.
 
 **The layout's schema is the frontmatter contract.** A layout is a component, and its
 `<name>.schema.json` lists the keys a page using it may set (`properties`) and must set (`required`). A
@@ -154,7 +160,22 @@ watched.
 |---|---|
 | `layouts/<name>` | A layout a page can choose with `layout: <name>`. Its schema is the frontmatter contract |
 | `partials/base` | The frame every layout is built on. Its schema's `site` property declares what `storefront.site` may hold |
+| `partials/head` | Optional: what the skin adds to every page's `<head>`, see below |
 | `partials/…` | Anything else the layouts include: header, navigation, footer |
+
+**The head.** Pattern Dump writes every page's `<head>`: the title, the description, the search and
+link-preview tags ([below](#search-engines-and-link-previews)) and the stylesheets. A skin adds what Pattern
+Dump can't know (an icon, a theme colour, a font preload) with a `partials/head` component. It is rendered with
+`site`, placed after Pattern Dump's tags and before the stylesheets, and may hold only `<meta>`, `<link>`,
+`<script>`, `<style>` and `<noscript>`. It must not write what Pattern Dump writes: `<title>`, a canonical
+link, `description`, `robots`, `og:*`, `twitter:*` or JSON-LD, nor `<base>`. Any of those, any other element,
+or text, is a problem for every page. Its workbench preview is empty, since everything in it belongs in a
+head.
+
+```hbs
+<link rel="icon" href="/assets/images/favicon.png">
+<meta name="theme-color" content="#1e3c78">
+```
 
 A layout receives:
 
@@ -249,6 +270,61 @@ belong to the skin.
 
 ---
 
+## Search engines and link previews
+
+**The site's address.** `storefront.url` is where the site will be hosted, such as `https://example.com/`
+(an origin: the storefront is served from the root of its host). With it, every page carries:
+
+- a canonical URL, and `og:url`
+- Open Graph (`og:type`, `og:site_name`, `og:title`, `og:description`, `og:image` with its width and height)
+  and a Twitter card, large when the page has an image
+- one JSON-LD graph: the `WebSite`, the `WebPage` with its last change from git (`dateModified`), and a
+  `BreadcrumbList` from Home down to the page
+
+and `pd build` writes `sitemap.xml`. Without it, those are left out and `pd build` says so once. In `pd dev`
+the same tags carry the address the browser is on. Every page has `<html lang>` from `storefront.lang`
+(default `en`).
+
+**Images.** A page's image is its `image`, else `storefront.image`. Link previews show raster images only, so
+an image must be a PNG, JPEG, GIF or WebP file in the assets.
+
+**Keeping pages out.** `index: false` on a page gives it `noindex` and leaves it out of the sitemap.
+`storefront.index: false` does that for the whole site, for a staging site: `robots.txt` then disallows
+everything and there is no sitemap.
+
+**`sitemap.xml`** lists every page in route order, except those with `index: false`, the 404 page and the
+redirect pages, each with a `lastmod` where git has a reliable date. A page with uncommitted changes has its
+last commit's date. From a shallow clone the dates would be the clone's boundary, so the sitemap and the
+JSON-LD leave them out and the build notes it once (in CI, check out with `fetch-depth: 0`). A layout that
+*shows* dates still fails the build there.
+
+**`robots.txt`.** Both output roots get one. The storefront's keeps crawlers out of `/preview/` (the live
+examples: component demos, not pages) and names the sitemap. The workbench's keeps them out of its
+previews only; the workbench itself stays searchable. Two limits:
+
+- `Disallow` stops crawling, not indexing: a preview someone links to from elsewhere can still appear in
+  results as a bare address, with no description. A crawler also never fetches the examples a page embeds,
+  so their text doesn't count toward the page.
+- Crawlers read `robots.txt` only at a host's root. A workbench built with `--base` writes it to its own
+  root, so copy its rule into the `robots.txt` the host serves at `/` (the build says so).
+
+### The 404 page
+
+`pages/404.md` is the site's 404 page: rendered through its layout like a page, but not one of the site's
+pages (not in the navigation, the sitemap or the pages list), with `noindex` and no canonical, Open Graph or
+JSON-LD. Without one, a built-in page goes through the default layout (`layouts/page`). `pd build` writes it to
+`404.html`, which GitHub Pages and most static hosts serve for every missing address; `pd dev` serves it the
+same way, with status 404. Since it is shown at every depth, every URL in it (its own, its layout's and the
+head's) must be root-relative (`/…`) or absolute: a relative one is a problem.
+
+### Redirects
+
+When a page moves, list its old routes in `redirectFrom`. Each old route gets a page that forwards to the new
+one at once (`<meta http-equiv="refresh">`, which search engines take as a permanent redirect), names it as
+canonical, and is never indexed. This works on any static host, GitHub Pages included. An old route must
+start and end with `/`, and must not be a page, be claimed by two pages, or lie under `/preview/`, `/_pd/`,
+`/assets/`, `/api/` or `/source/`.
+
 ## Hosts in `pd dev`
 
 One `pd dev` serves both front ends, telling them apart by the host name:
@@ -304,6 +380,9 @@ workbench links.
 ```
 site/
   index.html  about/index.html  guides/index.html  guides/setup/index.html
+  404.html                                          the 404 page
+  setup/index.html  start/index.html                pages that forward from old routes
+  robots.txt  sitemap.xml                           for crawlers (the sitemap with storefront.url)
   preview/components/callout/index.html            the previews the pages show
   _pd/  assets/                                    what pages and previews reference
   .nojekyll
