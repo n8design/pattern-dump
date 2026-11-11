@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
 import { basename, join, dirname, resolve, relative, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { ConfigError, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
 
@@ -231,7 +231,9 @@ async function readConfigFile(path: string): Promise<unknown> {
 
 /** Transpile a TS config to a temp ESM file and import its default export. */
 async function loadTsConfig(tsPath: string): Promise<unknown> {
-  const tmp = join(tmpdir(), `pd-config-${Date.now()}.mjs`);
+  // A name of its own for every load: loads in the same millisecond (pd processes started together, or
+  // several loads in one process) would otherwise write, import and delete one shared file.
+  const tmp = join(tmpdir(), `pd-config-${process.pid}-${randomUUID()}.mjs`);
   try {
     await esbuild({
       entryPoints: [tsPath],
