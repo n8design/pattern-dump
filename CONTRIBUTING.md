@@ -77,6 +77,9 @@ cannot depend on it:
 - **Repeat before the first commit.** Run the new or changed spec 20 times, with retries off, on Linux with
   the machine busy (`node scripts/ci/burn-in.mjs --runs 20 --load`). A pull request does this in CI for
   every spec it changes; a failure there is a real failure, not a reason to retry.
+  If a burn-in failure is in a test the pull request didn't change, a maintainer may merge when the same
+  failure reproduces on main. The failure then becomes an issue with its evidence. A test the pull request
+  changed must pass, and a run is never repeated just to get a green result.
 
 ## Reporting bugs and proposing features
 

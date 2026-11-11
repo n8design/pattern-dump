@@ -1,7 +1,7 @@
-// pd dev and pd build give the same page DOM, apart from the live-reload client and the workbench's
-// address. Read once each frame has been fitted, so the fitter's heights are part of what is compared.
+// pd dev and pd build give the same page DOM, apart from the live-reload client, the workbench's address,
+// and pd dev's own address in canonical and Open Graph URLs. Read once each frame has been fitted, so the fitter's heights are part of what is compared.
 import { expect, test, type Page } from "@playwright/test";
-import { BUILD_WORKBENCH_URL, DEV, domWithoutLiveClient, openChapters, STATIC, WORKBENCH } from "./helpers.js";
+import { BUILD_WORKBENCH_URL, DEV, domWithoutLiveClient, openChapters, SITE_URL, STATIC, WORKBENCH } from "./helpers.js";
 
 async function settled(page: Page, url: string): Promise<string> {
   await page.goto(url);
@@ -17,7 +17,7 @@ async function settled(page: Page, url: string): Promise<string> {
 test.describe("pd dev and pd build", () => {
   for (const route of ["/", "/about/", "/guides/", "/guides/setup/"]) {
     test(`render the same DOM for ${route}`, async ({ page }) => {
-      const dev = (await settled(page, DEV + route)).replaceAll(`${WORKBENCH}/`, BUILD_WORKBENCH_URL);
+      const dev = (await settled(page, DEV + route)).replaceAll(`${WORKBENCH}/`, BUILD_WORKBENCH_URL).replaceAll(`${DEV}/`, SITE_URL);
       const built = await settled(page, STATIC + route);
       expect(dev).toBe(built);
     });

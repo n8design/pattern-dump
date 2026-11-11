@@ -13,6 +13,7 @@ import { buildCompositionRegistry, type CompositionRegistry } from "../src/compo
 import { frontmatterBody } from "../src/frontmatter.js";
 import { readPages } from "../src/storefront/pages.js";
 import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
+import { checkPageImage } from "../src/storefront/page-image.js";
 import { save } from "../../../test-support/save.js";
 
 const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
@@ -24,6 +25,7 @@ let tmp = "";
 let map: DiscoveryMap;
 let composition: CompositionRegistry;
 let render: Render;
+let assets = "";
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "pd-page-"));
@@ -31,12 +33,18 @@ beforeAll(async () => {
   map = discoveryMap;
   composition = await buildCompositionRegistry(patterns, handleMap, discoveryMap);
   render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap });
+  assets = join(tmp, "assets");
+  await mkdir(assets, { recursive: true });
+  // A PNG header is all the check reads: 1200 × 630.
+  await save(join(assets, "share.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 4, 0xb0, 0, 0, 2, 0x76, 8, 6, 0, 0, 0]));
+  await save(join(assets, "logo.svg"), `<svg xmlns="http://www.w3.org/2000/svg"/>`);
 });
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
 const assembly = (over: Partial<PageAssembly> = {}): PageAssembly => ({
   discoveryMap: map, composition, render, site: SITE, workbenchUrl: WB,
   head: async (layoutId) => `<link rel="stylesheet" href="/_pd/head-for/${layoutId}">`,
+  image: path => checkPageImage(path, [assets], ["assets"]),
   ...over,
 });
 
@@ -170,6 +178,31 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
     const page = await build("/nope/", join(bench, "pages"));
     expect(page.status).toBe(404);
     expect(page.problems).toEqual(["there is no page at /nope/"]);
+  });
+});
+
+describe("assemblePage — the link-preview image", () => {
+  const page = (image?: string) => `---\ntitle: About\n${image ? `image: ${image}\n` : ""}---\n\nText.\n`;
+
+  it("renders a page whose image is a raster file in the assets", async () => {
+    const dir = await pagesOf({ "index.md": page("/assets/share.png") });
+    expect((await build("/", dir)).problems).toEqual([]);
+  });
+
+  it("fails a page whose own image is an SVG, at the image's line", async () => {
+    const dir = await pagesOf({ "index.md": page("/assets/logo.svg") });
+    const r = await build("/", dir);
+    expect(r.status).toBe(500);
+    expect(r.problems).toEqual([`index.md:3: image "/assets/logo.svg" is an SVG; link previews need a raster image (PNG, JPEG, GIF or WebP)`]);
+  });
+
+  it("fails every page on a bad storefront.image, as the whole site's problem, unless the page names its own", async () => {
+    const dir = await pagesOf({ "index.md": page(), "about.md": page("/assets/share.png") });
+    const home = await build("/", dir, { siteImage: "/assets/missing.png" });
+    const message = `storefront.image: image "/assets/missing.png" does not exist in the assets`;
+    expect(home.problems).toEqual([message]);
+    expect(home.html).toContain(`<li data-pd-site>${message}</li>`);
+    expect((await build("/about/", dir, { siteImage: "/assets/missing.png" })).problems).toEqual([]);
   });
 });
 

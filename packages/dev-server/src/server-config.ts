@@ -80,6 +80,14 @@ export interface ResolvedConfig {
     readonly host: string;
     readonly site: Record<string, unknown> | undefined;
     readonly workbenchUrl: string | undefined;
+    /** storefront.image: the link-preview image of every page that names none (a /assets/… path). */
+    readonly image: string | undefined;
+    /** storefront.url: the site's address, an origin with one slash; undefined when it is not set. */
+    readonly url: string | undefined;
+    /** storefront.lang, for <html lang>: "en" unless set. */
+    readonly lang: string;
+    /** storefront.index: false keeps the whole site out of search engines. */
+    readonly index: boolean;
   } | null;
 
   readonly overviewsEnabled: boolean;
@@ -209,6 +217,10 @@ export function resolveServerConfig(
       host: (config.storefront.host ?? PD_HOSTS.storefront).toLowerCase(),
       site: config.storefront.site,
       workbenchUrl: config.storefront.workbenchUrl,
+      image: config.storefront.image,
+      url: config.storefront.url,
+      lang: config.storefront.lang ?? "en",
+      index: config.storefront.index !== false,
     } : null,
     overviewsEnabled:    config.overviews !== false,
     documentBaseEnabled,

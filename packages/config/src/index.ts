@@ -184,6 +184,23 @@ export interface StorefrontConfig {
    */
   workbenchUrl?: string;
   /**
+   * The site's address, such as `https://example.com/`: an absolute http(s) URL with no path (the storefront
+   * is served from the root of its host), no query or fragment; loaded as its origin followed by `/`. With it,
+   * pages get a canonical URL, Open Graph and JSON-LD, and `pd build` writes a sitemap; without it they are
+   * left out, and `pd build` says so once.
+   */
+  url?: string;
+  /** The language of every page, as `<html lang>` takes it (a BCP 47 tag such as `de-AT`). Default: `en`. */
+  lang?: string;
+  /**
+   * `false` keeps the whole site out of search engines (a staging site): every page gets `noindex`,
+   * `robots.txt` disallows everything, and there is no sitemap. Default: `true`.
+   */
+  index?: boolean;
+  /** The image a page shows in link previews when it names none of its own: a raster image in the assets
+   *  (PNG, JPEG, GIF or WebP), such as `/assets/images/share.png`. */
+  image?: string;
+  /**
    * Values every page of the site shares, such as its title or the line in its footer. Every layout gets
    * them as `site`; a page cannot set them. Which keys there are, and their types, is what the `site`
    * property of `partials/base`'s schema declares: they are checked against it, not inferred.

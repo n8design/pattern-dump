@@ -2,6 +2,7 @@
 layout: doc
 title: About
 description: What the bench is for.
+image: /assets/images/about.png
 order: 2
 ---
 
