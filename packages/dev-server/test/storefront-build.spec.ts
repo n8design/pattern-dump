@@ -399,6 +399,38 @@ describe("pd build — the storefront's settings", () => {
     expect(await exists(out)).toBe(false);
   }, 60_000);
 
+  // A same-host workbench is linked at its path, so the build must make it for that path.
+  const builtFor = (got: string) => `pd build: storefront.workbenchUrl is /workbench/, so the workbench must be built for /workbench/ `
+    + `(build.basePath or --base); it is being built for ${got}`;
+  const withBase = (basePath: string | undefined) => validateConfig({ ...benchConfig, ...(basePath ? { build: { basePath } } : {}),
+    storefront: { ...benchConfig.storefront!, workbenchUrl: "/workbench/" } }, "test");
+
+  it("fails when the base path in the config is not the same-host workbench's path, and writes nothing", async () => {
+    const root = await benchCopy();
+    const out = join(root, "..", "wb-base-config");
+    await expect(build(root, out, withBase("/docs/"))).rejects.toThrow(builtFor("/docs/"));
+    expect(await exists(out)).toBe(false);
+  }, 60_000);
+
+  it("fails when --base overrides a matching build.basePath with another path", async () => {
+    const root = await benchCopy();
+    const out = join(root, "..", "wb-base-flag");
+    await expect(buildStaticSite(withBase("/workbench/"), root, { outDir: out, basePath: "/docs/", pdVersion: "0.0.0-test", now: NOW }))
+      .rejects.toThrow(builtFor("/docs/"));
+    expect(await exists(out)).toBe(false);
+  }, 60_000);
+
+  it("fails when no base path is given at all: the workbench would be built for /", async () => {
+    const root = await benchCopy();
+    await expect(build(root, join(root, "..", "wb-base-none"), withBase(undefined))).rejects.toThrow(builtFor("/"));
+  }, 60_000);
+
+  it("builds when --base names the same-host path in another spelling, and when build.basePath alone gives it", async () => {
+    const root = await benchCopy();
+    await buildStaticSite(withBase(undefined), root, { outDir: join(root, "..", "wb-base-spelled"), basePath: "/workbench", pdVersion: "0.0.0-test", now: NOW });
+    await build(root, join(root, "..", "wb-base-cfg-ok"), withBase("/workbench/"));
+  }, 60_000);
+
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
     const root = await benchCopy();
     await expect(build(root, join(root, ".out", "storefront"))).rejects.toThrow(/and --out .* overlap — the storefront and the workbench each need a folder of their own/);

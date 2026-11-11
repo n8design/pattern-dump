@@ -104,6 +104,13 @@ export async function buildStaticSite(
     if (!storefront.workbenchUrl) {
       throw new Error("pd build: storefront.workbenchUrl is required to build the storefront — its pages link into the workbench at that address");
     }
+    // A workbench published on the storefront's own host is linked at its path, so it must be built for that
+    // path: the base path this build uses (--base, else build.basePath, else /).
+    const sameHost = sameHostWorkbenchPath(storefront);
+    if (sameHost !== undefined && sameHost !== basePath) {
+      throw new Error(`pd build: storefront.workbenchUrl is ${storefront.workbenchUrl}, so the workbench must be built for ${sameHost} `
+        + `(build.basePath or --base); it is being built for ${basePath}`);
+    }
   }
 
   const fixed = opts.now;
