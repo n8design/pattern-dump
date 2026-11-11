@@ -35,10 +35,12 @@ npx --package=/path/to/pattern-dump-<version>.tgz pd init my-design-system --pd-
 | Package name | `--name <name>` | the folder name |
 | Title in the Nav Rail | `--brand <title>` | the name |
 | Include the starter components? | `--no-examples` to skip | yes |
+| Include a website (storefront)? | `--storefront` | no |
 | Run `git init`? | `--git` / `--no-git` | yes, unless already inside a repository |
 | Run `npm install`? | `--no-install` to skip | yes |
 
-`--yes` accepts every default without asking. In a folder that already has a `package.json`, `pd init`
+A website adds pages written in markdown, a small skin and a GitHub Pages workflow; see
+[storefront.md](storefront.md#quick-start). `--yes` accepts every default without asking. In a folder that already has a `package.json`, `pd init`
 adds to the project and never overwrites a file; a script name that is taken gets a `pd:` prefix instead.
 
 A global install (`npm install --global pattern-dump@alpha`) also works for creating projects, but each
