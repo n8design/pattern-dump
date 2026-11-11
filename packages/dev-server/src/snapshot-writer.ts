@@ -11,7 +11,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { staticPathFor } from "@pattern-dump/contracts";
+import { PD_ROUTES, staticPathFor } from "@pattern-dump/contracts";
 
 /** Root-relative PD URL prefixes that must move under the base path. */
 const PD_PREFIXES = /(^|["'(\s,=])\/(_pd|api|preview|source|assets)\//g;
@@ -76,7 +76,8 @@ export function createSnapshotWriter({ outDir, basePath, origin, report, fetch: 
     if (done.has(file)) return null;
     done.set(file, liveUrl);
     const res = await get(liveUrl);
-    if (res.status !== 200) {
+    // The 404 page is written as it is answered, with its 404 status; anything else is written when it is 200.
+    if (res.status !== (liveUrl === PD_ROUTES.notFound ? 404 : 200)) {
       // A component that fails to render is a finding about the design system, not a reason to abort
       // the build: the static shell reports the missing file exactly as the live one reports the error.
       // 404s of optional views (a component without a data file) are expected and not listed.

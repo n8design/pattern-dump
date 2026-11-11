@@ -13,14 +13,14 @@
 // never show on a real page. A layout that declares `page` gets what is derived for the page (derived.ts),
 // each declared sub-key present and null where nothing is.
 
-import { createHeightFitter, generationBehind, type DiscoveryMap, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
-import { frontmatterBody, frontmatterBodyOffset } from "../frontmatter.js";
+import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
+import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
 import { isHelperNameProblem } from "@pattern-dump/renderer";
 import { renderDoc } from "../markdown.js";
 import { readSchema, type PlacedProblem } from "./declared-values.js";
 import { checkPageFrontmatter } from "./frontmatter-contract.js";
-import type { PageModel } from "./pages.js";
+import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { resolveNavigations } from "./navigations.js";
 import { checkSampleData } from "./sample-data.js";
@@ -162,6 +162,26 @@ export function seoTags(p: {
   return tags;
 }
 
+/** The URLs in markup's href, src, poster, action and srcset that are relative: not root-relative ("/…"), not
+ *  a fragment ("#…"), and with no scheme. Each once, in order. */
+export function relativeUrls(markup: string): string[] {
+  const urls: string[] = [];
+  for (const m of markup.matchAll(/\s(href|src|poster|action|srcset)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
+    const value = (m[2] ?? m[3] ?? "").trim();
+    const candidates = m[1]!.toLowerCase() === "srcset" ? value.split(",").map(c => c.trim().split(/\s+/)[0] ?? "") : [value];
+    for (const u of candidates) if (u !== "" && !/^(?:\/|#|[a-z][a-z0-9+.-]*:)/i.test(u)) urls.push(u);
+  }
+  return [...new Set(urls)];
+}
+
+/** The built-in 404 page's markdown, through the default layout: with a title when that layout declares one. */
+function builtInNotFound(layoutDeclaresTitle: boolean): string {
+  const body = "There is no page at this address. Start again from the [home page](/).\n";
+  return layoutDeclaresTitle ? `---\ntitle: Page not found\n---\n\n${body}` : `# Page not found\n\n${body}`;
+}
+/** The 404 page of a site with no 404.md and no default layout. */
+const BUILT_IN_NOT_FOUND_DOCUMENT = `<main>\n<h1>Page not found</h1>\n<p>There is no page at this address. <a href="/">Go to the home page</a>.</p>\n</main>`;
+
 /** The document shown instead of a page that has problems: every problem, escaped. */
 /** `siteWide`: the problems that are the whole site's, not this page's (storefront.site): each is marked
  *  data-pd-site, so a build that crawls every page lists it once. */
@@ -193,21 +213,39 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
 
   const notFound = (): AssembledPage =>
     ({ status: 404, html: errorDocument(route, [`there is no page at ${route}`], a.live), problems: [`there is no page at ${route}`], notes: [] });
-  const page = model.files.get(route);
+  // The site's "not found" page, at /404.html: its 404.md, or a built-in one through the default layout.
+  const isNotFound = route === PD_ROUTES.notFound;
+  let page = isNotFound ? model.notFound : model.files.get(route);
+  let source: string | undefined;
+  if (isNotFound && !page) {
+    const layoutId = `layouts/${DEFAULT_LAYOUT}`;
+    if (!a.discoveryMap.has(layoutId)) {
+      return { status: 404, html: document(`<title>Page not found</title>`, BUILT_IN_NOT_FOUND_DOCUMENT, a.live, a.lang), problems: [],
+        notes: [`there is no ${NOT_FOUND_FILE} and no ${layoutId}, so the 404 page is a plain one of Pattern Dump's`] };
+    }
+    const declared = (await readSchema(a.discoveryMap.get(layoutId)?.schemaPath)).schema?.properties ?? {};
+    source = builtInNotFound(Object.hasOwn(declared, "title"));
+    page = { route, file: "", path: `${NOT_FOUND_FILE} (built in)`, frontmatter: readFrontmatterStrict(source) };
+  }
   if (!page) return notFound();
   // A page the folder listed can be gone by now (deleted between reading the folder and this request):
   // then there is no page at this route.
-  let source: string;
-  try {
-    source = await readFile(page.file, "utf8");
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return notFound();
-    throw e;
+  if (source === undefined) {
+    try {
+      source = await readFile(page.file, "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return notFound();
+      throw e;
+    }
   }
 
   const problems: string[] = [];
   const checked = await checkPageFrontmatter(page, a.discoveryMap);
   problems.push(...checked.problems.map(p => `${p.file}${p.line !== undefined ? `:${p.line}` : ""}: ${p.message}`));
+  if (isNotFound && checked.build.redirectFrom) {
+    const line = page.frontmatter.lines["redirectFrom"];
+    problems.push(`${page.path}${line !== undefined ? `:${line}` : ""}: the 404 page can't have redirectFrom: it is served for every address that has no page`);
+  }
   const site = await checkSite(a.site, a.discoveryMap, new Set([...model.files.values()].map(f => f.path)));
   siteWide = site.problems;
   problems.push(...site.problems);
@@ -268,7 +306,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   let dates: Partial<PageDates> = {};
   let modified: string | null = null;
   const showsDates = pageDeclaration.declared?.some(k => k === "created" || k === "modified") ?? false;
-  if (a.dates && (showsDates || a.siteUrl !== undefined)) {
+  if (a.dates && !isNotFound && (showsDates || a.siteUrl !== undefined)) {
     const dated = await a.dates.of(page.path, a.live ? "dev" : "build");
     if (showsDates) {
       dates = dated.dates;
@@ -357,22 +395,35 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const markup = checkHeadMarkup(headExtra);
     if (markup.length) { siteWide = [...siteWide, ...markup]; return fail(markup); }
   }
-  const title = typeof checked.values["title"] === "string" ? checked.values["title"] : route;
+  const title = typeof checked.values["title"] === "string" ? checked.values["title"] : isNotFound ? "Page not found" : route;
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} — ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
+    // The 404 page is served at every address that has none: no address of its own, never indexed.
     ...seoTags({
-      route, title, description, siteTitle, siteUrl: a.siteUrl,
+      route, title, description, siteTitle, siteUrl: isNotFound ? undefined : a.siteUrl,
       image: imageCheck?.ok ? imageCheck.image : undefined,
-      index: a.siteIndex !== false && checked.build.index !== false,
+      index: !isNotFound && a.siteIndex !== false && checked.build.index !== false,
     }),
-    ...(a.siteUrl !== undefined
+    ...(a.siteUrl !== undefined && !isNotFound
       ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified })]
       : []),
     ...(headExtra ? [headExtra] : []),
     await a.head(checked.layoutId, html),
   ].join("\n");
-  return { status: 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
+  // The 404 page is served at any depth, so every URL in it (its body's, its layout's, the head's) must be
+  // root-relative or absolute: a relative one points somewhere else on every address.
+  if (isNotFound) {
+    const relative = relativeUrls(`${head}\n${html}`);
+    if (relative.length) {
+      return fail(relative.map(u => {
+        const instead = u.startsWith("./") ? `use "/${u.slice(2)}" instead` : `write it from the site's root ("/…") instead`;
+        return `the 404 page (${page!.path}): the URL "${u}" is relative, and the 404 page is served at every address, `
+          + `so it only works from the site's root: ${instead}`;
+      }));
+    }
+  }
+  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
 }
