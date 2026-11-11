@@ -259,6 +259,10 @@ One `pd dev` serves both front ends, telling them apart by the host name:
 | `http://pd.localhost:<port>/` | The workbench |
 | `http://localhost:<port>/` | The workbench, as without a storefront |
 
+`pd dev` answers only to these names (and `127.0.0.1`) at its own port: a request for any other host name
+gets `403`, and the live-reload connection accepts only pages served from them. Without a storefront,
+`live.localhost` is not one of them.
+
 Edits to pages, layouts, partials, styles, global data, assets and helper modules reload the open page.
 Restart after changing the config. A problem that stops a reload (data that is not valid JSON, a helper
 that does not load or register) is listed in a notice on the open page and in the terminal; the page keeps the last good

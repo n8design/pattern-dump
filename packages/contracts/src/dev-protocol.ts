@@ -632,8 +632,9 @@ export const PD_ROUTES = {
 
 /**
  * The two front ends of one `pd dev` process, told apart by the request's Host header. Both serve
- * from `/`. Any other host — plain `localhost`, `127.0.0.1` — gets the workbench, as before.
- * `storefront.host` in the config replaces the storefront default.
+ * from `/`. Plain `localhost` and `127.0.0.1` also get the workbench. `storefront.host` in the config
+ * replaces the storefront default, which is a host of pd dev's only when there is a storefront. A request
+ * for any other host is refused (403).
  */
 export const PD_HOSTS = {
   storefront: "live.localhost",

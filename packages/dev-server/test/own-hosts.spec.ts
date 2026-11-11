@@ -6,6 +6,8 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import WebSocket from "ws";
+import { connect } from "node:net";
+import { request } from "node:http";
 import { defineConfig, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
 import type { DevServer } from "@pattern-dump/dev-server";
 import { isOwnHost, isOwnOrigin, ownHosts } from "../src/own-hosts.js";
@@ -49,6 +51,19 @@ const handshake = (wsPort: number, origin: string | undefined): Promise<string> 
   ws.once("error", e => resolve(`error ${e.message}`));
 });
 
+/** GET `path` with `host` as the Host header: the status, and the body. */
+const get = (port: number, path: string, host: string): Promise<{ status: number; body: string }> => new Promise((resolve, reject) => {
+  const req = request({ host: "127.0.0.1", port, path, headers: { host } }, res => {
+    let body = ""; res.setEncoding("utf8"); res.on("data", c => { body += c; }); res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+  });
+  req.on("error", reject); req.end();
+});
+/** An HTTP/1.0 request with no Host header at all: its status line. */
+const withoutHost = (port: number): Promise<string> => new Promise((resolve, reject) => {
+  const s = connect(port, "127.0.0.1", () => s.write("GET /api/version HTTP/1.0\r\n\r\n"));
+  let data = ""; s.setEncoding("utf8"); s.on("data", c => { data += c; }); s.on("end", () => resolve(data.split("\r\n")[0]!)); s.on("error", reject);
+});
+
 describe("pd dev's live-reload socket", () => {
   let tmp = "";
   const servers: DevServer[] = [];
@@ -60,7 +75,8 @@ describe("pd dev's live-reload socket", () => {
   beforeAll(async () => {
     tmp = await mkdtemp(join(tmpdir(), "pd-own-hosts-"));
     root = join(tmp, "p");
-    for (const [rel, text] of Object.entries({ "src/patterns/atoms/chip/chip.hbs": "<p>chip</p>\n", "src/styles/atoms/chip.scss": "p{margin:0}\n", "pages/index.md": "# Home\n" })) {
+    for (const [rel, text] of Object.entries({ "src/patterns/atoms/chip/chip.hbs": "<p>chip</p>\n", "src/styles/atoms/chip.scss": "p{margin:0}\n", "pages/index.md": "# Home\n",
+      "src/patterns/layouts/page/page.hbs": "<main>{{{body}}}</main>\n" })) {
       await mkdir(dirname(join(root, rel)), { recursive: true });
       await save(join(root, rel), text);
     }
@@ -91,9 +107,28 @@ describe("pd dev's live-reload socket", () => {
     }
   }, 60_000);
 
+  it("HTTP: answers its own hosts at its port, the storefront on a custom storefront.host", async () => {
+    const { port } = await start(config(true, "docs.localhost"));
+    for (const host of ["localhost", "127.0.0.1", "pd.localhost", "docs.localhost"]) {
+      expect((await get(port, "/api/version", `${host}:${port}`)).status, host).toBe(200);
+    }
+    const home = await get(port, "/", `docs.localhost:${port}`);
+    expect([home.status, home.body.includes("<h1")]).toEqual([200, true]);
+  }, 60_000);
+
+  it("HTTP: refuses any other Host with 403, and a request with no Host", async () => {
+    const { port } = await start(config(true, "docs.localhost"));
+    for (const host of ["evil.example", `evil.example:${port}`, `localhost:${port + 1}`, `live.localhost:${port}`, `127.0.0.1.nip.io:${port}`, `[::1]:${port}`]) {
+      const r = await get(port, "/api/version", host);
+      expect([r.status, r.body], host).toEqual([403, "Forbidden: this server answers only to its own host names"]);
+    }
+    expect(await withoutHost(port)).toBe("HTTP/1.1 403 Forbidden");
+  }, 60_000);
+
   it("without a storefront, a storefront host is no host of its own", async () => {
     const { port, wsPort } = await start(config(false));
     expect(await handshake(wsPort, `http://live.localhost:${port}`)).toBe("refused 401");
     expect(await handshake(wsPort, `http://pd.localhost:${port}`)).toBe("hello");
+    expect((await get(port, "/api/version", `live.localhost:${port}`)).status).toBe(403);
   }, 60_000);
 });

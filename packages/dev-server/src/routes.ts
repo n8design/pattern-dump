@@ -53,6 +53,7 @@ import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages } from "./storefront/pages.js";
 import { assetFile } from "./asset-file.js";
 import { containedFile, decodePath } from "./contained-file.js";
+import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
 import { assemblePage } from "./storefront/page.js";
@@ -106,6 +107,13 @@ export async function handleRequest(
   ctx: RouteContext,
 ): Promise<void> {
   const { cfg, state, tracker, devUiDist } = ctx;
+  // Only requests addressed to pd dev itself: one of its own host names at the port this request came in
+  // on. A page on another site that gets a name of its own to resolve to 127.0.0.1 still sends that name.
+  if (!isOwnHost(req.headers.host, ownHosts(cfg.storefront?.host), req.socket.localPort ?? -1)) {
+    res.writeHead(403, { "Content-Type": "text/plain" });
+    res.end("Forbidden: this server answers only to its own host names");
+    return;
+  }
   // One rendering for the whole request: a reload replacing it meanwhile does not mix its parts.
   const { render, globalData } = ctx.rendering.current;
   // Destructured so the chain below reads exactly as it did inside startDevServer — this move
@@ -488,8 +496,8 @@ export async function handleRequest(
     // --- Storefront pages, on the storefront's own host ---
     // Every route above serves the same on every host (a page's iframes load /preview/, its
     // stylesheets /_pd/). What is left is the page URL space: on the storefront host it is the
-    // storefront's, on every other host the workbench's, as before. Without a storefront config
-    // every host is the workbench.
+    // storefront's, on the workbench's hosts the workbench's. Without a storefront config the
+    // workbench's hosts are the only ones (a request for any other host was refused at the top).
     const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
     if (cfg.storefront && host === cfg.storefront.host) {
       const discovery = await currentDiscovery(state, patternRoots);
