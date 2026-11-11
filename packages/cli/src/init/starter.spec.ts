@@ -19,6 +19,7 @@ import { loadConfig } from "@pattern-dump/core";
 import { runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { applyPlan, readTemplates } from "./files.js";
 import { planInit } from "./plan.js";
+import { save } from "../../../../test-support/save.js";
 
 const cliDir = fileURLToPath(new URL("../../", import.meta.url));
 const tsc = createRequire(import.meta.url).resolve("typescript/bin/tsc");
@@ -179,5 +180,42 @@ describe("the starter project with a website (--storefront, no examples)", () =>
 
   it("type-checks with its own tsconfig", async () => {
     expect(await typecheck(siteDir)).toEqual({ code: 0, output: "" });
+  }, 60_000);
+});
+
+// The README's "Try breaking it" step, done as it says on a running server: the page then shows the
+// problem with its place in the file, and comes back by itself once the value is saved back.
+describe("the website starter's README step: break a pd- tag, then fix it", () => {
+  it("shows the problem on the page with file, line and column, then the note again", async () => {
+    const readme = await readFile(join(cliDir, "templates", "storefront-fills", "readme.md"), "utf8");
+    const step = /change `tone="(\w+)"` to `tone="(\w+)"`/.exec(readme.replace(/\s+/g, " "));
+    expect(step, "the README names the value to change and the one to try").not.toBeNull();
+    const [, good, bad] = step!;
+    const target = await scaffold(false, true);
+    try {
+      const file = join(target, "pages", "index.md");
+      const page = await readFile(file, "utf8");
+      const lines = page.split("\n");
+      const at = lines.findIndex(l => l.startsWith("<pd-components-note ") && l.includes(`tone="${good}"`));
+      expect(at, `the home page places the note with tone="${good}"`).toBeGreaterThanOrEqual(0);
+      const where = `index.md:${at + 1}:${lines[at].indexOf("tone=") + 1}`;
+
+      const server = await startDevServer(await loadConfig(target), target, { port: 0, wsPort: 0 });
+      try {
+        const home = () => onHost(server.port, "live.localhost", "/");
+        expect((await home()).body).toContain(`<aside class="note note-${good}" role="note">`);
+        lines[at] = lines[at].replace(`tone="${good}"`, `tone="${bad}"`);
+        await save(file, lines.join("\n"));
+        await expect.poll(async () => (await home()).body, { timeout: 10_000 })
+          .toContain(`${where}: &lt;pd-components-note&gt;.tone must be one of "tip", "warning" (got "${bad}")`);
+        await save(file, page);
+        await expect.poll(async () => (await home()).body, { timeout: 10_000 })
+          .toContain(`<aside class="note note-${good}" role="note">`);
+      } finally {
+        await server.close();
+      }
+    } finally {
+      await rm(target, { recursive: true, force: true });
+    }
   }, 60_000);
 });
