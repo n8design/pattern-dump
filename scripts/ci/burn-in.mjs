@@ -6,9 +6,14 @@
 //   --runs N      repetitions (default 20)
 //   --runner R    only the jobs of this runner, vitest or playwright (to run the halves in different places)
 //   --load        run one CPU hog (`stress-ng --cpu 1`) beside the repetitions, as a loaded runner would
+//   --matrix      print the jobs split into groups (one CI job each), as one JSON line for a matrix
+//   --job JSON    run exactly this one group (an entry of --matrix), not a plan
 //
 // The mapping from changed files to specs is `planBurnIn` below, and its cases are in burn-in.test.mjs.
+// The split into groups is `groupJobs`, by the measured seconds in burn-in-times.json
+// (refresh with `node scripts/ci/burn-in-times.mjs <burn-in log>`).
 import { spawn, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join, posix } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -70,6 +75,54 @@ export function planBurnIn(changed, allFiles) {
   return [...jobs.values()];
 }
 
+/**
+ * How many groups (each its own CI job and runner) a workspace's specs are split into. A workspace not
+ * listed is one group. More groups cut wall time and add one runner setup each.
+ */
+export const GROUPS = { "packages/dev-server": 3 };
+
+/** Seconds one run of a spec takes when burn-in-times.json has no measurement for it. */
+export const DEFAULT_SECONDS = 2;
+
+/**
+ * The least time one run of a group should take before a job is split for it: 15 s is 5 minutes of 20
+ * repeats, about what a runner's setup costs. Below it, another group adds more setup than it saves.
+ */
+export const MIN_GROUP_SECONDS = 15;
+
+/**
+ * The jobs split into groups: each job into up to `GROUPS[cwd]` groups of about equal time (no more than
+ * one per spec, none under MIN_GROUP_SECONDS), the slowest spec placed first, each into the group with the
+ * least time so far.
+ * @param {{ runner: string, cwd: string, files: string[] }[]} jobs from planBurnIn
+ * @param {Record<string, number>} seconds measured seconds per run, by repo-relative spec path
+ * @returns {{ name: string, runner: string, cwd: string, files: string[], seconds: number }[]}
+ */
+export function groupJobs(jobs, seconds, groups = GROUPS) {
+  const out = [];
+  for (const job of jobs) {
+    const cost = f => seconds[posix.join(job.cwd, f)] ?? DEFAULT_SECONDS;
+    const total = job.files.reduce((sum, f) => sum + cost(f), 0);
+    const n = Math.max(1, Math.min(groups[job.cwd] ?? 1, job.files.length, Math.floor(total / MIN_GROUP_SECONDS)));
+    const bins = Array.from({ length: n }, () => ({ files: [], seconds: 0 }));
+    const bySlowest = [...job.files].sort((a, b) => cost(b) - cost(a) || a.localeCompare(b));
+    for (const f of bySlowest) {
+      const bin = bins.reduce((min, b) => (b.seconds < min.seconds ? b : min));
+      bin.files.push(f);
+      bin.seconds += cost(f);
+    }
+    bins.forEach((b, i) => out.push({
+      name: n > 1 ? `${job.cwd} ${i + 1}/${n}` : job.cwd,
+      runner: job.runner, cwd: job.cwd, files: b.files.sort(), seconds: Math.round(b.seconds * 10) / 10,
+    }));
+  }
+  return out;
+}
+
+function readTimes() {
+  try { return JSON.parse(readFileSync(join(repo, "scripts/ci/burn-in-times.json"), "utf8")); } catch { return {}; }
+}
+
 function git(...args) {
   const r = spawnSync("git", args, { cwd: repo, encoding: "utf8", maxBuffer: 1 << 28 });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
@@ -96,6 +149,7 @@ function run(cmd, args, cwd) {
 async function main(argv) {
   const opt = (name, fallback) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : fallback);
   const runs = Number(opt("--runs", "20"));
+  if (argv.includes("--job")) return repeat([JSON.parse(opt("--job", ""))], runs, argv.includes("--load"));
   const filesIdx = argv.indexOf("--files");
   const changed = filesIdx >= 0
     ? argv.slice(filesIdx + 1).filter(a => !a.startsWith("--"))
@@ -103,12 +157,17 @@ async function main(argv) {
   const all = git("ls-files", "--cached", "--others", "--exclude-standard");
   const only = opt("--runner", "");
   const jobs = planBurnIn(changed, all).filter(j => !only || j.runner === only);
+  if (argv.includes("--matrix")) { console.log(JSON.stringify(groupJobs(jobs, readTimes()))); return 0; }
+  if (argv.includes("--plan")) { console.log(JSON.stringify(jobs, null, 2)); return 0; }
+  return repeat(jobs, runs, argv.includes("--load"));
+}
+
+async function repeat(jobs, runs, load) {
   console.log(JSON.stringify(jobs, null, 2));
-  if (argv.includes("--plan")) return 0;
   if (jobs.length === 0) { console.log("burn-in: no spec to repeat"); return 0; }
 
   let hog;
-  if (argv.includes("--load")) {
+  if (load) {
     hog = spawn("stress-ng", ["--cpu", "1", "--timeout", "3600s"], { stdio: "ignore" });
     hog.on("error", err => { console.error(`burn-in: --load needs stress-ng: ${err.message}`); process.exit(2); });
   }
@@ -129,5 +188,6 @@ async function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(await main(process.argv.slice(2)));
+  // exitCode, not exit(): exit() can cut off output still being written to a pipe (the --matrix line).
+  process.exitCode = await main(process.argv.slice(2));
 }
