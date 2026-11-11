@@ -390,6 +390,15 @@ describe("pd build — the storefront's settings", () => {
     expect(report.notes).toContain(sameHostNote);
   }, 60_000);
 
+  it("fails on a page where the same-host workbench is published, naming it, and writes nothing", async () => {
+    const root = await benchCopy();
+    await save(join(root, "pages", "workbench.md"), "---\ntitle: Workbench\n---\n\nA page in the workbench's place.\n");
+    const out = join(root, "..", "wb-taken");
+    await expect(buildAt(root, out, config({ workbenchUrl: "/workbench/" })))
+      .rejects.toThrow(`workbench.md: the page /workbench/ is at /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`);
+    expect(await exists(out)).toBe(false);
+  }, 60_000);
+
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
     const root = await benchCopy();
     await expect(build(root, join(root, ".out", "storefront"))).rejects.toThrow(/and --out .* overlap — the storefront and the workbench each need a folder of their own/);

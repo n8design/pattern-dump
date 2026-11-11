@@ -43,6 +43,17 @@ describe("redirectProblems", () => {
   it("leaves a badly shaped old route to the page's own check", () => {
     expect(redirectProblems(site(file("a.md", "/a/", "title: A\nredirectFrom: [old, /old]\n")))).toEqual([]);
   });
+
+  it("refuses an old route at or under the path of a workbench published on the same host", () => {
+    const at = (old: string) => redirectProblems(site(file("a.md", "/a/", `title: A\nredirectFrom: ${old}\n`)), "/workbench/");
+    expect(at("/workbench/")).toEqual([`a.md:3: redirectFrom "/workbench/" is at /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`]);
+    expect(at("/workbench/components/note/")).toEqual([`a.md:3: redirectFrom "/workbench/components/note/" is under /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`]);
+  });
+
+  it("takes the workbench's path as whole segments, and checks nothing without one", () => {
+    expect(redirectProblems(site(file("a.md", "/a/", "title: A\nredirectFrom: [/workbench-notes/, /work/]\n")), "/workbench/")).toEqual([]);
+    expect(redirectProblems(site(file("a.md", "/a/", "title: A\nredirectFrom: /workbench/\n")))).toEqual([]);
+  });
 });
 
 describe("redirectStub", () => {
