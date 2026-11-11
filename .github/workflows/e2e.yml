@@ -68,8 +68,12 @@ jobs:
       - name: Burn-in script tests
         run: npm run test:scripts
 
+      # The browser only, no system packages: the runner image already has every library and font Chromium
+      # needs here (--with-deps only added nine CJK and X11 font packages, and with them an apt fetch that fails
+      # whenever the Ubuntu mirror cannot be reached). A library missing from a future image fails the launch,
+      # naming it.
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: npx playwright install chromium
 
       # Pattern Dump packed as it is published, installed into a fresh project outside the repository
       # (pd init), then booted, audited and built there: what a user installing it gets. After the browsers:
@@ -163,7 +167,8 @@ jobs:
 
       - name: Install Playwright browsers
         if: matrix.group.runner == 'playwright'
-        run: npx playwright install chromium --with-deps
+        # The browser only, as in the e2e job above.
+        run: npx playwright install chromium
 
       - name: Install the load generator
         run: sudo apt-get install -y --no-install-recommends stress-ng
