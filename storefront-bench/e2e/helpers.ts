@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
 
 export const DEV_PORT = process.env["SF_DEV_PORT"] ?? "4300";
 export const DEV = `http://live.localhost:${DEV_PORT}`;
@@ -16,3 +16,17 @@ export const domWithoutLiveClient = (page: Page): Promise<string> => page.evalua
   d.querySelectorAll("script[data-pd-live]").forEach(s => s.remove());
   return d.outerHTML;
 });
+
+/**
+ * Every live example on the page has the height its preview reported: the fitter has written it (the frame is
+ * no longer at the 1px it starts at), and the frame's content box equals its preview document's height. Until
+ * then the frame grows, and whatever sits below it moves; wait for this before clicking at or below an example.
+ */
+export const examplesFitted = (page: Page): Promise<void> => expect.poll(() =>
+  page.locator("figure.doc-example iframe").evaluateAll(frames => frames.length > 0 && frames.every(node => {
+    const f = node as HTMLIFrameElement;
+    const doc = f.contentDocument;
+    if (!doc || doc.URL === "about:blank" || f.style.height === "1px" || f.style.height === "") return false;
+    const box = f.getBoundingClientRect().height - (f.offsetHeight - f.clientHeight);
+    return Math.abs(box - doc.documentElement.scrollHeight) <= 1;
+  }))).toBe(true);
