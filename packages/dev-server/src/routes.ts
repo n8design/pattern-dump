@@ -504,7 +504,7 @@ export async function handleRequest(
     if (cfg.storefront && host === cfg.storefront.host) {
       const discovery = await currentDiscovery(state, patternRoots);
       const discoveryMap = discovery.discoveryMap;
-      const model = await readPages(cfg.storefront.pagesDir);
+      const model = await readPages(cfg.storefront.pagesDir, { workbenchPath: sameHostWorkbenchPath(cfg.storefront) });
       if (pathname === PD_ROUTES.pages) {
         if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
         json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);

@@ -18,10 +18,11 @@ const RESERVED = [PD_ROUTE_PREFIX.preview, "/_pd/", PD_ROUTE_PREFIX.assets, "/ap
 
 /**
  * The problems of the site's redirects as a whole, one line each with the file and line it is set on: an old
- * route that is a page, one two pages both claim, one the server answers itself. (A chain can't arise: every
- * target is a page, and no old route may be one.)
+ * route that is a page, one two pages both claim, one the server answers itself, one at or under the path of a
+ * workbench published on the same host (`workbenchPath`, from sameHostWorkbenchPath). (A chain can't arise:
+ * every target is a page, and no old route may be one.)
  */
-export function redirectProblems(files: ReadonlyMap<string, PageFile>): string[] {
+export function redirectProblems(files: ReadonlyMap<string, PageFile>, workbenchPath?: string): string[] {
   const problems: string[] = [];
   const claimed = new Map<string, PageFile>();
   for (const f of files.values()) {
@@ -32,12 +33,22 @@ export function redirectProblems(files: ReadonlyMap<string, PageFile>): string[]
       if (page) { problems.push(`${at}: redirectFrom "${old}" is the page ${page.path}: a route can't both be a page and forward to one`); continue; }
       const reserved = RESERVED.find(r => old.startsWith(r));
       if (reserved) { problems.push(`${at}: redirectFrom "${old}" is under ${reserved}, which Pattern Dump serves itself`); continue; }
+      if (workbenchPath !== undefined && old.startsWith(workbenchPath)) {
+        problems.push(`${at}: redirectFrom "${old}" is ${workbenchPlace(old, workbenchPath)}`);
+        continue;
+      }
       const other = claimed.get(old);
       if (other && other !== f) { problems.push(`${at}: redirectFrom "${old}" is also claimed by ${other.path}: one old route forwards to one page`); continue; }
       claimed.set(old, f);
     }
   }
   return problems;
+}
+
+/** Where a route stands to the same-host workbench's path, which it is at or under (both end in "/"). */
+export function workbenchPlace(route: string, workbenchPath: string): string {
+  return `${route === workbenchPath ? "at" : "under"} ${workbenchPath}, where the workbench is published on this host `
+    + `(storefront.workbenchUrl), so the workbench would overwrite it there`;
 }
 
 /** The page at an old route: forwards to `route` at once. */
