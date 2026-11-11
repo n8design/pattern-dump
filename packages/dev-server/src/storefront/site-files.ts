@@ -25,10 +25,13 @@ export function workbenchRobotsTxt(basePath: string): string {
 
 /**
  * The storefront's robots.txt. Previews (/preview/) are kept from crawlers: they are component demos, embedded
- * in pages, not pages of their own. A site with index: false (a staging site) is kept out entirely, and lists
+ * in pages, not pages of their own. A workbench published on the same host (`workbenchPath`, from
+ * sameHostWorkbenchPath) has its previews kept out here too, since crawlers read robots.txt only at the host's
+ * root and never the workbench's own. A site with index: false (a staging site) is kept out entirely, and lists
  * no sitemap. The Sitemap line needs the site's address.
  */
-export function storefrontRobotsTxt(p: { siteUrl: string | undefined; index: boolean }): string {
+export function storefrontRobotsTxt(p: { siteUrl: string | undefined; index: boolean; workbenchPath?: string | undefined }): string {
   if (!p.index) return "User-agent: *\nDisallow: /\n";
-  return `User-agent: *\nDisallow: /preview/\n${p.siteUrl !== undefined ? `\nSitemap: ${p.siteUrl}sitemap.xml\n` : ""}`;
+  const workbench = p.workbenchPath !== undefined ? `Disallow: ${p.workbenchPath}preview/\n` : "";
+  return `User-agent: *\nDisallow: /preview/\n${workbench}${p.siteUrl !== undefined ? `\nSitemap: ${p.siteUrl}sitemap.xml\n` : ""}`;
 }

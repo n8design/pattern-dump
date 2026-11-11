@@ -359,6 +359,37 @@ describe("pd build — the storefront's settings", () => {
     expect(await readFile(join(out, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /preview/\n");
   }, 60_000);
 
+  // A workbench published on the storefront's own host (storefront.workbenchUrl a path, or an absolute URL on
+  // storefront.url's origin): its previews are kept out by the storefront's robots.txt, at the host's root, so
+  // the build no longer asks for its rule to be copied there.
+  const sameHostNote = "robots.txt is written to the workbench's root, but crawlers read it only at a host's root: "
+    + "with the base path /workbench/, add its rule (Disallow: /workbench/preview/) to the robots.txt the host serves at /";
+  const buildAt = (root: string, out: string, cfg: PatternDumpConfig) =>
+    buildStaticSite(cfg, root, { outDir: out, basePath: "/workbench/", pdVersion: "0.0.0-test", now: NOW });
+
+  it("a workbench at a path on the storefront's host: robots.txt keeps its previews out, and the build asks nothing", async () => {
+    const root = await benchCopy();
+    const report = await buildAt(root, join(root, "..", "wb-samehost"), config({ workbenchUrl: "/workbench/" }));
+    expect(await readFile(join(root, ".out", "storefront", "robots.txt"), "utf8"))
+      .toBe("User-agent: *\nDisallow: /preview/\nDisallow: /workbench/preview/\n\nSitemap: https://bench.example.test/sitemap.xml\n");
+    expect(report.notes).not.toContain(sameHostNote);
+  }, 60_000);
+
+  it("an absolute workbenchUrl on the site's own origin counts as the same host", async () => {
+    const root = await benchCopy();
+    const report = await buildAt(root, join(root, "..", "wb-sameorigin"), config({ workbenchUrl: "https://bench.example.test/workbench/" }));
+    expect(await readFile(join(root, ".out", "storefront", "robots.txt"), "utf8")).toContain("Disallow: /workbench/preview/\n");
+    expect(report.notes).not.toContain(sameHostNote);
+  }, 60_000);
+
+  it("a workbench on a host of its own: no line for it, and the build still says where its rule must go", async () => {
+    const root = await benchCopy();
+    const report = await buildAt(root, join(root, "..", "wb-ownhost"), config({ workbenchUrl: "https://workbench.example.test/workbench/" }));
+    expect(await readFile(join(root, ".out", "storefront", "robots.txt"), "utf8"))
+      .toBe("User-agent: *\nDisallow: /preview/\n\nSitemap: https://bench.example.test/sitemap.xml\n");
+    expect(report.notes).toContain(sameHostNote);
+  }, 60_000);
+
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
     const root = await benchCopy();
     await expect(build(root, join(root, ".out", "storefront"))).rejects.toThrow(/and --out .* overlap — the storefront and the workbench each need a folder of their own/);
