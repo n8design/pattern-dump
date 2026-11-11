@@ -15,6 +15,15 @@ export function sitemapXml(entries: readonly SitemapEntry[]): string {
 }
 
 /**
+ * The workbench's robots.txt: the workbench stays searchable, its previews (/preview/ under the base path) do
+ * not. Crawlers read robots.txt only at a host's root, so under a base path other than "/" the file in the
+ * output's root takes effect only where the host serves it from its root (the build says so).
+ */
+export function workbenchRobotsTxt(basePath: string): string {
+  return `User-agent: *\nDisallow: ${basePath}preview/\n`;
+}
+
+/**
  * The storefront's robots.txt. Previews (/preview/) are kept from crawlers: they are component demos, embedded
  * in pages, not pages of their own. A site with index: false (a staging site) is kept out entirely, and lists
  * no sitemap. The Sitemap line needs the site's address.
