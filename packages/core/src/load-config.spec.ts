@@ -33,6 +33,16 @@ describe("loadConfig", () => {
     await expect(loadConfig(root)).rejects.toThrow(`unknown key "overview" — did you mean "overviews"?`);
   });
 
+  it("loads many .ts configs at once, each its own: none fails, none gets another's values", async () => {
+    // Agents and scripts start several pd processes at the same moment; each config is bundled to a temp
+    // file before it is imported, and two loads must never share one.
+    const roots = await Promise.all(Array.from({ length: 20 }, (_, i) => project(`many-${i}`, "pattern-dump.config.ts",
+      `export default { sourceDir: "s", patternsDir: "p", outDir: "out-${i}", styles: { strategy: "parallel", dir: "d" } };`)));
+    const loaded = await Promise.allSettled(roots.map(r => loadConfig(r)));
+    expect(loaded.map(l => l.status === "fulfilled" ? l.value.outDir : `failed: ${String(l.reason).slice(0, 80)}`))
+      .toEqual(roots.map((_, i) => `out-${i}`));
+  });
+
   it("loads a valid config", async () => {
     const root = await project("ok", "pattern-dump.config.json",
       JSON.stringify({ sourceDir: "s", patternsDir: "p", outDir: "o", styles: { strategy: "parallel", dir: "d" } }));
