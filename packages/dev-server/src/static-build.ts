@@ -261,3 +261,4 @@ export async function buildStaticSite(
   report.ms = Math.round(performance.now() - started);
   return report;
 }
+

@@ -21,3 +21,4 @@ for (const [route, file] of [["/guides/setup/", "guides/setup.md"], ["/about/", 
     await expect(page.locator("body")).not.toContainText("2026-01-10T10:00:00+01:00");
   });
 }
+

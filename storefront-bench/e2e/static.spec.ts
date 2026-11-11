@@ -18,3 +18,4 @@ test.describe("the built storefront on a static host", () => {
     expect((await request.get("/nope/", { headers: NO_CACHE })).status()).toBe(404);
   });
 });
+

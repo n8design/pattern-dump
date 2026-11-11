@@ -60,3 +60,4 @@ describe("a quick second save", () => {
     expect(await (await fetch(`${b.origin}/preview/atoms/quick`)).text()).toContain("<p>third</p>");
   }, 30_000);
 });
+

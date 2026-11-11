@@ -26,3 +26,4 @@ test.describe("adding a page", () => {
     expect((await page.request.get("/zz-added/")).status()).toBe(404);
   });
 });
+

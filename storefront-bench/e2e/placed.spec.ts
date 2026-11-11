@@ -16,3 +16,4 @@ test("the guides page shows the slider placed on it, styled", async ({ page }) =
   await expect(slider.locator("figcaption").first().locator("strong")).toHaveText("wireframe");
   await expect(slider.locator("figcaption").nth(1).locator("code")).toHaveText("pd-");
 });
+

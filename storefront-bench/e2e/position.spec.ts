@@ -35,3 +35,4 @@ test("previous and next walk the nav across sections", async ({ page }) => {
   await page.locator(".doc-prev").click();
   await expect(page).toHaveURL(/\/guides\/setup\/$/);
 });
+

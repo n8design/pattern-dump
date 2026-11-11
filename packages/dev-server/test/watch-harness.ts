@@ -221,3 +221,4 @@ export class Bench {
     return { messages, events: this.handledSince(hFrom) };
   }
 }
+

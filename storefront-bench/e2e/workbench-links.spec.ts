@@ -31,3 +31,4 @@ test.describe("workbench links", () => {
     await expect(page.locator('a[href="https://workbench.example.test/components/callout"]')).toHaveText("callout");
   });
 });
+

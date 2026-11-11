@@ -43,3 +43,4 @@ test("a heading whose anchor the layout has is suffixed, and every id on the pag
   expect(new Set(ids).size).toBe(ids.length);
   await reaches(page, "Main", "main-1");
 });
+

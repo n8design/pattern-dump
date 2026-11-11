@@ -32,3 +32,4 @@ test("on a page outside any group, its link is the current one and no group is m
   await expect(nav(page).locator('a[aria-current="page"]')).toHaveText("About");
   await expect(nav(page).locator("li.is-ancestor")).toHaveCount(0);
 });
+

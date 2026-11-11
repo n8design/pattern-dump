@@ -97,3 +97,4 @@ test("a save in two steps (emptied, then written, as an editor does) leaves the 
     await save(svg, before);
   }
 });
+

@@ -174,3 +174,4 @@ describe("which watcher chokidar uses", () => {
     expect(chokidarBackend({ options: {} } as unknown as FSWatcher)).toBeNull();
   });
 });
+

@@ -33,3 +33,4 @@ test.describe("storefront pages with JavaScript off", () => {
     await expect(page.locator('.site-nav a[aria-current="page"]')).toHaveText(["Setup"]);
   });
 });
+

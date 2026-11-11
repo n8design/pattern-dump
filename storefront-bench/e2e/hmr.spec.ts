@@ -37,3 +37,4 @@ test.describe("storefront pages reload in pd dev", () => {
     await expect(page.locator("h1")).toHaveText("About", { timeout: 10_000 });
   });
 });
+

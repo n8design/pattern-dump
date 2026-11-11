@@ -343,3 +343,4 @@ else if (tmp) console.log(`kept ${project}`);
 
 console.log(failures.length ? `\n✗ ${failures.length} check(s) failed` : "\n✓ the installed package works");
 process.exit(failures.length ? 1 : 0);
+
