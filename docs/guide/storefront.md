@@ -55,6 +55,10 @@ pages/
   Files starting with a dot are ignored.
 - **Adding a page is adding a file.** It appears in the navigation with no other change.
 
+`pagesDir` is not the same as a `pages` folder among the patterns, such as `src/patterns/pages/` in `pd init`'s
+starter components: that is the page level of atomic design, page-sized components shown in the workbench,
+while `pagesDir` holds the website's pages.
+
 The navigation is built from the folder, one level deep: the top-level pages and folders, and each
 folder's pages beneath it. `order` sorts them, with the same meaning as for components
 ([authoring.md](authoring.md#order)): a number among siblings, and in the top `index.md` or a folder's
@@ -84,6 +88,59 @@ links still work.
 
 A `pattern:` link, such as `[the callout](pattern:components/callout)`, links to the component in the
 workbench.
+
+### Placing components
+
+A live example shows a component as it is in the workbench. A `pd-` tag places a component in the page
+itself, with values the page gives it, and checks them against the component's schema first:
+
+```md
+<pd-components-note tone="tip" heading="Before you start">
+Install **Node 22** or later.
+</pd-components-note>
+```
+
+The tag's name is `pd-` followed by the component's handle (`<category>-<name>`, as in `{{> components-note }}`);
+a variant is `pd-components-note~warning`. The component renders into the page, with its stylesheet linked
+in the page's head, so the page's own styles also reach it.
+
+| Written | Becomes |
+|---|---|
+| An attribute | A value, its name turned from kebab-case into camelCase: `per-view="2"` sets `perView` |
+| An attribute's value | Text, read as a number or `true`/`false` only where the schema declares that type |
+| An attribute with no value | `true`, for a boolean. Any other type needs a value |
+| A child `pd-` tag | An item of the property whose items name that component (`"items": { "x-pd-component": "components/slide" }`), or the property's value when it names the component itself |
+| Text inside the tag | The property the schema names with `"x-pd-content"`. Markdown when that property is `"contentMediaType": "text/markdown"`, otherwise plain text |
+
+A component placed with children, from the storefront bench:
+
+```md
+<pd-components-slider label="The bench in pictures">
+  <pd-components-slide image="/assets/images/bench-blocks.svg" alt="Blocks of colour">The **wireframe** skin</pd-components-slide>
+  <pd-components-slide image="/assets/images/bench-blocks.svg" alt="The same blocks">Placed with `pd-` tags</pd-components-slide>
+</pd-components-slider>
+```
+
+Where a tag is read:
+
+- It starts a block: at the start of a line, indented at most three spaces, also inside a list item or a
+  quote. The block runs to the tag's closing tag, blank lines included.
+- A tag in the middle of a paragraph is text, and a tag indented four spaces is a code block, as for any
+  markdown.
+- Inside the block only `pd-` tags are tags. Any other HTML in the content is text, escaped like everywhere
+  else on a page.
+
+**What is checked.** Before the page is shown, every placement is checked against the component's schema: a
+required value missing, a value that isn't declared (with a suggestion for a likely typo), a value of the
+wrong type or outside its `enum`, a child the component doesn't take, content text where the schema names no
+`x-pd-content`, a tag that is never closed, and a component that doesn't exist or has no schema. Each is a
+[problem](#problems) with its file, line and column:
+
+```
+index.md:22:21: <pd-components-note>.tone must be one of "tip", "warning" (got "tips")
+```
+
+`pd-` tags work on storefront pages. In a component's own documentation they are shown as text.
 
 ---
 
