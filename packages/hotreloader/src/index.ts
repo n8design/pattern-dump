@@ -32,6 +32,8 @@ export interface HotReloader {
   /** The port it is bound to, once `listening` has resolved: with 0, the one the system chose. Before that,
    *  the port it was given. */
   readonly port: number;
+  /** The address it is bound to, once `listening` has resolved: always the loopback, 127.0.0.1. */
+  readonly address: string;
   /**
    * Settles once the socket is bound: resolves when listening, rejects with the bind error (e.g.
    * EADDRINUSE). Await it before relying on the reloader. Without it a bind failure surfaced only as
@@ -41,8 +43,11 @@ export interface HotReloader {
   close(): Promise<void>;
 }
 
+const LOOPBACK = "127.0.0.1";
+
 export function createHotReloader(port = Number(process.env["PD_WS_PORT"] ?? 4001)): HotReloader {
-  const wss = new WebSocketServer({ port });
+  // The loopback only, like pd dev's HTTP server: nothing else on the network can connect.
+  const wss = new WebSocketServer({ port, host: LOOPBACK });
   const clients = new Set<WebSocket>();
   const listening = new Promise<void>((resolve, reject) => {
     wss.once("listening", () => resolve());
@@ -79,6 +84,10 @@ export function createHotReloader(port = Number(process.env["PD_WS_PORT"] ?? 400
     get port(): number {
       const address = wss.address();
       return address !== null && typeof address === "object" ? address.port : port;
+    },
+    get address(): string {
+      const address = wss.address();
+      return address !== null && typeof address === "object" ? address.address : LOOPBACK;
     },
     listening,
     push(message: HmrMessage) {

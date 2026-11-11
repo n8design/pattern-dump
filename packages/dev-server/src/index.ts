@@ -32,6 +32,7 @@ import { createHotReloader, type HotReloader } from "@pattern-dump/hotreloader";
 /** Headless servers (pd build) push nowhere: no socket is opened and nothing is retained. */
 const SILENT_RELOADER: HotReloader = {
   port: 0,
+  address: "127.0.0.1",
   listening: Promise.resolve(),
   push() { /* no clients */ },
   pushChange() { /* no clients */ },

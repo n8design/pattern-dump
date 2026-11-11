@@ -27,6 +27,14 @@ function firstFrames(port: number, count: number): Promise<HmrMessage[]> {
   });
 }
 
+describe("createHotReloader — where it listens", () => {
+  it("binds to the loopback only, like the HTTP server", async () => {
+    hr = createHotReloader(0);
+    await hr.listening;
+    expect(hr.address).toBe("127.0.0.1");
+  });
+});
+
 describe("createHotReloader — on connect", () => {
   it("sends hello, then the retained messages, to a client that connects later", async () => {
     hr = createHotReloader(0);
