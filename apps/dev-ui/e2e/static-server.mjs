@@ -5,11 +5,12 @@
 //   node static-server.mjs --dir <snapshot> [--base /pd/] [--port 4200]
 //
 // Behaves like a typical host: decodes the request path, serves <path>/index.html for a folder,
-// answers 404 (with <base>404.html when present) otherwise, and serves nothing outside --base.
+// answers 404 (with <base>404.html when present) otherwise, and serves nothing outside --base or outside
+// --dir (resolved as the file system resolves it, links followed).
 
 import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize, resolve } from "node:path";
+import { readFile, realpath, stat } from "node:fs/promises";
+import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 
 const { values } = parseArgs({ options: { dir: { type: "string" }, base: { type: "string", default: "/" }, port: { type: "string", default: "4200" } } });
@@ -24,18 +25,26 @@ const TYPES = {
   ".mp4": "video/mp4",
 };
 
+const inside = (path, dir) => { const rel = relative(dir, path); return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); };
+const realRoot = await realpath(root);
+
+/** The file at `path`, or its folder's index.html; null when there is none, or when it is outside the root. */
 async function file(path) {
-  const s = await stat(path).catch(() => null);
+  const real = await realpath(path).catch(() => null);
+  if (!real || !inside(real, realRoot)) return null;
+  const s = await stat(real).catch(() => null);
   if (!s) return null;
-  if (s.isDirectory()) return file(join(path, "index.html"));
-  return path;
+  if (s.isDirectory()) return file(join(real, "index.html"));
+  return real;
 }
 
 createServer(async (req, res) => {
-  const pathname = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname);
-  if (!pathname.startsWith(base)) { res.writeHead(404); res.end("outside base"); return; }
-  const target = normalize(join(root, pathname.slice(base.length)));
-  const found = target.startsWith(root) ? await file(target) : null;
+  let pathname;
+  try { pathname = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname); } catch { pathname = null; }
+  if (pathname === null || !pathname.startsWith(base)) { res.writeHead(404); res.end("outside base"); return; }
+  const rest = pathname.slice(base.length);
+  // file() compares resolved paths (links followed), which covers ".." and a link pointing out alike.
+  const found = rest.includes("\0") || rest.includes("\\") ? null : await file(resolve(root, rest));
   if (!found) {
     const notFound = await file(join(root, "404.html"));
     res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
