@@ -8,6 +8,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
+import { request } from "node:http";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -18,18 +19,20 @@ import { loadConfig } from "@pattern-dump/core";
 import { runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { applyPlan, readTemplates } from "./files.js";
 import { planInit } from "./plan.js";
+import { save } from "../../../../test-support/save.js";
 
 const cliDir = fileURLToPath(new URL("../../", import.meta.url));
 const tsc = createRequire(import.meta.url).resolve("typescript/bin/tsc");
 let dir = "";
 let bareDir = "";
+let siteDir = "";
 
-async function scaffold(examples: boolean): Promise<string> {
+async function scaffold(examples: boolean, storefront = false): Promise<string> {
   const target = await mkdtemp(join(cliDir, ".test-scaffold-"));
   const templates = await readTemplates(join(cliDir, "templates"));
   const r = planInit(
     templates,
-    { name: "starter-check", brand: "Starter Check", examples, dependency: "^0.0.0" },
+    { name: "starter-check", brand: "Starter Check", examples, storefront, dependency: "^0.0.0" },
     { packageJson: null, exists: () => false },
     "@pattern-dump/config",
   );
@@ -48,10 +51,21 @@ const typecheck = (project: string) =>
 beforeAll(async () => {
   dir = await scaffold(true);
   bareDir = await scaffold(false);
+  siteDir = await scaffold(false, true);
 }, 60_000);
 
 afterAll(async () => {
-  for (const d of [dir, bareDir]) if (d) await rm(d, { recursive: true, force: true });
+  for (const d of [dir, bareDir, siteDir]) if (d) await rm(d, { recursive: true, force: true });
+});
+
+/** A GET on a named host of the server (fetch ignores an overridden Host header). */
+const onHost = (port: number, host: string, path: string) => new Promise<{ status: number; body: string }>((resolve, reject) => {
+  request({ host: "127.0.0.1", port, path, headers: { host: `${host}:${port}` } }, res => {
+    let body = "";
+    res.setEncoding("utf8");
+    res.on("data", d => { body += d; });
+    res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+  }).on("error", reject).end();
 });
 
 const components = (nodes: TreeNode[]): TreeNode[] =>
@@ -123,5 +137,85 @@ describe("the starter project", () => {
 
   it("type-checks without the examples too (src/scripts is never empty)", async () => {
     expect(await typecheck(bareDir)).toEqual({ code: 0, output: "" });
+  }, 60_000);
+});
+
+describe("the starter project with a website (--storefront, no examples)", () => {
+  it("has a config that validates: a same-host workbench at /workbench/, built for that path", async () => {
+    const config = await loadConfig(siteDir);
+    expect(config.storefront).toMatchObject({ pagesDir: "./pages", outDir: "./site", workbenchUrl: "/workbench/",
+      site: { title: "Starter Check", footer: "Made with Pattern Dump." } });
+    expect(config.build?.basePath).toBe("/workbench/");
+  });
+
+  it("audits with zero static defects, and its skin and component render", async () => {
+    const config = await loadConfig(siteDir);
+    const { graph } = await runDiagnosticsAudit(config, siteDir);
+    expect(graph.occurrences).toEqual([]);
+    expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
+      [["components/note", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"]]);
+  }, 120_000);
+
+  it("serves the website: the home page with its placed note, the about page, the 404 page and robots.txt", async () => {
+    const config = await loadConfig(siteDir);
+    const server = await startDevServer(config, siteDir, { port: 0, wsPort: 0 });
+    try {
+      const home = await onHost(server.port, "live.localhost", "/");
+      expect(home.status).toBe(200);
+      expect(home.body).toContain("<title>Home — Starter Check</title>");
+      expect(home.body).toContain(`<aside class="note note-tip" role="note">`);
+      expect(home.body).toContain(`<iframe src="/preview/components/note"`);
+      expect(home.body).toContain(`<a rel="next" href="/about/">Next: About</a>`);
+      expect((await onHost(server.port, "live.localhost", "/about/")).status).toBe(200);
+      const missing = await onHost(server.port, "live.localhost", "/no-such-page/");
+      expect(missing.status).toBe(404);
+      expect(missing.body).toContain("Page not found");
+      expect((await onHost(server.port, "live.localhost", "/robots.txt")).body)
+        .toBe("User-agent: *\nDisallow: /preview/\nDisallow: /workbench/preview/\n");
+      expect((await onHost(server.port, "pd.localhost", "/components/note")).status).toBe(200);
+    } finally {
+      await server.close();
+    }
+  }, 120_000);
+
+  it("type-checks with its own tsconfig", async () => {
+    expect(await typecheck(siteDir)).toEqual({ code: 0, output: "" });
+  }, 60_000);
+});
+
+// The README's "Try breaking it" step, done as it says on a running server: the page then shows the
+// problem with its place in the file, and comes back by itself once the value is saved back.
+describe("the website starter's README step: break a pd- tag, then fix it", () => {
+  it("shows the problem on the page with file, line and column, then the note again", async () => {
+    const readme = await readFile(join(cliDir, "templates", "storefront-fills", "readme.md"), "utf8");
+    const step = /change `tone="(\w+)"` to `tone="(\w+)"`/.exec(readme.replace(/\s+/g, " "));
+    expect(step, "the README names the value to change and the one to try").not.toBeNull();
+    const [, good, bad] = step!;
+    const target = await scaffold(false, true);
+    try {
+      const file = join(target, "pages", "index.md");
+      const page = await readFile(file, "utf8");
+      const lines = page.split("\n");
+      const at = lines.findIndex(l => l.startsWith("<pd-components-note ") && l.includes(`tone="${good}"`));
+      expect(at, `the home page places the note with tone="${good}"`).toBeGreaterThanOrEqual(0);
+      const where = `index.md:${at + 1}:${lines[at].indexOf("tone=") + 1}`;
+
+      const server = await startDevServer(await loadConfig(target), target, { port: 0, wsPort: 0 });
+      try {
+        const home = () => onHost(server.port, "live.localhost", "/");
+        expect((await home()).body).toContain(`<aside class="note note-${good}" role="note">`);
+        lines[at] = lines[at].replace(`tone="${good}"`, `tone="${bad}"`);
+        await save(file, lines.join("\n"));
+        await expect.poll(async () => (await home()).body, { timeout: 10_000 })
+          .toContain(`${where}: &lt;pd-components-note&gt;.tone must be one of "tip", "warning" (got "${bad}")`);
+        await save(file, page);
+        await expect.poll(async () => (await home()).body, { timeout: 10_000 })
+          .toContain(`<aside class="note note-${good}" role="note">`);
+      } finally {
+        await server.close();
+      }
+    } finally {
+      await rm(target, { recursive: true, force: true });
+    }
   }, 60_000);
 });

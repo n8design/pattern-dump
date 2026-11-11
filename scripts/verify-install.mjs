@@ -13,14 +13,15 @@
 // `pd audit --format json`, read through a real pipe, parses and reports zero defects; `pd build
 // --base /demo/` writes a snapshot that a plain file server serves, links included; the starter's
 // TypeScript (installed by init) type-checks and compiles its behaviour scripts, which pd dev and
-// pd build both serve. Last, a storefront: its page on live.localhost and the workbench on
-// pd.localhost, the page's inlined height fitter run on its own, and pd build's storefront folder. Then a
+// pd build both serve. Then the website starter (pd init --storefront) in a project of its own: both
+// addresses in pd dev, the page's inlined height fitter run on its own, the audit, npm run build put
+// together as the GitHub Pages workflow does, served as plain files and read with axe in Chromium. Then a
 // packed pattern package installed as a real copy: its compiled helpers render a page, pd dev does not
 // watch it, and a TypeScript helper path stops pd dev with the named error.
 
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, lstatSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -177,29 +178,44 @@ if (failures.length === 0) {
   fileServer.kill();
 }
 
-// A storefront, from the installed package: one page with a live example, on its own host in pd dev,
-// and as its own folder from pd build. The page's height fitter is inlined from the packed bundle, so it
-// is run on its own here, in an empty context, the way a browser runs the page's script. Added last,
-// because the layout it adds would change the starter tree checked above.
-if (failures.length === 0) {
-  const configFile = join(project, "pattern-dump.config.ts");
-  const config = await readFile(configFile, "utf8");
-  await writeFile(configFile, config.replace("  shell: {",
-    `  storefront: { pagesDir: "./pages", outDir: "./storefront", workbenchUrl: "https://workbench.example.test/" },\n\n  shell: {`));
-  await mkdir(join(project, "src/patterns/layouts/page"), { recursive: true });
-  await writeFile(join(project, "src/patterns/layouts/page/page.hbs"), "<main><h1>{{title}}</h1>{{{body}}}</main>\n");
-  await writeFile(join(project, "src/patterns/layouts/page/page.schema.json"),
-    JSON.stringify({ type: "object", required: ["title"], properties: { title: { type: "string" } } }));
-  await mkdir(join(project, "pages"), { recursive: true });
-  await writeFile(join(project, "pages/index.md"), "---\ntitle: Home\n---\n\nThe home page.\n\n```pattern atoms/button\n```\n");
+// The website starter, from the installed package: `pd init --storefront` in a project of its own (the
+// demo above stays the examples starter, whose tree is checked exactly). pd dev serves the website on
+// live.localhost and the workbench on pd.localhost and prints both addresses; the page's height fitter is
+// inlined from the packed bundle, so it is run on its own here, in an empty context, the way a browser runs
+// the page's script. Then `npm run build`, the two output roots put together as the GitHub Pages workflow
+// does (the workbench under /workbench/), served as plain files, and read in Chromium with axe-core.
+if (failures.length === 0 && tmp) {
+  const cliVersion = JSON.parse(await readFile(join(repo, "packages/cli/package.json"), "utf8")).version;
+  const name = (await readFile(join(repo, "packages/cli/src/distribution.ts"), "utf8")).match(/PD_PACKAGE_NAME = "([^"]+)"/)[1];
+  const source = join(repo, ".pd-pack", `${name}-${cliVersion}.tgz`);
+  const starter = join(tmp, "website");
+  let initLog = "";
+  try {
+    initLog = execFileSync("npx", ["--yes", `--package=${source}`, "pd", "init", "website", "--yes", "--no-git", "--no-examples", "--storefront", "--pd-source", source],
+      { cwd: tmp, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    check(true, "pd init --storefront + npm install");
+  } catch (e) {
+    check(false, "pd init --storefront + npm install", String(e.stdout ?? e).slice(-800));
+  }
+  check(initLog.includes("The GitHub Pages workflow installs with npm ci, which can't reach it"),
+    "pd init warns that the workflow can't install a local-file dependency", initLog.slice(-800));
+  check(initLog.includes("the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/"),
+    "pd init's next steps name the website's and the workbench's addresses", initLog.slice(-400));
+  const spd = join(starter, "node_modules/.bin/pd");
 
   const port = await freePort();
   const wsPort = await freePort();
-  const dev = spawn(pd, ["dev", "--port", String(port), "--ws-port", String(wsPort)], { cwd: project, stdio: ["ignore", "pipe", "pipe"] });
+  const dev = spawn(spd, ["dev", "--port", String(port), "--ws-port", String(wsPort)], { cwd: starter, stdio: ["ignore", "pipe", "pipe"] });
   let log = "";
-  dev.stdout.on("data", d => { log += d; });
   dev.stderr.on("data", d => { log += d; });
-  // fetch() ignores an overridden Host header, so the storefront host is asked for through node:http.
+  const ready = new Promise(resolve => {
+    dev.stdout.on("data", d => { log += d; if (log.includes("[dev-server] Ready in")) resolve(true); });
+    dev.once("exit", () => resolve(false));
+  });
+  check(await ready, "pd dev starts on the website starter", log.slice(-1500));
+  check(log.includes(`[dev-server] Website:   http://live.localhost:${port}/\n[dev-server] Workbench: http://pd.localhost:${port}/\n`),
+    "pd dev prints the website's and the workbench's addresses", log.slice(-1500));
+  // fetch() ignores an overridden Host header, so the hosts are asked for through node:http.
   const onHost = (host, path) => new Promise(resolve => {
     request({ host: "127.0.0.1", port, path, headers: { host: `${host}:${port}` } }, res => {
       let body = "";
@@ -208,14 +224,13 @@ if (failures.length === 0) {
       res.on("end", () => resolve({ status: res.statusCode, body }));
     }).on("error", e => resolve({ status: 0, body: String(e) })).end();
   });
-  let page = { status: 0, body: "" };
-  for (let i = 0; i < 120 && page.status !== 200; i++) {
-    page = await onHost("live.localhost", "/");
-    if (page.status !== 200) await new Promise(r => setTimeout(r, 500));
-  }
-  check(page.status === 200 && page.body.includes("<h1>Home</h1>"), "pd dev serves the storefront page on live.localhost", `${page.status} ${log.slice(-1500)}`);
-  check(page.body.includes('<iframe src="/preview/atoms/button"') && page.body.includes(`href="http://pd.localhost:${port}/atoms/button"`),
+  const page = await onHost("live.localhost", "/");
+  check(page.status === 200 && page.body.includes(`<aside class="note note-tip" role="note">`),
+    "pd dev serves the home page on live.localhost, with its placed note", `${page.status} ${page.body.slice(0, 300)}`);
+  check(page.body.includes(`<iframe src="/preview/components/note"`) && page.body.includes(`href="http://pd.localhost:${port}/components/note"`),
     "the page's live example is a frame with a workbench link");
+  const missing = await onHost("live.localhost", "/no-such-page/");
+  check(missing.status === 404 && missing.body.includes("Page not found"), "an unknown address gets the 404 page, with status 404", String(missing.status));
   const workbench = await onHost("pd.localhost", "/");
   check(workbench.status === 200 && workbench.body.includes('<div id="app"'), "pd dev serves the workbench on pd.localhost");
 
@@ -238,17 +253,60 @@ if (failures.length === 0) {
   dev.kill();
 
   try {
-    execFileSync(pd, ["build", "--out", "site"], { cwd: project, stdio: "pipe" });
-    check(true, "pd build with a storefront");
+    const json = execFileSync("bash", ["-o", "pipefail", "-c", `"${spd}" audit --format json 2>/dev/null | cat`], { cwd: starter, encoding: "utf8" });
+    const report = JSON.parse(json);
+    check(report.totals.defects === 0 && report.totals.components === 4, "pd audit on the website starter: 4 components, 0 defects", report.headline);
   } catch (e) {
-    check(false, "pd build with a storefront", String(e.stderr ?? e).slice(0, 800));
+    check(false, "pd audit on the website starter", String(e).slice(0, 500));
   }
-  for (const file of ["index.html", "preview/atoms/button/index.html", "_pd/components/atoms/button.css"]) {
-    check(existsSync(join(project, "storefront", file)), `storefront ${file}`);
+
+  const built = spawnSync("npm", ["run", "build"], { cwd: starter, encoding: "utf8" });
+  check(built.status === 0, "npm run build on the website starter", `${built.stdout}${built.stderr}`.slice(-800));
+  check(!`${built.stdout}${built.stderr}`.includes("add its rule"),
+    "the build doesn't ask for the workbench's robots rule: the website's robots.txt carries it", `${built.stdout}`.slice(-800));
+  // As the workflow does it: the website at the root, the workbench copied in under /workbench/.
+  const out = join(tmp, "website-pages");
+  await cp(join(starter, "site"), out, { recursive: true });
+  await cp(join(starter, "dist"), join(out, "workbench"), { recursive: true });
+  const robots = existsSync(join(out, "robots.txt")) ? await readFile(join(out, "robots.txt"), "utf8") : "";
+  check(robots === "User-agent: *\nDisallow: /preview/\nDisallow: /workbench/preview/\n", "the website's robots.txt keeps the workbench's previews out", JSON.stringify(robots));
+  const home = existsSync(join(out, "index.html")) ? await readFile(join(out, "index.html"), "utf8") : "";
+  check(home.includes('href="/workbench/components/note"') && !home.includes("data-pd-live"),
+    "the built page links into the workbench at /workbench/, with no live client");
+
+  const sport = await freePort();
+  const fileServer = spawn(process.execPath, [join(repo, "apps/dev-ui/e2e/static-server.mjs"), "--dir", out, "--port", String(sport)], { stdio: "ignore" });
+  const origin = `http://127.0.0.1:${sport}`;
+  let served = false;
+  for (let i = 0; i < 40 && !served; i++) {
+    served = await fetch(`${origin}/`).then(r => r.ok, () => false);
+    if (!served) await new Promise(r => setTimeout(r, 250));
   }
-  const built = existsSync(join(project, "storefront/index.html")) ? await readFile(join(project, "storefront/index.html"), "utf8") : "";
-  check(built.includes('href="https://workbench.example.test/atoms/button"') && !built.includes("data-pd-live"),
-    "the built page links to storefront.workbenchUrl, with no live client");
+  check(served, "the assembled site is served as plain files");
+  if (served) {
+    const wb = await fetch(`${origin}/workbench/components/note/`);
+    check(wb.ok && (await wb.text()).includes('"basePath":"/workbench/"'), "the workbench is served under /workbench/, built for that path");
+    const lost = await fetch(`${origin}/no-such-page/`);
+    check(lost.status === 404 && (await lost.text()).includes("Page not found"), "a missing address gets the built 404 page");
+    // axe in a real browser (colour contrast needs layout), with the axe-core the built workbench ships.
+    const axe = await readFile(join(out, "workbench", "_pd", "axe-core.js"), "utf8").catch(() => "");
+    check(axe.length > 100_000, "the built workbench ships axe-core");
+    const { chromium } = await import(join(repo, "node_modules", "playwright", "index.mjs"));
+    const browser = await chromium.launch();
+    try {
+      const tab = await browser.newPage();
+      for (const path of ["/", "/about/", "/404.html"]) {
+        await tab.goto(`${origin}${path}`, { waitUntil: "load" });
+        await tab.addScriptTag({ content: axe });
+        const violations = await tab.evaluate(async () => (await globalThis.axe.run(globalThis.document, { resultTypes: ["violations"] }))
+          .violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(" ")).join(", ")}`));
+        check(violations.length === 0, `axe finds no violation on the built ${path}`, violations.join("; "));
+      }
+    } finally {
+      await browser.close();
+    }
+  }
+  fileServer.kill();
 }
 
 // A packed pattern package, installed as a real copy (as from a registry) into a second project outside

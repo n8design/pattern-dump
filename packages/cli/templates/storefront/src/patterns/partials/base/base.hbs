@@ -1,0 +1,17 @@
+<div class="site">
+  <a class="site-skip" href="#main">Skip to the content</a>
+  <header class="site-header">
+    <a class="site-title" href="/">{{site.title}}</a>
+    <nav class="site-nav" aria-label="Site">
+      <ul>
+        {{#each nav}}<li><a href="{{route}}"{{#if current}} aria-current="page"{{/if}}>{{title}}</a></li>{{/each}}
+      </ul>
+    </nav>
+  </header>
+  <main class="site-main" id="main">
+    {{> @partial-block }}
+  </main>
+  <footer class="site-footer">
+    <p>{{site.footer}}</p>
+  </footer>
+</div>

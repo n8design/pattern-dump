@@ -9,6 +9,16 @@ export interface TemplateFile {
   content: string;
 }
 
+/** Every template `pd init` can write, as read from its `templates/` folder (files.ts). */
+export interface Templates {
+  base: TemplateFile[];
+  examples: TemplateFile[];
+  /** The website starter: pages, a skin, a component of its own, a GitHub Pages workflow. */
+  storefront: TemplateFile[];
+  /** What the base templates' storefront placeholders become with a storefront; never files of their own. */
+  storefrontFills: { config: string; readme: string; gitignore: string };
+}
+
 export interface InitAnswers {
   /** npm package name for a new project (also the README title). */
   name: string;
@@ -16,6 +26,8 @@ export interface InitAnswers {
   brand: string;
   /** Include the teaching components. */
   examples: boolean;
+  /** Include the website starter (storefront). */
+  storefront: boolean;
   /** Dependency spec for the PD package: `^0.1.0`, `file:/abs/pattern-dump-0.1.0.tgz`, … */
   dependency: string;
 }
@@ -40,6 +52,14 @@ const CONFIG_FILES = ["pattern-dump.config.ts", "pattern-dump.config.json"];
 /** Template file names npm refuses to publish, stored under a different name. */
 const RENAMES: Record<string, string> = { _gitignore: ".gitignore" };
 
+/**
+ * The storefront's skin: written as one unit or not at all. Mixed with a skin already in the project (its own
+ * `layouts/page` beside the starter's `partials/base`, say), pages would render with parts of two skins.
+ */
+const SKIN_PREFIXES = ["src/patterns/layouts/", "src/patterns/partials/", "src/styles/layouts/", "src/styles/partials/"];
+const SKIN_FILES = ["assets/icon.svg"];
+const isSkin = (path: string): boolean => SKIN_PREFIXES.some(p => path.startsWith(p)) || SKIN_FILES.includes(path);
+
 /** A valid npm package name from a free-form folder or project name. */
 export function toPackageName(input: string): string {
   const slug = input.toLowerCase().replace(/[^a-z0-9._~-]+/g, "-").replace(/^[-._]+|[-._]+$/g, "");
@@ -47,7 +67,7 @@ export function toPackageName(input: string): string {
 }
 
 export function planInit(
-  templates: { base: TemplateFile[]; examples: TemplateFile[] },
+  templates: Templates,
   answers: InitAnswers,
   existing: ExistingProject,
   packageName: string,
@@ -57,14 +77,28 @@ export function planInit(
     return { ok: false, reason: `${existingConfig} already exists — this folder is already a Pattern Dump project` };
   }
 
+  // A placeholder stands on a line of its own; without a storefront the line goes.
+  const fills = templates.storefrontFills;
   const substitute = (text: string): string => text
+    .replaceAll("__PD_STOREFRONT__\n", answers.storefront ? fills.config : "")
+    .replaceAll("__PD_STOREFRONT_README__\n", answers.storefront ? fills.readme : "")
+    .replaceAll("__PD_STOREFRONT_GITIGNORE__\n", answers.storefront ? fills.gitignore : "")
     .replaceAll("__PD_PACKAGE__", packageName)
     .replaceAll("__PD_NAME__", answers.name)
     .replaceAll("__PD_BRAND_JSON__", JSON.stringify(answers.brand));
 
   const writes: TemplateFile[] = [];
   const skipped: InitPlan["skipped"] = [];
-  const files = [...templates.base, ...(answers.examples ? templates.examples : [])];
+  const storefront = answers.storefront ? templates.storefront : [];
+  // The skin goes in whole or not at all: one file of it already there leaves all of it out.
+  const skin = storefront.filter(f => isSkin(renamed(f.path)));
+  const skinTaken = skin.map(f => renamed(f.path)).find(p => existing.exists(p));
+  if (skinTaken) {
+    skipped.push({ path: skinTaken, reason: `already exists — the storefront skin (${skin.length} files in src/patterns/layouts, `
+      + `src/patterns/partials and their styles) was left out as a whole, so it isn't mixed with the skin already here` });
+  }
+  const files = [...templates.base, ...(answers.examples ? templates.examples : []),
+    ...storefront.filter(f => !skinTaken || !skin.includes(f))];
   for (const file of files) {
     const path = renamed(file.path);
     if (existing.exists(path)) {
@@ -102,7 +136,9 @@ function mergePackageJson(
     : structuredClone(current);
 
   const scripts = { ...(pkg.scripts as Record<string, string> | undefined) };
-  for (const [name, command] of Object.entries(SCRIPTS)) {
+  // The website is built with the workbench, by pd build.
+  const ours = answers.storefront ? { ...SCRIPTS, build: "pd build" } : SCRIPTS;
+  for (const [name, command] of Object.entries(ours)) {
     if (scripts[name] === undefined) {
       scripts[name] = command;
     } else if (scripts[name] !== command) {

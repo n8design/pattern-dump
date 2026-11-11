@@ -16,7 +16,7 @@ export type Command =
   | { kind: "export"; root: string; configPath?: string; out?: string }
   | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean }
   | { kind: "init"; target: string; yes: boolean; name?: string; brand?: string; examples?: boolean;
-      install?: boolean; git?: boolean; pdSource?: string }
+      storefront?: boolean; install?: boolean; git?: boolean; pdSource?: string }
   | { kind: "help"; topic?: string }
   | { kind: "error"; message: string };
 
@@ -128,6 +128,7 @@ function parseInit(rest: string[], cwd: string): Command {
       name: { type: "string" },
       brand: { type: "string" },
       examples: { type: "boolean" }, "no-examples": { type: "boolean" },
+      storefront: { type: "boolean" }, "no-storefront": { type: "boolean" },
       install: { type: "boolean" }, "no-install": { type: "boolean" },
       git: { type: "boolean" }, "no-git": { type: "boolean" },
       "pd-source": { type: "string" },
@@ -138,8 +139,9 @@ function parseInit(rest: string[], cwd: string): Command {
   if (values.help) return { kind: "help", topic: "init" };
   if (positionals.length > 1) return { kind: "error", message: `init takes one folder (got ${positionals.join(", ")})` };
 
-  const toggles: Record<"examples" | "install" | "git", boolean | undefined> = { examples: undefined, install: undefined, git: undefined };
-  for (const name of ["examples", "install", "git"] as const) {
+  const toggles: Record<"examples" | "storefront" | "install" | "git", boolean | undefined> =
+    { examples: undefined, storefront: undefined, install: undefined, git: undefined };
+  for (const name of ["examples", "storefront", "install", "git"] as const) {
     const t = toggle(values, name);
     if (t instanceof Error) return { kind: "error", message: t.message };
     toggles[name] = t;
@@ -151,6 +153,7 @@ function parseInit(rest: string[], cwd: string): Command {
     ...(values.name !== undefined ? { name: values.name } : {}),
     ...(values.brand !== undefined ? { brand: values.brand } : {}),
     ...(toggles.examples !== undefined ? { examples: toggles.examples } : {}),
+    ...(toggles.storefront !== undefined ? { storefront: toggles.storefront } : {}),
     ...(toggles.install !== undefined ? { install: toggles.install } : {}),
     ...(toggles.git !== undefined ? { git: toggles.git } : {}),
     ...(values["pd-source"] !== undefined ? { pdSource: values["pd-source"] } : {}),
@@ -170,6 +173,7 @@ export const USAGE = `Usage: pd <command> [options]
     --name <name>      Package name (default: the folder name)
     --brand <title>    Title shown in the Nav Rail (default: the name)
     --no-examples      Structure, config and themes only — no starter components
+    --storefront       Also a website: pages, a skin, and a GitHub Pages workflow (default: no)
     --no-install       Skip npm install
     --git / --no-git   Run git init (default: yes, unless already inside a repository)
     --pd-source <src>  Where to install Pattern Dump from: a .tgz file or an npm spec

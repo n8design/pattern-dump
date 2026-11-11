@@ -2,7 +2,7 @@
 
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
-import type { InitPlan, TemplateFile } from "./plan.js";
+import type { InitPlan, TemplateFile, Templates } from "./plan.js";
 
 /** Every file under `dir`, with forward-slash paths relative to it. */
 export async function readTemplateDir(dir: string): Promise<TemplateFile[]> {
@@ -18,13 +18,16 @@ export async function readTemplateDir(dir: string): Promise<TemplateFile[]> {
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-/** Both template sets, from the `templates/` folder shipped beside the CLI. */
-export async function readTemplates(templatesDir: string): Promise<{ base: TemplateFile[]; examples: TemplateFile[] }> {
-  const [base, examples] = await Promise.all([
+/** Every template set, from the `templates/` folder shipped beside the CLI. */
+export async function readTemplates(templatesDir: string): Promise<Templates> {
+  const fill = (name: string) => readFile(join(templatesDir, "storefront-fills", name), "utf8");
+  const [base, examples, storefront, config, readme, gitignore] = await Promise.all([
     readTemplateDir(join(templatesDir, "base")),
     readTemplateDir(join(templatesDir, "examples")),
+    readTemplateDir(join(templatesDir, "storefront")),
+    fill("config.txt"), fill("readme.md"), fill("gitignore.txt"),
   ]);
-  return { base, examples };
+  return { base, examples, storefront, storefrontFills: { config, readme, gitignore } };
 }
 
 /** Perform a plan. Writes use the `wx` flag, so even a file that appeared after planning is never

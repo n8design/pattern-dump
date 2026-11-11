@@ -66,6 +66,12 @@ describe("pd export", () => {
 });
 
 describe("pd init", () => {
+  it("reads --storefront and --no-storefront, and leaves the answer open without either", () => {
+    expect(parseCommand(["init", "--storefront"], cwd)).toMatchObject({ kind: "init", storefront: true });
+    expect(parseCommand(["init", "--no-storefront"], cwd)).toMatchObject({ kind: "init", storefront: false });
+    expect(parseCommand(["init"], cwd)).not.toHaveProperty("storefront");
+  });
+
   it("defaults to the current folder and asks for everything else", () => {
     expect(parseCommand(["init"], cwd)).toEqual({ kind: "init", target: cwd, yes: false });
   });
@@ -82,6 +88,7 @@ describe("pd init", () => {
 
   it("rejects contradictory toggles and more than one folder", () => {
     expect(parseCommand(["init", "--git", "--no-git"], cwd)).toEqual({ kind: "error", message: "--git and --no-git cannot both be given" });
+    expect(parseCommand(["init", "--storefront", "--no-storefront"], cwd)).toEqual({ kind: "error", message: "--storefront and --no-storefront cannot both be given" });
     expect(parseCommand(["init", "a", "b"], cwd)).toMatchObject({ kind: "error" });
   });
 });
