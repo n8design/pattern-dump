@@ -11,7 +11,9 @@ import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
 import { buildCompositionRegistry, type CompositionRegistry } from "../src/composition.js";
 import { readPages } from "../src/storefront/pages.js";
-import { assemblePage, seoTags, type PageAssembly } from "../src/storefront/page.js";
+import { assemblePage, seoTags, SHALLOW_SEO_NOTE, type PageAssembly } from "../src/storefront/page.js";
+import { jsonLdScript } from "../src/storefront/json-ld.js";
+import type { DatedPage, GitDates } from "../src/storefront/git-dates.js";
 import { checkPageImage } from "../src/storefront/page-image.js";
 import { save } from "../../../test-support/save.js";
 
@@ -66,6 +68,49 @@ describe("seoTags", () => {
   });
 });
 
+const ldOf = (script: string) => {
+  const m = /^<script type="application\/ld\+json">(.*)<\/script>$/s.exec(script);
+  if (!m) throw new Error(`not a JSON-LD script: ${script}`);
+  return JSON.parse(m[1]!) as { "@context": string; "@graph": Record<string, unknown>[] };
+};
+const ld = { siteUrl: URL_, siteTitle: "Bench", route: "/guides/setup/", title: "Setup", description: "How.",
+  breadcrumbs: [{ route: "/", title: "Bench" }, { route: "/guides/", title: "Guides" }], modified: "2026-02-10T10:00:00+01:00" };
+
+describe("jsonLdScript", () => {
+  it("a page in a folder: the site, the page with its last change, and the trail from Home to the page", () => {
+    expect(ldOf(jsonLdScript(ld))).toEqual({
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "WebSite", "@id": "https://example.test/#website", url: "https://example.test/", name: "Bench" },
+        {
+          "@type": "WebPage", "@id": "https://example.test/guides/setup/", url: "https://example.test/guides/setup/", name: "Setup",
+          description: "How.", isPartOf: { "@id": "https://example.test/#website" }, dateModified: "2026-02-10T10:00:00+01:00",
+          breadcrumb: { "@type": "BreadcrumbList", itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Bench", item: "https://example.test/" },
+            { "@type": "ListItem", position: 2, name: "Guides", item: "https://example.test/guides/" },
+            { "@type": "ListItem", position: 3, name: "Setup", item: "https://example.test/guides/setup/" },
+          ] },
+        },
+      ],
+    });
+  });
+
+  it("the home page has no trail; a page without description, date or site title leaves them out", () => {
+    const [site, page] = ldOf(jsonLdScript({ ...ld, route: "/", breadcrumbs: [], description: undefined, modified: null, siteTitle: undefined }))["@graph"];
+    expect(site).toEqual({ "@type": "WebSite", "@id": "https://example.test/#website", url: "https://example.test/" });
+    expect(page).toEqual({ "@type": "WebPage", "@id": "https://example.test/", url: "https://example.test/", name: "Setup",
+      isPartOf: { "@id": "https://example.test/#website" } });
+  });
+
+  it("no value can end the element or open a comment: every < is \\u003c, and the values come back unchanged", () => {
+    const title = `A </script><script>alert(1)</script> <!-- title`;
+    const script = jsonLdScript({ ...ld, title, description: "x</SCRIPT>y" });
+    expect(script.indexOf("<", 1)).toBe(script.lastIndexOf("</script>"));
+    const page = ldOf(script)["@graph"][1]!;
+    expect([page.name, page.description]).toEqual([title, "x</SCRIPT>y"]);
+  });
+});
+
 const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
 const patterns = join(bench, "src", "patterns");
 let tmp = "";
@@ -116,7 +161,7 @@ describe("assemblePage — the head", () => {
     const head = headOf(page.html);
     expect(head).toContain(`<meta name="description" content="The start.">\n<link rel="canonical" href="https://example.test/">`);
     expect(head).toContain(`<meta property="og:image" content="https://example.test/assets/share.png">`);
-    expect(head).toContain(`<meta name="twitter:card" content="summary_large_image">\n<link rel="stylesheet" href="/_pd/x.css">`);
+    expect(head).toMatch(/<meta name="twitter:card" content="summary_large_image">\n<script type="application\/ld\+json">[^\n]*<\/script>\n<link rel="stylesheet" href="\/_pd\/x.css">/);
   });
 
   it("without it: none of the tags that need it", async () => {
@@ -132,6 +177,42 @@ describe("assemblePage — the head", () => {
     expect(headOf(home.html)).not.toContain("noindex");
     const staging = await assemblePage("/", await readPages(dir), assembly({ siteUrl: URL_, siteIndex: false }));
     expect(headOf(staging.html)).toContain(`<meta name="robots" content="noindex">`);
+  });
+
+  const dated = (over: Partial<DatedPage> = {}) => {
+    const calls: string[] = [];
+    const dates: GitDates = {
+      of: async (path: string) => { calls.push(path); return { dates: { created: "2026-01-10T10:00:00+01:00", modified: "2026-02-10T10:00:00+01:00" }, notes: [], problems: [], shallow: false, ...over }; },
+      statusChanged: () => {},
+    };
+    return { dates, calls };
+  };
+  const graphOf = (html: string) => ldOf(/<script type="application\/ld\+json">.*?<\/script>/s.exec(html)![0])["@graph"];
+
+  it("JSON-LD only with the site's address; its date from git", async () => {
+    const dir = await pages();
+    const { dates, calls } = dated();
+    const page = await assemblePage("/", await readPages(dir), assembly({ siteUrl: URL_, dates }));
+    expect(graphOf(page.html)[1]).toMatchObject({ "@type": "WebPage", dateModified: "2026-02-10T10:00:00+01:00" });
+    expect(calls).toEqual(["index.md"]);
+    expect((await assemblePage("/", await readPages(dir), assembly())).html).not.toContain("application/ld+json");
+  });
+
+  it("no git pass for a site without an address whose layout shows no dates", async () => {
+    const { dates, calls } = dated();
+    await assemblePage("/", await readPages(await pages()), assembly({ dates }));
+    expect(calls).toEqual([]);
+  });
+
+  it("a shallow clone: no dateModified, no problem, one note whatever the page; other date notes are not the JSON-LD's", async () => {
+    const dir = await pages();
+    const shallow = dated({ shallow: true, notes: ["index.md: a date note"], problems: ["index.md: the repository is a shallow clone"] });
+    const home = await assemblePage("/", await readPages(dir), assembly({ siteUrl: URL_, dates: shallow.dates }));
+    expect(home.problems).toEqual([]);
+    expect(home.notes).toEqual([SHALLOW_SEO_NOTE]);
+    expect(graphOf(home.html)[1]).not.toHaveProperty("dateModified");
+    const draft = await assemblePage("/draft/", await readPages(dir), assembly({ siteUrl: URL_, dates: shallow.dates }));
+    expect(draft.notes).toEqual([SHALLOW_SEO_NOTE]);
   });
 
   it("the site's language on <html>, en unless set", async () => {

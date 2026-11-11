@@ -10,6 +10,11 @@ const PAGES = [
   ["/", "Storefront bench", SHARE], ["/about/", "About", ["/assets/images/about.png", "200", "100"]],
   ["/guides/", "Guides", SHARE], ["/guides/setup/", "Setup", SHARE],
 ] as const;
+/** The trail each page's JSON-LD gives, Home first, the page last; the home page has none. */
+const TRAILS: Record<string, string[]> = {
+  "/": [], "/about/": ["Storefront bench", "About"], "/guides/": ["Storefront bench", "Guides"],
+  "/guides/setup/": ["Storefront bench", "Guides", "Setup"],
+};
 
 for (const [route, title, [image, width, height]] of PAGES) {
   test(`${route}: canonical, Open Graph and the card, at the site's address`, async ({ page, request }, info) => {
@@ -36,5 +41,18 @@ for (const [route, title, [image, width, height]] of PAGES) {
     expect(res.headers()["content-type"]).toContain("image/png");
     expect(head.meta["robots"]).toBeUndefined();
     expect(head.lang).toBe("en");
+
+    // The structured data, as the browser holds it: one script, parsed as it is.
+    const scripts = await page.locator(`script[type="application/ld+json"]`).allTextContents();
+    expect(scripts).toHaveLength(1);
+    const graph = (JSON.parse(scripts[0]!) as { "@graph": Array<Record<string, any>> })["@graph"];
+    expect(graph.map(n => n["@type"])).toEqual(["WebSite", "WebPage"]);
+    expect(graph[0]).toMatchObject({ url: site, name: "Storefront bench" });
+    expect(graph[1]).toMatchObject({ url, name: title });
+    // Every bench page is committed, so git dates it (the checkout has its full history, in CI too).
+    expect(graph[1]!["dateModified"]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/);
+    const trail = graph[1]!["breadcrumb"]?.itemListElement ?? [];
+    expect(trail.map((i: { name: string }) => i.name)).toEqual(TRAILS[route]);
+    if (trail.length) expect(trail.at(-1).item).toBe(url);
   });
 }
