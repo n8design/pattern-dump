@@ -120,7 +120,7 @@ export async function buildStaticSite(
   // output roots as they were.
   const sfGet = storefront ? hostTransport(server.port, storefront.host) : null;
   // The crawler files: robots.txt always; the sitemap when the site has an address and is indexed.
-  const sfFiles: string[] = storefront ? [PD_ROUTES.robots, ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
+  const sfFiles: string[] = storefront ? [PD_ROUTES.robots, PD_ROUTES.notFound, ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
   const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles) : null;
   if (sfCrawl && sfCrawl.problems.length) {
     await server.close();

@@ -68,7 +68,8 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
     const url = queue.shift()!;
     const res = await get(url);
     const type = res.headers.get("content-type") ?? "";
-    if (res.status !== 200) {
+    // The 404 page answers with 404 when it is sound; anything else answers 200.
+    if (res.status !== (url === PD_ROUTES.notFound ? 404 : 200)) {
       const body = await res.text();
       // A problem of the whole site (data-pd-site) is on every page: listed once, without a page's URL.
       const items = [...body.matchAll(/<li( data-pd-site)?>([\s\S]*?)<\/li>/g)].map(m => ({ site: !!m[1], text: unescapeHtml(m[2]) }));
