@@ -45,9 +45,21 @@ export interface HotReloader {
 
 const LOOPBACK = "127.0.0.1";
 
-export function createHotReloader(port = Number(process.env["PD_WS_PORT"] ?? 4001)): HotReloader {
+export interface HotReloaderOptions {
+  /**
+   * Whether to accept a connection whose handshake carries this Origin. A browser always sends the page's
+   * origin, so this keeps pages of other sites out; a handshake without one (a process on this machine, not a
+   * page) is accepted. Without it, every origin is accepted.
+   */
+  acceptOrigin?: (origin: string) => boolean;
+}
+
+export function createHotReloader(port = Number(process.env["PD_WS_PORT"] ?? 4001), opts: HotReloaderOptions = {}): HotReloader {
   // The loopback only, like pd dev's HTTP server: nothing else on the network can connect.
-  const wss = new WebSocketServer({ port, host: LOOPBACK });
+  const wss = new WebSocketServer({
+    port, host: LOOPBACK,
+    verifyClient: ({ origin }: { origin?: string }) => !origin || !opts.acceptOrigin || opts.acceptOrigin(origin),
+  });
   const clients = new Set<WebSocket>();
   const listening = new Promise<void>((resolve, reject) => {
     wss.once("listening", () => resolve());

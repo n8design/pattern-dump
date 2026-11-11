@@ -28,6 +28,7 @@ import {
   initHighlighter, } from "@pattern-dump/renderer";
 import { createSassDependencyTracker, compileSassFile } from "@pattern-dump/build";
 import { createHotReloader, type HotReloader } from "@pattern-dump/hotreloader";
+import { isOwnOrigin, ownHosts } from "./own-hosts.js";
 
 /** Headless servers (pd build) push nowhere: no socket is opened and nothing is retained. */
 const SILENT_RELOADER: HotReloader = {
@@ -196,7 +197,13 @@ export async function startDevServer(
   const rendering = createRenderingHandle(buildRenderer, helperRegistrars, globalData);
   const render: Render = input => rendering.current.render(input);
   const live = opts.live !== false;
-  const hotreloader: HotReloader = live ? createHotReloader(wsPort) : SILENT_RELOADER;
+  // A live-reload connection from a browser page is accepted only from a page pd dev served: one of its own
+  // hosts, at its HTTP port (known once it listens; until then no page of it exists).
+  let httpPort = -1;
+  const hosts = ownHosts(cfg.storefront?.host);
+  const hotreloader: HotReloader = live
+    ? createHotReloader(wsPort, { acceptOrigin: origin => isOwnOrigin(origin, hosts, httpPort) })
+    : SILENT_RELOADER;
   // Fail here, before compiling anything, if live reload's port is taken.
   const wsPortChosen = opts.wsPort !== undefined || process.env["PD_WS_PORT"] !== undefined;
   await hotreloader.listening.catch((e: unknown) => {
@@ -306,6 +313,7 @@ export async function startDevServer(
     throw describeBindError(e, port, "workbench", { http: port, wsChosen: wsPortChosen });
   });
   const actualPort = (httpServer.address() as import("node:net").AddressInfo).port;
+  httpPort = actualPort;
   console.log(`[dev-server] Listening at http://127.0.0.1:${actualPort}`);
   const startupDiscovery = await cachedDiscovery(state);
   const componentCount = startupDiscovery ? [...startupDiscovery.discoveryMap.keys()].filter(id => !id.includes("~")).length : 0;
