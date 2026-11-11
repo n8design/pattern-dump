@@ -62,10 +62,57 @@ describe("runInit", () => {
       answers: { "Title in the Nav Rail": "Acme", "Include starter components": false, "Initialise a git repository": false },
     });
     expect(await runInit(init(target, { name: "acme", install: false }), io)).toBe(0);
-    expect(asked).toEqual(["Title in the Nav Rail", "Include starter components", "Initialise a git repository"]);
+    expect(asked).toEqual(["Title in the Nav Rail", "Include starter components", "Include a website (storefront)", "Initialise a git repository"]);
     expect(await readFile(join(target, "pattern-dump.config.ts"), "utf8")).toContain('title: "Acme"');
     expect(existsSync(join(target, "src/patterns/atoms"))).toBe(false);
     expect(calls).toEqual(["git rev-parse --is-inside-work-tree"]);
+  });
+
+  it("asks about the website after the starter components, default no, and writes it on a yes", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    const asked = fakeIO({ interactive: true });
+    expect(await runInit(init(join(root, "no"), { install: false, git: false }), asked.io)).toBe(0);
+    expect(asked.asked.slice(2, 4)).toEqual(["Include starter components", "Include a website (storefront)"]);
+    expect(existsSync(join(root, "no", "pages"))).toBe(false);
+
+    const yes = fakeIO({ interactive: true, answers: { "Include a website (storefront)": true } });
+    expect(await runInit(init(join(root, "yes"), { install: false, git: false }), yes.io)).toBe(0);
+    expect(existsSync(join(root, "yes", "pages", "index.md"))).toBe(true);
+    expect(await readFile(join(root, "yes", "pattern-dump.config.ts"), "utf8")).toContain(`workbenchUrl: "/workbench/"`);
+  });
+
+  it("--storefront writes the website without asking, and the next steps name both addresses", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    const { io, asked, logs } = fakeIO({ interactive: true });
+    expect(await runInit(init(join(root, "ds"), { storefront: true, install: false, git: false }), io)).toBe(0);
+    expect(asked).not.toContain("Include a website (storefront)");
+    expect(existsSync(join(root, "ds", ".github", "workflows", "pages.yml"))).toBe(true);
+    expect(logs.at(-1)).toBe("  npm run dev      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/");
+  });
+
+  it("--yes leaves the website out, and the next steps name the workbench only", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    const { io, logs } = fakeIO({ interactive: true });
+    expect(await runInit(init(join(root, "ds"), { yes: true, install: false, git: false }), io)).toBe(0);
+    expect(existsSync(join(root, "ds", "pages"))).toBe(false);
+    expect(logs.at(-1)).toBe("  npm run dev      # http://localhost:4000");
+  });
+
+  it("warns, with a website, that a local-file dependency can't install on GitHub's runners", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    const tgz = join(root, "pattern-dump-0.1.0.tgz");
+    await save(tgz, "");
+    const warning = (logs: string[]) => logs.find(l => l.includes("npm ci"));
+    const withSite = fakeIO();
+    expect(await runInit(init(join(root, "a"), { storefront: true, pdSource: tgz, install: false, git: false }), withSite.io)).toBe(0);
+    expect(warning(withSite.logs)).toBe(`  ! pattern-dump is installed from a local file (file:${tgz}). The GitHub Pages workflow installs `
+      + "with npm ci, which can't reach it: depend on the published pattern-dump before you push.");
+    const noSite = fakeIO();
+    expect(await runInit(init(join(root, "b"), { pdSource: tgz, install: false, git: false }), noSite.io)).toBe(0);
+    expect(warning(noSite.logs)).toBeUndefined();
+    const registry = fakeIO();
+    expect(await runInit(init(join(root, "c"), { storefront: true, install: false, git: false }), registry.io)).toBe(0);
+    expect(warning(registry.logs)).toBeUndefined();
   });
 
   it("--yes never prompts, even on a TTY", async () => {

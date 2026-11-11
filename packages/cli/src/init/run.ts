@@ -81,11 +81,12 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   const name = cmd.name ?? (prompt ? await io.ask("Project name", existingName ?? toPackageName(basename(target))) : existingName ?? toPackageName(basename(target)));
   const brand = cmd.brand ?? (prompt ? await io.ask("Title in the Nav Rail", name) : name);
   const examples = cmd.examples ?? (prompt ? await io.confirm("Include starter components", true) : true);
+  const storefront = cmd.storefront ?? (prompt ? await io.confirm("Include a website (storefront)", false) : false);
   const gitDefault = !(await insideGitRepo(target, io));
   const git = cmd.git ?? (prompt && gitDefault ? await io.confirm("Initialise a git repository", true) : gitDefault);
   const install = cmd.install ?? (prompt ? await io.confirm("Run npm install", true) : true);
 
-  const answers: InitAnswers = { name, brand, examples, storefront: false, dependency };
+  const answers: InitAnswers = { name, brand, examples, storefront, dependency };
   const templates = await readTemplates(io.templatesDir);
   const result = planInit(templates, answers, { packageJson, exists: p => existsSync(join(target, p)) }, PD_PACKAGE_NAME);
   if (!result.ok) {
@@ -100,6 +101,11 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   io.log(`✓ package.json ${plan.packageJson.created ? "created" : "updated"} — ${PD_PACKAGE_NAME} ${answers.dependency}`);
   for (const note of plan.packageJson.notes) io.log(`  · ${note}`);
   for (const s of plan.skipped) io.log(`  · ${s.path}: ${s.reason}`);
+  if (storefront && dependency.startsWith("file:")) {
+    // The workflow runs npm ci on GitHub's runners, where this machine's file is not.
+    io.log(`  ! ${PD_PACKAGE_NAME} is installed from a local file (${dependency}). The GitHub Pages workflow installs `
+      + `with npm ci, which can't reach it: depend on the published ${PD_PACKAGE_NAME} before you push.`);
+  }
 
   if (git) {
     const code = await io.run("git", ["init", "-q"], target);
@@ -127,6 +133,11 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   io.log("Next:");
   if (where !== ".") io.log(`  cd ${where}`);
   if (!install) io.log("  npm install");
-  io.log(`  npm run ${JSON.parse(plan.packageJson.content).scripts["pd:dev"] ? "pd:dev" : "dev"}      # http://localhost:4000`);
+  const dev = `npm run ${JSON.parse(plan.packageJson.content).scripts["pd:dev"] ? "pd:dev" : "dev"}`;
+  if (storefront) {
+    io.log(`  ${dev}      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/`);
+  } else {
+    io.log(`  ${dev}      # http://localhost:4000`);
+  }
   return 0;
 }
