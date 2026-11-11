@@ -118,7 +118,9 @@ export async function buildStaticSite(
   // The storefront, crawled before anything is written: a problem anywhere stops the build with both
   // output roots as they were.
   const sfGet = storefront ? hostTransport(server.port, storefront.host) : null;
-  const sfCrawl = sfGet ? await crawlStorefront(sfGet) : null;
+  // The crawler files: robots.txt always; the sitemap when the site has an address and is indexed.
+  const sfFiles: string[] = storefront ? [PD_ROUTES.robots, ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
+  const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles) : null;
   if (sfCrawl && sfCrawl.problems.length) {
     await server.close();
     throw new Error(`pd build: the storefront has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
@@ -246,7 +248,7 @@ export async function buildStaticSite(
       }
       await writeFile(join(sfOut, ".nojekyll"), "");
       counts.files++;
-      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u)).length;
+      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u)).length;
       report.storefront = { outDir: sfOut, pages, files: counts.files, bytes: counts.bytes };
       if (storefront.url === undefined) {
         report.notes.push("storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "

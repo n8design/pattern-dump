@@ -44,7 +44,8 @@ export interface StorefrontCrawl {
   problems: string[];
 }
 
-export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>): Promise<StorefrontCrawl> {
+/** `files`: the root files to write besides the pages and what they reference (robots.txt, sitemap.xml). */
+export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>, files: readonly string[] = []): Promise<StorefrontCrawl> {
   const problems: string[] = [];
   const siteProblems = new Set<string>();
   const list = await get(PD_ROUTES.pages);
@@ -61,6 +62,7 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
   const queue: string[] = [];
   const add = (url: string): void => { if (!seen.has(url)) { seen.add(url); queue.push(url); } };
   for (const p of pages) add(p.route);
+  for (const f of files) add(f);
 
   while (queue.length) {
     const url = queue.shift()!;
