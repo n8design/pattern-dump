@@ -18,6 +18,8 @@ export default defineConfig({
     workbenchUrl: "https://workbench.example.test/",
     // The site's own address: canonical URLs, Open Graph, JSON-LD and the sitemap are built from it.
     url: "https://bench.example.test/",
+    // The link-preview image of every page that names none of its own.
+    image: "/assets/images/share.png",
     site: {
       title: "Storefront bench",
       tagline: "A website written in markdown",

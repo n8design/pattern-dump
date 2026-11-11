@@ -511,6 +511,11 @@ export async function handleRequest(
         ...(ctx.dates ? { dates: ctx.dates } : {}),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
         image: path => checkPageImage(path, assetRoots, assetRootNames),
+        // With storefront.url set, pages carry absolute URLs: the configured address in a build, and in
+        // pd dev the address the browser is on, so every link it shows works there.
+        ...(cfg.storefront.url !== undefined
+          ? { siteUrl: ctx.live ? `http://${req.headers.host ?? cfg.storefront.host}/` : cfg.storefront.url } : {}),
+        lang: cfg.storefront.lang, siteIndex: cfg.storefront.index,
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
       });
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);

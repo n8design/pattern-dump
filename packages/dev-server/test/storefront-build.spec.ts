@@ -76,14 +76,17 @@ describe("pd build — the storefront root", () => {
       "_pd/components/partials/header.css",
       "_pd/components/partials/nav.css",
       "about/index.html",
+      // The link-preview images: the site's, and about.md's own (crawled from og:image).
+      "assets/images/about.png",
       "assets/images/bench-blocks.svg",
+      "assets/images/share.png",
       "guides/index.html",
       "guides/setup/index.html",
       "index.html",
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 16, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 18, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
@@ -133,7 +136,16 @@ describe("pd build — the storefront root", () => {
     }
   });
 
-  it("is what pd dev serves, apart from the live-reload client and the workbench's address", async () => {
+  it("with storefront.url: canonical and og:url on every page at the configured address, and no note about it", () => {
+    expect(report.notes.some(n => n.startsWith("storefront.url is not set"))).toBe(false);
+    for (const [route, file] of [["", "index.html"], ["about/", "about/index.html"], ["guides/setup/", "guides/setup/index.html"]]) {
+      const html = files.get(file)!.bytes.toString("utf8");
+      expect(html, file).toContain(`<link rel="canonical" href="https://bench.example.test/${route}">`);
+      expect(html, file).toContain(`<meta property="og:url" content="https://bench.example.test/${route}">`);
+    }
+  });
+
+  it("is what pd dev serves, apart from the live-reload client, the workbench's address and the site's", async () => {
     const server = await startDevServer(config(), root, { port: 0, wsPort: 0 });
     try {
       for (const [route, file] of [["/", "index.html"], ["/about/", "about/index.html"], ["/guides/", "guides/index.html"], ["/guides/setup/", "guides/setup/index.html"]]) {
@@ -145,7 +157,9 @@ describe("pd build — the storefront root", () => {
         });
         const normalized = live
           .replace(/\n<script data-pd-live>[\s\S]*?<\/script>/, "\n")
-          .replaceAll(`http://pd.localhost:${server.port}/`, WB);
+          .replaceAll(`http://pd.localhost:${server.port}/`, WB)
+          // pd dev's absolute URLs are the address the browser is on; the build's, storefront.url.
+          .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!);
         expect(normalized, route).toBe(files.get(file)!.bytes.toString("utf8"));
       }
     } finally { await server.close(); }
@@ -222,6 +236,20 @@ describe("pd build — the storefront's settings", () => {
       .rejects.toThrow("pd build: storefront.workbenchUrl is required to build the storefront — its pages link into the workbench at that address");
     expect(await exists(out)).toBe(false);
   });
+
+  it("without storefront.url: no canonical, Open Graph or card, and one note for the whole build", async () => {
+    const root = await benchCopy();
+    const { url: _u, ...rest } = benchConfig.storefront!;
+    const report = await buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root,
+      { outDir: join(root, "..", "wb-nosite"), pdVersion: "x", now: NOW });
+    const note = `storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, `
+      + `and there is no sitemap: set storefront.url to the site's address, such as "https://example.com/"`;
+    expect(report.notes.filter(n => n === note)).toHaveLength(1);
+    const pages = await tree(join(root, ".out", "storefront"));
+    for (const [file, { bytes }] of pages) {
+      if (file.endsWith(".html")) expect(bytes.toString("utf8"), file).not.toMatch(/rel="canonical"|property="og:|name="twitter:/);
+    }
+  }, 60_000);
 
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
     const root = await benchCopy();
