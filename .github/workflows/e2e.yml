@@ -104,16 +104,49 @@ jobs:
   # Every spec a pull request adds or changes (and the watcher specs, when the harness or the dev-server
   # changes) runs 20 times with retries off, beside one CPU hog: the runner has two cores, and a test
   # that depends on timing shows there. It runs next to the e2e job, not after it, and not on main,
-  # where the whole suite already runs. What is repeated is decided in scripts/ci/burn-in.mjs.
-  burn-in:
+  # where the whole suite already runs. What is repeated is decided in scripts/ci/burn-in.mjs, and split
+  # into groups by measured time (scripts/ci/burn-in-times.json): burn-in-plan lists the groups, and each
+  # repeats on its own runner, with its own hog.
+  burn-in-plan:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 5
+    outputs:
+      groups: ${{ steps.plan.outputs.groups }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           # The diff against the base branch needs its history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - name: Plan the groups
+        id: plan
+        run: |
+          groups="$(node scripts/ci/burn-in.mjs --base "origin/${{ github.base_ref }}" --matrix)"
+          echo "$groups"
+          echo "groups=$groups" >> "$GITHUB_OUTPUT"
+
+  burn-in:
+    needs: burn-in-plan
+    if: needs.burn-in-plan.outputs.groups != '[]'
+    name: burn-in (${{ matrix.group.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      # One failing group fails the pull request; the others need not finish.
+      fail-fast: true
+      matrix:
+        group: ${{ fromJSON(needs.burn-in-plan.outputs.groups) }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The storefront specs read page dates from git, so they need the whole history.
           fetch-depth: 0
 
       - uses: actions/setup-node@v7
@@ -128,19 +161,22 @@ jobs:
         run: npm run build
 
       - name: Install Playwright browsers
+        if: matrix.group.runner == 'playwright'
         run: npx playwright install chromium --with-deps
 
       - name: Install the load generator
         run: sudo apt-get install -y --no-install-recommends stress-ng
 
-      - name: Repeat the changed specs
-        run: node scripts/ci/burn-in.mjs --base "origin/${{ github.base_ref }}" --runs 20 --load
+      - name: Repeat the group's specs
+        env:
+          GROUP: ${{ toJSON(matrix.group) }}
+        run: node scripts/ci/burn-in.mjs --job "$GROUP" --runs 20 --load
 
       - name: Upload Playwright traces and videos on failure
-        if: failure()
+        if: failure() && matrix.group.runner == 'playwright'
         uses: actions/upload-artifact@v7
         with:
-          name: burn-in-report-${{ github.run_id }}
+          name: burn-in-report-${{ github.run_id }}-${{ strategy.job-index }}
           path: |
             apps/dev-ui/test-results/
             storefront-bench/test-results/
