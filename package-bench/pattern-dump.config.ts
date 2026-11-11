@@ -13,6 +13,8 @@ export default defineConfig({
     pagesDir: "./pages",
     outDir: "./.out/storefront",
     workbenchUrl: "https://workbench.example.test/",
+    // The site's own address: canonical URLs, Open Graph, JSON-LD and the sitemap are built from it.
+    url: "https://package-bench.example.test/",
     site: { title: "Package bench", footer: "Built from two linked pattern packages." },
   },
 });
