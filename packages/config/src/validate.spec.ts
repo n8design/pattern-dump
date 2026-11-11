@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { configProblems, validateConfig } from "./validate.js";
+import { configProblems, sameHostWorkbenchPath, validateConfig } from "./validate.js";
 import { defineConfig } from "./index.js";
 
 const valid = {
@@ -107,12 +107,17 @@ describe("configProblems — storefront", () => {
 
   it("takes an absolute http(s) URL for the workbench, and nothing else", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
-    for (const ok of ["https://workbench.example.com", "http://localhost:4000", "https://example.com/docs/workbench/"]) {
+    for (const ok of ["https://workbench.example.com", "http://localhost:4000", "https://example.com/docs/workbench/",
+      // A workbench on the storefront's own host: a root-relative path.
+      "/workbench/", "/workbench", "/docs/workbench/", "/Docs/v2.1/work_bench~x/"]) {
       expect(storefront({ ...base, workbenchUrl: ok }), ok).toEqual([]);
     }
-    const message = `"storefront.workbenchUrl" must be an absolute http(s) URL with no query or fragment, such as "https://workbench.example.com/"`;
-    for (const bad of ["workbench.example.com", "/workbench/", "ftp://example.com", "javascript:alert(1)", "", 42,
-      "https://htwoo.io/workbench/?v=1", "https://htwoo.io/workbench/#top", "https://htwoo.io/workbench?"]) {
+    const message = `"storefront.workbenchUrl" must be an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the storefront's host, such as "/workbench/"`;
+    for (const bad of ["workbench.example.com", "ftp://example.com", "javascript:alert(1)", "", 42,
+      "https://htwoo.io/workbench/?v=1", "https://htwoo.io/workbench/#top", "https://htwoo.io/workbench?",
+      // Paths: "//host/" is another host to a browser; a relative path depends on the page; "/" is the storefront.
+      "//evil.test/", "//evil.test/workbench/", "workbench/", "./workbench/", "/", "/workbench?x=1", "/workbench#top",
+      "/work bench/", "/workbench//", "/../workbench/"]) {
       expect(storefront({ ...base, workbenchUrl: bad }), String(bad)).toEqual([message]);
     }
   });
@@ -233,6 +238,34 @@ describe("configProblems — storefront", () => {
     for (const bad of ["http://live.localhost", "live.localhost:4000", "live.localhost/x", "-live.localhost", "", "live..localhost", 7]) {
       expect(storefront({ ...base, host: bad }), String(bad)).toEqual([message]);
     }
+  });
+});
+
+describe("sameHostWorkbenchPath — a workbench published on the storefront's own host", () => {
+  const path = (workbenchUrl: string | undefined, url?: string) => {
+    const config = validateConfig({ ...valid, storefront: { pagesDir: "./pages", outDir: "./www",
+      ...(workbenchUrl !== undefined ? { workbenchUrl } : {}), ...(url !== undefined ? { url } : {}) } }, "test");
+    return sameHostWorkbenchPath(config.storefront);
+  };
+
+  it("is the path of a root-relative workbenchUrl, normalised to one trailing slash", () => {
+    expect(path("/workbench/")).toBe("/workbench/");
+    expect(path("/docs/workbench")).toBe("/docs/workbench/");
+    expect(path("/workbench/", "https://example.com/")).toBe("/workbench/");
+  });
+
+  it("is the path of an absolute workbenchUrl on the origin of storefront.url", () => {
+    expect(path("https://example.com/workbench", "https://example.com")).toBe("/workbench/");
+    expect(path("https://example.com/", "https://example.com/")).toBe("/");
+  });
+
+  it("is undefined for a workbench on a host of its own, or with no workbenchUrl", () => {
+    expect(path("https://workbench.example.com/", "https://example.com/")).toBeUndefined();
+    expect(path("https://example.com:8443/workbench/", "https://example.com/")).toBeUndefined();
+    expect(path("http://example.com/workbench/", "https://example.com/")).toBeUndefined();
+    expect(path("https://example.com/workbench/")).toBeUndefined();
+    expect(path(undefined, "https://example.com/")).toBeUndefined();
+    expect(sameHostWorkbenchPath(undefined)).toBeUndefined();
   });
 });
 
