@@ -1,0 +1,4 @@
+{
+  "site": { "title": __PD_BRAND_JSON__, "footer": "Made with Pattern Dump." },
+  "nav": [{ "route": "/", "title": "Home", "current": true }, { "route": "/about/", "title": "About" }]
+}

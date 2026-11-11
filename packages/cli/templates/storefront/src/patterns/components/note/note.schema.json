@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Note",
+  "description": "A short aside. On a page: <pd-components-note heading=\"…\">text</pd-components-note>.",
+  "type": "object",
+  "required": ["heading", "text"],
+  "x-pd-content": "text",
+  "properties": {
+    "heading": { "type": "string", "description": "One line, in bold" },
+    "text": { "type": "string", "contentMediaType": "text/markdown", "description": "The note itself: the tag's content, as markdown" },
+    "tone": { "type": "string", "enum": ["tip", "warning"], "description": "Its colour; a plain note without one" }
+  }
+}
