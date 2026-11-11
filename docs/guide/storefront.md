@@ -11,7 +11,17 @@ workbench's own styles.
 
 ## Quick start
 
-Add a `storefront` block to the config ([configuration.md](configuration.md#storefront)):
+The quickest start is a new project with a website already in it:
+
+```bash
+npx pattern-dump@alpha init my-site --storefront
+```
+
+It brings two pages, a small skin, one component the home page shows (in a live example and placed with a
+`pd-` tag), and a GitHub Pages workflow that publishes the website with the workbench under `/workbench/`
+([cli.md](cli.md#pd-init)). Its README says how to publish it.
+
+To add a storefront to a project you have, add a `storefront` block to the config ([configuration.md](configuration.md#storefront)):
 
 ```ts
 export default defineConfig({
@@ -357,13 +367,16 @@ JSON-LD leave them out and the build notes it once (in CI, check out with `fetch
 
 **`robots.txt`.** Both output roots get one. The storefront's keeps crawlers out of `/preview/` (the live
 examples: component demos, not pages) and names the sitemap. The workbench's keeps them out of its
-previews only; the workbench itself stays searchable. Two limits:
+previews only; the workbench itself stays searchable. A workbench on the storefront's own host
+([below](#building)) has its previews kept out by the storefront's `robots.txt` too
+(`Disallow: /workbench/preview/`), since crawlers read only the one at the host's root. Two limits:
 
 - `Disallow` stops crawling, not indexing: a preview someone links to from elsewhere can still appear in
   results as a bare address, with no description. A crawler also never fetches the examples a page embeds,
   so their text doesn't count toward the page.
-- Crawlers read `robots.txt` only at a host's root. A workbench built with `--base` writes it to its own
-  root, so copy its rule into the `robots.txt` the host serves at `/` (the build says so).
+- Crawlers read `robots.txt` only at a host's root. A workbench built with `--base` for a host of its own
+  writes it to its own root, so copy its rule into the `robots.txt` that host serves at `/` (the build says
+  so). On the storefront's host there is nothing to copy.
 
 ### The 404 page
 
@@ -380,11 +393,19 @@ When a page moves, list its old routes in `redirectFrom`. Each old route gets a 
 one at once (`<meta http-equiv="refresh">`, which search engines take as a permanent redirect), names it as
 canonical, and is never indexed. This works on any static host, GitHub Pages included. An old route must
 start and end with `/`, and must not be a page, be claimed by two pages, or lie under `/preview/`, `/_pd/`,
-`/assets/`, `/api/` or `/source/`.
+`/assets/`, `/api/` or `/source/`, nor under the path of a workbench on the same host. No page may be there
+either: the workbench would take its place.
 
 ## Hosts in `pd dev`
 
-One `pd dev` serves both front ends, telling them apart by the host name:
+One `pd dev` serves both front ends, telling them apart by the host name, and prints the two addresses
+to open when it starts:
+
+```
+[dev-server] Listening at http://127.0.0.1:4000
+[dev-server] Website:   http://live.localhost:4000/
+[dev-server] Workbench: http://pd.localhost:4000/
+```
 
 | Address | Serves |
 |---|---|
@@ -446,3 +467,26 @@ site/
 ```
 
 `storefront.workbenchUrl` is required to build, since built pages link to the workbench at its own address.
+
+**The workbench on the storefront's host.** One host can serve both: the website at its root and the
+workbench under a path. Set `workbenchUrl` to that path and build the workbench for it:
+
+```ts
+export default defineConfig({
+  // …
+  storefront: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "/workbench/" },
+  build: { basePath: "/workbench/" },
+});
+```
+
+`pd build` still writes two folders. Publish the storefront's at the host's root and the workbench's inside
+it at `/workbench/`; on GitHub Pages the workflow copies one into the other before it uploads them, as
+`pd init --storefront`'s does. Then:
+
+- the storefront's `robots.txt` also keeps crawlers out of the workbench's previews;
+- no page or `redirectFrom` may be at or under `/workbench/`, since the workbench would overwrite it there;
+- the build refuses to make the workbench for another base path than `workbenchUrl`'s (`build.basePath`,
+  or `--base`): its pages would link to a workbench that isn't there.
+
+An absolute `workbenchUrl` on the origin of `storefront.url` (`https://example.com/workbench/` with
+`url: "https://example.com/"`) counts as the same host too.

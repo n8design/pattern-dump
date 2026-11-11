@@ -30,6 +30,7 @@ export default defineConfig({
   // Each package describes its patterns, styles and themes in its package.json ("patternDump").
   // packages: ["@n8d/htwoo-patterns"],
 
+__PD_STOREFRONT__
   shell: {
     brand: { title: __PD_BRAND_JSON__ },
   },
