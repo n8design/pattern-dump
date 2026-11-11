@@ -25,12 +25,16 @@
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import type { StorefrontNavItem, StorefrontPage, StorefrontPagesResponse } from "@pattern-dump/contracts";
+import { PD_ROUTES, type StorefrontNavItem, type StorefrontPage, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
+import { redirectProblems, redirectsOf } from "./redirects.js";
 
 /** The layout a page uses when its frontmatter names none. */
 export const DEFAULT_LAYOUT = "page";
+
+/** The site's own "not found" page, when it has one: written to /404.html, not a page of the site. */
+export const NOT_FOUND_FILE = "404.md";
 
 export interface PageFile {
   route: string;
@@ -44,6 +48,9 @@ export interface PageFile {
 export interface PageModel extends StorefrontPagesResponse {
   /** Every page by route, in the order of `pages`. */
   files: Map<string, PageFile>;
+  /** 404.md at the top of the pages folder, at the route /404.html: not a page of the site, so in neither
+   *  `pages`, `files` nor the nav. Absent when the site has none (a built-in one is used). */
+  notFound?: PageFile;
   /** Problems with the folder as a whole, one line each. Empty when it is a sound site. */
   problems: string[];
 }
@@ -86,6 +93,7 @@ const scalar = (v: string | string[] | undefined): string | undefined => typeof 
 export async function readPages(pagesDir: string): Promise<PageModel> {
   const problems: string[] = [];
   const files = new Map<string, PageFile>();
+  let notFound: PageFile | undefined;
   if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
     return { pages: [], nav: [], files, problems: [`the pages folder ${pagesDir} does not exist`] };
   }
@@ -97,14 +105,19 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
     // Listed, but deleted before it could be read: no longer a page.
     const text = await readFile(file, "utf8").catch((e: NodeJS.ErrnoException) => { if (e.code === "ENOENT") return null; throw e; });
     if (text === null) continue;
+    if (path === NOT_FOUND_FILE) { notFound = { route: PD_ROUTES.notFound, file, path, frontmatter: readFrontmatterStrict(text) }; continue; }
     files.set(route, { route, file, path, frontmatter: readFrontmatterStrict(text) });
   }
 
-  const pageOf = (f: PageFile): StorefrontPage => ({
-    route: f.route,
-    title: scalar(f.frontmatter.values["title"]) ?? f.route,
-    layout: scalar(f.frontmatter.values["layout"]) ?? DEFAULT_LAYOUT,
-  });
+  const pageOf = (f: PageFile): StorefrontPage => {
+    const redirectFrom = redirectsOf(f);
+    return {
+      route: f.route,
+      title: scalar(f.frontmatter.values["title"]) ?? f.route,
+      layout: scalar(f.frontmatter.values["layout"]) ?? DEFAULT_LAYOUT,
+      ...(redirectFrom.length ? { redirectFrom } : {}),
+    };
+  };
   /** A nav entry's page fields: its route and title, and its description when it has one. */
   const entryOf = (f: PageFile): StorefrontNavItem => {
     const description = scalar(f.frontmatter.values["description"]);
@@ -175,5 +188,7 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
   const rest = [...files.keys()].filter(r => !inNav.includes(r)).sort();
   const routes = [...inNav, ...rest];
   const pages = routes.map(r => pageOf(files.get(r)!));
-  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), problems };
+  // Redirects across pages: an old route that is a page, or that two pages claim.
+  problems.push(...redirectProblems(files));
+  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), problems, ...(notFound ? { notFound } : {}) };
 }

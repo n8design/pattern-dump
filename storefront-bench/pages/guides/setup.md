@@ -1,6 +1,7 @@
 ---
 layout: doc
 title: Setup
+redirectFrom: [/setup/, /start/]
 description: How the bench is put together.
 lede: Three folders make a site — the pages, the layouts that dress them, and the components they show.
 ---

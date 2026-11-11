@@ -45,7 +45,7 @@ import type { PatternDumpConfig } from "@pattern-dump/config";
 import { classifyConfigChange } from "./config-change.js";
 import type { SiteValuesHandle } from "./storefront/site-values.js";
 import type { GitDates } from "./storefront/git-dates.js";
-import { readPages, routeFor } from "./storefront/pages.js";
+import { NOT_FOUND_FILE, readPages, routeFor } from "./storefront/pages.js";
 import { readGlobalData, readHelperRegistrars, type LoadProblem } from "./project-loaders.js";
 import { createDisplayPath } from "./display-path.js";
 import type { HelperRegistrar, RenderingHandle } from "./rendering.js";
@@ -1030,10 +1030,13 @@ async function handlePages(filePath: string, event: "change" | "add" | "unlink" 
   pagesPrint = await pagesFingerprint();
   // A page saved, added or removed can change what git status says of it (committed, changed, untracked).
   dates?.statusChanged();
-  const own = event === "change" && rel.endsWith(".md") ? routeFor(rel) : null;
+  // The 404 page has no route of its own: it is shown at every address with no page, so any open page may be it.
+  const notFound = rel === NOT_FOUND_FILE;
+  const own = event === "change" && rel.endsWith(".md") && !notFound ? routeFor(rel) : null;
   const route = own !== null && pagesPrint === before ? own : null;
   hmr.push({ type: "page-changed", route });
-  const why = own !== null && route === null ? " (it changed what other pages show of it)" : "";
+  const why = notFound ? " (the 404 page, shown at every address with no page)"
+    : own !== null && route === null ? " (it changed what other pages show of it)" : "";
   console.log(`[dev-server] Page ${event}: ${rel || "."} → page-changed ${route ?? "(every page)"}${why}`);
   return true;
 }

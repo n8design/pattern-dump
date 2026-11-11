@@ -56,6 +56,7 @@ import { containedFile, decodePath } from "./contained-file.js";
 import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
+import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import { pageStylesheets } from "./storefront/page-head.js";
 import type { RenderingHandle } from "./rendering.js";
@@ -534,11 +535,21 @@ export async function handleRequest(
       }
       // A page route is a folder path; /about is /about/, as a static host serves it.
       const route = /\.[a-z0-9]+$/i.test(pathname) ? null : pathname.endsWith("/") ? pathname : `${pathname}/`;
-      if (route === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end(`Not found: ${pathname}`); return; }
+      // An old route a page lists in redirectFrom: the page that forwards to it, as pd build writes it.
+      const movedTo = route === null ? undefined : model.pages.find(p => p.redirectFrom?.includes(route));
+      if (movedTo && !model.problems.length) {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(redirectStub({ route: movedTo.route, title: movedTo.title, siteUrl, lang: cfg.storefront.lang }));
+        return;
+      }
+      // /404.html, and every address with no page, is the site's 404 page with status 404, as a static host
+      // serves it (a 404 page with problems is a 500 listing them).
+      const target = pathname === PD_ROUTES.notFound || route === null || (!model.problems.length && !model.files.has(route))
+        ? PD_ROUTES.notFound : route;
       // In pd dev a page links to the workbench of this same process, whatever the config's build-time
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
-      const page = await assemblePage(route, model, {
+      const page = await assemblePage(target, model, {
         discoveryMap, handleMap: discovery.handleMap, shown: createDisplayPath(cwd, cfg.packages),
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
