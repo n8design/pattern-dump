@@ -253,3 +253,24 @@ describe("readPages — problems (each one fatal to the caller)", () => {
     expect((await readPages(file)).problems).toEqual([`the pages folder ${file} does not exist`]);
   });
 });
+
+describe("readPages — the path of a workbench published on the same host", () => {
+  const home = page("Home");
+  it("refuses a page at the workbench's path, and one under it", async () => {
+    const dir = await pages({ "index.md": home, "workbench/index.md": page("Workbench"), "workbench/notes.md": page("Notes") });
+    expect((await readPages(dir, { workbenchPath: "/workbench/" })).problems).toEqual([
+      `workbench/index.md: the page /workbench/ is at /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`,
+      `workbench/notes.md: the page /workbench/notes/ is under /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`,
+    ]);
+  });
+
+  it("takes the path as whole segments: a page whose route only starts with the same letters is fine", async () => {
+    const dir = await pages({ "index.md": home, "workbench-notes.md": page("Notes"), "work.md": page("Work") });
+    expect((await readPages(dir, { workbenchPath: "/workbench/" })).problems).toEqual([]);
+  });
+
+  it("checks nothing for a workbench on a host of its own", async () => {
+    const dir = await pages({ "index.md": home, "workbench.md": page("Workbench") });
+    expect((await readPages(dir)).problems).toEqual([]);
+  });
+});

@@ -12,7 +12,7 @@
 
 import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
-import type { PatternDumpConfig } from "@pattern-dump/config";
+import { sameHostWorkbenchPath, type PatternDumpConfig } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
   staticPathFor, themeCssUrl,
@@ -103,6 +103,13 @@ export async function buildStaticSite(
     }
     if (!storefront.workbenchUrl) {
       throw new Error("pd build: storefront.workbenchUrl is required to build the storefront — its pages link into the workbench at that address");
+    }
+    // A workbench published on the storefront's own host is linked at its path, so it must be built for that
+    // path: the base path this build uses (--base, else build.basePath, else /).
+    const sameHost = sameHostWorkbenchPath(storefront);
+    if (sameHost !== undefined && sameHost !== basePath) {
+      throw new Error(`pd build: storefront.workbenchUrl is ${storefront.workbenchUrl}, so the workbench must be built for ${sameHost} `
+        + `(build.basePath or --base); it is being built for ${basePath}`);
     }
   }
 
@@ -238,7 +245,9 @@ export async function buildStaticSite(
     // Crawlers: the workbench is searchable, its previews are not.
     await writeFile(join(outDir, "robots.txt"), workbenchRobotsTxt(basePath));
     report.files++;
-    if (basePath !== "/") {
+    // Unless the storefront's own robots.txt, at this host's root, already keeps these previews out: a
+    // workbench published on the storefront's host at this base path (with index: false, it keeps out everything).
+    if (basePath !== "/" && sameHostWorkbenchPath(storefront ?? undefined) !== basePath) {
       report.notes.push(`robots.txt is written to the workbench's root, but crawlers read it only at a host's root: `
         + `with the base path ${basePath}, add its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
     }

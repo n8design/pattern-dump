@@ -28,7 +28,7 @@ import { join, relative, sep } from "node:path";
 import { PD_ROUTES, type StorefrontNavItem, type StorefrontPage, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
-import { redirectProblems, redirectsOf } from "./redirects.js";
+import { redirectProblems, redirectsOf, workbenchPlace } from "./redirects.js";
 
 /** The layout a page uses when its frontmatter names none. */
 export const DEFAULT_LAYOUT = "page";
@@ -90,7 +90,11 @@ async function markdownFiles(dir: string, root: string, problems: string[]): Pro
 
 const scalar = (v: string | string[] | undefined): string | undefined => typeof v === "string" ? v : undefined;
 
-export async function readPages(pagesDir: string): Promise<PageModel> {
+/**
+ * `workbenchPath`: the path of a workbench published on the storefront's host (sameHostWorkbenchPath), where no
+ * page and no old route may be, since the published workbench would take its place.
+ */
+export async function readPages(pagesDir: string, opts: { workbenchPath?: string | undefined } = {}): Promise<PageModel> {
   const problems: string[] = [];
   const files = new Map<string, PageFile>();
   let notFound: PageFile | undefined;
@@ -188,7 +192,14 @@ export async function readPages(pagesDir: string): Promise<PageModel> {
   const rest = [...files.keys()].filter(r => !inNav.includes(r)).sort();
   const routes = [...inNav, ...rest];
   const pages = routes.map(r => pageOf(files.get(r)!));
+  // A page where the same-host workbench is published.
+  const { workbenchPath } = opts;
+  if (workbenchPath !== undefined) {
+    for (const f of files.values()) {
+      if (f.route.startsWith(workbenchPath)) problems.push(`${f.path}: the page ${f.route} is ${workbenchPlace(f.route, workbenchPath)}`);
+    }
+  }
   // Redirects across pages: an old route that is a page, or that two pages claim.
-  problems.push(...redirectProblems(files));
+  problems.push(...redirectProblems(files, workbenchPath));
   return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), problems, ...(notFound ? { notFound } : {}) };
 }

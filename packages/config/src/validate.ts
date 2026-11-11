@@ -10,7 +10,7 @@ type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo" | "http-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object";
+  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object";
 type Shape = Readonly<Record<string, Rule>>;
 
 const SHAPE: Shape = {
@@ -56,7 +56,7 @@ const SHAPE: Shape = {
   build: { keys: { outDir: "string", basePath: "string", audit: "boolean" } },
   storefront: {
     keys: {
-      pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "http-url", site: "plain-object",
+      pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", site: "plain-object",
       url: "site-url", lang: "lang", index: "boolean", image: "asset-path",
     },
     required: ["pagesDir", "outDir"],
@@ -64,6 +64,10 @@ const SHAPE: Shape = {
 };
 
 const REQUIRED = ["sourceDir", "patternsDir", "outDir", "styles"] as const;
+
+/** A root-relative path of plain segments: "/workbench/", "/docs/workbench". Never "//…" (another host), and
+ *  no "." or ".." segment (the path a browser resolves would not be the one written). */
+const WORKBENCH_PATH = /^\/(?:(?!\.{1,2}(?:\/|$))[a-z0-9._~-]+\/?)+$/i;
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
@@ -142,17 +146,19 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     if (!ok) fail(`a path or { light, dark }`);
     return;
   }
-  if (rule === "http-url") {
-    // Written into every link a static build makes to the workbench, so it must be a full address.
-    // Links are built by appending a path to it, so it carries no query or fragment.
+  if (rule === "workbench-url") {
+    // Written into every link a static build makes to the workbench: a full address for a workbench on a
+    // host of its own, or a path for one on the storefront's own host. Links are built by appending a path
+    // to it, so it carries no query or fragment. "//host/" is refused: a browser reads it as another host.
     let ok = false;
-    if (typeof value === "string") {
+    if (typeof value === "string" && WORKBENCH_PATH.test(value)) ok = true;
+    else if (typeof value === "string") {
       try {
         const url = new URL(value);
         ok = /^https?:$/.test(url.protocol) && url.search === "" && url.hash === "" && !/[?#]/.test(value);
       } catch { ok = false; }
     }
-    if (!ok) fail(`an absolute http(s) URL with no query or fragment, such as "https://workbench.example.com/"`);
+    if (!ok) fail(`an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the storefront's host, such as "/workbench/"`);
     return;
   }
   if (rule === "site-url") {
@@ -275,4 +281,18 @@ export function validateConfig(raw: unknown, source: string): PatternDumpConfig 
   return { ...config, storefront: {
     ...sf, ...(workbenchUrl !== undefined ? { workbenchUrl } : {}), ...(url !== undefined ? { url } : {}),
   } };
+}
+
+/**
+ * The path of a workbench published on the storefront's own host, or undefined when it has a host of its own.
+ * Same-host means a root-relative `workbenchUrl` ("/workbench/"), or an absolute one on the origin of
+ * `storefront.url`. Reads a validated config, so both are already normalised (one trailing slash).
+ */
+export function sameHostWorkbenchPath(storefront: { workbenchUrl?: string; url?: string } | undefined): string | undefined {
+  const w = storefront?.workbenchUrl;
+  if (w === undefined) return undefined;
+  if (w.startsWith("/")) return w;
+  if (storefront?.url === undefined) return undefined;
+  const u = new URL(w);
+  return `${u.origin}/` === storefront.url ? u.pathname : undefined;
 }
