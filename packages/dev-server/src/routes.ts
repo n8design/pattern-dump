@@ -158,9 +158,12 @@ function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
   return path => {
     let hash = hashes.get(path);
     if (!hash) {
-      const self = { url: path, method: "GET", headers: { host: req.headers.host }, socket: { localPort: req.socket.localPort } } as unknown as IncomingMessage;
+      // Straight to the storefront's routes, past the host check: that check reads the socket the outer request
+      // came in on, which is gone once its client hangs up (a page live reload replaces), and would refuse the
+      // server its own request. The Host header is the outer request's, read as it arrived.
+      const self = { url: path, method: "GET", headers: { host: req.headers.host } } as unknown as IncomingMessage;
       const held = holdResponse();
-      hash = handleRequest(self, held.res, ctx).then(() => held.status() === 200 ? contentHash(held.body()) : undefined);
+      hash = stampedResponse(self, held.res, ctx).then(() => held.status() === 200 ? contentHash(held.body()) : undefined);
       hashes.set(path, hash);
     }
     return hash;

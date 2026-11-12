@@ -4,6 +4,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { request } from "node:http";
+import { connect } from "node:net";
 import { validateConfig } from "@pattern-dump/config";
 import { PD_HOSTS } from "@pattern-dump/contracts";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
@@ -88,6 +89,26 @@ describe("content stamps on the storefront host", () => {
     for (const { path, v } of stamped(css)) expect(v, path).toBe(sha10((await getOn(skin, skinSite(), path)).body));
     // The base sheet's own stamp covers its stamped url()s: the page's stamp is the hash of this text.
     expect(base!.split("?v=")[1]).toBe(sha10(Buffer.from(css)));
+  });
+
+  it("survive a client that hangs up mid-request: the next page is stamped in full", async () => {
+    // A fresh server, so no stamp is cached yet: the hung-up request is the one that looks them up.
+    const fresh = await startDevServer(config, bench, { port: 0, live: false });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const socket = connect(fresh.port, "127.0.0.1", () => {
+          socket.write(`GET /about/ HTTP/1.1\r\nHost: ${SITE}:${fresh.port}\r\nConnection: close\r\n\r\n`);
+          socket.destroy(); // gone before the server has looked up a single stamp
+          resolve();
+        });
+        socket.on("error", reject);
+      });
+      const page = (await getOn(fresh, SITE, "/about/")).body.toString("utf8");
+      expect(page).not.toMatch(/(?:href|src)="\/(?:_pd|assets)\/[^"?]+"/);
+      expect(page).toMatch(/og:image" content="[^"]+\/assets\/images\/about\.png\?v=[0-9a-f]{10}"/);
+    } finally {
+      await fresh.close();
+    }
   });
 
   it("leave the workbench's hosts unstamped", async () => {

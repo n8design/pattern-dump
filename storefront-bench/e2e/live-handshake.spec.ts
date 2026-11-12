@@ -89,10 +89,12 @@ test("a save in two steps (emptied, then written, as an editor does) leaves the 
     await page.waitForTimeout(2_000);
     expect(navigations).toBeGreaterThanOrEqual(1);
     expect(navigations).toBeLessThanOrEqual(2);
-    // The page shows the final asset: its image loaded, and the file it loads is the written one.
-    await expect(page.locator(`img[src="/assets/images/bench-blocks.svg"]`)).toHaveJSProperty("complete", true);
-    expect(await page.locator(`img[src="/assets/images/bench-blocks.svg"]`).evaluate(img => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
-    expect(await page.evaluate(() => fetch("/assets/images/bench-blocks.svg").then(r => r.text()))).toContain("<!-- two steps -->");
+    // The page shows the final asset: its image loaded, and the URL it loaded (stamped with the content hash
+    // of the file it named) serves the written one.
+    const img = page.locator(`img[src^="/assets/images/bench-blocks.svg?v="]`);
+    await expect(img).toHaveJSProperty("complete", true);
+    expect(await img.evaluate(i => (i as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    expect(await img.evaluate(i => fetch((i as HTMLImageElement).currentSrc).then(r => r.text()))).toContain("<!-- two steps -->");
   } finally {
     await save(svg, before);
   }
