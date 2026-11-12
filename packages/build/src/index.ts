@@ -224,3 +224,8 @@ export async function compileScriptFile(entryPoint: string): Promise<string> {
   });
   return result.outputFiles[0].text;
 }
+
+export {
+  SHARP_VERSION, SharpUnavailableError, loadSharp, imageVariantKey, imageSize, encodeWebp, createImageCache,
+  type SharpModule, type ImageEncoding, type ImageCache,
+} from "./images.js";

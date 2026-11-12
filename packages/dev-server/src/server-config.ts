@@ -9,6 +9,7 @@
 // `--config`; resolving in one place is what keeps that straight.
 
 import { basename, join, resolve } from "node:path";
+import type { ImageEncoding } from "@pattern-dump/build";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import { PD_HOSTS, type ThemeSwitch } from "@pattern-dump/contracts";
 import type { PatternRoot } from "@pattern-dump/discovery";
@@ -72,6 +73,8 @@ export interface ResolvedConfig {
   /** Prepend globalScripts to a component's own requireScripts, deduped, so they load first. */
   withGlobalScripts(own: string[] | undefined): string[];
 
+  /** How image variants are encoded: `images` from the config over the defaults (quality 75, effort 4). */
+  readonly images: ImageEncoding;
   /** The storefront, when the project has one: its folders resolved against the root, and the host
    *  `pd dev` serves it on. null without a `storefront` block — every host then serves the workbench. */
   readonly storefront: {
@@ -86,6 +89,8 @@ export interface ResolvedConfig {
     readonly url: string | undefined;
     /** storefront.lang, for <html lang>: "en" unless set. */
     readonly lang: string;
+    /** How the site's image variants are encoded: the project's `images`, with `storefront.images` over it. */
+    readonly images: ImageEncoding;
     /** storefront.index: false keeps the whole site out of search engines. */
     readonly index: boolean;
   } | null;
@@ -180,6 +185,8 @@ export function resolveServerConfig(
     ...(config.scriptsDir ? [resolve(cwd, config.scriptsDir)] : []),
     ...packages.filter(p => p.manifest.scripts).map(p => inPackage(p, p.manifest.scripts!)),
   ];
+  // The defaults the step 4 recon measured with: WebP quality 75, effort 4.
+  const images: ImageEncoding = { quality: 75, effort: 4, ...config.images };
   const documentBaseEnabled = (Array.isArray(config.documentBase) && config.documentBase.length > 0)
     || packages.some(p => p.styles && (p.manifest.styles?.documentBase?.length ?? 0) > 0);
 
@@ -221,7 +228,9 @@ export function resolveServerConfig(
       url: config.storefront.url,
       lang: config.storefront.lang ?? "en",
       index: config.storefront.index !== false,
+      images: { ...images, ...config.storefront.images },
     } : null,
+    images,
     overviewsEnabled:    config.overviews !== false,
     documentBaseEnabled,
     themeSwitch,

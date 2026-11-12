@@ -68,6 +68,19 @@ if (!project) {
 const pd = join(project, "node_modules/.bin/pd");
 check(existsSync(pd), "pd is installed in the project");
 
+// sharp, as the project installed it: the exact version Pattern Dump pins, with a binary for this platform. An
+// image in the project's assets is asked for as a variant below, which only works if sharp loads here.
+const { SHARP_VERSION, imageVariantKey } = await import(join(repo, "packages/build/dist/index.js"));
+const { imageUrl } = await import(join(repo, "packages/contracts/dist/index.js"));
+const sharpPkg = JSON.parse(await readFile(join(project, "node_modules/sharp/package.json"), "utf8").catch(() => "{}"));
+const pdPkg = JSON.parse(await readFile(join(project, "node_modules/pattern-dump/package.json"), "utf8").catch(() => "{}"));
+check(sharpPkg.version === SHARP_VERSION && pdPkg.dependencies?.sharp === SHARP_VERSION,
+  `sharp ${SHARP_VERSION} is installed, pinned exactly`, `installed ${sharpPkg.version}, pattern-dump asks for ${pdPkg.dependencies?.sharp}`);
+const photo = join(repo, "packages/build/test/fixtures/images/photo.jpg");
+await mkdir(join(project, "assets", "images"), { recursive: true });
+await cp(photo, join(project, "assets", "images", "verify.jpg"));
+const variant = imageUrl("images/verify", imageVariantKey(await readFile(photo), 240, { quality: 75, effort: 4 }), 240);
+
 let server;
 if (failures.length === 0) {
   const port = await freePort();
@@ -113,6 +126,11 @@ if (failures.length === 0) {
     const script = await get("/_pd/scripts/search-field.js");
     check(search.document.includes('src="/_pd/scripts/search-field.js') && script.ok && (await script.text()).includes("form.search-field"),
       "search-field loads its compiled behaviour script", `HTTP ${script.status}`);
+
+    const image = await get(variant);
+    const webp = Buffer.from(await image.arrayBuffer());
+    check(image.ok && image.headers.get("content-type") === "image/webp" && webp.subarray(8, 12).toString("latin1") === "WEBP",
+      "an image variant is encoded by the installed sharp", `HTTP ${image.status}: ${image.ok ? "" : webp.toString("utf8").slice(0, 300)}`);
 
     const themes = await (await get("/api/themes")).json();
     check(themes.length === 2 && themes.every(t => Object.values(t.tokens ?? {}).every(v => v !== null)),
