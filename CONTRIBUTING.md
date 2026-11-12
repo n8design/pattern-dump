@@ -8,7 +8,7 @@ and the rules the code base depends on.
 
 ## Setup
 
-Requirements: Node.js 20.10 or later, npm, and a Chromium for Playwright.
+Requirements: Node.js 22.22 or later, npm, and a Chromium for Playwright.
 
 ```bash
 npm install

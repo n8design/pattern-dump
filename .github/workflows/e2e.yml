@@ -13,6 +13,13 @@ concurrency:
 
 jobs:
   e2e:
+    # On the oldest Node the package supports (engines: the latest 22.x is past its 22.22 floor) and on the
+    # current one. A failure on one leg does not cancel the other: which version fails is the finding.
+    name: e2e (Node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
     # Pinned: ubuntu-latest moved to 26.04, which the Playwright in use (1.60) cannot install browsers
     # on. Moving off the pin goes with a Playwright upgrade and a re-recorded E2E baseline.
     runs-on: ubuntu-24.04
@@ -30,8 +37,11 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
           cache: npm
+
+      - name: Show the Node version
+        run: node --version
 
       - name: Install dependencies
         run: npm install
@@ -97,7 +107,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ github.run_id }}
+          name: playwright-report-${{ github.run_id }}-node${{ matrix.node }}
           path: |
             apps/dev-ui/test-results/
             apps/dev-ui/playwright-report/
@@ -127,7 +137,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Plan the groups
         id: plan
@@ -154,9 +164,11 @@ jobs:
           # The storefront specs read page dates from git, so they need the whole history.
           fetch-depth: 0
 
+      # The oldest Node the package supports: the repeats look for timing failures, and one version is
+      # enough for that.
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies

@@ -5,7 +5,7 @@ static build.
 
 ![Your project's patterns, styles, themes, scripts and assets go into Pattern Dump, which gives you the live workbench (pd dev), an audit report (pd audit) and a static site (pd build)](how-it-works.svg)
 
-**Requirements:** Node.js 20.10 or later, and npm.
+**Requirements:** Node.js 22.22 or later, and npm.
 
 ## 1. Create a project
 
