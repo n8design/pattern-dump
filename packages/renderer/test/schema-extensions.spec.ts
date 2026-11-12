@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
-import { checkSchemaExtensions, createRenderer } from "../src/index";
+import { checkSchemaExtensions, createRenderer, readExampleHeight } from "../src/index";
 import { save } from "../../../test-support/save.js";
 
 const ctx = {
@@ -57,9 +57,29 @@ describe("the placement schema extensions", () => {
 
   it("an unknown x-pd- key is an error, at the top and in a property", () => {
     expect(check({ "x-pd-contnet": "caption", properties: { caption: { type: "string", "x-pd-componnet": "atoms/slide" } } })).toEqual([
-      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content)`,
-      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content)`,
+      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`,
+      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`,
     ]);
+  });
+
+  it("x-pd-example-height: a whole number of pixels above 0, at a schema's top", () => {
+    expect(check({ "x-pd-example-height": 112, properties: { text: { type: "string" } } })).toEqual([]);
+    expect(readExampleHeight({ "x-pd-example-height": 112 })).toEqual({ height: 112 });
+    expect(readExampleHeight({ properties: {} })).toEqual({});
+    const wording = (got: string) => `#/x-pd-example-height: x-pd-example-height must be a whole number of pixels above 0 (got ${got}): `
+      + `the live example's height at the widest column, no taller than its shortest variant`;
+    for (const [value, got] of [[0, "0"], [-4, "-4"], [112.5, "112.5"], ["112", `"112"`], [null, "null"]] as const) {
+      expect(check({ "x-pd-example-height": value })).toEqual([wording(got)]);
+      expect(readExampleHeight({ "x-pd-example-height": value }).problem).toBe(wording(got).slice("#/x-pd-example-height: ".length));
+    }
+    // In a property it is not a known key.
+    expect(check({ properties: { a: { type: "string", "x-pd-example-height": 10 } } })).toEqual([
+      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`,
+    ]);
+  });
+
+  it("x-pd-example-height doesn't make a component placeable: its template is not checked", () => {
+    expect(check({ "x-pd-example-height": 80, properties: { body: { type: "string" } } }, `<main>{{{body}}}</main>`)).toEqual([]);
   });
 
   it("the template of a schema that uses them outputs unescaped only its text/markdown properties", () => {
