@@ -2,12 +2,15 @@
 // component's own preview document plus a link into the workbench; nothing of the component is rendered
 // into the page. `pattern:` links go to the workbench's URL. A missing component is marked in the page
 // and reported as a problem. The same parser and the same safety rules as the workbench's docs.
-import { beforeAll, describe, expect, it } from "vitest";
-import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { renderDoc, type DocEmbed } from "../src/markdown.js";
+import { save } from "../../../test-support/save.js";
 
 const WB = "https://workbench.example.test/";
 let map: DiscoveryMap;
@@ -99,6 +102,53 @@ describe("renderDoc frame mode — a component's variants", () => {
 
   it("leaves the workbench's own docs unchanged: inline mode has no variant list", async () => {
     expect(await renderDoc("```pattern components/callout\n```\n", renderComponent, map)).not.toContain("doc-example-variants");
+  });
+});
+
+describe("renderDoc frame mode — a live example's declared height (x-pd-example-height)", () => {
+  let root = "";
+  let declared: DiscoveryMap;
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-example-height-"));
+    for (const [rel, text] of Object.entries({
+      "components/tip/tip.hbs": `<p>{{text}}</p>\n`,
+      "components/tip/tip.schema.json": JSON.stringify({ "x-pd-example-height": 96, properties: { text: { type: "string" } } }),
+      "components/tip/tip~short.json": JSON.stringify({ text: "Short" }),
+      "components/bad/bad.hbs": `<p>bad</p>\n`,
+      "components/bad/bad.schema.json": JSON.stringify({ "x-pd-example-height": 0 }),
+    })) {
+      await mkdir(dirname(join(root, rel)), { recursive: true });
+      await save(join(root, rel), text);
+    }
+    declared = (await buildDiscoveryMap(root)).discoveryMap;
+  });
+  afterAll(async () => { if (root) await rm(root, { recursive: true, force: true }); });
+
+  it("starts the frame at the declared height, as an attribute that holds without script", async () => {
+    const problems: string[] = [];
+    const html = await renderDoc("```pattern components/tip\n```\n", renderComponent, declared, frame(problems));
+    expect(html).toContain(`<iframe src="/preview/components/tip" title="components/tip" loading="lazy" height="96"></iframe>`);
+    expect(problems).toEqual([]);
+  });
+
+  it("gives a variant its base component's height: one value covers every variant", async () => {
+    const html = await renderDoc("```pattern components/tip~short\n```\n", renderComponent, declared, frame());
+    expect(html).toContain(`<iframe src="/preview/components/tip~short" title="components/tip~short" loading="lazy" height="96"></iframe>`);
+  });
+
+  it("gives a component that declares no height no attribute", async () => {
+    const html = await renderDoc("```pattern components/callout\n```\n", renderComponent, map, frame());
+    expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>`);
+  });
+
+  it("marks an invalid declared height in the page and reports it, so the page fails to build", async () => {
+    const problems: string[] = [];
+    const html = await renderDoc("```pattern components/bad\n```\n", renderComponent, declared, frame(problems));
+    expect(html).toBe(`<p class="doc-error">[pattern: components/bad — invalid x-pd-example-height]</p>`);
+    expect(problems).toEqual([
+      `pattern components/bad: its schema (bad.schema.json, #/x-pd-example-height): x-pd-example-height must be a whole number of pixels `
+      + `above 0 (got 0): the live example's height at the widest column, no taller than its shortest variant`,
+    ]);
   });
 });
 
