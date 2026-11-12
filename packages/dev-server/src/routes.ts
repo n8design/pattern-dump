@@ -41,6 +41,8 @@ import { resolveDocumentAssets } from "./document-layers.js";
 import { resolveLayoutMode } from "./layout-mode.js";
 import { aggregateRequires, normalizeScriptId } from "./requires.js";
 import { compiledScript, ScriptMissing } from "./scripts.js";
+import { contentHash } from "./content-hash.js";
+import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
@@ -107,7 +109,7 @@ export async function handleRequest(
   res: ServerResponse,
   ctx: RouteContext,
 ): Promise<void> {
-  const { cfg, state, tracker, devUiDist } = ctx;
+  const { cfg } = ctx;
   // Only requests addressed to pd dev itself: one of its own host names at the port this request came in
   // on. A page on another site that gets a name of its own to resolve to 127.0.0.1 still sends that name.
   if (!isOwnHost(req.headers.host, ownHosts(cfg.storefront?.host), req.socket.localPort ?? -1)) {
@@ -115,6 +117,74 @@ export async function handleRequest(
     res.end("Forbidden: this server answers only to its own host names");
     return;
   }
+  // On the storefront's host, every HTML and CSS response leaves with its references to served files
+  // stamped with their content hashes (storefront/asset-stamps.ts). The workbench's hosts are not stamped.
+  const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
+  if (cfg.storefront && host === cfg.storefront.host) return stampedResponse(req, res, ctx);
+  return routeRequest(req, res, ctx);
+}
+
+/** A response held in memory: what a route wrote, to be stamped before it is sent, or hashed. */
+interface HeldResponse { res: ServerResponse; status(): number; headers: Record<string, number | string | string[]>; body(): Buffer }
+
+function holdResponse(): HeldResponse {
+  let status = 200;
+  const headers: Record<string, number | string | string[]> = {};
+  const chunks: Buffer[] = [];
+  const add = (chunk: unknown): void => { if (chunk !== undefined && chunk !== null) chunks.push(Buffer.from(chunk as string | Uint8Array)); };
+  const res = {
+    setHeader(name: string, value: number | string | string[]) { headers[name.toLowerCase()] = value; return res; },
+    getHeader(name: string) { return headers[name.toLowerCase()]; },
+    writeHead(code: number, more?: Record<string, number | string | string[]>) {
+      status = code;
+      for (const [k, v] of Object.entries(more ?? {})) headers[k.toLowerCase()] = v;
+      return res;
+    },
+    write(chunk: unknown) { add(chunk); return true; },
+    end(chunk?: unknown) { add(chunk); return res; },
+  };
+  return { res: res as unknown as ServerResponse, status: () => status, headers, body: () => Buffer.concat(chunks) };
+}
+
+/** Per server, the stamps of the current generation: any handled change starts a new set. */
+const stampCaches = new WeakMap<RouteContext, { generation: string; hashes: Map<string, Promise<string | undefined>> }>();
+
+/** A served path's stamp: the content hash of the path as this host serves it, asked of the server itself. */
+function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
+  const generation = ctx.generation?.() ?? "";
+  let cache = stampCaches.get(ctx);
+  if (!cache || cache.generation !== generation) { cache = { generation, hashes: new Map() }; stampCaches.set(ctx, cache); }
+  const { hashes } = cache;
+  return path => {
+    let hash = hashes.get(path);
+    if (!hash) {
+      const self = { url: path, method: "GET", headers: { host: req.headers.host }, socket: { localPort: req.socket.localPort } } as unknown as IncomingMessage;
+      const held = holdResponse();
+      hash = handleRequest(self, held.res, ctx).then(() => held.status() === 200 ? contentHash(held.body()) : undefined);
+      hashes.set(path, hash);
+    }
+    return hash;
+  };
+}
+
+async function stampedResponse(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): Promise<void> {
+  const held = holdResponse();
+  await routeRequest(req, held.res, ctx);
+  const type = String(held.headers["content-type"] ?? "");
+  let body: Buffer | string = held.body();
+  if (/^text\/html\b/.test(type)) body = await stampHtml(body.toString("utf8"), hashOfFor(req, ctx));
+  else if (/^text\/css\b/.test(type)) body = await stampCss(body.toString("utf8"), hashOfFor(req, ctx));
+  res.writeHead(held.status(), held.headers);
+  res.end(body);
+}
+
+/** Every route, on every host. */
+async function routeRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: RouteContext,
+): Promise<void> {
+  const { cfg, state, tracker, devUiDist } = ctx;
   // One rendering for the whole request: a reload replacing it meanwhile does not mix its parts.
   const { render, globalData } = ctx.rendering.current;
   // Destructured so the chain below reads exactly as it did inside startDevServer — this move

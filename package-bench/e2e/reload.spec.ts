@@ -98,8 +98,9 @@ test("edits to linked packages reach the open workbench and storefront page, wit
   });
 
   await test.step("an asset referenced from CSS", async () => {
-    // Both pages load it again, with its new bytes (it is a background in the chip's stylesheet).
-    const fresh = (page: Page) => page.waitForResponse(async r => r.url().endsWith("/assets/pd-fixture-ds/dot.svg") && (await r.text()).includes("data-v2"));
+    // Both pages load it again, with its new bytes (it is a background in the chip's stylesheet). The storefront
+    // asks for it at its stamped URL (?v=<content hash>), so the path is what is compared.
+    const fresh = (page: Page) => page.waitForResponse(async r => new URL(r.url()).pathname === "/assets/pd-fixture-ds/dot.svg" && (await r.text()).includes("data-v2"));
     const loaded = [fresh(workbench), fresh(storefront)];
     await edit("vendor/fixture-ds/assets/pd-fixture-ds/dot.svg", "<svg ", `<svg data-v2="" `);
     await Promise.all(loaded);

@@ -75,8 +75,8 @@ describe("the discovery a request takes", () => {
       expect(page.status).toBe(200);
       expect(page.body).toContain(`<h1 class="page-title">Storefront bench</h1>`);
       // The layout's partials, linked through the composition built from the discovery the request took.
-      expect(page.body).toContain(`<link rel="stylesheet" href="/_pd/components/partials/base.css" data-pd-comp="partials/base">`);
-      expect(page.body).toContain(`<link rel="stylesheet" href="/_pd/components/partials/nav.css" data-pd-comp="partials/nav">`);
+      expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/partials\/base\.css\?v=[0-9a-f]{10}" data-pd-comp="partials\/base">/);
+      expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/partials\/nav\.css\?v=[0-9a-f]{10}" data-pd-comp="partials\/nav">/);
       expect(errors.filter(e => e.includes("Unhandled request error"))).toEqual([]);
     } finally {
       spy.mockRestore();

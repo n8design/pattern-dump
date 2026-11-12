@@ -1,7 +1,8 @@
 // pd dev and pd build give the same page DOM, apart from what only pd dev has: the live-reload client, the
-// workbench's address, its own address in canonical and Open Graph URLs, and the base layer's `?v=N`, which pd dev adds once the base layer has changed so
-// open pages fetch it again (a spec before this one may have changed it; pd build never writes it). Read
-// once each frame has been fitted, so the fitter's heights are part of what is compared.
+// workbench's address, and its own address in canonical and Open Graph URLs. Content stamps (`?v=<hash>`) are
+// compared as they are: both stamp a file with the hash of what they serve, so a stylesheet a spec before this
+// one changed and restored has its old stamp again. Read once each frame has been fitted, so the fitter's
+// heights are part of what is compared.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 import { BUILD_WORKBENCH_URL, DEV, domWithoutLiveClient, SITE_URL, STATIC, WORKBENCH } from "./helpers.js";
@@ -18,8 +19,7 @@ async function settled(page: Page, url: string): Promise<string> {
 test.describe("pd dev and pd build", () => {
   for (const route of ["/", "/about/", "/guides/", "/guides/setup/"]) {
     test(`render the same DOM for ${route}`, async ({ page }) => {
-      const dev = (await settled(page, DEV + route)).replaceAll(`${WORKBENCH}/`, BUILD_WORKBENCH_URL).replaceAll(`${DEV}/`, SITE_URL)
-        .replace(/(href="\/_pd\/base\.css)\?v=\d+"/g, '$1"');
+      const dev = (await settled(page, DEV + route)).replaceAll(`${WORKBENCH}/`, BUILD_WORKBENCH_URL).replaceAll(`${DEV}/`, SITE_URL);
       const built = await settled(page, STATIC + route);
       expect(dev).toBe(built);
     });
