@@ -116,6 +116,8 @@ describe("renderDoc frame mode — a live example's declared height (x-pd-exampl
       "components/tip/tip~short.json": JSON.stringify({ text: "Short" }),
       "components/bad/bad.hbs": `<p>bad</p>\n`,
       "components/bad/bad.schema.json": JSON.stringify({ "x-pd-example-height": 0 }),
+      "components/broken/broken.hbs": `<p>broken</p>\n`,
+      "components/broken/broken.schema.json": `{ "x-pd-example-height": 96, `,
     })) {
       await mkdir(dirname(join(root, rel)), { recursive: true });
       await save(join(root, rel), text);
@@ -149,6 +151,13 @@ describe("renderDoc frame mode — a live example's declared height (x-pd-exampl
       `pattern components/bad: its schema (bad.schema.json, #/x-pd-example-height): x-pd-example-height must be a whole number of pixels `
       + `above 0 (got 0): the live example's height at the widest column, no taller than its shortest variant`,
     ]);
+  });
+
+  it("marks a schema that cannot be read and reports it: the page can't tell what it declares", async () => {
+    const problems: string[] = [];
+    const html = await renderDoc("```pattern components/broken\n```\n", renderComponent, declared, frame(problems));
+    expect(html).toBe(`<p class="doc-error">[pattern: components/broken — its schema cannot be read]</p>`);
+    expect(problems).toEqual([expect.stringMatching(/^pattern components\/broken: its schema \(broken\.schema\.json\) cannot be read: \S/)]);
   });
 });
 

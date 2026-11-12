@@ -268,10 +268,17 @@ async function _resolveFence(
       // The height the frame starts at, before its preview reports its own: the base component's declared
       // x-pd-example-height, one value for every variant. As an attribute, so it holds without script and a
       // skin's CSS can still override it. An invalid value fails the page, as a missing component does.
+      // A schema that can't be read fails the page too: what it declares is unknown.
       const schemaPath = discoveryMap.get(compId)?.schemaPath;
-      const declared = readExampleHeight((await readSchema(schemaPath)).schema);
+      const read = await readSchema(schemaPath);
+      const shown = embed.placed?.deps.shown ?? basename;
+      if (read.error !== undefined) {
+        embed.problems.push(`pattern ${spec}: its schema (${shown(schemaPath!)}) cannot be read: ${read.error}`);
+        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — its schema cannot be read]</p>`);
+        return;
+      }
+      const declared = readExampleHeight(read.schema);
       if (declared.problem) {
-        const shown = embed.placed?.deps.shown ?? basename;
         embed.problems.push(`pattern ${spec}: its schema (${shown(schemaPath!)}, #/x-pd-example-height): ${declared.problem}`);
         out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — invalid x-pd-example-height]</p>`);
         return;
