@@ -112,8 +112,8 @@ export function parseCommand(argv: string[], cwd: string): Command {
   }
 }
 
-/** `--x` / `--no-x` pairs. Implemented as two options rather than parseArgs' allowNegative, which
- *  needs Node 20.16+ — this CLI supports 20.10. Giving both is an error. */
+/** `--x` / `--no-x` pairs. Implemented as two options rather than parseArgs' allowNegative, with which
+ *  the last one given would win: here giving both is an error. */
 function toggle(values: Record<string, unknown>, name: string): boolean | undefined | Error {
   const on = values[name] === true;
   const off = values[`no-${name}`] === true;

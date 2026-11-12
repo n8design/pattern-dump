@@ -26,7 +26,7 @@ how they relate, and publishes the result as a static site.
 
 ## Requirements
 
-Node.js 20.10 or later, and npm.
+Node.js 22.22 or later, and npm.
 
 ## Quick start
 
