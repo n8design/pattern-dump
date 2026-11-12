@@ -38,7 +38,7 @@ describe("checkSchemaHelperNames", () => {
 
   it("names its own problems, and no other message", () => {
     expect(isHelperNameProblem(said("id"))).toBe(true);
-    expect(isHelperNameProblem(`"x-pd-thing" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content)`)).toBe(false);
+    expect(isHelperNameProblem(`"x-pd-thing" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`)).toBe(false);
   });
 });
 

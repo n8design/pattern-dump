@@ -21,13 +21,14 @@
 // which is what makes concurrent renders safe.
 
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import MarkdownIt from "markdown-it";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
-import { highlight, wrapWithCopyButton, deepMerge } from "@pattern-dump/renderer";
+import { highlight, wrapWithCopyButton, deepMerge, readExampleHeight } from "@pattern-dump/renderer";
 import { escapeAttr, escapeHtml } from "./http-utils.js";
 import { usePlacedTags, type PlacedBlock } from "./placed-tags.js";
 import { placeBlock, type PlacementDeps } from "./storefront/placed.js";
-import type { PlacedProblem } from "./storefront/declared-values.js";
+import { readSchema, type PlacedProblem } from "./storefront/declared-values.js";
 import type { PageHeading } from "./storefront/derived.js";
 import { slug, Slugger } from "./storefront/slug.js";
 
@@ -264,9 +265,28 @@ async function _resolveFence(
         out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — no such component]</p>`);
         return;
       }
+      // The height the frame starts at, before its preview reports its own: the base component's declared
+      // x-pd-example-height, one value for every variant. As an attribute, so it holds without script and a
+      // skin's CSS can still override it. An invalid value fails the page, as a missing component does.
+      // A schema that can't be read fails the page too: what it declares is unknown.
+      const schemaPath = discoveryMap.get(compId)?.schemaPath;
+      const read = await readSchema(schemaPath);
+      const shown = embed.placed?.deps.shown ?? basename;
+      if (read.error !== undefined) {
+        embed.problems.push(`pattern ${spec}: its schema (${shown(schemaPath!)}) cannot be read: ${read.error}`);
+        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — its schema cannot be read]</p>`);
+        return;
+      }
+      const declared = readExampleHeight(read.schema);
+      if (declared.problem) {
+        embed.problems.push(`pattern ${spec}: its schema (${shown(schemaPath!)}, #/x-pd-example-height): ${declared.problem}`);
+        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — invalid x-pd-example-height]</p>`);
+        return;
+      }
+      const height = declared.height === undefined ? "" : ` height="${declared.height}"`;
       const workbench = embed.workbenchUrl + compId + (variant ? `#${variant}` : "");
       out.set(idx, `<figure class="doc-example">\n`
-        + `<iframe src="${escapeAttr(`/preview/${fullId}`)}" title="${escapeAttr(fullId)}" loading="lazy"></iframe>\n`
+        + `<iframe src="${escapeAttr(`/preview/${fullId}`)}" title="${escapeAttr(fullId)}" loading="lazy"${height}></iframe>\n`
         + _frameVariants(compId, variant, discoveryMap)
         + `<figcaption><span class="doc-example-id">${escapeHtml(fullId)}</span> <a href="${escapeAttr(workbench)}">Open ${escapeHtml(fullId)} in the workbench</a></figcaption>\n`
         + `</figure>\n`);

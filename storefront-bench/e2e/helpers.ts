@@ -20,9 +20,10 @@ export const domWithoutLiveClient = (page: Page): Promise<string> => page.evalua
 });
 
 /**
- * Every live example on the page has the height its preview reported: the fitter has written it (the frame is
- * no longer at the 1px it starts at), and the frame's content box equals its preview document's height. Until
- * then the frame grows, and whatever sits below it moves; wait for this before clicking at or below an example.
+ * Every live example on the page has the height its preview reported: the fitter has written it (the frame no
+ * longer has no inline height, or the 1px an undeclared frame starts at), and the frame's content box equals its
+ * preview document's height. Until then a frame can grow, and whatever sits below it moves; wait for this
+ * before clicking at or below an example.
  */
 export const examplesFitted = (page: Page): Promise<void> => expect.poll(() =>
   page.locator("figure.doc-example iframe").evaluateAll(frames => frames.length > 0 && frames.every(node => {
