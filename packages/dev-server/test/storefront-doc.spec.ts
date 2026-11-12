@@ -35,7 +35,7 @@ describe("renderDoc frame mode — pattern fences", () => {
     const html = await renderDoc("```pattern components/callout\n```\n", renderComponent, map, frame(problems));
     expect(html).toBe(
       `<figure class="doc-example">\n`
-      + `<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>\n`
+      + `<iframe src="/preview/components/callout" title="components/callout" loading="lazy" height="112"></iframe>\n`
       + `<ul class="doc-example-variants" aria-label="Variants of components/callout">\n`
       + `<li><a href="/preview/components/callout" aria-current="true">default</a></li>\n`
       + `<li><a href="/preview/components/callout~warning">warning</a></li>\n`
@@ -49,7 +49,7 @@ describe("renderDoc frame mode — pattern fences", () => {
 
   it("addresses a variant by its id, and links to it in the workbench", async () => {
     const html = await renderDoc("```pattern components/callout~warning\n```\n", renderComponent, map, frame());
-    expect(html).toContain(`<iframe src="/preview/components/callout~warning" title="components/callout~warning" loading="lazy"></iframe>`);
+    expect(html).toContain(`<iframe src="/preview/components/callout~warning" title="components/callout~warning" loading="lazy" height="112"></iframe>`);
     expect(html).toContain(`<a href="https://workbench.example.test/components/callout#warning">Open components/callout~warning in the workbench</a>`);
   });
 
@@ -95,7 +95,7 @@ describe("renderDoc frame mode — a component's variants", () => {
     const html = await renderDoc("```pattern components/callout\n```\n", renderComponent, noVariants, frame());
     expect(html).toBe(
       `<figure class="doc-example">\n`
-      + `<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>\n`
+      + `<iframe src="/preview/components/callout" title="components/callout" loading="lazy" height="112"></iframe>\n`
       + `<figcaption><span class="doc-example-id">components/callout</span> <a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a></figcaption>\n`
       + `</figure>\n`);
   });
@@ -116,6 +116,7 @@ describe("renderDoc frame mode — a live example's declared height (x-pd-exampl
       "components/tip/tip~short.json": JSON.stringify({ text: "Short" }),
       "components/bad/bad.hbs": `<p>bad</p>\n`,
       "components/bad/bad.schema.json": JSON.stringify({ "x-pd-example-height": 0 }),
+      "components/plain/plain.hbs": `<p>plain</p>\n`,
       "components/broken/broken.hbs": `<p>broken</p>\n`,
       "components/broken/broken.schema.json": `{ "x-pd-example-height": 96, `,
     })) {
@@ -139,8 +140,8 @@ describe("renderDoc frame mode — a live example's declared height (x-pd-exampl
   });
 
   it("gives a component that declares no height no attribute", async () => {
-    const html = await renderDoc("```pattern components/callout\n```\n", renderComponent, map, frame());
-    expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>`);
+    const html = await renderDoc("```pattern components/plain\n```\n", renderComponent, declared, frame());
+    expect(html).toContain(`<iframe src="/preview/components/plain" title="components/plain" loading="lazy"></iframe>`);
   });
 
   it("marks an invalid declared height in the page and reports it, so the page fails to build", async () => {

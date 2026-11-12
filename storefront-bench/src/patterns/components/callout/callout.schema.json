@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Callout",
   "type": "object",
+  "x-pd-example-height": 112,
   "required": ["title", "text"],
   "properties": {
     "title": { "type": "string" },

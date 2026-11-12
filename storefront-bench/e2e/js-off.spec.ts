@@ -11,8 +11,9 @@ test.describe("storefront pages with JavaScript off", () => {
     await expect(page.locator(".page-body")).toContainText("Every markdown file in pages/ is a page");
     const frame = page.locator("figure.doc-example iframe");
     await expect(frame).toHaveAttribute("src", "/preview/components/callout");
-    // The frame keeps the UA default height: it is not fitted without script, and still shows the component.
-    expect(Math.round(await frame.evaluate((f: HTMLIFrameElement) => f.clientHeight))).toBe(150);
+    // The frame has the height its component declares (x-pd-example-height, as its height attribute): it is not
+    // fitted without script, and still shows the component, at the height it would start at with script.
+    expect(Math.round(await frame.evaluate((f: HTMLIFrameElement) => f.clientHeight))).toBe(112);
     const base = isDev(info) ? `${WORKBENCH}/` : BUILD_WORKBENCH_URL;
     await expect(page.locator("figure.doc-example figcaption a")).toHaveAttribute("href", `${base}components/callout`);
   });
