@@ -42,9 +42,10 @@ export interface StaticBuildOptions {
   log?: (line: string) => void;
 }
 
-/** Not a test's watcher barrier (`.__testOnly_barrier`, which tests and the settle hook write into watched
- *  folders, asset folders among them): those never reach the build's output. */
-const notABarrier = (path: string): boolean => basename(path) !== ".__testOnly_barrier";
+/** Not a watcher barrier: a test's (`.__testOnly_barrier`, which tests and the settle hook write into watched
+ *  folders, asset folders among them) or the one pd dev writes into each watched folder as it starts
+ *  (`.pd-watch-start`, removed once seen). Neither reaches the build's output. */
+const notABarrier = (path: string): boolean => basename(path) !== ".__testOnly_barrier" && basename(path) !== ".pd-watch-start";
 
 export interface StaticBuildReport {
   outDir: string;

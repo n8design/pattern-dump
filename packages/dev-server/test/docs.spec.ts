@@ -22,7 +22,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { cp, mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
+import { copyProject } from "./copy-project.js";
 import { tmpdir } from "node:os";
 
 import { startDevServer } from "@pattern-dump/dev-server";
@@ -231,7 +232,7 @@ describe("docs security — validateLink allowlist", () => {
 
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), "pd-docs-sec-"));
-    await cp(testBench, dir, { recursive: true });
+    await copyProject(testBench, dir);
     await save(
       join(dir, "src/patterns/atoms/chip/chip.md"),
       [

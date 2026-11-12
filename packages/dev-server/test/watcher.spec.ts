@@ -22,7 +22,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { readFile, mkdir, rm, cp, mkdtemp } from "node:fs/promises";
+import { readFile, mkdir, rm, mkdtemp } from "node:fs/promises";
+import { copyProject } from "./copy-project.js";
 import { tmpdir } from "node:os";
 import WebSocket from "ws";
 
@@ -111,7 +112,7 @@ describe("file watcher / HMR — characterisation", () => {
 
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), "pd-watcher-"));
-    await cp(testBench, dir, { recursive: true });
+    await copyProject(testBench, dir);
     server = await startDevServer(config, dir, { port: 0, wsPort: WS_PORT });
     tap = new HmrTap();
     await tap.connect();

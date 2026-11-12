@@ -1,4 +1,6 @@
 node_modules
 dist
 lib
+# pd dev writes this into each watched folder for a moment as it starts, then removes it
+.pd-watch-start
 __PD_STOREFRONT_GITIGNORE__

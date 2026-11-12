@@ -129,6 +129,10 @@ own body (pinned by `iframe-fit.spec.ts`).
   dropped); the modules it imports are not, so a change to one asks for a restart.
 - **Diagnostics name files without absolute paths.** `display-path.ts` gives the renderer's `displayPath`:
   project-relative, or `<package name>/<path in the package>`.
+- **The start barrier.** `startWatching` resolves only once every watched folder has reported a write of
+  `.pd-watch-start`, which it then removes: chokidar's `ready` means its first scan is done, not that its
+  watches are live. It is the one file `pd dev` writes into the project, and it leaves nothing behind; a
+  folder it cannot write is skipped and named.
 - **Test-only, not features.** The watcher calls `globalThis.__testOnly_onEventHandled`, when a test sets
   it, after each event's handler finishes, and reports a file named `.__testOnly_barrier` without handling
   it. `test/watch-harness.ts` uses both to wait on events instead of waiting for quiet. Unset, they cost a
