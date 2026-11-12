@@ -109,11 +109,35 @@ export function liveScript(wsPort: number, generation = ""): string {
     + `ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}`
     + `if(m.type==="hello"){if(behind(g,m.generation))location.reload();return;}`
     + `if((m.type==="page-changed"&&(m.route===null||m.route===location.pathname))||m.type==="content-swap"||m.type==="css-link-swap")location.reload();`
-    + `else if(m.type==="error"){var n=document.querySelector("[data-pd-live-notice]");`
-    + `if(!n){n=document.createElement("div");n.setAttribute("data-pd-live-notice","");n.setAttribute("role","alert");`
-    + `n.style.cssText="position:fixed;left:1rem;right:1rem;bottom:1rem;z-index:2147483647;padding:.75rem 1rem;background:#fff;color:#000;border:2px solid #b00020;font:14px/1.4 system-ui,sans-serif";`
-    + `n.appendChild(document.createElement("ul"));document.body.appendChild(n);}`
-    + `var li=document.createElement("li");li.textContent=String(m.message);n.firstChild.appendChild(li);}};`
+    + `else if(m.type==="error")(${LIVE_NOTICE})(String(m.message));};`
+    + `})();</script>`;
+}
+
+/** The live client's notice: one fixed list on the page, a line added per problem; the next reload clears it. */
+const LIVE_NOTICE = `function(t){var n=document.querySelector("[data-pd-live-notice]");`
+  + `if(!n){n=document.createElement("div");n.setAttribute("data-pd-live-notice","");n.setAttribute("role","alert");`
+  + `n.style.cssText="position:fixed;left:1rem;right:1rem;bottom:1rem;z-index:2147483647;padding:.75rem 1rem;background:#fff;color:#000;border:2px solid #b00020;font:14px/1.4 system-ui,sans-serif";`
+  + `n.appendChild(document.createElement("ul"));document.body.appendChild(n);}`
+  + `var li=document.createElement("li");li.textContent=t;n.firstChild.appendChild(li);}`;
+
+/**
+ * `pd dev` only: warn when a live example is declared taller than its content (x-pd-example-height), the one
+ * mistake the fitter can't correct. Once per load of each frame with a declared height, after its fonts are
+ * ready: the preview's root box is the content's own height (scrollHeight is floored at the frame's). A root box
+ * exactly as tall as the frame is ambiguous (`html { height: 100% }` fills any frame) and stays silent; only a
+ * root clearly shorter than the declared height warns, on the console and in the live notice. Each check ends
+ * in one console.debug line saying its outcome.
+ */
+export function exampleHeightCheckScript(): string {
+  return `<script data-pd-live>(function(){var notice=(${LIVE_NOTICE});`
+    + `document.querySelectorAll("figure.doc-example iframe[height]").forEach(function(f){`
+    + `var check=function(){var d=f.contentDocument;if(!d||d.URL==="about:blank")return;d.fonts.ready.then(function(){`
+    + `var declared=Number(f.getAttribute("height")),root=d.documentElement.getBoundingClientRect().height,id=f.title,outcome="fits";`
+    + `if(root===f.clientHeight)outcome="can't tell (the content is as tall as its frame)";`
+    + `else if(root<declared-1){outcome="too tall";var t=id+": its live example is declared "+declared+"px tall (x-pd-example-height), but its content is "+Math.round(root)`
+    + `+"px. A frame is never fitted shorter than it starts, so it stays too tall: declare at most "+Math.floor(root)+".";console.warn(t);notice(t);}`
+    + `console.debug("[pd] example height of "+id+": "+outcome);});};`
+    + `f.addEventListener("load",check);if(f.contentDocument&&f.contentDocument.readyState==="complete")check();});`
     + `})();</script>`;
 }
 
@@ -127,7 +151,7 @@ ${head}
 </head>
 <body>
 ${body}
-${live ? liveScript(live.wsPort, live.generation) : ""}
+${live ? liveScript(live.wsPort, live.generation) + exampleHeightCheckScript() : ""}
 </body>
 </html>`;
 }

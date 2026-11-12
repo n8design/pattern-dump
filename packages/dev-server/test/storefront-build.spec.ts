@@ -199,7 +199,7 @@ describe("pd build — the storefront root", () => {
           req.on("error", reject); req.end();
         });
         const normalized = live
-          .replace(/\n<script data-pd-live>[\s\S]*?<\/script>/, "\n")
+          .replace(/\n(?:<script data-pd-live>[\s\S]*?<\/script>)+/, "\n")
           .replaceAll(`http://pd.localhost:${server.port}/`, WB)
           // pd dev's absolute URLs are the address the browser is on; the build's, storefront.url.
           .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!);
