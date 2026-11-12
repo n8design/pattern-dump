@@ -17,7 +17,8 @@
     "autoprefixer": "^10.4.0",
     "esbuild": "^0.28.2",
     "postcss": "^8.4.0",
-    "sass": "^1.77.0"
+    "sass": "^1.77.0",
+    "sharp": "0.35.5"
   },
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js",
