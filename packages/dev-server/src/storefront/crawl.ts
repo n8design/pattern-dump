@@ -32,6 +32,9 @@ const unescapeHtml = (s: string): string => s.replace(/&lt;/g, "<").replace(/&gt
  *  absolute URL on the site's own address, so its path is taken). Page routes are crawled from the page list. */
 const markupRefs = (html: string): string[] => [
   ...[...html.matchAll(/(?:href|src)="(\/(?:_pd|assets|preview)\/[^"]+)"/g)].map(m => unescapeHtml(m[1])),
+  // Each candidate of a srcset: its URL, before the width or density that describes it.
+  ...[...html.matchAll(/srcset="([^"]+)"/g)].flatMap(m => unescapeHtml(m[1]).split(",").map(c => c.trim().split(/\s+/)[0] ?? ""))
+    .filter(u => /^\/(?:_pd|assets)\//.test(u)),
   ...[...html.matchAll(/<meta property="og:image" content="https?:\/\/[^/"]+(\/assets\/[^"]+)">/g)].map(m => unescapeHtml(m[1])),
 ];
 const cssRefs = (css: string): string[] =>

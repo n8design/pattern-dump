@@ -42,6 +42,7 @@ import { resolveLayoutMode } from "./layout-mode.js";
 import { aggregateRequires, normalizeScriptId } from "./requires.js";
 import { compiledScript, ScriptMissing } from "./scripts.js";
 import { contentHash } from "./content-hash.js";
+import { serveImageVariant } from "./image-route.js";
 import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
@@ -313,6 +314,11 @@ async function routeRequest(
         res.end(`Script compile error: ${String(e)}`);
       }
       return;
+    }
+
+    // --- Responsive image variants (image-route.ts) ---
+    if (pathname.startsWith(PD_ROUTE_PREFIX.images)) {
+      return await serveImageVariant(pathname, (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase(), res, cfg);
     }
 
     // --- Project asset serving (/assets/*) ---
