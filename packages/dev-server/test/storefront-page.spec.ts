@@ -73,7 +73,7 @@ describe("assemblePage — the bench's pages", () => {
     expect(html).toContain(`<h1 class="page-title">Storefront bench</h1>`);
     expect(html).toContain(`<a href="/" aria-current="page">Storefront bench</a>`);
     expect(html).toContain(`<a href="/guides/">Guides</a>`);
-    expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy"></iframe>`);
+    expect(html).toContain(`<iframe src="/preview/components/callout" title="components/callout" loading="lazy" height="112"></iframe>`);
     expect(html).toContain(`<a href="https://workbench.example.test/components/callout">Open components/callout in the workbench</a>`);
     expect(html).toContain("<p>Built with Pattern Dump from the storefront bench.</p>");
     // The layout's sample body never shows.

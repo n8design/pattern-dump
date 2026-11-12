@@ -93,8 +93,39 @@ On a storefront page this is a frame with the component's own preview, not a cop
 component is styled by its own CSS and nothing on the page can restyle it. With JavaScript on, the frame
 fits the preview's height. Beside the frame are a list of the component's variants, each a link to its
 preview, and a link that opens the component in the workbench (in `pd dev`, this server's workbench; in a
-build, `storefront.workbenchUrl`). With JavaScript off, the frame keeps the browser's default height and the
-links still work.
+build, `storefront.workbenchUrl`). With JavaScript off, the frame keeps the browser's default height (or the
+height its component declares, below) and the links still work.
+
+#### The height an example starts at
+
+Until its preview has loaded, a frame doesn't know how tall its content is. If it started small and then grew,
+everything below it on the page would move (a layout shift, which search engines count against a page). So a
+component can declare the height its live example starts at, in its schema:
+
+```json
+{
+  "x-pd-example-height": 112,
+  "properties": { "title": { "type": "string" }, "text": { "type": "string" } }
+}
+```
+
+The frame then starts at that height (as its `height` attribute, so it holds with JavaScript off too, and a
+skin's CSS can still change it) and grows from there to fit its preview.
+
+The value must **err short**. A frame can grow to fit its content but never shrink below the height it starts
+at, so a value taller than the content leaves the frame too tall, with empty space under the component. Use:
+
+- the height of the example **at the widest column** your skin gives it, which is its smallest height, since
+  narrower columns wrap its text onto more lines; and
+- **no taller than the shortest variant**: one value covers the component and all its variants.
+
+`pd dev` warns, on the page and in the browser console, when an example's content turns out shorter than its
+declared height. It can't tell when a preview's content fills whatever frame it is in (`html { height: 100% }`),
+and says nothing then.
+
+The value is a whole number of pixels above 0. Anything else is an error on the component in the workbench, and
+every page that shows it in a live example fails to build, as it does when a schema can't be read at all. A
+component without the key starts as before: small, then fitted.
 
 A `pattern:` link, such as `[the callout](pattern:components/callout)`, links to the component in the
 workbench.

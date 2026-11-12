@@ -78,13 +78,16 @@ export interface AssembledPage {
   notes: string[];
 }
 
-/** The fitter's glue: frames start at 1px (from script, so with scripting off they keep the UA default
- *  height and stay readable), then follow the pd-height their preview documents post. */
+/** The fitter's glue: a frame with a declared height (its `height` attribute, from the component's
+ *  x-pd-example-height) starts there; any other starts at 1px, from script, so with scripting off it keeps
+ *  the UA default height and stays readable. Then each follows the pd-height its preview document posts.
+ *  A frame can be fitted taller but never shorter than it starts (scrollHeight never drops below the frame's
+ *  own height), which is why a declared height errs short and an undeclared frame can't keep the UA's 150px. */
 export function fitterScript(): string {
   return `<script>(function(){var createHeightFitter=(${createHeightFitter.toString()});`
     + `var fitter=createHeightFitter({write:function(f,h){f.style.height=h+"px";}});`
     + `var frames=function(){return document.querySelectorAll("figure.doc-example iframe");};`
-    + `frames().forEach(function(f){f.style.height="1px";});`
+    + `frames().forEach(function(f){if(!f.hasAttribute("height"))f.style.height="1px";});`
     + `addEventListener("message",function(e){var m=fitter.fromMessage(e,frames());if(m)fitter.accept(m.frame,m.height);});`
     + `})();</script>`;
 }
@@ -106,12 +109,36 @@ export function liveScript(wsPort: number, generation = ""): string {
     + `ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}`
     + `if(m.type==="hello"){if(behind(g,m.generation))location.reload();return;}`
     + `if((m.type==="page-changed"&&(m.route===null||m.route===location.pathname))||m.type==="content-swap"||m.type==="css-link-swap")location.reload();`
-    + `else if(m.type==="error"){var n=document.querySelector("[data-pd-live-notice]");`
-    + `if(!n){n=document.createElement("div");n.setAttribute("data-pd-live-notice","");n.setAttribute("role","alert");`
-    + `n.style.cssText="position:fixed;left:1rem;right:1rem;bottom:1rem;z-index:2147483647;padding:.75rem 1rem;background:#fff;color:#000;border:2px solid #b00020;font:14px/1.4 system-ui,sans-serif";`
-    + `n.appendChild(document.createElement("ul"));document.body.appendChild(n);}`
-    + `var li=document.createElement("li");li.textContent=String(m.message);n.firstChild.appendChild(li);}};`
-    + `})();</script>`;
+    + `else if(m.type==="error")(${LIVE_NOTICE})(String(m.message));};`
+    + `})();${exampleHeightCheck()}</script>`;
+}
+
+/** The live client's notice: one fixed list on the page, a line added per problem; the next reload clears it. */
+const LIVE_NOTICE = `function(t){var n=document.querySelector("[data-pd-live-notice]");`
+  + `if(!n){n=document.createElement("div");n.setAttribute("data-pd-live-notice","");n.setAttribute("role","alert");`
+  + `n.style.cssText="position:fixed;left:1rem;right:1rem;bottom:1rem;z-index:2147483647;padding:.75rem 1rem;background:#fff;color:#000;border:2px solid #b00020;font:14px/1.4 system-ui,sans-serif";`
+  + `n.appendChild(document.createElement("ul"));document.body.appendChild(n);}`
+  + `var li=document.createElement("li");li.textContent=t;n.firstChild.appendChild(li);}`;
+
+/**
+ * Part of the live client, so `pd dev` only: warn when a live example is declared taller than its content (x-pd-example-height), the one
+ * mistake the fitter can't correct. Once per load of each frame with a declared height, after its fonts are
+ * ready: the preview's root box is the content's own height (scrollHeight is floored at the frame's). A root box
+ * exactly as tall as the frame is ambiguous (`html { height: 100% }` fills any frame) and stays silent; only a
+ * root clearly shorter than the declared height warns, on the console and in the live notice. Each check ends
+ * in one console.debug line saying its outcome.
+ */
+function exampleHeightCheck(): string {
+  return `(function(){var notice=(${LIVE_NOTICE});`
+    + `document.querySelectorAll("figure.doc-example iframe[height]").forEach(function(f){`
+    + `var check=function(){var d=f.contentDocument;if(!d||d.URL==="about:blank")return;d.fonts.ready.then(function(){`
+    + `var declared=Number(f.getAttribute("height")),root=d.documentElement.getBoundingClientRect().height,id=f.title,outcome="fits";`
+    + `if(root===f.clientHeight)outcome="can't tell (the content is as tall as its frame)";`
+    + `else if(root<declared-1){outcome="too tall";var t=id+": its live example is declared "+declared+"px tall (x-pd-example-height), but its content is "+Math.round(root)`
+    + `+"px. A frame is never fitted shorter than it starts, so it stays too tall: declare at most "+Math.floor(root)+".";console.warn(t);notice(t);}`
+    + `console.debug("[pd] example height of "+id+": "+outcome);});};`
+    + `f.addEventListener("load",check);if(f.contentDocument&&f.contentDocument.readyState==="complete")check();});`
+    + `})();`;
 }
 
 function document(head: string, body: string, live: PageAssembly["live"], lang = "en"): string {

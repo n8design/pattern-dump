@@ -5,6 +5,14 @@
 //   x-pd-content       at a schema's top: the property a tag's content fills; it must be a declared string.
 //   contentMediaType   only "text/markdown", only on a string: rendered as markdown, HTML escaped.
 //
+// And one that is not about placement, so it doesn't switch on the template check below:
+//
+//   x-pd-example-height  at a schema's top: the height, in whole CSS pixels, a live example of the component
+//                        starts at on a storefront page, before its preview reports its own. It must err
+//                        short: the frame can grow to its content but never shrink below this. One value
+//                        covers every variant, so it is the height at the widest column and no taller than
+//                        the shortest variant.
+//
 // Any other `x-pd-` key is an error (a typo would otherwise do nothing); other `x-` keys are left alone. A
 // schema that uses a placement extension says its component can be placed, so its template is checked too:
 // it may output unescaped (`{{{x}}}`, `{{& x}}`) only what the schema declares `text/markdown`. Checked at
@@ -23,9 +31,20 @@ export interface SchemaExtensionContext {
 
 type Prop = Record<string, unknown>;
 const KNOWN_PROPERTY_KEYS = new Set(["x-pd-component"]);
-const KNOWN_TOP_KEYS = new Set(["x-pd-content"]);
+const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height"]);
+const KNOWN_LIST = "x-pd-component, x-pd-content, x-pd-example-height";
 const isObject = (v: unknown): v is Prop => typeof v === "object" && v !== null && !Array.isArray(v);
 const typesOf = (p: Prop): unknown[] => p["type"] === undefined ? [] : Array.isArray(p["type"]) ? p["type"] : [p["type"]];
+
+/** A schema's x-pd-example-height: the height when it declares a valid one, the problem when it is invalid,
+ *  nothing when it declares none. The schema check and the storefront's live examples both read it here. */
+export function readExampleHeight(schema: unknown): { height?: number; problem?: string } {
+  if (!isObject(schema) || !("x-pd-example-height" in schema)) return {};
+  const value = schema["x-pd-example-height"];
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) return { height: value };
+  return { problem: `x-pd-example-height must be a whole number of pixels above 0 (got ${JSON.stringify(value)}): `
+    + `the live example's height at the widest column, no taller than its shortest variant` };
+}
 
 /** Every problem with a schema's placement extensions (and, when it uses them, its template's). */
 export function checkSchemaExtensions(schema: unknown, template: string | undefined, ctx: SchemaExtensionContext): SchemaExtensionProblem[] {
@@ -37,7 +56,7 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
   const unknownKeys = (node: Prop, known: Set<string>, path: string): void => {
     for (const key of Object.keys(node)) {
       if (key.startsWith("x-pd-") && !known.has(key)) {
-        problems.push({ path: `${path}/${key}`, message: `"${key}" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content)` });
+        problems.push({ path: `${path}/${key}`, message: `"${key}" is not a schema extension Pattern Dump knows (${KNOWN_LIST})` });
       }
     }
   };
@@ -74,6 +93,9 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
     if (!target) problems.push({ path: "#/x-pd-content", message: `x-pd-content names ${JSON.stringify(content)}, which is not a declared property` });
     else if (!typesOf(target).includes("string")) problems.push({ path: "#/x-pd-content", message: `x-pd-content names "${content}", which is not a string` });
   }
+
+  const exampleHeight = readExampleHeight(schema).problem;
+  if (exampleHeight) problems.push({ path: "#/x-pd-example-height", message: exampleHeight });
 
   if (usesPlacement && template !== undefined) {
     for (const o of unescapedOutputs(template)) {

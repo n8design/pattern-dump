@@ -233,6 +233,7 @@ describe("the storefront page's live client", () => {
       body,
       createElement: make,
       querySelector: (sel: string) => elements.find(e => sel === "[data-pd-live-notice]" && "data-pd-live-notice" in e.attrs) ?? null,
+      querySelectorAll: () => [], // no live examples on this stand-in page
     };
     class WebSocket { set onmessage(f: (e: { data: string }) => void) { onmessage = f; } }
     const src = /<script data-pd-live>([\s\S]*)<\/script>/.exec(liveScript(4321))![1];
