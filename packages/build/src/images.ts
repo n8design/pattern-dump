@@ -52,26 +52,28 @@ export function loadSharp(importer?: () => Promise<{ default: SharpModule }>): P
 
 /**
  * A variant's key: the first 10 hex digits of a SHA-256 over the source's bytes and everything its bytes depend
- * on (format, width, quality, effort, sharp's version). It names the variant before it is encoded, and changes
+ * on (format, that it is auto-oriented, width, quality, effort, sharp's version). It names the variant before it is encoded, and changes
  * exactly when the variant's bytes would.
  */
 export function imageVariantKey(source: Uint8Array, width: number, encoding: ImageEncoding): string {
   const sourceHash = createHash("sha256").update(source).digest("hex");
   return createHash("sha256")
-    .update(`${sourceHash}|webp|w=${width}|q=${encoding.quality}|e=${encoding.effort}|sharp=${SHARP_VERSION}`)
+    .update(`${sourceHash}|webp|orient=auto|w=${width}|q=${encoding.quality}|e=${encoding.effort}|sharp=${SHARP_VERSION}`)
     .digest("hex").slice(0, 10);
 }
 
-/** The source's pixel size, read by sharp. */
+/** The source's pixel size as it is displayed: an EXIF orientation of 5 to 8 swaps width and height, as the
+ *  encoded variant does. Read by sharp from the header. */
 export async function imageSize(sharp: SharpModule, source: Uint8Array): Promise<{ width: number; height: number }> {
-  const { width, height } = await sharp(source).metadata();
-  return { width: width ?? 0, height: height ?? 0 };
+  const meta = await sharp(source).metadata();
+  return { width: meta.autoOrient?.width ?? meta.width ?? 0, height: meta.autoOrient?.height ?? meta.height ?? 0 };
 }
 
-/** The variant: WebP, `width` pixels wide, height in proportion, never wider than the source. Metadata is
- *  dropped (sharp's default), so a variant's bytes depend only on the pixels. */
+/** The variant: WebP, turned upright by its EXIF orientation, `width` pixels wide, height in proportion, never
+ *  wider than the source as displayed. Metadata is dropped (sharp's default), so a variant's bytes depend only
+ *  on the pixels, and no orientation tag is left to turn it again. */
 export function encodeWebp(sharp: SharpModule, source: Uint8Array, width: number, encoding: ImageEncoding): Promise<Buffer> {
-  return sharp(source).resize({ width, withoutEnlargement: true })
+  return sharp(source, { autoOrient: true }).resize({ width, withoutEnlargement: true })
     .webp({ quality: encoding.quality, effort: encoding.effort }).toBuffer();
 }
 

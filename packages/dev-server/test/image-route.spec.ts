@@ -48,6 +48,7 @@ beforeAll(async () => {
   await save(join(root, "pages", "index.md"), "---\ntitle: Home\n---\n\nHome.\n");
   await copyFile(join(fixtures, "photo.jpg"), join(root, "src", "assets", "images", "harbour.jpg"));
   await copyFile(join(fixtures, "alpha.png"), join(root, "src", "assets", "images", "harbour.png"));
+  await copyFile(join(fixtures, "portrait-exif6.jpg"), join(root, "src", "assets", "images", "tower.jpg"));
   // Sentinels: raster images outside the assets folder, in the project and above it.
   await copyFile(join(fixtures, "flat.png"), join(root, "outside.png"));
   await copyFile(join(fixtures, "flat.png"), join(tmp, "outside.png"));
@@ -90,6 +91,17 @@ describe("the image variant route", () => {
     expect((await get(imageUrl("images/harbour", imageVariantKey(photo, 960, PROJECT), 960))).status).toBe(404); // photo is 480 wide
     expect((await get(imageUrl("images/nope", imageVariantKey(photo, 240, PROJECT), 240))).status).toBe(404);
     expect((await get("/_pd/images/images/harbour.webp")).status).toBe(404);
+  });
+
+  it("serves a photo upright, and only up to its width as displayed", async () => {
+    const tagged = await readFile(join(fixtures, "portrait-exif6.jpg")); // stored 480 x 320, orientation 6
+    const res = await get(imageUrl("images/tower", imageVariantKey(tagged, 160, PROJECT), 160));
+    expect(res.status).toBe(200);
+    const sharp = await loadSharp();
+    const { width, height } = await sharp(res.body).metadata();
+    expect({ width, height }).toEqual({ width: 160, height: 240 });
+    expect((await get(imageUrl("images/tower", imageVariantKey(tagged, 320, PROJECT), 320))).status).toBe(200);
+    expect((await get(imageUrl("images/tower", imageVariantKey(tagged, 480, PROJECT), 480))).status).toBe(404); // wider than shown
   });
 
   it("reads nothing outside the assets folder, whatever the name climbs to", async () => {
