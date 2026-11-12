@@ -12,9 +12,11 @@ const valid = {
   shell: { brand: { title: "T", logo: { light: "/a.svg", dark: "/b.svg" }, logoAlt: "T", href: "/" } },
   packages: ["pkg-a", { name: "pkg-b", exclude: ["x/**"] }, { name: "pkg-c", styles: false }], exclude: ["drafts/**"],
   build: { outDir: "./site", basePath: "/docs/", audit: false },
+  images: { quality: 75, effort: 4 },
   storefront: {
     pagesDir: "./pages", outDir: "./site-www", host: "docs.localhost", workbenchUrl: "https://workbench.example.com/",
     site: { title: "Docs", footer: "Made here", social: { links: ["a"] } },
+    images: { quality: 80 },
   },
 };
 
@@ -23,6 +25,23 @@ const storefront = (sf: Record<string, unknown>) => configProblems({ ...valid, s
 describe("configProblems", () => {
   it("accepts every documented option", () => {
     expect(configProblems(valid)).toEqual([]);
+  });
+
+  it("images: quality a whole number from 1 to 100, effort from 0 to 6, for the project and per site", () => {
+    expect(configProblems({ ...valid, images: { quality: 1, effort: 0 } })).toEqual([]);
+    expect(configProblems({ ...valid, images: { quality: 100, effort: 6 } })).toEqual([]);
+    expect(configProblems({ ...valid, images: { quality: 0, effort: 7 } })).toEqual([
+      `"images.quality" must be a whole number from 1 to 100 (WebP quality)`,
+      `"images.effort" must be a whole number from 0 to 6 (WebP effort: 0 fastest, 6 smallest)`,
+    ]);
+    expect(configProblems({ ...valid, images: { quality: 75.5, effort: "4" } })).toEqual([
+      `"images.quality" must be a whole number from 1 to 100 (WebP quality)`,
+      `"images.effort" must be a whole number from 0 to 6 (WebP effort: 0 fastest, 6 smallest)`,
+    ]);
+    expect(storefront({ ...valid.storefront, images: { quality: 101 } })).toEqual([
+      `"storefront.images.quality" must be a whole number from 1 to 100 (WebP quality)`,
+    ]);
+    expect(configProblems({ ...valid, images: { qualty: 80 } })[0]).toMatch(/"images\.qualty"/);
   });
 
   it("accepts the minimal config, with no strategy", () => {
