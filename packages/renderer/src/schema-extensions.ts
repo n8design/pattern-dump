@@ -5,8 +5,11 @@
 //   x-pd-content       at a schema's top: the property a tag's content fills; it must be a declared string.
 //   contentMediaType   only "text/markdown", only on a string: rendered as markdown, HTML escaped.
 //
-// And one that is not about placement, so it doesn't switch on the template check below:
+// And two that are not about placement, so they don't switch on the template check below:
 //
+//   x-pd-image           on a string property: the image slot that field fills, `{ widths, sizes }`, which
+//                        `{{pd-image field alt=…}}` writes as an <img> with its variants (image-slots.ts). Every
+//                        `{{pd-image}}` call in the template is checked against it.
 //   x-pd-example-height  at a schema's top: the height, in whole CSS pixels, a live example of the component
 //                        starts at on a storefront page, before its preview reports its own. It must err
 //                        short: the frame can grow to its content but never shrink below this. One value
@@ -19,6 +22,7 @@
 // render, so a broken schema shows on its component in the workbench before any page places it; the
 // storefront refuses to place it as well.
 import { unescapedOutputs } from "./unescaped";
+import { imageCalls, readSlot } from "./image-slots";
 
 /** One problem, with the JSON pointer of the schema keyword it is about. */
 export interface SchemaExtensionProblem { path: string; message: string }
@@ -30,9 +34,9 @@ export interface SchemaExtensionContext {
 }
 
 type Prop = Record<string, unknown>;
-const KNOWN_PROPERTY_KEYS = new Set(["x-pd-component"]);
+const KNOWN_PROPERTY_KEYS = new Set(["x-pd-component", "x-pd-image"]);
 const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height"]);
-const KNOWN_LIST = "x-pd-component, x-pd-content, x-pd-example-height";
+const KNOWN_LIST = "x-pd-component, x-pd-content, x-pd-example-height, x-pd-image";
 const isObject = (v: unknown): v is Prop => typeof v === "object" && v !== null && !Array.isArray(v);
 const typesOf = (p: Prop): unknown[] => p["type"] === undefined ? [] : Array.isArray(p["type"]) ? p["type"] : [p["type"]];
 
@@ -71,6 +75,11 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
       else if (!ctx.componentExists(component)) problems.push({ path: `${path}/x-pd-component`, message: `x-pd-component names "${component}", which is not a component` });
       else if (!ctx.hasSchema(component)) problems.push({ path: `${path}/x-pd-component`, message: `x-pd-component names "${component}", which has no schema, so it cannot be placed with values` });
     }
+    const image = prop["x-pd-image"];
+    if (image !== undefined) {
+      if (!typesOf(prop).includes("string")) problems.push({ path: `${path}/x-pd-image`, message: `x-pd-image is only for a string property: the path of an image in the assets` });
+      else if (!readSlot(image)) problems.push({ path: `${path}/x-pd-image`, message: `x-pd-image must be { "widths": [...], "sizes": "..." }: widths whole numbers above 0 in ascending order, sizes the <img> sizes value (with no double quote)` });
+    }
     const media = prop["contentMediaType"];
     if (media !== undefined) {
       usesPlacement = true;
@@ -96,6 +105,10 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
 
   const exampleHeight = readExampleHeight(schema).problem;
   if (exampleHeight) problems.push({ path: "#/x-pd-example-height", message: exampleHeight });
+
+  if (template !== undefined) {
+    for (const call of imageCalls(template, schema)) if (call.problem) problems.push({ path: "#", message: call.problem });
+  }
 
   if (usesPlacement && template !== undefined) {
     for (const o of unescapedOutputs(template)) {

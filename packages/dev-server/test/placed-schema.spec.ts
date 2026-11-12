@@ -44,7 +44,7 @@ describe("a schema that misuses a placement extension", () => {
     const detail = await (await fetch(`http://127.0.0.1:${server.port}/api/component/atoms/note`)).json() as ComponentDetail;
     expect(detail.diagnostics.filter(d => d.kind === "SCHEMA_INVALID")).toEqual([{
       kind: "SCHEMA_INVALID", severity: "error", source: "schema", path: "#/x-pd-contnet",
-      message: `"x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`,
+      message: `"x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image)`,
       location: { file: "src/patterns/atoms/note/note.schema.json" },
     }]);
   });
@@ -61,7 +61,7 @@ describe("a schema that misuses a placement extension", () => {
     });
     expect(r.html).toBeUndefined();
     expect(r.problems.map(p => p.message)).toEqual([
-      `atoms/note cannot be placed: its schema (src/patterns/atoms/note/note.schema.json, #/x-pd-contnet): "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`,
+      `atoms/note cannot be placed: its schema (src/patterns/atoms/note/note.schema.json, #/x-pd-contnet): "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image)`,
     ]);
   });
 });

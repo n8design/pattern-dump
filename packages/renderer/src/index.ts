@@ -10,9 +10,11 @@ export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
 export { checkSchemaExtensions, readExampleHeight, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
 export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
 import { checkSchemaExtensions } from "./schema-extensions";
+import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
 import type {
   CreateRenderer, RendererOptions, Diagnostic, RenderMeta,
+  ImageLookup,
 } from "@pattern-dump/contracts";
 import { HtmlValidate } from "html-validate";
 import Handlebars from "handlebars";
@@ -82,6 +84,39 @@ async function readDataFile(path: string, display: (absPath: string) => string):
       },
     };
   }
+}
+
+/** `{{pd-image field alt=… [loading="eager"]}}`: an image in its slot (image-slots.ts) as an <img> with its variants. */
+function registerImageHelper(env: ReturnType<typeof Handlebars.create>, images: ImageLookup | undefined): void {
+  const esc = Handlebars.escapeExpression;
+  env.registerHelper("pd-image", function (value: unknown, options: { hash?: Record<string, unknown>; data?: { pdImages?: "site" } }) {
+    const raw = options.hash?.[SLOT_KEY];
+    if (typeof raw !== "string") {
+      throw new Error(`{{pd-image}} has no image slot: the component's schema problem (SCHEMA_INVALID) says why`);
+    }
+    const slot = JSON.parse(raw) as ImageSlot;
+    const alt = options.hash?.["alt"];
+    if (alt === undefined || alt === null) {
+      throw new Error(`{{pd-image}}: the image's alt text is missing: give it a text alternative, or alt="" for a decorative image`);
+    }
+    if (typeof value !== "string" || value === "") throw new Error(`{{pd-image}}: the image field is empty`);
+    if (!images) throw new Error(`{{pd-image}}: this renderer was given no image index`);
+    const source = images(value);
+    if (!source) throw new Error(`{{pd-image}}: "${value}" is not an image in the assets`);
+    if (source.kind === "unavailable") throw new Error(source.reason);
+    const rest = `alt="${esc(String(alt))}" loading="${options.hash?.["loading"] === "eager" ? "eager" : "lazy"}" decoding="async"`;
+    if (source.kind === "single") {
+      return new env.SafeString(`<img src="${esc(source.url)}" width="${source.width}" height="${source.height}" ${rest}>`);
+    }
+    // Only widths the image has as displayed; at least its own width when every slot width is wider.
+    const widths = slot.widths.filter(w => w <= source.width);
+    if (widths.length === 0) widths.push(source.width);
+    const urls = widths.map(w => source.variantUrl(w, options.data?.pdImages));
+    const top = widths[widths.length - 1]!;
+    const srcset = urls.map((u, i) => `${esc(u)} ${widths[i]}w`).join(", ");
+    return new env.SafeString(`<img src="${esc(urls[urls.length - 1]!)}" srcset="${srcset}" sizes="${esc(slot.sizes)}" `
+      + `width="${top}" height="${Math.round(top * source.height / source.width)}" ${rest}>`);
+  });
 }
 
 /** Register core + legacy + project helpers on a Handlebars env.
@@ -323,6 +358,18 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
       throw new MissingHelperError(opts.name, opts.loc?.start?.line, opts.loc?.start?.column);
     });
     registerHelpers(env, mintId, () => lastMintedId, options.helpers, options.helperRegistrars);
+    registerImageHelper(env, options.images);
+
+    // A template with {{pd-image}} is compiled from its AST with each call's image slot resolved against its
+    // component's schema (image-slots.ts); any other template from its source, as before.
+    const schemaJson = async (id: string): Promise<unknown> => {
+      const base = id.includes("~") ? id.slice(0, id.indexOf("~")) : id;
+      const path = discoveryMap.get(id)?.schemaPath ?? discoveryMap.get(base)?.schemaPath;
+      if (!path) return null;
+      try { return JSON.parse(await readFile(path, "utf-8")); } catch { return null; }
+    };
+    const slotted = async (src: string, id: string): Promise<string | hbs.AST.Program> =>
+      src.includes("pd-image") ? withImageSlots(src, await schemaJson(id)) : src;
 
     // Register every discovered component as a cascade-aware, base-seeded partial.
     // Iterates handleMap (handle → id) and looks up file paths in discoveryMap — no reconstruction.
@@ -343,7 +390,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         const baseData = baseJsonPath ? await readDataFile(baseJsonPath, display) : {};
         const childDefaults: Record<string, unknown> = deepMerge(structuredClone(baseData.data ?? {}), childData.data);
 
-        const childTemplate = env.compile(partialSrc);
+        const childTemplate = env.compile(await slotted(partialSrc, compId));
         const capturedDefaults = childDefaults;
         const partialSlug = safePart(compId.replace(/[\\/]/g, "-"));
 
@@ -423,8 +470,10 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // render an empty block rather than throw. Block invocations override this with the real body.
     let html: string;
     try {
-      html = env.compile(templateSrc)(data, {
+      html = env.compile(await slotted(templateSrc, componentId))(data, {
         partials: { ...env.partials, "@partial-block": () => "" },
+        // The render's image settings, for {{pd-image}} here and in every partial (data frames pass on).
+        data: { pdImages: input.images },
       });
     } catch (e) {
       if (e instanceof MissingHelperError) e.stamp(input.component, templateHbsPath ? display(templateHbsPath) : undefined);
