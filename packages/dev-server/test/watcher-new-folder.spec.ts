@@ -538,6 +538,30 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
   }, 60_000);
 });
 
+// chokidar 6, as installed: no `_closers`, so the rescan takes its fallback times, which with chokidar 6 is no
+// degraded detection (it watches a new folder before it reads it), and nothing is said of it.
+describe.runIf(rescanning && !closersReadable)("with chokidar as installed, which has no _closers", () => {
+  it("rescans a new folder on the fallback times, sees its file, and says nothing of it", async () => {
+    const warn = vi.spyOn(console, "warn");
+    const { b } = await project();
+    try {
+      const file = "src/patterns/atoms/zz-six/zz-six.hbs";
+      const endedFrom = cyclesEnded.length;
+      const { events, messages } = await b.step(async () => {
+        await b.create(file, "<p>six</p>\n");
+        await until(() => cyclesEnded.slice(endedFrom).includes(b.at(dirname(file))), "the new folder's rescan cycle ended");
+      }, [["addDir", dirname(file)], ["add", file]]);
+      expect(endedWhy.get(b.at(dirname(file)))).toBe("fallback-done");
+      expect(events).toEqual([["addDir", dirname(file)], ["add", file]]);
+      expect(messages).toContain(`{"type":"tree-changed"}`);
+      expect(warn.mock.calls.map(c => c.join(" ")).filter(m => /new-folder detection|still not watched/i.test(m))).toEqual([]);
+    } finally {
+      warn.mockRestore();
+      await b.close();
+    }
+  }, 60_000);
+});
+
 describe.runIf(rescanning)("with chokidar's _closers not readable", () => {
   it("still sees a file renamed into a new folder", async () => {
     hooks.__testOnly_hideChokidarWatches = true;
