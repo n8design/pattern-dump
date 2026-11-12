@@ -23,16 +23,14 @@ import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
 } from "@pattern-dump/contracts";
-import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import { sameHostWorkbenchPath } from "@pattern-dump/config";
 import type { ResolvedConfig } from "./server-config.js";
-import { compositionFor, currentDiscovery, scriptFor, type ServerState } from "./server-state.js";
+import { compositionFor, currentDiscovery, type ServerState } from "./server-state.js";
 import { createDisplayPath } from "./display-path.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
-class ScriptMissing extends Error {}
 import { buildShellHtml, json, mimeType, serveFile, servesShell } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
 import { buildComponentTree } from "./component-tree.js";
@@ -42,6 +40,7 @@ import { buildPreviewDocument, normalizeAssetRefs } from "./preview-document.js"
 import { resolveDocumentAssets } from "./document-layers.js";
 import { resolveLayoutMode } from "./layout-mode.js";
 import { aggregateRequires, normalizeScriptId } from "./requires.js";
+import { compiledScript, ScriptMissing } from "./scripts.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
@@ -53,7 +52,7 @@ import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages } from "./storefront/pages.js";
 import { assetFile } from "./asset-file.js";
-import { containedFile, decodePath } from "./contained-file.js";
+import { decodePath } from "./contained-file.js";
 import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
@@ -216,16 +215,7 @@ export async function handleRequest(
       if (decoded === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end("Script not found"); return; }
       const scriptId = normalizeScriptId(decoded);
       try {
-        const js = await scriptFor(state, scriptId).get(async () => {
-          // The project's scripts first, then each package's — a project script replaces a package's. Each
-          // entry point must be inside its scripts folder.
-          let entryPoint: string | undefined;
-          for (const d of scriptsDirs) { entryPoint = (await containedFile(d, `${scriptId}.ts`)) ?? undefined; if (entryPoint) break; }
-          // Say what is missing. Compiling a path we know is absent would report it as an ENOENT
-          // compile error inside the preview, naming neither the id nor where it was looked for.
-          if (entryPoint === undefined) throw new ScriptMissing(scriptId);
-          return compileScriptFile(entryPoint);
-        });
+        const js = await compiledScript(state, scriptsDirs, scriptId);
         res.writeHead(200, { "Content-Type": "application/javascript" });
         res.end(js);
       } catch (e) {

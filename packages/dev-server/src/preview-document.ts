@@ -78,7 +78,7 @@ export function buildPreviewDocument(
   // baseHref: omit in dev (unsandboxed srcdoc inherits parent origin; root-relative URLs resolve).
   // Supply for the static build where the deployment base differs from the serving origin.
   baseHref?: string,
-  scriptVersions?: Map<string, number>,
+  scriptVersions?: Map<string, string>,
   // linkBase: inject the document-base layer (/_pd/base.css) beneath the closure. Driven by
   // config.documentBase; off preserves the honest-UA-page default for projects with no shared layer.
   linkBase = false,
@@ -117,7 +117,7 @@ export function buildPreviewDocument(
   const symbolSets = (svgContents ?? []).join("\n");
 
   // requireScript tags (module, in declaration order).
-  // Local ids are stamped with ?v=<mtime> so the browser fetches fresh JS after a file change.
+  // Local ids are stamped with ?v=<content hash> (scripts.ts), so the URL changes when the served script does.
   const scriptTags = (requireScripts ?? [])
     .map(src => {
       if (src.includes("://")) return `<script type="module" src="${escapeAttr(src)}"></script>`;
