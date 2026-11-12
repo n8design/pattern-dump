@@ -323,12 +323,11 @@ export async function startDevServer(
   }
   const startupDiscovery = await cachedDiscovery(state);
   const componentCount = startupDiscovery ? [...startupDiscovery.discoveryMap.keys()].filter(id => !id.includes("~")).length : 0;
-  console.log(`[dev-server] Ready in ${Math.round(performance.now() - startTime)}ms — ${componentCount} components`);
 
   // ---- File watcher ----
 
-  // Resolves once chokidar has finished its initial scan (an edit made before that would be missed). A
-  // watcher that cannot start fails startup, named, after closing what is already listening.
+  // Resolves once every watched folder is live (the start barrier in watch.ts): an edit made after it is seen.
+  // A watcher that cannot start fails startup, named, after closing what is already listening.
   let watcher: WatchHandle | null = null;
   if (live) {
     try {
@@ -343,6 +342,8 @@ export async function startDevServer(
       throw e;
     }
   }
+  // Only once the watch is live: scripts wait for this line, and edit right after it.
+  console.log(`[dev-server] Ready in ${Math.round(performance.now() - startTime)}ms — ${componentCount} components`);
 
   return {
     port: actualPort,

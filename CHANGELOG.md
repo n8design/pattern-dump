@@ -8,6 +8,8 @@
 - `pd dev` is ready only once every folder it watches has reported a write. For a moment as it starts it writes
   an empty `.pd-watch-start` into each and removes it again; a folder it cannot write to is named in the
   terminal. New projects list the file in `.gitignore`.
+- `pd dev` prints its `Ready in …` line once its watch is live, not before: an edit saved right after the line
+  is seen.
 
 ### Fixed
 
