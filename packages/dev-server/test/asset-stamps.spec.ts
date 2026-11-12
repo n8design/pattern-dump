@@ -37,6 +37,13 @@ describe("stampHtml", () => {
     expect(await stampHtml(html, hashOf)).toBe(html.replaceAll("share.png", "share.png?v=54a4e00003"));
   });
 
+  it("leaves image variants as written, and never looks them up: their name is their key", async () => {
+    asked.length = 0;
+    const html = `<img src="/_pd/images/images/harbour.0123456789.960.webp" srcset="/_pd/images/images/harbour.abcdefabcd.480.webp 480w">`;
+    expect(await stampHtml(html, hashOf)).toBe(html);
+    expect(asked).toEqual([]);
+  });
+
   it("leaves page links, previews, other hosts, other queries, fragments and missing files as written", async () => {
     const html = [
       `<a href="/guides/">`, `<iframe src="/preview/components/callout">`, `<a href="https://pd.localhost:4000/components/callout">`,

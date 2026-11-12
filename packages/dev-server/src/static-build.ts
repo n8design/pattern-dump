@@ -10,8 +10,9 @@
 //     is included — its <link>/<script>/url() references are root-relative too.
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
-import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
+import { createImageCache } from "@pattern-dump/build";
 import { sameHostWorkbenchPath, type PatternDumpConfig } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
@@ -20,6 +21,7 @@ import {
 } from "@pattern-dump/contracts";
 import { startDevServer } from "./index.js";
 import { buildShellHtml } from "./http-utils.js";
+import { imageCacheDir } from "./image-route.js";
 import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 import { createSnapshotWriter } from "./snapshot-writer.js";
@@ -275,6 +277,17 @@ export async function buildStaticSite(
       report.notes.push(...storefrontNotes);
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
+
+    // ---- 8. The image cache keeps what this build used: the variants written to either root ----
+    const used = new Set<string>();
+    for (const root of [outDir, ...(storefront ? [storefront.outDir] : [])]) {
+      const files = await readdir(join(root, "_pd", "images"), { recursive: true }).catch(() => [] as string[]);
+      for (const f of files) {
+        const m = /\.([0-9a-f]{10})\.[1-9][0-9]*\.webp$/.exec(String(f));
+        if (m) used.add(m[1]!);
+      }
+    }
+    await createImageCache(imageCacheDir(cfg.cwd)).sweep(used);
 
     // Deliberately no 404.html shell: every route has its own index.html, and a host that served the
     // shell for a missing preview would boot a second workbench inside the preview iframe.
