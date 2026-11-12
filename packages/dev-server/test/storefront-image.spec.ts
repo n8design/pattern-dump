@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { imageInfo } from "../src/storefront/image-info.js";
+import { imageInfo } from "@pattern-dump/build";
 import { checkPageImage } from "../src/storefront/page-image.js";
 import { save } from "../../../test-support/save.js";
 
@@ -30,16 +30,16 @@ const webpLossless = (w: number, h: number) => {
 const webpExtended = (w: number, h: number) => riff("VP8X", [0, 0, 0, 0, ...le24(w - 1), ...le24(h - 1)]);
 
 describe("imageInfo — raster formats, size from the bytes", () => {
-  it("PNG", () => expect(imageInfo(png(1200, 630))).toEqual({ raster: true, format: "png", width: 1200, height: 630 }));
-  it("GIF", () => expect(imageInfo(gif(300, 200))).toEqual({ raster: true, format: "gif", width: 300, height: 200 }));
+  it("PNG", () => expect(imageInfo(png(1200, 630))).toEqual({ raster: true, format: "png", width: 1200, height: 630 , orientation: 1 }));
+  it("GIF", () => expect(imageInfo(gif(300, 200))).toEqual({ raster: true, format: "gif", width: 300, height: 200 , orientation: 1 }));
   it("JPEG, its frame header found past other segments", () => {
-    expect(imageInfo(jpeg(1200, 630))).toEqual({ raster: true, format: "jpeg", width: 1200, height: 630 });
+    expect(imageInfo(jpeg(1200, 630))).toEqual({ raster: true, format: "jpeg", width: 1200, height: 630 , orientation: 1 });
   });
   it("JPEG, progressive (SOF2)", () => expect(imageInfo(jpeg(800, 418, 0xc2))).toMatchObject({ format: "jpeg", width: 800, height: 418 }));
   it("WebP: lossy, lossless and extended", () => {
-    expect(imageInfo(webpLossy(1200, 630))).toEqual({ raster: true, format: "webp", width: 1200, height: 630 });
-    expect(imageInfo(webpLossless(1200, 630))).toEqual({ raster: true, format: "webp", width: 1200, height: 630 });
-    expect(imageInfo(webpExtended(1200, 630))).toEqual({ raster: true, format: "webp", width: 1200, height: 630 });
+    expect(imageInfo(webpLossy(1200, 630))).toEqual({ raster: true, format: "webp", width: 1200, height: 630 , orientation: 1 });
+    expect(imageInfo(webpLossless(1200, 630))).toEqual({ raster: true, format: "webp", width: 1200, height: 630 , orientation: 1 });
+    expect(imageInfo(webpExtended(1200, 630))).toEqual({ raster: true, format: "webp", width: 1200, height: 630 , orientation: 1 });
   });
 });
 

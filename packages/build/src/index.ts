@@ -226,6 +226,9 @@ export async function compileScriptFile(entryPoint: string): Promise<string> {
 }
 
 export {
-  SHARP_VERSION, SharpUnavailableError, loadSharp, imageVariantKey, imageSize, encodeWebp, createImageCache,
+  SHARP_VERSION, SharpUnavailableError, loadSharp, imageVariantKey, imageVariantKeyFromSourceHash, imageSourceHash,
+  imageSize, encodeWebp, createImageCache,
   type SharpModule, type ImageEncoding, type ImageCache,
 } from "./images.js";
+export { imageInfo, svgSize, type ImageInfo, type RasterFormat } from "./image-info.js";
+export { createImageIndexer, type ImageIndex, type ImageIndexEntry, type ImageIndexFile, type ImageIndexer } from "./image-index.js";
