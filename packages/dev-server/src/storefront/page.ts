@@ -78,13 +78,16 @@ export interface AssembledPage {
   notes: string[];
 }
 
-/** The fitter's glue: frames start at 1px (from script, so with scripting off they keep the UA default
- *  height and stay readable), then follow the pd-height their preview documents post. */
+/** The fitter's glue: a frame with a declared height (its `height` attribute, from the component's
+ *  x-pd-example-height) starts there; any other starts at 1px, from script, so with scripting off it keeps
+ *  the UA default height and stays readable. Then each follows the pd-height its preview document posts.
+ *  A frame can be fitted taller but never shorter than it starts (scrollHeight never drops below the frame's
+ *  own height), which is why a declared height errs short and an undeclared frame can't keep the UA's 150px. */
 export function fitterScript(): string {
   return `<script>(function(){var createHeightFitter=(${createHeightFitter.toString()});`
     + `var fitter=createHeightFitter({write:function(f,h){f.style.height=h+"px";}});`
     + `var frames=function(){return document.querySelectorAll("figure.doc-example iframe");};`
-    + `frames().forEach(function(f){f.style.height="1px";});`
+    + `frames().forEach(function(f){if(!f.hasAttribute("height"))f.style.height="1px";});`
     + `addEventListener("message",function(e){var m=fitter.fromMessage(e,frames());if(m)fitter.accept(m.frame,m.height);});`
     + `})();</script>`;
 }
