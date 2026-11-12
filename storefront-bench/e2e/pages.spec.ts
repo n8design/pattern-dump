@@ -28,8 +28,10 @@ test.describe("storefront pages", () => {
 
   test("loads no workbench shell stylesheet", async ({ page }) => {
     await page.goto("/");
-    const hrefs = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")));
+    // Compared by path: a link carries its content stamp (?v=<hash>).
+    const hrefs = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")?.split("?")[0]));
     expect(hrefs.length).toBeGreaterThan(0);
+    expect(hrefs).toContain("/_pd/base.css");
     expect(hrefs).not.toContain("/_pd/main.css");
     expect(hrefs.some(h => h?.startsWith("/_pd/themes/"))).toBe(false);
   });
