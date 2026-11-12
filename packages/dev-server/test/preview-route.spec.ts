@@ -3,7 +3,7 @@
 // requests /preview/ (it stores the detail's document), so the static golden snapshot does not cover it.
 //
 // The project is a copy of test-bench's tracked files at a fixed path, with every mtime pinned, so the
-// documents are reproducible byte for byte — including the `?v=<mtime>` versions of behaviour scripts,
+// documents are reproducible byte for byte — including the `?v=<content hash>` stamps of behaviour scripts,
 // which are compared exactly: the code that computes them is part of what is pinned here.
 //
 // Each document is pinned by its SHA-256, and every `?v=` stamp and stylesheet href it carries is pinned
@@ -54,7 +54,7 @@ async function pinAll(dir: string): Promise<void> {
 
 function record(url: string, doc: string): void {
   hashes[url] = createHash("sha256").update(doc).digest("hex");
-  stamps[url] = [...doc.matchAll(/[?&]v=[0-9.]+/g)].map(m => m[0]);
+  stamps[url] = [...doc.matchAll(/[?&]v=[0-9a-f.]+/g)].map(m => m[0]);
   links[url] = [...doc.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map(m => m[1]);
 }
 
