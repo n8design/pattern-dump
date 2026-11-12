@@ -1,7 +1,9 @@
 // The start barrier (watch.ts, startBarrier): pd dev is ready only once every watched folder has reported a
-// write, so an edit saved the moment it is ready is handled. On macOS chokidar reports `ready` before its
-// watches are live, and without the barrier such an edit can go unreported: the page never updates. Linux
-// reports it either way, so there this spec guards the outcome, not the race.
+// write, so an edit saved the moment it is ready is handled. chokidar's `ready` means its first scan is done, not
+// that its watches are live. Where a watcher does lose such an edit (chokidar 6 on macOS), the race is under a
+// millisecond wide, so a test cannot rely on hitting it. These cases hold the barrier to its contract
+// instead: a test-only hook keeps one folder's watch from going live until a while after `ready`, on every
+// platform, and pd dev must not be ready before that folder has reported.
 //
 // Also: the barrier leaves nothing behind, removes one a crash left, and a folder it cannot write to is
 // named and skipped, with pd dev started all the same.
@@ -16,6 +18,8 @@ import { startOnFreeWsPort } from "./free-ports.js";
 import { save } from "../../../test-support/save.js";
 
 const START_FILE = ".pd-watch-start";
+/** How long after chokidar's ready the late folder's watch goes live: well under the barrier's 2 s fallback. */
+const LATE_MS = 300;
 const config = validateConfig(defineConfig({
   sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
   styles: { strategy: "parallel", dir: "./src/styles" },
@@ -54,23 +58,37 @@ afterAll(async () => {
 });
 
 describe("the start barrier", () => {
-  it("an edit in each watched folder, saved the moment pd dev is ready, is handled and reloads", async () => {
-    const b = new Bench(await project(), "atoms/btn");
-    await b.start(config);
-    // No wait of any kind between ready and the edits.
-    const from = handled.length;
-    const messagesFrom = b.messages.length;
-    const edits = Object.keys(FILES);
-    for (const rel of edits) await b.edit(rel, rel.endsWith(".hbs") ? "<p>two</p>\n" : rel.endsWith(".txt") ? "two\n" : "\n/* two */\n");
-    const onDisk = new Map(await Promise.all(edits.map(async rel => [rel, await diskStamp(b.at(rel))] as const)));
-    const stampsOf = (rel: string) => handled.slice(from).filter(h => b.owns(h.path) && b.rel(h.path) === rel).map(h => h.stamp);
-    await whenHandled(() => edits.every(rel => isSettled(stampsOf(rel), onDisk.get(rel)!)),
-      () => `each edit handled as it is on disk; handled: ${JSON.stringify(b.handledSince(from))}`);
-    await b.barrier();
-    const sent = b.messages.slice(messagesFrom);
-    expect(sent).toContain("{\"type\":\"content-swap\",\"componentId\":\"atoms/btn\"}");
-    expect(sent.some(m => m.includes("\"type\":\"css-link-swap\"") && m.includes("atoms/btn"))).toBe(true);
-    await b.close();
+  it("is ready only once a folder whose watch goes live late has reported, and an edit saved then is handled", async () => {
+    const root = await project();
+    // The patterns folder's watch goes live LATE_MS after chokidar's ready; until then its events are dropped.
+    const late: { dir: string; ms: number; liveAt?: number } = { dir: join(root, "src/patterns"), ms: LATE_MS };
+    (globalThis as { __testOnly_liveAfterReady?: typeof late }).__testOnly_liveAfterReady = late;
+    const readyLineAt: number[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      if (String(args[0]).startsWith("[dev-server] Ready in ")) readyLineAt.push(Date.now());
+    });
+    try {
+      const { server } = await startOnFreeWsPort(config, root);
+      const startedAt = Date.now();
+      try {
+        // No wait of any kind between ready and the edit.
+        const file = join(root, "src/patterns/atoms/btn/btn.hbs");
+        const from = handled.length;
+        await save(file, "<p>two</p>\n");
+        const onDisk = await diskStamp(file);
+        expect(late.liveAt, "the hook was armed at chokidar's ready").toBeTypeOf("number");
+        expect.soft(readyLineAt, "one Ready line").toHaveLength(1);
+        expect.soft(readyLineAt[0], "the Ready line, against the folder going live").toBeGreaterThanOrEqual(late.liveAt!);
+        expect.soft(startedAt, "the start promise, against the folder going live").toBeGreaterThanOrEqual(late.liveAt!);
+        const stamps = () => handled.slice(from).filter(h => h.path === file).map(h => h.stamp);
+        await whenHandled(() => isSettled(stamps(), onDisk),
+          () => `the edit saved once pd dev was ready; handled: ${JSON.stringify(handled.slice(from).map(h => [h.event, h.path]))}`);
+      } finally {
+        await server.close();
+      }
+    } finally {
+      delete (globalThis as { __testOnly_liveAfterReady?: typeof late }).__testOnly_liveAfterReady;
+    }
   }, 30_000);
 
   it("leaves nothing behind, and removes one a crash left", async () => {

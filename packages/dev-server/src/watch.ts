@@ -379,6 +379,15 @@ type TestOnlyEventHandled = (event: string, path: string, stillRunning: number, 
 // exported, not part of any contract.
 type TestOnlyDropEvent = (event: string, path: string) => boolean;
 
+// TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_liveAfterReady` before the watcher is
+// ready, the watch on that one folder behaves as not yet live for `ms` after chokidar's `ready`: every event at
+// or in it until then is dropped, as a watch not yet live misses them. At `ready` this sets `liveAt`, the
+// time it goes live, for the test to read. It lets a test hold the start barrier to its contract on every
+// platform, without the race. Not exported, not part of any contract.
+type TestOnlyLiveAfterReady = { dir: string; ms: number; liveAt?: number };
+const liveAfterReady = (): TestOnlyLiveAfterReady | undefined =>
+  (globalThis as { __testOnly_liveAfterReady?: TestOnlyLiveAfterReady }).__testOnly_liveAfterReady;
+
 // TEST ONLY, not a feature: when a test has set `globalThis.__testOnly_onCycleEnded`, it is called when a new
 // folder's rescan cycle ends, with the folder and why: its watches attached, the folder gone, the fallback's
 // last scan done, or the cap reached. A test waits for it instead of for the cycle's time. Not exported, not
@@ -558,6 +567,9 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
   if (event === "add" || event === "addDir" || event === "change" || event === "unlink") dispatchers[event] = path => dispatch(path);
   watcher.on(event, (path: string) => {
     if ((globalThis as { __testOnly_dropEvent?: TestOnlyDropEvent }).__testOnly_dropEvent?.(event, path)) return;
+    const notLive = liveAfterReady();
+    if (notLive && (path === notLive.dir || path.startsWith(notLive.dir + sep))
+      && (notLive.liveAt === undefined || Date.now() < notLive.liveAt)) return;
     if (event === "addDir" && !firstReport(path)) return;
     if (event === "add" && !firstFileReport(path)) return;
     dispatch(path);
@@ -708,6 +720,8 @@ let ready = false;
 const started = new Promise<void>((resolve, reject) => {
   watcher.once("ready", () => {
     ready = true;
+    const notLive = liveAfterReady();
+    if (notLive) notLive.liveAt = Date.now() + notLive.ms;
     // fsevents: one stream for the whole tree, no gap. Any other (chokidar's own, or one this code does not know): rescan.
     if (chokidarBackend(watcher) !== "fsevents") {
       const hidden = (globalThis as { __testOnly_hideChokidarWatches?: boolean }).__testOnly_hideChokidarWatches === true;
