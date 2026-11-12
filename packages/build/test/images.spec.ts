@@ -1,5 +1,6 @@
 // The image module (images.ts): loading sharp and its named error, the variant key, encoding, the cache.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -42,6 +43,11 @@ describe("a variant's key", () => {
     expect(imageVariantKey(source, 480, ENC)).toMatch(/^[0-9a-f]{10}$/);
     expect(imageVariantKey(source, 480, ENC)).toBe(imageVariantKey(new Uint8Array([1, 2, 3, 4]), 480, { ...ENC }));
   });
+  it("is pinned: its formula changes only on purpose, since every cached variant and built URL depends on it", () => {
+    const sourceHash = createHash("sha256").update(source).digest("hex");
+    const formula = `${sourceHash}|webp|orient=auto|w=480|q=75|e=4|sharp=${SHARP_VERSION}`;
+    expect(imageVariantKey(source, 480, ENC)).toBe(createHash("sha256").update(formula).digest("hex").slice(0, 10));
+  });
   it("changes with the source's bytes, the width, the quality and the effort", () => {
     const base = imageVariantKey(source, 480, ENC);
     for (const other of [
@@ -59,6 +65,18 @@ describe("encoding", () => {
     expect([(await sharp(small).metadata()).format, await imageSize(sharp, small)]).toEqual(["webp", { width: 240, height: 160 }]);
     const asked = await encodeWebp(sharp, photo, 2000, ENC);
     expect(await imageSize(sharp, asked)).toEqual({ width: 480, height: 320 });
+  });
+});
+
+describe("orientation", () => {
+  it("encodes a photo as it is displayed: a portrait stored landscape with an orientation tag comes out upright", async () => {
+    const sharp = await loadSharp();
+    const tagged = await readFile(join(fixtures, "portrait-exif6.jpg"));
+    expect((await sharp(tagged).metadata()).orientation).toBe(6); // stored 480 x 320, shown 320 x 480
+    expect(await imageSize(sharp, tagged)).toEqual({ width: 320, height: 480 });
+    expect(await imageSize(sharp, await encodeWebp(sharp, tagged, 160, ENC))).toEqual({ width: 160, height: 240 });
+    // Never wider than the image as displayed (320), not as stored (480).
+    expect(await imageSize(sharp, await encodeWebp(sharp, tagged, 2000, ENC))).toEqual({ width: 320, height: 480 });
   });
 });
 
