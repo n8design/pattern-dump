@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import {
   previewUrl, renderedSourceUrl, dataSourceUrl, overviewUrl,
-  componentUrl, componentCssUrl, themeCssUrl, scriptUrl, PD_ROUTES, PD_ROUTE_PREFIX, PD_HOSTS,
+  componentUrl, componentCssUrl, themeCssUrl, scriptUrl, imageUrl, parseImageUrl, PD_ROUTES, PD_ROUTE_PREFIX, PD_HOSTS,
   staticPathFor, normalizeBasePath,
   buildAuditRollup, AUDIT_SCOPE, PD_PROTOCOL_VERSION,
   type DiagnosticsGraph, type HmrMessage,
@@ -114,6 +114,22 @@ describe("route table — builders round-trip through the server's parse", () =>
       expect(parse.script(scriptUrl(name))).toBe(name);
     }
     expect(scriptUrl("toggle", 3)).toBe("/_pd/scripts/toggle.js?v=3");
+  });
+
+  it("image variants: the asset's name, the variant's hash and width, round-tripped", () => {
+    expect(imageUrl("images/harbour", "0123456789", 960)).toBe("/_pd/images/images/harbour.0123456789.960.webp");
+    for (const name of ["harbour", "images/harbour", "photos/2026/at the harbour", "a.b/c.d", "50%"]) {
+      expect(parseImageUrl(new URL(imageUrl(name, "abcdef0123", 480), "http://x").pathname)).toEqual({ name, hash: "abcdef0123", width: 480 });
+    }
+  });
+
+  it("image variants: anything else under the prefix is not one", () => {
+    for (const path of [
+      "/_pd/images/harbour.webp", "/_pd/images/harbour.0123456789.960.png", "/_pd/images/harbour.012345678.960.webp",
+      "/_pd/images/harbour.0123456789.0.webp", "/_pd/images/harbour.0123456789.096.webp", "/_pd/images/harbour.0123456789.-1.webp",
+      "/_pd/images/.0123456789.960.webp", "/_pd/images/a//b.0123456789.960.webp", "/_pd/images/../x.0123456789.960.webp",
+      "/_pd/images/a/%2E%2E/x.0123456789.960.webp", "/_pd/images/%E0%A4%A.0123456789.960.webp", "/assets/x.0123456789.960.webp",
+    ]) expect(parseImageUrl(path), path).toBeNull();
   });
 
   it("every fixed route and prefix is root-relative and unique", () => {
@@ -373,6 +389,7 @@ describe("staticPathFor — every builder's URL maps to one file", () => {
     expect(staticPathFor(scriptUrl("toggle", 9))).toBe("_pd/scripts/toggle.js");
     expect(staticPathFor("/assets/images/logo.svg")).toBe("assets/images/logo.svg");
     expect(staticPathFor(PD_ROUTES.mainJs)).toBe("_pd/main.js");
+    expect(staticPathFor(imageUrl("images/harbour", "0123456789", 960))).toBe("_pd/images/images/harbour.0123456789.960.webp");
   });
 
   it("writes the storefront's root files under their own names, not as folders", () => {
