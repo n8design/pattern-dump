@@ -5,6 +5,11 @@
 ### Changed
 
 - Pattern Dump now needs Node.js 22.22 or later (it was 20.10).
+- File watching uses chokidar 6. It reports a file saved into a folder made a moment before, and a second save
+  made right after the first, without help from `pd dev`.
+- `pd dev` is ready only once every folder it watches has reported a write. For a moment as it starts it writes
+  an empty `.pd-watch-start` into each and removes it again; a folder it cannot write to is named in the
+  terminal. New projects list the file in `.gitignore`.
 
 ### Fixed
 

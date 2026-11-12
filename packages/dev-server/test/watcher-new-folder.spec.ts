@@ -6,8 +6,9 @@
 // between. A folder restored with its files reported as changes only is built into discovery again. Within a
 // rescan cycle, chokidar's late add of a file the cycle already reported is not a second add, a folder in it
 // queued before the cycle started is not reported again however slow the first scan, a write between the last
-// scan and the watches is seen by the closing scan, and a folder still not watched at the cap is said so once. And with chokidar's `_closers` not readable, the fallback still sees a
-// file in a new folder, saying so once.
+// scan and the watches is seen by the closing scan, and a folder still not watched at the cap is said so once
+// (these last need chokidar 3.6's `_closers`, and run only with it). And with `_closers` not readable, as with
+// chokidar 6, the fallback still sees a file in a new folder.
 //
 // The repeat is delivered with `__testOnly_onWatchStarted`, a missed removal made with `__testOnly_dropEvent`,
 // a cycle held or its watches shown with `__testOnly_cycleTick`, the queue backed up with
@@ -23,7 +24,7 @@ import { dirname, join } from "node:path";
 import chokidar from "chokidar";
 import { defineConfig } from "@pattern-dump/config";
 import { Bench, closeAll, handled, LATCH_MS, whenHandled } from "./watch-harness.js";
-import { chokidarBackend } from "../src/watch.js";
+import { chokidarBackend, chokidarWatches } from "../src/watch.js";
 import { save } from "../../../test-support/save.js";
 
 type Deliver = (event: "change" | "add", path: string) => void;
@@ -42,7 +43,6 @@ const config = defineConfig({
   styles: { strategy: "parallel", dir: "./src/styles" },
 });
 const DOCS = "src/patterns/atoms/btn/btn.md";
-const DEGRADED = "New-folder detection is degraded";
 /** A component folder's files, relative to it. */
 const FILES = { "item.hbs": "<p class=\"item\">{{label}}</p>\n", "item.json": "{\"label\":\"Item\"}\n", "item.md": "# Item\n" };
 
@@ -50,6 +50,10 @@ const FILES = { "item.hbs": "<p class=\"item\">{{label}}</p>\n", "item.json": "{
 const probeDir = realpathSync(await mkdtemp(join(tmpdir(), "pd-new-folder-probe-")));
 const probe = chokidar.watch(probeDir, { ignoreInitial: true, persistent: true });
 const rescanning = chokidarBackend(probe) !== "fsevents";
+// Whether the cycle can tell when a new folder is watched (chokidar 3.6's `_closers`); without it, it scans at
+// NEW_FOLDER_FALLBACK_MS. The cases that hold a cycle open until it is watched need it.
+await new Promise<void>(resolve => probe.once("ready", () => resolve()));
+const closersReadable = chokidarWatches(probe, [probeDir]) !== null;
 await probe.close();
 await rm(probeDir, { recursive: true, force: true });
 
@@ -325,7 +329,7 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
     }
   }, 60_000);
 
-  it("sees a write between its last scan and the watches in its closing scan", async () => {
+  it.runIf(closersReadable)("sees a write between its last scan and the watches in its closing scan", async () => {
     const { b } = await project();
     try {
       // chokidar's reports of the file never arrive: only the cycle's scans can see it.
@@ -353,7 +357,7 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
     }
   }, 60_000);
 
-  it("handles a file removed before the folder was watched as removed: its last scan finds it gone", async () => {
+  it.runIf(closersReadable)("handles a file removed before the folder was watched as removed: its last scan finds it gone", async () => {
     const { b } = await project();
     try {
       // chokidar never reports the removal, as when it lands before the folder's watch: only the last scan can see it.
@@ -385,7 +389,7 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
     }
   }, 60_000);
 
-  it("hands what it reported to chokidar: a file chokidar never saw is reported removed after the cycle, once, also with its folder", async () => {
+  it.runIf(closersReadable)("hands what it reported to chokidar: a file chokidar never saw is reported removed after the cycle, once, also with its folder", async () => {
     const { b, forget } = await project();
     const G = `${D}/other.hbs`;
     const onlyOf = (events: string[][], rel: string) => events.filter(([, p]) => p === rel);
@@ -513,7 +517,7 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
     }
   }, 60_000);
 
-  it("still not watched after NEW_FOLDER_CAP_MS, ends and says so once; what it found is handled", async () => {
+  it.runIf(closersReadable)("still not watched after NEW_FOLDER_CAP_MS, ends and says so once; what it found is handled", async () => {
     const warn = vi.spyOn(console, "warn");
     const { b } = await project();
     try {
@@ -535,9 +539,8 @@ describe.runIf(rescanning)("a new folder's rescan cycle", () => {
 });
 
 describe.runIf(rescanning)("with chokidar's _closers not readable", () => {
-  it("still sees a file renamed into a new folder, and says once that new-folder detection is degraded", async () => {
+  it("still sees a file renamed into a new folder", async () => {
     hooks.__testOnly_hideChokidarWatches = true;
-    const warn = vi.spyOn(console, "warn");
     const { b } = await project();
     try {
       for (const name of ["zz-a", "zz-b"]) {
@@ -547,9 +550,7 @@ describe.runIf(rescanning)("with chokidar's _closers not readable", () => {
         expect(events).toEqual([["addDir", dirname(file)], ["add", file]]);
         expect(messages).toContain(`{"type":"tree-changed"}`);
       }
-      expect(warn.mock.calls.map(c => c.join(" ")).filter(m => m.includes(DEGRADED))).toHaveLength(1);
     } finally {
-      warn.mockRestore();
       await b.close();
     }
   }, 60_000);
@@ -564,12 +565,12 @@ describe.runIf(rescanning)("with chokidar's _closers not readable", () => {
     }
   }, 60_000);
 
-  it("with _closers readable, says nothing of it", async () => {
+  it.runIf(closersReadable)("with _closers readable, says nothing of it", async () => {
     const warn = vi.spyOn(console, "warn");
     const { b } = await project();
     try {
       await b.step(() => b.create("src/patterns/atoms/zz-c/zz-c.hbs", "<p>c</p>\n"));
-      expect(warn.mock.calls.map(c => c.join(" ")).filter(m => m.includes(DEGRADED) || m.includes("still not watched"))).toEqual([]);
+      expect(warn.mock.calls.map(c => c.join(" ")).filter(m => m.includes("still not watched"))).toEqual([]);
     } finally {
       warn.mockRestore();
       await b.close();

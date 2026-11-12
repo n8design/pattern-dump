@@ -311,11 +311,13 @@ async function startBarrier(): Promise<void> {
     await Promise.all(written.map(f => rm(f, { force: true }).catch(() => undefined)));
   }
 }
-// The config file (handleConfig), by a watcher of its own, without fsevents: chokidar watches a file with
-// fsevents through a stream on its whole folder, here the project's root, which would carry every write under
-// it (build output, test traces) into the watcher's callbacks. Its events join the one queue below.
+// The config file (handleConfig), by a watcher of its own. chokidar watches one file through a watch on its
+// folder, the project's root (on macOS, one on the file as well), none of them recursive: writes deeper in the
+// root (build output, node_modules, test traces) are never reported, and reach its callbacks at most as a few
+// coalesced notices, not one per write (pinned in watcher-chokidar.spec.ts). Its events join the one queue
+// below.
 const configWatcher = configFile
-  ? chokidar.watch(configFile.path, { ignoreInitial: true, persistent: true, useFsEvents: false })
+  ? chokidar.watch(configFile.path, { ignoreInitial: true, persistent: true })
   : null;
 // Listened for at once: its ready can come before the main watcher's.
 const configReady = configWatcher ? new Promise<void>(resolve => configWatcher.once("ready", () => resolve())) : Promise.resolve();
@@ -713,11 +715,7 @@ const started = new Promise<void>((resolve, reject) => {
       const hidden = (globalThis as { __testOnly_hideChokidarWatches?: boolean }).__testOnly_hideChokidarWatches === true;
       const watches = hidden ? null : chokidarWatches(watcher, watchDirs);
       if (watches) newFolders = { mode: "closers", watches };
-      else {
-        newFolders = { mode: "timed" };
-        console.warn("[dev-server] New-folder detection is degraded: this chokidar does not show which folders it watches, "
-          + `so a new folder is scanned at ${NEW_FOLDER_FALLBACK_MS.join(", ")} ms only, and a file saved into it later may go unseen.`);
-      }
+      else newFolders = { mode: "timed" };
     }
     resolve();
   });

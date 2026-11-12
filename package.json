@@ -59,7 +59,7 @@
     "@playwright/test": "^1.45.0",
     "autoprefixer": "^10.4.0",
     "axe-core": "^4.9.0",
-    "chokidar": "^3.6.0",
+    "chokidar": "^6.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^9.0.0",
     "handlebars": "^4.7.8",

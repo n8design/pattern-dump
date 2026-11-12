@@ -21,7 +21,7 @@
     "@pattern-dump/hotreloader": "*",
     "@pattern-dump/renderer": "*",
     "axe-core": "^4.9.0",
-    "chokidar": "^3.6.0",
+    "chokidar": "^6.0.0",
     "markdown-it": "^14",
     "node-html-parser": "^7.1.0",
     "postcss": "^8.0.0",
