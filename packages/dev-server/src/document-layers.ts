@@ -12,8 +12,6 @@
 // `escapeAttr` is applied at every attribute bake site, as in the preview document: it is the injection
 // defence for anything PD writes into a document.
 
-import { stat } from "node:fs/promises";
-import { join } from "node:path";
 import { componentCssUrl, PD_ROUTES, themeCssUrl, type DiscoveryMap, type ThemeSwitch } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "./composition.js";
 import { computeCssClosure, linkableClosure, withRenderedClassOwners } from "./css-closure.js";
@@ -21,27 +19,7 @@ import { escapeAttr } from "./http-utils.js";
 import { loadSvgAssets } from "./requires.js";
 import type { ResolvedConfig } from "./server-config.js";
 import type { ServerState } from "./server-state.js";
-
-// Stat each script's .ts source to get its current mtime (milliseconds since epoch).
-// Called just before buildPreviewDocument so the version is fresh on every render.
-// Unknown ids are silently skipped (no .ts file → no ?v= stamp, browser cache used).
-export async function buildScriptVersions(
-  ids: string[],
-  dirs: string | string[]
-): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
-  await Promise.all(ids.map(async id => {
-    // First folder that has the script, in the same order the script route resolves it.
-    for (const dir of Array.isArray(dirs) ? dirs : [dirs]) {
-      try {
-        const { mtimeMs } = await stat(join(dir, `${id}.ts`));
-        map.set(id, mtimeMs);
-        return;
-      } catch { /* not in this folder */ }
-    }
-  }));
-  return map;
-}
+import { scriptStamps } from "./scripts.js";
 
 /** What layers 0–3 are built from. */
 export interface StylesheetLayerInput {
@@ -110,8 +88,8 @@ export interface DocumentAssets {
   closureIds: string[];
   /** Behaviour scripts: the project's global scripts, then the component's own. */
   scripts: string[];
-  /** Script versions (?v=), when there are scripts and a scripts folder. */
-  scriptVersions: Map<string, number> | undefined;
+  /** Script stamps (?v=<content hash>), when there are scripts and a scripts folder. */
+  scriptVersions: Map<string, string> | undefined;
   /** SVG symbol sets to inline. */
   svgContents: string[];
 }
@@ -141,7 +119,7 @@ export async function resolveDocumentAssets(
   ), html, classOwners);
   const scripts = cfg.withGlobalScripts(requireScripts);
   const scriptVersions = cfg.scriptsDirs.length && scripts.length
-    ? await buildScriptVersions(scripts, cfg.scriptsDirs)
+    ? await scriptStamps(state, cfg.scriptsDirs, scripts)
     : undefined;
   return { closureIds: linkableClosure(closureIds, state.perComponentCss), scripts, scriptVersions, svgContents };
 }

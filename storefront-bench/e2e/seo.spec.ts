@@ -1,6 +1,7 @@
 // What a search engine or a link preview reads off a page: the canonical URL and Open Graph, as the
 // browser parsed them from the head, on every bench page. In pd dev the page's own address is the one the
 // browser is on; in the built site, storefront.url.
+import { createHash } from "node:crypto";
 import { expect, test } from "./fixtures.js";
 import { DEV, isDev, SITE_URL } from "./helpers.js";
 
@@ -32,13 +33,15 @@ for (const [route, title, [image, width, height]] of PAGES) {
     expect(head.meta["og:title"]).toBe(title);
     expect(head.meta["og:type"]).toBe("website");
     expect(head.meta["og:site_name"]).toBe("Storefront bench");
-    expect(head.meta["og:image"]).toBe(new URL(image.slice(1), site).href);
     expect([head.meta["og:image:width"], head.meta["og:image:height"]]).toEqual([width, height]);
     expect(head.meta["twitter:card"]).toBe("summary_large_image");
-    // The image is served where the site serves it: at the same path on the server under test.
+    // The image is served where the site serves it: at the same path on the server under test. Its URL is
+    // stamped with the content hash of what is served there, so a changed image gets a new URL.
     const res = await request.get(image);
     expect(res.status(), image).toBe(200);
     expect(res.headers()["content-type"]).toContain("image/png");
+    const stamp = createHash("sha256").update(await res.body()).digest("hex").slice(0, 10);
+    expect(head.meta["og:image"]).toBe(`${new URL(image.slice(1), site).href}?v=${stamp}`);
     expect(head.meta["robots"]).toBeUndefined();
     expect(head.lang).toBe("en");
 

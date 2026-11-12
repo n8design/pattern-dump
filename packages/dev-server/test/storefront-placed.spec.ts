@@ -94,9 +94,9 @@ describe("a storefront page that places a component", () => {
     expect(page.body).toContain(`<section class="carousel" aria-label="Recent talks" data-per-view="1">`
       + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/espc.jpg" alt="On stage"><figcaption><p>ESPC <strong>2025</strong></p>\n    </figcaption></figure>\n    </div>`
       + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/collab.jpg" alt="Audience"><figcaption><p>Collab Summit</p>\n    </figcaption></figure>\n    </div></section>`);
-    // The placed component's stylesheet, and the nested slide's.
-    expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/molecules\/slider\.css" data-pd-comp="molecules\/slider">/);
-    expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/atoms\/slide\.css" data-pd-comp="atoms\/slide">/);
+    // The placed component's stylesheet, and the nested slide's, each stamped with its content hash.
+    expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/molecules\/slider\.css\?v=[0-9a-f]{10}" data-pd-comp="molecules\/slider">/);
+    expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/atoms\/slide\.css\?v=[0-9a-f]{10}" data-pd-comp="atoms\/slide">/);
   });
 
   for (const [name, [, problem]] of Object.entries(CASES)) {

@@ -115,7 +115,8 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
     await expect.poll(async () => {
       try {
         await page.reload();
-        const links = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")));
+        // Compared by path: a link carries its content stamp (?v=<hash>).
+        const links = await page.locator('link[rel="stylesheet"]').evaluateAll(ls => ls.map(l => l.getAttribute("href")?.split("?")[0]));
         const base = await (await page.request.get("/_pd/base.css")).text();
         return [links.includes("/_pd/components/partials/zz-badge.css"), base.includes(".zz-badge")];
       } catch {
