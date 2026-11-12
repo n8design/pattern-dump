@@ -163,8 +163,19 @@ function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
       // server its own request. The Host header is the outer request's, read as it arrived.
       const self = { url: path, method: "GET", headers: { host: req.headers.host } } as unknown as IncomingMessage;
       const held = holdResponse();
-      hash = stampedResponse(self, held.res, ctx).then(() => held.status() === 200 ? contentHash(held.body()) : undefined);
-      hashes.set(path, hash);
+      const lookup = stampedResponse(self, held.res, ctx).then(() => {
+        const status = held.status();
+        if (status === 200) return contentHash(held.body());
+        // Only "no such file" is remembered for the generation. Any other failure (a script that doesn't
+        // compile, a file that can't be read) is reported and asked again by the next page.
+        if (status !== 404) {
+          if (hashes.get(path) === lookup) hashes.delete(path);
+          console.error(`[storefront] ${path} could not be stamped: ${status} ${held.body().toString("utf8").split("\n")[0]!.slice(0, 160)}`);
+        }
+        return undefined;
+      });
+      hashes.set(path, lookup);
+      hash = lookup;
     }
     return hash;
   };
