@@ -59,8 +59,8 @@ export async function surfaceCollisions(
           "",
         ]),
       ].join("\n");
-  // Never write into the project root (it may be read-only / not ours). Emit to a PD-owned
-  // scratch dir outside the root; the collisions are also pushed to the Console above, so a
+  // Nothing is left behind in the project root (it may be read-only / not ours). Emit to a
+  // PD-owned scratch dir outside the root; the collisions are also pushed to the Console above, so a
   // failed write degrades to "diagnostic on the Console only", never a crash.
   try {
     const dir = pdScratchDir(cwd);

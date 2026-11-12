@@ -78,6 +78,12 @@ Starts the workbench with live reload.
 
 If a port is taken, `pd dev` says which one and exits; pick another with `--port`.
 
+As it starts, `pd dev` writes an empty `.pd-watch-start` into each folder it watches and removes it once its
+watch there has seen it, so an edit saved the moment it is ready is not missed. Nothing is left behind (one
+left by a crash is removed at the next start), and new projects list it in `.gitignore`. A folder it cannot
+write to is named in the terminal, and so is one whose watch has not reported within 2 seconds; `pd dev`
+starts either way.
+
 Restart `pd dev` after changing the config, a file a helper module imports (only the module itself
 reloads), or an installed pattern package. Everything else reloads while it runs, global data and helpers
 included; if a data or helper file fails to load, the last good version stays in use and the problem is

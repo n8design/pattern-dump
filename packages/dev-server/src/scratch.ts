@@ -1,8 +1,10 @@
 // Per-root scratch directory.
 //
 // A LEAF. Derived artifacts (the diagnostics graph, CONFLICTS/FLATTENED reports) are written
-// outside the subject tree — PD never writes into a root it is reading, which is what makes
-// foreign-system rendering safe on a read-only checkout. The path is keyed by a hash of the
+// outside the subject tree — PD leaves nothing behind in a root it is reading, which is what
+// makes foreign-system rendering safe on a read-only checkout. (The one write into it is the
+// watcher's start barrier, `.pd-watch-start` in watch.ts: removed once seen, and skipped in a
+// folder that cannot be written.) The path is keyed by a hash of the
 // resolved root so two projects never collide in the shared temp dir.
 
 import { createHash } from "node:crypto";

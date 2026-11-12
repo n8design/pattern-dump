@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { readFile, cp, mkdtemp, rm } from "node:fs/promises";
+import { readFile, mkdtemp, rm } from "node:fs/promises";
+import { copyProject } from "./copy-project.js";
 import { tmpdir } from "node:os";
 
 import { startDevServer, formatAuditReport, formatAudit, buildAuditRollup, AUDIT_SCOPE } from "@pattern-dump/dev-server";
@@ -102,7 +103,7 @@ describe("diagnostics graph — corpus sweep + guards", () => {
       return last;
     };
     try {
-      await cp(testBench, tmpBench, { recursive: true });
+      await copyProject(testBench, tmpBench);
       const canary = join(tmpBench, "src/patterns/atoms/audit-clean/audit-clean.hbs");
       const scss   = join(tmpBench, "src/styles/01-atoms/button.scss");
       const server = await startDevServer(config, tmpBench, { port: 0, wsPort: 0 });

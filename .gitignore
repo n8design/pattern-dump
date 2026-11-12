@@ -11,6 +11,8 @@ playwright-report/
 test-results/
 # The watcher barrier tests and the settle hook (PD_TEST_HOOKS) write into watched folders
 .__testOnly_barrier
+# pd dev writes this into each watched folder for a moment as it starts, then removes it
+.pd-watch-start
 apps/dev-ui/test-results/
 
 # Local env (never commit secrets)

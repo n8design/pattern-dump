@@ -19,7 +19,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { appendFile, readdir } from "node:fs/promises";
+import { appendFile, readdir, rm, writeFile } from "node:fs/promises";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
 import { componentCssUrl, type DiscoveryResult, type HmrMessage } from "@pattern-dump/contracts";
@@ -265,6 +265,52 @@ async function settle(): Promise<void> {
     await new Promise(r => setTimeout(r, 10));
   }
 }
+
+// The start barrier: startWatching resolves only once every watched folder has reported a write. chokidar's
+// `ready` means its first scan is done, not that its watches are live, and a watcher may say it before it
+// reports anything (chokidar 6 on macOS lost an edit made in the first moment after it). So pd dev writes
+// START_FILE into each watched folder (the project's and each linked package's, never an installed copy in
+// node_modules), rewrites it every START_REWRITE_MS until the watcher reports it, and then removes it: pd dev leaves nothing behind in the project. A START_FILE left by a pd dev
+// that crashed here is overwritten and removed at the next start. A folder it cannot write to is skipped and
+// named; one that has not reported by START_BARRIER_MS is named, and pd dev starts anyway. Its events are
+// reported, never handled, and never passed to the test hooks.
+const START_FILE = ".pd-watch-start";
+const START_REWRITE_MS = 50;
+const START_BARRIER_MS = 2_000;
+const startWaiters = new Set<(path: string) => void>();
+const MISSED_AT_START = "an edit saved there in the first moment after start may be missed";
+async function startBarrier(): Promise<void> {
+  const dirs = [...new Set(watchDirs)].filter(d => existsSync(d) && !d.split(sep).includes("node_modules"));
+  const written: string[] = [];
+  const waiting = new Set<string>();
+  for (const dir of dirs) {
+    const file = join(dir, START_FILE);
+    try {
+      await writeFile(file, "");
+      written.push(file);
+      waiting.add(file);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code ?? String(e);
+      console.warn(`[dev-server] Cannot write to ${shown(dir)} (${code}), so pd dev cannot tell when its watch there is live: ${MISSED_AT_START}.`);
+    }
+  }
+  const seen = (path: string): void => { waiting.delete(path); };
+  startWaiters.add(seen);
+  try {
+    const deadline = Date.now() + START_BARRIER_MS;
+    while (waiting.size > 0 && Date.now() < deadline && !closed) {
+      await new Promise(r => setTimeout(r, START_REWRITE_MS));
+      for (const file of waiting) await appendFile(file, ".").catch(() => undefined);
+    }
+    if (waiting.size > 0 && !closed) {
+      const late = [...waiting].map(f => shown(f.slice(0, -(START_FILE.length + 1))));
+      console.warn(`[dev-server] The watch on ${late.join(", ")} did not report within ${START_BARRIER_MS / 1000} s; starting anyway: ${MISSED_AT_START}.`);
+    }
+  } finally {
+    startWaiters.delete(seen);
+    await Promise.all(written.map(f => rm(f, { force: true }).catch(() => undefined)));
+  }
+}
 // The config file (handleConfig), by a watcher of its own, without fsevents: chokidar watches a file with
 // fsevents through a stream on its whole folder, here the project's root, which would carry every write under
 // it (build output, test traces) into the watcher's callbacks. Its events join the one queue below.
@@ -430,6 +476,8 @@ function reportHandlerFailure(event: string, path: string, e: unknown, step?: st
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
   // The event's turn: resolves once its handler has finished (or it was skipped).
   const start = (path: string, fromRecheck: boolean): Promise<void> => new Promise<void>(finish => {
+    // The start barrier's file: what it waits for, nothing else (startBarrier).
+    if (basename(path) === START_FILE) { startWaiters.forEach(w => w(path)); finish(); return; }
     // A change: the file as the handler is about to read it. A newer event for the same file replaces
     // the pending recheck, since it is handled with whatever the file holds by then.
     let seen: Seen | null = null;
@@ -1257,6 +1305,7 @@ on("unlinkDir", async (dirPath) => {
   try {
     await started;
     await configReady;
+    await startBarrier();
   } catch (e) {
     await close();
     throw e;
