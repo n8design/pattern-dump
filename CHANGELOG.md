@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Pattern Dump now needs Node.js 22.22 or later (it was 20.10).
+
 ### Fixed
 
 - A component added while `pd dev` runs gets its own stylesheet even when the stylesheet is saved before

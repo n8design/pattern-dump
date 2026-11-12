@@ -141,7 +141,7 @@ const pkg = {
   },
   types: "./dist/index.d.ts",
   files: ["dist", "templates", "README.md", "LICENSE", "THIRD-PARTY-NOTICES.md", "CHANGELOG.md"],
-  engines: { node: ">=20.10" },
+  engines: { node: ">=22.22" },
   dependencies,
 };
 await writeFile(join(stage, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
