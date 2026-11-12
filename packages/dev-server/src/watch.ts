@@ -1141,7 +1141,7 @@ on("change", async (filePath) => {
 
   } else if (ext === ".ts" && scriptDirOf(filePath)) {
     // Script changed → invalidate cache + dispatch content-swap so the client re-renders
-    // the srcdoc with a fresh ?v=<mtime> on the script src (busting the browser cache).
+    // the srcdoc with a fresh ?v=<content hash> on the script src (busting the browser cache).
     const scriptId = basename(filePath, ".ts");
     scriptFor(state, scriptId).invalidate();
     if (state.lastComponentId) {

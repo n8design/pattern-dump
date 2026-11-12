@@ -59,14 +59,17 @@ export function json(res: ServerResponse, status: number, data: unknown): void {
 
 /** Stream a file, or 404 if it cannot be read. Any read failure is a 404, not a 500 — a missing
  * asset is a routing outcome, not a server fault. */
+/** A file's bytes: 404 when there is no such file, 500 when it exists but can't be read. */
 export async function serveFile(res: ServerResponse, filePath: string, contentType: string): Promise<void> {
   try {
     const content = await readFile(filePath);
     res.writeHead(200, { "Content-Type": contentType });
     res.end(content);
-  } catch {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("Not found");
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    const missing = code === "ENOENT" || code === "ENOTDIR" || code === "EISDIR";
+    res.writeHead(missing ? 404 : 500, { "Content-Type": "text/plain" });
+    res.end(missing ? "Not found" : `Could not read the file (${code ?? "unknown error"})`);
   }
 }
 

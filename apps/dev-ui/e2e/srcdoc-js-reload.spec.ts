@@ -69,8 +69,8 @@ test.describe("JS HMR — srcdoc reload", () => {
       const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
       return f?.srcdoc ?? "";
     });
-    // mtime from Node stat().mtimeMs may be a float — allow digits and optional decimal.
-    expect(srcdoc).toMatch(/<script[^>]+src="[^"]*\?v=[\d.]+"/);
+    // The stamp is the content hash of the script as served: ten hex digits.
+    expect(srcdoc).toMatch(/<script[^>]+src="[^"]*\?v=[0-9a-f]{10}"/);
   });
 
   // AT-2: version changes on edit
@@ -83,7 +83,7 @@ test.describe("JS HMR — srcdoc reload", () => {
         const f = document.getElementById("preview-frame") as HTMLIFrameElement | null;
         return f?.srcdoc ?? "";
       });
-      const m = srcdoc.match(/\?v=([\d.]+)/);
+      const m = srcdoc.match(/\?v=([0-9a-f]{10})"/);
       return m ? m[1] : null;
     };
 

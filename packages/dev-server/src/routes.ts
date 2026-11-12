@@ -23,16 +23,14 @@ import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
 } from "@pattern-dump/contracts";
-import { compileScriptFile } from "@pattern-dump/build";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import { sameHostWorkbenchPath } from "@pattern-dump/config";
 import type { ResolvedConfig } from "./server-config.js";
-import { compositionFor, currentDiscovery, scriptFor, type ServerState } from "./server-state.js";
+import { compositionFor, currentDiscovery, type ServerState } from "./server-state.js";
 import { createDisplayPath } from "./display-path.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
-class ScriptMissing extends Error {}
 import { buildShellHtml, json, mimeType, serveFile, servesShell } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
 import { buildComponentTree } from "./component-tree.js";
@@ -42,6 +40,9 @@ import { buildPreviewDocument, normalizeAssetRefs } from "./preview-document.js"
 import { resolveDocumentAssets } from "./document-layers.js";
 import { resolveLayoutMode } from "./layout-mode.js";
 import { aggregateRequires, normalizeScriptId } from "./requires.js";
+import { compiledScript, ScriptMissing } from "./scripts.js";
+import { contentHash } from "./content-hash.js";
+import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
@@ -53,7 +54,7 @@ import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages } from "./storefront/pages.js";
 import { assetFile } from "./asset-file.js";
-import { containedFile, decodePath } from "./contained-file.js";
+import { decodePath } from "./contained-file.js";
 import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
@@ -108,7 +109,7 @@ export async function handleRequest(
   res: ServerResponse,
   ctx: RouteContext,
 ): Promise<void> {
-  const { cfg, state, tracker, devUiDist } = ctx;
+  const { cfg } = ctx;
   // Only requests addressed to pd dev itself: one of its own host names at the port this request came in
   // on. A page on another site that gets a name of its own to resolve to 127.0.0.1 still sends that name.
   if (!isOwnHost(req.headers.host, ownHosts(cfg.storefront?.host), req.socket.localPort ?? -1)) {
@@ -116,6 +117,88 @@ export async function handleRequest(
     res.end("Forbidden: this server answers only to its own host names");
     return;
   }
+  // On the storefront's host, every HTML and CSS response leaves with its references to served files
+  // stamped with their content hashes (storefront/asset-stamps.ts). The workbench's hosts are not stamped.
+  const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
+  if (cfg.storefront && host === cfg.storefront.host) return stampedResponse(req, res, ctx);
+  return routeRequest(req, res, ctx);
+}
+
+/** A response held in memory: what a route wrote, to be stamped before it is sent, or hashed. */
+interface HeldResponse { res: ServerResponse; status(): number; headers: Record<string, number | string | string[]>; body(): Buffer }
+
+function holdResponse(): HeldResponse {
+  let status = 200;
+  const headers: Record<string, number | string | string[]> = {};
+  const chunks: Buffer[] = [];
+  const add = (chunk: unknown): void => { if (chunk !== undefined && chunk !== null) chunks.push(Buffer.from(chunk as string | Uint8Array)); };
+  const res = {
+    setHeader(name: string, value: number | string | string[]) { headers[name.toLowerCase()] = value; return res; },
+    getHeader(name: string) { return headers[name.toLowerCase()]; },
+    writeHead(code: number, more?: Record<string, number | string | string[]>) {
+      status = code;
+      for (const [k, v] of Object.entries(more ?? {})) headers[k.toLowerCase()] = v;
+      return res;
+    },
+    write(chunk: unknown) { add(chunk); return true; },
+    end(chunk?: unknown) { add(chunk); return res; },
+  };
+  return { res: res as unknown as ServerResponse, status: () => status, headers, body: () => Buffer.concat(chunks) };
+}
+
+/** Per server, the stamps of the current generation: any handled change starts a new set. */
+const stampCaches = new WeakMap<RouteContext, { generation: string; hashes: Map<string, Promise<string | undefined>> }>();
+
+/** A served path's stamp: the content hash of the path as this host serves it, asked of the server itself. */
+function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
+  const generation = ctx.generation?.() ?? "";
+  let cache = stampCaches.get(ctx);
+  if (!cache || cache.generation !== generation) { cache = { generation, hashes: new Map() }; stampCaches.set(ctx, cache); }
+  const { hashes } = cache;
+  return path => {
+    let hash = hashes.get(path);
+    if (!hash) {
+      // Straight to the storefront's routes, past the host check: that check reads the socket the outer request
+      // came in on, which is gone once its client hangs up (a page live reload replaces), and would refuse the
+      // server its own request. The Host header is the outer request's, read as it arrived.
+      const self = { url: path, method: "GET", headers: { host: req.headers.host } } as unknown as IncomingMessage;
+      const held = holdResponse();
+      const lookup = stampedResponse(self, held.res, ctx).then(() => {
+        const status = held.status();
+        if (status === 200) return contentHash(held.body());
+        // Only "no such file" is remembered for the generation. Any other failure (a script that doesn't
+        // compile, a file that can't be read) is reported and asked again by the next page.
+        if (status !== 404) {
+          if (hashes.get(path) === lookup) hashes.delete(path);
+          console.error(`[storefront] ${path} could not be stamped: ${status} ${held.body().toString("utf8").split("\n")[0]!.slice(0, 160)}`);
+        }
+        return undefined;
+      });
+      hashes.set(path, lookup);
+      hash = lookup;
+    }
+    return hash;
+  };
+}
+
+async function stampedResponse(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): Promise<void> {
+  const held = holdResponse();
+  await routeRequest(req, held.res, ctx);
+  const type = String(held.headers["content-type"] ?? "");
+  let body: Buffer | string = held.body();
+  if (/^text\/html\b/.test(type)) body = await stampHtml(body.toString("utf8"), hashOfFor(req, ctx));
+  else if (/^text\/css\b/.test(type)) body = await stampCss(body.toString("utf8"), hashOfFor(req, ctx));
+  res.writeHead(held.status(), held.headers);
+  res.end(body);
+}
+
+/** Every route, on every host. */
+async function routeRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: RouteContext,
+): Promise<void> {
+  const { cfg, state, tracker, devUiDist } = ctx;
   // One rendering for the whole request: a reload replacing it meanwhile does not mix its parts.
   const { render, globalData } = ctx.rendering.current;
   // Destructured so the chain below reads exactly as it did inside startDevServer — this move
@@ -216,16 +299,7 @@ export async function handleRequest(
       if (decoded === null) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end("Script not found"); return; }
       const scriptId = normalizeScriptId(decoded);
       try {
-        const js = await scriptFor(state, scriptId).get(async () => {
-          // The project's scripts first, then each package's — a project script replaces a package's. Each
-          // entry point must be inside its scripts folder.
-          let entryPoint: string | undefined;
-          for (const d of scriptsDirs) { entryPoint = (await containedFile(d, `${scriptId}.ts`)) ?? undefined; if (entryPoint) break; }
-          // Say what is missing. Compiling a path we know is absent would report it as an ENOENT
-          // compile error inside the preview, naming neither the id nor where it was looked for.
-          if (entryPoint === undefined) throw new ScriptMissing(scriptId);
-          return compileScriptFile(entryPoint);
-        });
+        const js = await compiledScript(state, scriptsDirs, scriptId);
         res.writeHead(200, { "Content-Type": "application/javascript" });
         res.end(js);
       } catch (e) {
