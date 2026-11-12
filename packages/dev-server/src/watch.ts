@@ -485,8 +485,6 @@ function reportHandlerFailure(event: string, path: string, e: unknown, step?: st
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
   // The event's turn: resolves once its handler has finished (or it was skipped).
   const start = (path: string, fromRecheck: boolean): Promise<void> => new Promise<void>(finish => {
-    // The start barrier's file: what it waits for, nothing else (startBarrier).
-    if (basename(path) === START_FILE) { startWaiters.forEach(w => w(path)); finish(); return; }
     // A change: the file as the handler is about to read it. A newer event for the same file replaces
     // the pending recheck, since it is handled with whatever the file holds by then.
     let seen: Seen | null = null;
@@ -562,6 +560,10 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
     if (held) void held.then(run, run); else run();
   });
   const dispatch = (path: string, fromRecheck = false): void => {
+    // The start barrier's file: what it waits for, nothing else (startBarrier). Answered here, never queued:
+    // on macOS its last writes and its removal can be reported after pd dev is ready, and in the queue they
+    // would stand ahead of the first edits.
+    if (basename(path) === START_FILE) { startWaiters.forEach(w => w(path)); return; }
     enqueue({ event, path, start: () => start(path, fromRecheck) });
   };
   if (event === "add" || event === "addDir" || event === "change" || event === "unlink") dispatchers[event] = path => dispatch(path);

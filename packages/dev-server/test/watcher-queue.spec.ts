@@ -105,4 +105,23 @@ describe("watcher events", () => {
     await b.barrier();
     expect(handled.slice(from).filter(h => b.owns(h.path) && b.rel(h.path) === B && h.event === "change")).toHaveLength(1);
   }, 60_000);
+
+  it("give no place to a late report of the start barrier's file", async () => {
+    const { b, deliver } = await project();
+    const hold = holdOne(b, A);
+    const from = handled.length;
+    await save(b.at(A), "<p>a, saved</p>\n");
+    await hold.held;
+    // The barrier's file, removed before pd dev was ready, reported only now: on macOS its removal can come
+    // after ready, while the first edits are already being handled.
+    (deliver as (event: string, path: string) => void)("unlink", b.at("src/patterns/.pd-watch-start"));
+    await save(b.at(B), "<p>b, saved</p>\n");
+    deliver("change", b.at(B));
+    hold.release();
+    // When A's handler finishes, only B's change is waiting.
+    await whenHandled(() => handled.slice(from).some(h => b.owns(h.path) && b.rel(h.path) === A));
+    const atA = handled.slice(from).find(h => b.owns(h.path) && b.rel(h.path) === A)!;
+    expect(atA.stillRunning).toBe(1);
+    await b.barrier();
+  }, 60_000);
 });
