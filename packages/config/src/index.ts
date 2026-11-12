@@ -156,6 +156,9 @@ export interface PatternDumpConfig {
    * static site has no Audit tab. All three can be overridden on the command line.
    */
   build?: { outDir?: string; basePath?: string; audit?: boolean };
+  /** How responsive image variants are encoded (WebP). Defaults: quality 75, effort 4. A site can override
+   *  either in `storefront.images`. */
+  images?: ImageSettings;
   /** The storefront: a website of real HTML pages, written from markdown, beside the workbench. */
   storefront?: StorefrontConfig;
 }
@@ -165,6 +168,14 @@ export interface PatternDumpConfig {
  * the workbench on `pd.localhost`, both from `/`. `pd build` writes it to its own folder, apart from
  * the workbench snapshot. A page renders with the layout `layouts/<layout>` from the project's patterns.
  */
+/** How responsive image variants are encoded. */
+export interface ImageSettings {
+  /** WebP quality, a whole number from 1 to 100. Default: 75. */
+  quality?: number;
+  /** WebP effort, 0 (fastest) to 6 (smallest files). Default: 4. */
+  effort?: number;
+}
+
 export interface StorefrontConfig {
   /** Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/`.
    *  `pagesDir`, `patternsDir` and `outDir` are three separate folders: none is another, and none is inside
@@ -202,6 +213,8 @@ export interface StorefrontConfig {
   /** The image a page shows in link previews when it names none of its own: a raster image in the assets
    *  (PNG, JPEG, GIF or WebP), such as `/assets/images/share.png`. */
   image?: string;
+  /** This site's image encoding, over the project's `images`. */
+  images?: ImageSettings;
   /**
    * Values every page of the site shares, such as its title or the line in its footer. Every layout gets
    * them as `site`; a page cannot set them. Which keys there are, and their types, is what the `site`

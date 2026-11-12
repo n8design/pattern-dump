@@ -29,6 +29,9 @@ const VERSION = cliPkg.version;
 
 // Packages loaded by name at runtime rather than imported statically, so the metafile cannot see them.
 const RUNTIME_RESOLVED = ["axe-core"];
+// Pinned to the exact version locked here, not a caret range: sharp's version is part of every image variant's
+// key, so another release could encode other bytes under the same URL.
+const EXACT = new Set(["sharp"]);
 
 await rm(outRoot, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
@@ -76,7 +79,7 @@ for (const dep of [...external].sort()) {
   if (versions.size === 0) throw new Error(`pack: "${dep}" is imported by the bundle but not in package-lock.json`);
   if (versions.size > 1) throw new Error(`pack: workspaces lock "${dep}" at different versions (${[...versions].join(", ")})`);
   const [locked] = versions;
-  dependencies[dep] = `^${locked}`;
+  dependencies[dep] = EXACT.has(dep) ? locked : `^${locked}`;
 }
 
 // ---- 3. The dev-ui bundle, next to the binary (dev-server/src/assets.ts looks for ./dev-ui/) ----

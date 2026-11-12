@@ -651,6 +651,7 @@ export const PD_ROUTE_PREFIX = {
   themeCss: "/_pd/themes/",
   script: "/_pd/scripts/",
   assets: "/assets/",
+  images: "/_pd/images/",
 } as const;
 
 /**
@@ -677,6 +678,33 @@ export function themeCssUrl(name: string): string {
 export function scriptUrl(id: string, version?: number | string): string {
   const q = version !== undefined ? `?v=${version}` : "";
   return `${PD_ROUTE_PREFIX.script}${encodeURIComponent(id)}.js${q}`;
+}
+
+/**
+ * A responsive image variant, served immutable: WebP, `width` pixels wide, of the asset `name` (its path under the
+ * assets folder without its extension, e.g. "images/harbour"). `hash` is the variant's key, the first 10 hex
+ * digits of a SHA-256 over the source's bytes and what the variant is encoded with, so the URL changes whenever
+ * its bytes would. Each segment of `name` is encoded.
+ */
+export function imageUrl(name: string, hash: string, width: number): string {
+  return `${PD_ROUTE_PREFIX.images}${name.split("/").map(encodeURIComponent).join("/")}.${hash}.${width}.webp`;
+}
+
+/** An image variant URL's parts (`name` decoded), or null when the path is not one: an empty, "." or ".."
+ *  segment, a segment that doesn't decode, a hash that isn't 10 hex digits, a width that isn't a whole number
+ *  from 1, written without leading zeros. */
+export function parseImageUrl(pathname: string): { name: string; hash: string; width: number } | null {
+  if (!pathname.startsWith(PD_ROUTE_PREFIX.images)) return null;
+  const m = /^(.+)\.([0-9a-f]{10})\.([1-9][0-9]{0,4})\.webp$/.exec(pathname.slice(PD_ROUTE_PREFIX.images.length));
+  if (!m) return null;
+  const segments: string[] = [];
+  for (const raw of m[1]!.split("/")) {
+    let seg: string;
+    try { seg = decodeURIComponent(raw); } catch { return null; }
+    if (seg === "" || seg === "." || seg === ".." || seg.includes("/") || seg.includes("\\")) return null;
+    segments.push(seg);
+  }
+  return { name: segments.join("/"), hash: m[2]!, width: Number(m[3]) };
 }
 
 /** How the shell switches component themes in the preview: toggle `data-theme` on one set of

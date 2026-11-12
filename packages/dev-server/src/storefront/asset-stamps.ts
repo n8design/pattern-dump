@@ -12,15 +12,18 @@
 // The pass only rewrites text. `hashOf` says what a path's stamp is: the server answers it by serving the
 // path to itself (routes.ts), so a stylesheet's hash covers its own stamped `url()`s.
 
+import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
+
 /** The stamp of a served path, or undefined when nothing is served there. */
 export type HashOf = (path: string) => Promise<string | undefined>;
 
 const SERVED = String.raw`\/(?:_pd|assets)\/[^"'()\s?#]+`;
 
-/** `path` or `path?v=…`: the path, when the reference may be stamped; otherwise null. */
+/** `path` or `path?v=…`: the path, when the reference may be stamped; otherwise null. An image variant
+ *  (/_pd/images/…) is already named by its key, and looking its stamp up would encode it: never stamped. */
 function stampable(ref: string): string | null {
   const m = new RegExp(`^(${SERVED})(?:\\?v=[^"'()\\s#&]*)?$`).exec(ref);
-  return m ? m[1]! : null;
+  return m && !m[1]!.startsWith(PD_ROUTE_PREFIX.images) ? m[1]! : null;
 }
 
 async function replaceAsync(text: string, re: RegExp, fn: (m: RegExpExecArray) => Promise<string>): Promise<string> {

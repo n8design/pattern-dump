@@ -10,8 +10,12 @@ type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object";
+  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object"
+  | "quality" | "effort";
 type Shape = Readonly<Record<string, Rule>>;
+
+/** How responsive image variants are encoded: for the project, and overridden per site. */
+const IMAGES: Rule = { keys: { quality: "quality", effort: "effort" } };
 
 const SHAPE: Shape = {
   $schema: "string",
@@ -54,10 +58,11 @@ const SHAPE: Shape = {
   packages: "packages",
   exclude: "strings",
   build: { keys: { outDir: "string", basePath: "string", audit: "boolean" } },
+  images: IMAGES,
   storefront: {
     keys: {
       pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", site: "plain-object",
-      url: "site-url", lang: "lang", index: "boolean", image: "asset-path",
+      url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES,
     },
     required: ["pagesDir", "outDir"],
   },
@@ -186,6 +191,14 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     if (typeof value !== "string" || !/^\/assets\/[^?#]+[^/?#]$/.test(value)) {
       fail(`a path to a file in the assets, such as "/assets/images/share.png"`);
     }
+    return;
+  }
+  if (rule === "quality") {
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 100) fail("a whole number from 1 to 100 (WebP quality)");
+    return;
+  }
+  if (rule === "effort") {
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 6) fail("a whole number from 0 to 6 (WebP effort: 0 fastest, 6 smallest)");
     return;
   }
   if (rule === "plain-object") {
