@@ -110,7 +110,7 @@ export function liveScript(wsPort: number, generation = ""): string {
     + `if(m.type==="hello"){if(behind(g,m.generation))location.reload();return;}`
     + `if((m.type==="page-changed"&&(m.route===null||m.route===location.pathname))||m.type==="content-swap"||m.type==="css-link-swap")location.reload();`
     + `else if(m.type==="error")(${LIVE_NOTICE})(String(m.message));};`
-    + `})();</script>`;
+    + `})();${exampleHeightCheck()}</script>`;
 }
 
 /** The live client's notice: one fixed list on the page, a line added per problem; the next reload clears it. */
@@ -121,15 +121,15 @@ const LIVE_NOTICE = `function(t){var n=document.querySelector("[data-pd-live-not
   + `var li=document.createElement("li");li.textContent=t;n.firstChild.appendChild(li);}`;
 
 /**
- * `pd dev` only: warn when a live example is declared taller than its content (x-pd-example-height), the one
+ * Part of the live client, so `pd dev` only: warn when a live example is declared taller than its content (x-pd-example-height), the one
  * mistake the fitter can't correct. Once per load of each frame with a declared height, after its fonts are
  * ready: the preview's root box is the content's own height (scrollHeight is floored at the frame's). A root box
  * exactly as tall as the frame is ambiguous (`html { height: 100% }` fills any frame) and stays silent; only a
  * root clearly shorter than the declared height warns, on the console and in the live notice. Each check ends
  * in one console.debug line saying its outcome.
  */
-export function exampleHeightCheckScript(): string {
-  return `<script data-pd-live>(function(){var notice=(${LIVE_NOTICE});`
+function exampleHeightCheck(): string {
+  return `(function(){var notice=(${LIVE_NOTICE});`
     + `document.querySelectorAll("figure.doc-example iframe[height]").forEach(function(f){`
     + `var check=function(){var d=f.contentDocument;if(!d||d.URL==="about:blank")return;d.fonts.ready.then(function(){`
     + `var declared=Number(f.getAttribute("height")),root=d.documentElement.getBoundingClientRect().height,id=f.title,outcome="fits";`
@@ -138,7 +138,7 @@ export function exampleHeightCheckScript(): string {
     + `+"px. A frame is never fitted shorter than it starts, so it stays too tall: declare at most "+Math.floor(root)+".";console.warn(t);notice(t);}`
     + `console.debug("[pd] example height of "+id+": "+outcome);});};`
     + `f.addEventListener("load",check);if(f.contentDocument&&f.contentDocument.readyState==="complete")check();});`
-    + `})();</script>`;
+    + `})();`;
 }
 
 function document(head: string, body: string, live: PageAssembly["live"], lang = "en"): string {
@@ -151,7 +151,7 @@ ${head}
 </head>
 <body>
 ${body}
-${live ? liveScript(live.wsPort, live.generation) + exampleHeightCheckScript() : ""}
+${live ? liveScript(live.wsPort, live.generation) : ""}
 </body>
 </html>`;
 }
