@@ -200,8 +200,12 @@ async function routeRequest(
   ctx: RouteContext,
 ): Promise<void> {
   const { cfg, state, tracker, devUiDist } = ctx;
-  // One rendering for the whole request: a reload replacing it meanwhile does not mix its parts.
-  const { render, globalData } = ctx.rendering.current;
+  // One rendering for the whole request: a reload replacing it meanwhile does not mix its parts. On the storefront's
+  // host everything renders with the site's image settings (RenderInput.images): its pages, the components they place,
+  // and the previews and component data it serves, so the variant URLs they write are the ones its image route serves.
+  const { render: renderAny, globalData } = ctx.rendering.current;
+  const onSite = cfg.storefront !== null && (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase() === cfg.storefront.host;
+  const render: typeof renderAny = onSite ? input => renderAny({ ...input, images: "site" }) : renderAny;
   // Destructured so the chain below reads exactly as it did inside startDevServer — this move
   // changes where the handler lives, not a line of its logic.
   const {

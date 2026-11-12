@@ -2,6 +2,7 @@
 // Orchestration: load config, start dev server, run the diagnostics audit.
 import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite } from "@pattern-dump/dev-server";
 import type { DevServerOptions, AuditFormat } from "@pattern-dump/dev-server";
+import type { DiagnosticsGraph } from "@pattern-dump/contracts";
 import { build as esbuild } from "esbuild";
 import { existsSync } from "node:fs";
 import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
@@ -64,20 +65,33 @@ export async function runBuild(
  */
 export async function runAudit(root: string, configPath?: string, format: AuditFormat = "md"): Promise<void> {
   const config = await loadConfig(root, configPath);
-  const { graph, reaudited, reused, artifactPath } = await runDiagnosticsAudit(config, root);
+  const { graph, reaudited, reused, artifactPath, imageWarning } = await runDiagnosticsAudit(config, root);
   const report = formatAudit(graph, format);
   const ext = format === "json" ? "json" : format === "text" ? "txt" : "md";
   const reportPath = join(dirname(artifactPath), `diagnostics-report.${ext}`);
   await writeFile(reportPath, report, "utf-8");
 
   console.log(report);
-  const affected = new Set(graph.occurrences.map(o => o.component)).size;
   // Meta lines: stderr for json (so stdout is pure JSON for CI), stdout otherwise.
   const meta = format === "json" ? console.error : console.log;
-  meta(`${format === "json" ? "" : "\n"}[pd audit] re-audited ${reaudited.length}, reused ${reused} (of ${graph.components.length}).`);
-  meta(`[pd audit] serialized graph: ${artifactPath}`);
-  meta(`[pd audit] report: ${reportPath}`);
-  meta(`[pd audit] ${graph.occurrences.length} defects across ${affected}/${graph.components.length} components.`);
+  const lines = auditSummaryLines({ graph, reaudited: reaudited.length, reused, artifactPath, reportPath, ...(imageWarning ? { imageWarning } : {}) });
+  meta(`${format === "json" ? "" : "\n"}${lines.join("\n")}`);
+}
+
+/** The audit's summary, after its report: what was re-audited, where the files are, the defects, and the image
+ *  warning once for the whole audit, not per component (a missing sharp is the installation's, not a component's). */
+export function auditSummaryLines(r: {
+  graph: Pick<DiagnosticsGraph, "occurrences" | "components">; reaudited: number; reused: number;
+  artifactPath: string; reportPath: string; imageWarning?: string;
+}): string[] {
+  const affected = new Set(r.graph.occurrences.map(o => o.component)).size;
+  return [
+    `[pd audit] re-audited ${r.reaudited}, reused ${r.reused} (of ${r.graph.components.length}).`,
+    `[pd audit] serialized graph: ${r.artifactPath}`,
+    `[pd audit] report: ${r.reportPath}`,
+    `[pd audit] ${r.graph.occurrences.length} defects across ${affected}/${r.graph.components.length} components.`,
+    ...(r.imageWarning ? [`[pd audit] warning: ${r.imageWarning}`] : []),
+  ];
 }
 
 /**

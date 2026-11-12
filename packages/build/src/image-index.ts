@@ -33,7 +33,10 @@ export interface ImageIndexer {
 
 const IMAGE = /\.(?:jpe?g|png|gif|webp|svg)$/i;
 
-export function createImageIndexer(): ImageIndexer {
+/** `loadSharp` replaces the loader whose result `sharpError` reports (a caller passes its own, so a test can make it
+ *  fail); the default is this package's. */
+export function createImageIndexer(options: { loadSharp?: () => Promise<unknown> } = {}): ImageIndexer {
+  const load = options.loadSharp ?? loadSharp;
   const known = new Map<string, { stamp: string; entry: ImageIndexEntry | null }>();
   const read = async (path: string): Promise<ImageIndexEntry | null> => {
     const bytes = await readFile(path);
@@ -59,7 +62,7 @@ export function createImageIndexer(): ImageIndexer {
         }
         if (cached.entry) entries.set(f.url, cached.entry);
       }));
-      const sharpError = await loadSharp().then(() => undefined, (e: unknown) => e instanceof SharpUnavailableError ? e : new SharpUnavailableError(e));
+      const sharpError = await load().then(() => undefined, (e: unknown) => e instanceof SharpUnavailableError ? e : new SharpUnavailableError(e));
       return { entries, sharpError };
     },
   };

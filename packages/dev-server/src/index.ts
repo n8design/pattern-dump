@@ -74,6 +74,7 @@ import { reportUnresolvableScripts } from "./requires.js";
 import { applyStyleData, cachedDiscovery, compositionFor, createServerState, setDiscovery } from "./server-state.js";
 // Resolved paths + flags, derived once from PatternDumpConfig against the ONE resolution base.
 import { resolveServerConfig } from "./server-config.js";
+import { createImageService } from "./image-service.js";
 // HTTP route handling — takes an explicit RouteContext instead of closing over this scope.
 import { handleRequest, type RouteContext, type BootStamp } from "./routes.js";
 import { createSiteValues } from "./storefront/site-values.js";
@@ -189,11 +190,22 @@ export async function startDevServer(
   // helpers, replaced together in one assignment when a helper or data file is reloaded (rendering.ts).
   // A request takes `rendering.current` once; `render` always calls the current renderer.
   const displayPath = createDisplayPath(cwd, cfg.packages);
-  const buildRenderer: BuildRenderer = (registrars, data) => createRenderer({
-    patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme, displayPath,
-    ...(registrars.length ? { helperRegistrars: [...registrars] } : {}),
-    ...(data ? { globalData: data } : {}),
+  // The images in the assets, for {{pd-image}} (image-service.ts): indexed before every render, for the generation
+  // the render runs in. pd build (not live) needs every image encoded and reads every file fresh.
+  let generationNow = (): string => "";
+  const images = createImageService({
+    assetRoots: cfg.assetRoots, assetRootNames: cfg.assetRootNames, images: cfg.images,
+    ...(cfg.storefront ? { siteImages: cfg.storefront.images } : {}),
+    build: opts.live === false, warn: message => console.warn(`[dev-server] ${message}`),
   });
+  const buildRenderer: BuildRenderer = (registrars, data) => {
+    const renderWith = createRenderer({
+      patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme, displayPath, images: images.lookup,
+      ...(registrars.length ? { helperRegistrars: [...registrars] } : {}),
+      ...(data ? { globalData: data } : {}),
+    });
+    return async input => { await images.ready(generationNow()); return renderWith(input); };
+  };
   const rendering = createRenderingHandle(buildRenderer, helperRegistrars, globalData);
   const render: Render = input => rendering.current.render(input);
   const live = opts.live !== false;
@@ -204,6 +216,7 @@ export async function startDevServer(
   const hotreloader: HotReloader = live
     ? createHotReloader(wsPort, { acceptOrigin: origin => isOwnOrigin(origin, hosts, httpPort) })
     : SILENT_RELOADER;
+  if (live) generationNow = () => hotreloader.generation();
   // Fail here, before compiling anything, if live reload's port is taken.
   const wsPortChosen = opts.wsPort !== undefined || process.env["PD_WS_PORT"] !== undefined;
   await hotreloader.listening.catch((e: unknown) => {
