@@ -40,14 +40,21 @@ export const DEPENDENTS = [
 ];
 
 const SPEC = /\.(spec|test)\.ts$/;
+/** A workspace's folder (the root package.json's workspaces). */
+const WORKSPACE = /^((?:packages|apps|skins)\/[^/]+|package-bench|storefront-bench|test-bench)\//;
 
-/** Where a spec runs: vitest in its workspace, or Playwright in its suite. Null for a file that is no spec. */
+/**
+ * Where a spec runs: Playwright in its suite (its `e2e/` folder); vitest in its workspace, wherever the
+ * workspace keeps it (`test/`, or beside the code in `src/`); `node --test` for the repository scripts' own
+ * tests (`scripts/**\/*.test.mjs`, run from the repository's root). Null for a file that is no spec.
+ */
 export function runnerOf(file) {
+  if (/^scripts\/.+\.test\.mjs$/.test(file)) return { runner: "node", cwd: "." };
   if (!SPEC.test(file)) return null;
   for (const suite of PLAYWRIGHT) {
     if (file.startsWith(`${suite}/e2e/`)) return { runner: "playwright", cwd: suite };
   }
-  const m = /^((?:packages|apps|skins)\/[^/]+|package-bench|storefront-bench|test-bench)\/(?:[^/]+\/)*test\//.exec(file);
+  const m = WORKSPACE.exec(file);
   if (m) return { runner: "vitest", cwd: m[1] };
   return null;
 }
@@ -112,7 +119,8 @@ export function groupJobs(jobs, seconds, groups = GROUPS) {
       bin.seconds += cost(f);
     }
     bins.forEach((b, i) => out.push({
-      name: n > 1 ? `${job.cwd} ${i + 1}/${n}` : job.cwd,
+      // The repository's root (the scripts' tests) is named for what it holds.
+      name: `${job.cwd === "." ? "scripts" : job.cwd}${n > 1 ? ` ${i + 1}/${n}` : ""}`,
       runner: job.runner, cwd: job.cwd, files: b.files.sort(), seconds: Math.round(b.seconds * 10) / 10,
     }));
   }
@@ -131,6 +139,7 @@ function git(...args) {
 
 /** The command for one repetition (vitest) or for all of them (Playwright repeats within one run). */
 export function commandFor(job, runs) {
+  if (job.runner === "node") return { cmd: "node", args: ["--test", ...job.files], times: runs };
   if (job.runner === "vitest") return { cmd: "npx", args: ["vitest", "run", "--retry=0", ...job.files], times: runs };
   return {
     cmd: "npx",
