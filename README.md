@@ -28,12 +28,14 @@ how they relate, and publishes the result as a static site.
 
 Node.js 22.22 or later, and npm.
 
+Pattern Dump is at 0.x, so breaking changes are possible between minor versions (0.3 to 0.4); the [changelog](CHANGELOG.md) names them.
+
 ## Quick start
 
-Pattern Dump is on npm as an alpha. Create a project with it:
+Pattern Dump is on npm. Create a project with it:
 
 ```bash
-npx pattern-dump@alpha init my-design-system
+npx pattern-dump init my-design-system
 cd my-design-system
 npm run dev              # → http://localhost:4000
 ```

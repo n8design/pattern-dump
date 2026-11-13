@@ -4,19 +4,19 @@ A workbench for HTML and CSS design systems, and a successor to PatternLab. Writ
 Handlebars templates with SCSS, data and Markdown docs; Pattern Dump shows them live, checks them, maps
 how they relate, and publishes the result as a static site.
 
-> **Alpha ({{version}}).** Published under the `alpha` tag. Options and file conventions can still change
-> between releases.
+> **{{version}}.** Pattern Dump is at 0.x, so breaking changes are possible between minor versions (0.3 to 0.4);
+> the [changelog]({{repo}}/blob/main/CHANGELOG.md) names them.
 
 ## Requirements
 
-Node.js 20.10 or later, and npm.
+Node.js 22.22 or later, and npm.
 
 ## Quick start
 
 Create a new project:
 
 ```bash
-npx {{name}}@alpha init my-design-system
+npx {{name}} init my-design-system
 cd my-design-system
 npm run dev              # → http://localhost:4000
 ```
@@ -24,7 +24,7 @@ npm run dev              # → http://localhost:4000
 Or add Pattern Dump to an existing project:
 
 ```bash
-npm install --save-dev {{name}}@alpha
+npm install --save-dev {{name}}
 npx pd init
 ```
 
@@ -35,7 +35,7 @@ overwrites an existing file.
 ### Installing `pd` globally
 
 ```bash
-npm install --global {{name}}@alpha
+npm install --global {{name}}
 pd init my-design-system
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "@pattern-dump/cli",
-  "version": "0.2.0-alpha.0",
+  "version": "0.3.0",
   "private": true,
   "description": "The pd command and the published pattern-dump package.",
   "type": "module",

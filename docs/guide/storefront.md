@@ -14,7 +14,7 @@ workbench's own styles.
 The quickest start is a new project with a website already in it:
 
 ```bash
-npx pattern-dump@alpha init my-site --storefront
+npx pattern-dump init my-site --storefront
 ```
 
 It brings two pages, a small skin, one component the home page shows (in a live example and placed with a

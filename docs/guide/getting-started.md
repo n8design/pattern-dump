@@ -13,10 +13,10 @@ Pattern Dump installs into each project as a development dependency. `pd init` w
 project and installs it.
 
 ```bash
-npx pattern-dump@alpha init my-design-system
+npx pattern-dump init my-design-system
 ```
 
-Pattern Dump is published as an alpha, so name the `alpha` tag. To try changes that are not released yet,
+To try changes that are not released yet,
 build the package from a clone of this repository and create the project from the file:
 
 ```bash
@@ -43,7 +43,7 @@ A website adds pages written in markdown, a small skin and a GitHub Pages workfl
 [storefront.md](storefront.md#quick-start). `--yes` accepts every default without asking. In a folder that already has a `package.json`, `pd init`
 adds to the project and never overwrites a file; a script name that is taken gets a `pd:` prefix instead.
 
-A global install (`npm install --global pattern-dump@alpha`) also works for creating projects, but each
+A global install (`npm install --global pattern-dump`) also works for creating projects, but each
 project still uses its own local copy; see [global or local](cli.md#global-or-local).
 
 ## 2. What you get

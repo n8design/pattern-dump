@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
+
+From this release Pattern Dump is published as plain 0.x versions under npm's `latest` tag: install it with
+`npx pattern-dump init`, without `@alpha`. Being at 0.x, breaking changes are possible between minor versions, and
+this changelog names them.
 
 ### Added
 
