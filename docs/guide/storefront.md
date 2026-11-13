@@ -612,6 +612,31 @@ site/
 
 `storefront.workbenchUrl` is required to build, since built pages link to the workbench at its own address.
 
+### The link check
+
+Before it writes anything, `pd build` checks every link on every page of the site (its pages and its 404 page),
+and stops if one is broken: every `href`, `src` and `srcset` of every element must lead to something the build
+writes.
+
+- A path leads to a page (`/guides/setup/`, with or without its trailing slash, or as its `index.html`), to a page
+  that forwards from an old route (`redirectFrom`), or to a file (a stylesheet, an image, a preview).
+- A `#fragment` leads to an element with that `id` in the target page. Headings carry their anchors as ids, so a link
+  to a heading is checked too.
+- A URL on the site's own address (`storefront.url`) is checked as its path.
+- A link into the workbench (`storefront.workbenchUrl`) leads to a component, a folder or a component's variants
+  page the workbench snapshot has; its `#fragment` names one of the component's variants.
+- A link to another site is not fetched: the build lists each one in its notes, with the pages that use it.
+  `mailto:` and `tel:` links are left alone.
+
+```
+pd build: the storefront has broken links, so nothing was written:
+  - /guides/: <a href="/guides/instal/">: no page or file is built at /guides/instal/
+  - /about/: <a href="/guides/setup/#instal">: /guides/setup/ has no element with id "instal"
+```
+
+Code examples are text, so a link written in one is not checked. In `pd dev`, a page's links to pages that don't
+exist and to anchors it doesn't have are warnings in the terminal; the full check runs in `pd build`.
+
 **The workbench on the storefront's host.** One host can serve both: the website at its root and the
 workbench under a path. Set `workbenchUrl` to that path and build the workbench for it:
 
