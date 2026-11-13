@@ -1,5 +1,6 @@
 // The burn-in's mapping from changed files to the specs it repeats. Run: npm run test:scripts
 import { test } from "node:test";
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { planBurnIn, runnerOf, commandFor, groupJobs, DEFAULT_SECONDS, MIN_GROUP_SECONDS } from "./burn-in.mjs";
 import { timesFromLog } from "./burn-in-times.mjs";
@@ -20,6 +21,30 @@ const ALL = [
   "test-support/save.ts",
   "README.md",
 ];
+
+test("every spec in the repository has a runner, wherever its workspace keeps it", () => {
+  const tracked = spawnSync("git", ["ls-files"], { encoding: "utf8" }).stdout.split("\n");
+  const specs = tracked.filter(f => /\.(spec|test)\.(ts|mjs)$/.test(f));
+  assert.ok(specs.length > 200, `found ${specs.length} specs`);
+  assert.deepEqual(specs.filter(f => runnerOf(f) === null), []);
+});
+
+test("runnerOf: specs beside the code (src/) run with vitest in their workspace; the scripts' tests with node --test", () => {
+  assert.deepEqual(runnerOf("packages/cli/src/init/starter.spec.ts"), { runner: "vitest", cwd: "packages/cli" });
+  assert.deepEqual(runnerOf("apps/dev-ui/src/core/cvd-math.spec.ts"), { runner: "vitest", cwd: "apps/dev-ui" });
+  assert.deepEqual(runnerOf("packages/contracts/src/routes.spec.ts"), { runner: "vitest", cwd: "packages/contracts" });
+  assert.deepEqual(runnerOf("scripts/ci/burn-in.test.mjs"), { runner: "node", cwd: "." });
+  assert.deepEqual(planBurnIn(["packages/cli/src/init/starter.spec.ts"], ["packages/cli/src/init/starter.spec.ts"]),
+    [{ runner: "vitest", cwd: "packages/cli", files: ["src/init/starter.spec.ts"] }]);
+  // A .mjs file that is no test, and a Playwright suite's helper, are still not specs.
+  assert.equal(runnerOf("scripts/ci/burn-in.mjs"), null);
+  assert.equal(runnerOf("apps/dev-ui/e2e/static-server.mjs"), null);
+});
+
+test("commandFor: a node --test job repeats the process", () => {
+  assert.deepEqual(commandFor({ runner: "node", cwd: ".", files: ["scripts/ci/burn-in.test.mjs"] }, 20),
+    { cmd: "node", args: ["--test", "scripts/ci/burn-in.test.mjs"], times: 20 });
+});
 
 test("runnerOf: vitest per workspace, Playwright per suite, nothing for other files", () => {
   assert.deepEqual(runnerOf("packages/render/test/render.spec.ts"), { runner: "vitest", cwd: "packages/render" });
