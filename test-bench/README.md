@@ -19,7 +19,7 @@ Playwright runs with a single worker.
 | File | What it is | Licence |
 |---|---|---|
 | `assets/fonts/pd-test.woff2` | Mr Bedfort Regular, version 1.000, by Alejandro Paul ([Sudtipos](http://www.sudtipos.com)), under its open licence | SIL Open Font License 1.1, in `licenses/pd-test-OFL.txt` |
-| `assets/images/symbols.svg` | A sprite of two icons, a star and a check, for the sprite and `<use>` specs. Both paths are the same as Feather's `star` and `check` icons; where they were copied from was not recorded | MIT, from [Feather](https://github.com/feathericons/feather), in `THIRD-PARTY-NOTICES.md` |
+| `assets/images/symbols.svg` | A sprite of two icons, a star and a check, for the sprite and `<use>` specs. Both are [Phosphor](https://github.com/phosphor-icons/core) icons (regular weight), paths unchanged | MIT, from Phosphor Icons, in `THIRD-PARTY-NOTICES.md` |
 | `media/tb-sprite.svg` | A sprite of one circle | The repository's MIT licence |
 
 `pd-test.woff2` is the whole font (231 characters, no subset) with the name and licence fields of the font itself.

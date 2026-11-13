@@ -34,33 +34,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 The experimental skin's fonts (Montserrat, Source Serif 4, IBM Plex Mono) are listed, with their sources and
 licences, in `skins/experimental/assets/skin-experimental/fonts/README.md`.
 
-## Feather icons
-
-- **Feather**, Cole Bemis: https://github.com/feathericons/feather
-- **Used in:** `test-bench/assets/images/symbols.svg`: its `star` and `check` paths are the same as Feather's. Not
-  part of the npm package.
-- **Licence:** MIT
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2013-2017 Cole Bemis
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
-to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of
-the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
-CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-IN THE SOFTWARE.
-```
-
 ## Images in the repository
 
 These files are in the git repository, in test fixtures and benches. They are not part of the npm package.
@@ -83,6 +56,8 @@ These files are in the git repository, in test fixtures and benches. They are no
 - **Used in:** `apps/dev-ui/src/icons/index.ts`: twenty icons of the workbench (regular and fill weights, the
   SVG paths unchanged), which are in the npm package as part of `dist/dev-ui/main.js`. The registry's two other
   icons (the disclosure chevron and the open-in-new-window mark) are not Phosphor's.
+- **Also used in:** `test-bench/assets/images/symbols.svg`: the `star` and `check` icons (regular weight, paths
+  unchanged), for the sprite and `<use>` specs. Not part of the npm package.
 - **Licence:** MIT
 
 ```
