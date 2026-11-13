@@ -25,6 +25,7 @@
     "classify": "node --experimental-strip-types src/classifier.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "classify-pages": "vite-node src/classify-pages.ts"
   }
 }
