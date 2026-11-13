@@ -10,6 +10,8 @@ lede: Three folders make a site — the pages, the layouts that dress them, and 
 
 Each markdown file in `pages/` is a page. A folder's `index.md` is the folder's own page.
 
+![Colourful cable cars hanging from their cables against a clear sky](/assets/images/cable-cars.jpg)
+
 ## Layouts
 
 A page picks its layout in its frontmatter; the [callout](pattern:components/callout) shows how a live

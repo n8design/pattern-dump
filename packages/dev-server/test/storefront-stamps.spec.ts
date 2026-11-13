@@ -104,7 +104,8 @@ describe("content stamps on the storefront host", () => {
         socket.on("error", reject);
       });
       const page = (await getOn(fresh, SITE, "/about/")).body.toString("utf8");
-      expect(page).not.toMatch(/(?:href|src)="\/(?:_pd|assets)\/[^"?]+"/);
+      // Every reference is stamped, but an image variant (/_pd/images/), whose name is its key and is left as written.
+      expect(page).not.toMatch(/(?:href|src)="\/(?:_pd\/(?!images\/)|assets\/)[^"?]+"/);
       expect(page).toMatch(/og:image" content="[^"]+\/assets\/images\/about\.png\?v=[0-9a-f]{10}"/);
     } finally {
       await fresh.close();

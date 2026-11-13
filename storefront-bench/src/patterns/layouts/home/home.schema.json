@@ -3,6 +3,10 @@
   "title": "Home layout",
   "description": "The frontmatter a page using layout: home may set, besides layout and order.",
   "type": "object",
+  "x-pd-prose-images": {
+    "widths": [480, 960, 1920],
+    "sizes": "(min-width: 62rem) 60rem, calc(100vw - 2rem)"
+  },
   "required": ["title"],
   "properties": {
     "title":       { "type": "string", "description": "The site's heading on its cover, and the home page's title in the nav" },
