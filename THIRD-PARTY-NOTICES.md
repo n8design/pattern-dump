@@ -76,3 +76,80 @@ These files are in the git repository, in test fixtures and benches. They are no
 - **Cable cars**, Cody Hiscox: https://unsplash.com/photos/kzb0Mo0YQDw
 - **Used in:** `storefront-bench/src/assets/images/cable-cars.jpg` (cropped and scaled; how, in the README beside it).
 - **Licence:** [Unsplash License](https://unsplash.com/license), as above: not the MIT licence.
+
+## Phosphor Icons
+
+- **Phosphor Icons**: https://github.com/phosphor-icons/core
+- **Used in:** `apps/dev-ui/src/icons/index.ts`: twenty icons of the workbench (regular and fill weights, the
+  SVG paths unchanged), which are in the npm package as part of `dist/dev-ui/main.js`. The registry's two other
+  icons (the disclosure chevron and the open-in-new-window mark) are not Phosphor's.
+- **Licence:** MIT
+
+```
+MIT License
+
+Copyright (c) 2023 Phosphor Icons
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+```
+
+## Monokai Light
+
+- **Monokai Light**, Velichko Konstantin: https://github.com/zoxon/vscode-theme-monokai-light
+- **Used in:** `packages/renderer/src/themes/monokai-light.ts`: the syntax theme `pd-monokai-light` takes its
+  token colours from the theme's JSON, with two deliberate changes (listed in the file). It is part of the npm
+  package (`dist/pd.js`).
+- **Licence:** MIT
+
+```
+MIT License
+
+Copyright (c) 2017 Velichko Konstantin
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
+to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+```
+
+## Colour vision deficiency matrices
+
+- **Machado, G. M., Oliveira, M. M., Fernandes, L. (2009).** "A Physiologically-based Model for Simulation of Color
+  Vision Deficiency". *IEEE Transactions on Visualization and Computer Graphics* 15(6), 1291-1298.
+  https://doi.org/10.1109/TVCG.2009.113
+- **Used in:** `apps/dev-ui/src/core/cvd-math.ts`: the matrices of the workbench's colour-vision simulation (protanopia,
+  deuteranopia, tritanopia, eleven severities each). They are numbers published in that paper: data, not code. The
+  achromatopsia table is not from the paper.
+- **Licence:** none applies to published data; the paper is cited as its source.
+
+## Dependencies with other licences
+
+The npm package declares its dependencies, and npm installs them with their own licence files; none is bundled into
+`dist/` or modified. Almost all are MIT, ISC, BSD or Apache-2.0. Two have terms worth naming:
+
+- **axe-core** (Deque Systems), **MPL-2.0**: https://github.com/dequelabs/axe-core. Used by the accessibility checks
+  (`packages/a11y`), as installed.
+- **libvips** binaries (`@img/sharp-libvips-*`), **LGPL-3.0-or-later**: https://github.com/lovell/sharp-libvips. Optional
+  dependencies of **sharp** (Apache-2.0), which encodes the storefront's images; installed as prebuilt binaries, not
+  linked into or copied into this package. An install with `--omit=optional` leaves them out.

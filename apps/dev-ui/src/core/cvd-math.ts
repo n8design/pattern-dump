@@ -12,8 +12,10 @@
 import type { CvdType } from "./store.js";
 
 // ─── CVD overlay — Machado 2009 matrix table ─────────────────────────────
-// Source: Machado, Oliveira, Fernandes (2009) "A Physiologically-based Model for Simulation of
-// Color Vision Deficiency" — coefficients as implemented in Chromium and Firefox DevTools.
+// Source: G. M. Machado, M. M. Oliveira, L. Fernandes (2009), "A Physiologically-based Model for
+// Simulation of Color Vision Deficiency", IEEE Transactions on Visualization and Computer Graphics
+// 15(6), 1291-1298, doi:10.1109/TVCG.2009.113. The coefficients are the paper's published values
+// (data, not code), as also used by Chromium and Firefox DevTools. Listed in THIRD-PARTY-NOTICES.md.
 // Each entry: 9-element row-major 3×3 linear-sRGB transform [r1,r2,r3, g1,g2,g3, b1,b2,b3].
 // 11 entries per type, severity 0.0–1.0, step 0.1.
 // Intermediate severities: element-wise lerp between the two bracketing table entries.
