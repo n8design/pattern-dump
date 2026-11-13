@@ -12,6 +12,8 @@ import pageTiers from "./page-rule-tiers.generated.json" with { type: "json" };
 const require = createRequire(import.meta.url);
 let axeSource: string | undefined;
 const source = (): string => (axeSource ??= readFileSync(require.resolve("axe-core/axe.min.js"), "utf8"));
+/** axe-core's browser build, as text: injected into a page a browser renders (`pd build --browser`). */
+export const axeScript = (): string => source();
 
 /** The axe tags a site page is checked against. */
 export const PAGE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
