@@ -655,8 +655,37 @@ pd build: the storefront has accessibility problems, so nothing was written:
 ```
 
 The check runs without a browser, so it leaves out what only a rendered page can tell: colour contrast, and axe's
-rules that need layout. The project's own [`pd audit`](cli.md) checks each component on its own; this check is the
-assembled page. In `pd dev`, a page without one `<main>` and one `<h1>` is a warning in the terminal.
+rules that need layout (`--browser`, below, runs those). The project's own [`pd audit`](cli.md) checks each component
+on its own; this check is the assembled page. In `pd dev`, a page without one `<main>` and one `<h1>` is a warning in
+the terminal.
+
+### Checks in a browser: `pd build --browser`
+
+`pd build --browser` also opens every page of the site in Chromium, at 1000 × 720 and at 390 × 844 with a pixel ratio
+of 2, before anything is written:
+
+- **Accessibility:** axe's rules that need a rendered page: colour contrast, one main landmark and one `<h1>` as axe
+  sees them, and the rest the check without a browser leaves out. A critical or serious finding stops the build, as
+  above (contrast failures among them); the others are warnings.
+- **Image sizes:** every image with variants is brought into view and compared with the box it is laid out in. A
+  warning names an image that takes a variant too small for its box while a larger one exists (it shows soft), or a
+  larger variant than the box needs (it downloads more than it shows). Either means the slot's `sizes` doesn't
+  describe the layout:
+
+```
+[pd build]   warning: /guides/: the image images/cable-cars is laid out 396 px wide (396 px at 1x) but takes the 320w
+  variant, which is too small: its sizes, "(max-width: 40rem) 33vw, 19rem", says it is narrower than it is (at 1000×720)
+```
+
+It uses the project's own [Playwright](https://playwright.dev); Pattern Dump doesn't install a browser. Without it,
+the build stops at once and says what to install:
+
+```bash
+npm install --save-dev playwright
+npx playwright install chromium
+```
+
+A page is fetched from the build itself, never from the network: images and fonts from other sites are not loaded.
 
 **The workbench on the storefront's host.** One host can serve both: the website at its root and the
 workbench under a path. Set `workbenchUrl` to that path and build the workbench for it:

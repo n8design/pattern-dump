@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `pd build --browser` also checks a storefront's pages in Chromium, at a desktop and a phone width: colour contrast
+  and the other accessibility rules that need a rendered page (a critical or serious finding stops the build), and
+  each image's variant against the box it is laid out in (a warning when its slot's `sizes` doesn't match). It uses
+  the project's own Playwright: `npm install --save-dev playwright`, then `npx playwright install chromium`.
+
 ## 0.3.0
 
 From this release Pattern Dump is published as plain 0.x versions under npm's `latest` tag: install it with
