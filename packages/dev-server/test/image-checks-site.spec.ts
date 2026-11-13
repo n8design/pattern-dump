@@ -75,9 +75,7 @@ describe("the image checks on a storefront page", () => {
     const page = await get(built, "/");
     expect(page.status).toBe(500);
     const problems = [...page.body.matchAll(/<li>([^<]*)<\/li>/g)].map(m => m[1]!.replaceAll("&lt;", "<").replaceAll("&gt;", ">")
-      .replaceAll("&quot;", `"`).replaceAll("&#39;", "'")
-      // The storefront host's stamping pass stamps the src quoted in a problem's text as well: compared without it.
-      .replace(/\?v=[0-9a-f]{10}/g, ""));
+      .replaceAll("&quot;", `"`).replaceAll("&#39;", "'"));
     expect(problems).toEqual([REMOTE_SIZE, LOGO_SIZE, LOGO_RASTER]);
   });
 

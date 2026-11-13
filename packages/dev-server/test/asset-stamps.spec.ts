@@ -52,6 +52,26 @@ describe("stampHtml", () => {
     ].join("\n");
     expect(await stampHtml(html, hashOf)).toBe(html);
   });
+
+  it("stamps attributes of elements only, never text: a code example that quotes a reference is shown as written", async () => {
+    // A plain fence writes its quotes as they are; a comment, a <script>'s code and a <textarea>'s text are text too.
+    const text = [
+      `<pre><code>&lt;img src="/assets/images/a.webp" alt=""&gt;\n&lt;link href="/_pd/base.css"&gt;</code></pre>`,
+      `<!-- <img src="/assets/images/a.webp"> -->`,
+      `<script>var html = '<img src="/assets/images/a.webp">';</script>`,
+      `<textarea><link href="/_pd/base.css"></textarea>`,
+      `<p>src="/assets/images/a.webp" in a sentence</p>`,
+    ].join("\n");
+    expect(await stampHtml(text, hashOf)).toBe(text);
+  });
+
+  it("reads an element's attributes as the parser does: any quoting, and a quoted value that holds markup", async () => {
+    expect(await stampHtml(`<div data-raw="<img src=&quot;/assets/images/a.webp&quot;>"><img src='/assets/images/a.webp' alt="x"></div>`, hashOf))
+      .toBe(`<div data-raw="<img src=&quot;/assets/images/a.webp&quot;>"><img src='/assets/images/a.webp?v=aaaa000004' alt="x"></div>`);
+    expect(await stampHtml(`<IMG SRC=/assets/images/a.webp alt=x>`, hashOf)).toBe(`<IMG SRC=/assets/images/a.webp?v=aaaa000004 alt=x>`);
+    // The attribute named, not a look-alike inside another value.
+    expect(await stampHtml(`<span title='src="/assets/images/a.webp"'></span>`, hashOf)).toBe(`<span title='src="/assets/images/a.webp"'></span>`);
+  });
 });
 
 describe("stampCss", () => {
