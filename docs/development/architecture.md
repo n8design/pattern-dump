@@ -68,6 +68,12 @@ second writer:
 - **Assembly** (`page.ts`) renders the page's markdown with `renderDoc` in frame mode, then the layout
   through `render()`. The `<head>` (`page-head.ts`) uses `document-layers.ts`, the same stylesheet
   layering as preview documents. The height fitter is `contracts`' `createHeightFitter`, inlined.
+- **Images** come through one route, `/_pd/images/<name>.<key>.<width>.webp` (`contracts`' `imageUrl`,
+  `PD_ROUTE_PREFIX.images`), served by `image-route.ts`: encoded with sharp (`build`'s image module) on first
+  request, cached under `node_modules/.cache/pattern-dump/images/`, immutable, since the key names the bytes.
+  `image-service.ts` indexes the assets for each render; the renderer's `{{pd-image}}` and the markdown's prose
+  images (`markdown.ts`) both write their `<img>` through the renderer's `imageTag`. `image-checks.ts` checks
+  every `<img>` of an assembled page (a size, and WebP variants for a raster).
 - **Serving** is one branch in `routes.ts`, chosen by the `Host` header (`PD_HOSTS`); it never changes
   `state.lastComponentId`, so the workbench's own reload target is untouched. The watcher sends
   `page-changed` for edited pages and for changes that reach every page.

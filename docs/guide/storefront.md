@@ -368,6 +368,119 @@ belong to the skin.
 
 ---
 
+## Images
+
+Every raster image on a page (JPEG, PNG, GIF, WebP and the like) is served as WebP variants, a few widths of it,
+and the browser picks the one that fits. Every `<img>` carries its width and height, so the page keeps the room
+for an image while it loads and doesn't shift when it arrives. Images live in the assets folder; a component and
+a page refer to them by their URL there, such as `/assets/images/harbour.jpg`.
+
+There are two ways an image gets onto a page: a component with an image slot, and an image in a page's markdown.
+
+### Image slots
+
+A component declares where an image goes and how wide it is shown, on the string property that holds the image:
+
+```json
+{
+  "properties": {
+    "image": {
+      "type": "string",
+      "x-pd-image": { "widths": [480, 960, 1600], "sizes": "(min-width: 60rem) 30rem, 100vw" }
+    },
+    "alt": { "type": "string" }
+  }
+}
+```
+
+`widths` are the variants' widths in pixels, ascending; `sizes` is the `<img>`'s `sizes`: how wide the image is
+shown at each viewport. The template writes the image with the `{{pd-image}}` helper:
+
+```hbs
+<figure class="slide">{{pd-image image alt=alt}}</figure>
+```
+
+```html
+<img src="/_pd/images/images/harbour.3f0a9c1d2e.1600.webp"
+  srcset="/_pd/images/images/harbour.0b1c2d3e4f.480.webp 480w, … 1600w"
+  sizes="(min-width: 60rem) 30rem, 100vw" width="1600" height="1067" alt="…" loading="lazy" decoding="async">
+```
+
+- `alt=` is required. A decorative image says so with `alt=""`; a call without `alt=` is a problem in the
+  component's schema check, and a missing value when the page renders fails the page.
+- `loading="eager"` loads it at once: for the image at the top of a page.
+- An image is never made wider than it is: widths above its own are left out.
+- An SVG in the assets is written as one file at its own size (from its `width` and `height`, or its `viewBox`).
+- `{{pd-image}}` is a Handlebars helper; a Mustache template can't use it.
+
+### Images in a page's markdown
+
+A page's markdown images get the same treatment, in the slot the page's layout declares at the top of its
+schema:
+
+```json
+{
+  "type": "object",
+  "x-pd-prose-images": { "widths": [480, 960, 1920], "sizes": "(min-width: 62rem) 60rem, calc(100vw - 2rem)", "eager": 1 }
+}
+```
+
+```md
+![Cable cars against a clear sky](/assets/images/cable-cars.jpg "Optional title")
+```
+
+- `sizes` describes the layout's text column. A lazy image is written with `sizes="auto, …"` (below).
+- `eager` (optional, default 0): how many of a page's first images load at once, with the declared `sizes` alone.
+- Alt text is required: a markdown image with an empty alt is a problem, since markdown can't tell a decorative
+  image from a forgotten description. A decorative image goes in through a component, with `alt=""`.
+- An SVG from the assets is written at its own size and needs no slot. A raster image on a page whose layout
+  declares no slot is a problem that names the layout.
+- An image from another site is written as markdown writes it, and has no size (see the checks below): host it in
+  the assets instead.
+
+### `sizes="auto"`
+
+A lazy image's `sizes` starts with `auto`: the browser chooses the variant for the width the image is actually laid
+out at, so it never fetches more than the column needs. Chrome and Edge (126 and later) and Firefox (150 and later)
+support it; other browsers skip `auto` and use the sizes after it, so those must still be right.
+
+### The skin's image rule
+
+The width and height attributes set an image's aspect ratio. To let it shrink with its column while keeping that
+ratio, a skin needs this rule (the `pd init --storefront` skin has it):
+
+```css
+img { max-inline-size: 100%; block-size: auto; }
+```
+
+### The image checks
+
+Every `<img>` on an assembled page, whether from the page, a component it places, its layout or a partial, is
+checked:
+
+| Check | `pd build` | `pd dev` |
+|---|---|---|
+| An `<img>` without both a `width` and a `height`, external images too | A problem: nothing is written | A warning in the terminal; the page is served |
+| A raster file not served as WebP variants (`src` or `srcset`), such as a hand-written `<img src="/assets/images/logo.png">` | A problem, naming the file and the fix: `{{pd-image}}` in a template, or a markdown image in a page | A warning |
+
+Not checked: SVG files, `og:image` and `twitter:image` (the link-preview image stays the original file), icons
+(`<link rel="icon">`), and images in stylesheets (`url()`). An image from another site can't be converted;
+`pd build` names each one in its report's notes.
+
+### Encoding and the cache
+
+Variants are encoded with [sharp](https://sharp.pixelplumbing.com/), which Pattern Dump installs with its
+prebuilt binaries. Each variant is encoded the first time it is asked for and kept in
+`node_modules/.cache/pattern-dump/images/`; a full `pd build` removes the ones no page uses any more. The quality
+and effort are set by `images` in the config, and a site can override them with `storefront.images`
+([Configuration](configuration.md)).
+
+When sharp can't be loaded (an install with `--omit=optional` leaves its binaries out), `pd dev` shows the
+original images at their size and says so once, and `pd build` stops with the error, since every image it writes
+must be encoded.
+
+---
+
 ## Search engines and link previews
 
 **The site's address.** `storefront.url` is where the site will be hosted, such as `https://example.com/`
