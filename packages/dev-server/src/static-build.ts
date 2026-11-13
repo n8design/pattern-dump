@@ -26,6 +26,7 @@ import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 import { createSnapshotWriter } from "./snapshot-writer.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
+import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { workbenchRobotsTxt } from "./storefront/site-files.js";
 
 export interface StaticBuildOptions {
@@ -62,6 +63,8 @@ export interface StaticBuildReport {
   notes: string[];
   /** The storefront's own output root, when the project has a storefront. */
   storefront?: { outDir: string; pages: number; files: number; bytes: number };
+  /** The storefront's link check: the site pages read, the references checked, the other hosts listed in the notes. */
+  links?: { pages: number; references: number; external: number };
   ms: number;
 }
 
@@ -136,10 +139,47 @@ export async function buildStaticSite(
     throw new Error(`pd build: the storefront has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
   }
   if (sfCrawl) log(`… storefront checked: ${sfCrawl.urls.length} files`);
+  const origin = `http://127.0.0.1:${server.port}`;
+
+  // The link check (links.ts), also before anything is written: every reference on every site page (its pages and
+  // its 404 page; not the previews and redirect stubs it writes) resolves to what this build writes, a link into the
+  // workbench to a component and variant the workbench snapshot has. Other hosts are listed in the notes.
+  let linkSummary: StaticBuildReport["links"];
+  const externalNotes: string[] = [];
+  if (storefront && sfGet && sfCrawl) {
+    const { pages: list } = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
+    const pages = [...list.map(p => p.route), PD_ROUTES.notFound];
+    const wbUrl = storefront.workbenchUrl!.endsWith("/") ? storefront.workbenchUrl! : `${storefront.workbenchUrl!}/`;
+    const tree = await (await fetch(`${origin}${PD_ROUTES.tree}`)).json() as ComponentTree;
+    const routes = new Set<string>([""]);
+    const walk = (nodes: TreeNode[]): void => nodes.forEach(n => { routes.add(n.path); walk(n.children ?? []); });
+    walk(tree.roots);
+    const variants = new Map<string, string[]>();
+    for (const route of linkedWorkbenchRoutes(sfCrawl.documents, pages, wbUrl)) {
+      if (!routes.has(route)) continue;
+      const res = await fetch(`${origin}${componentUrl(route)}`);
+      if (res.status !== 200) continue;
+      const names = (await res.json() as ComponentDetailResponse).variants.map(v => v.name);
+      variants.set(route, names);
+      if (names.length) routes.add(`${route}/variants`);
+    }
+    const links = checkLinks({
+      // The crawl records a stamped reference with its ?v=; what is written, and what a link names, is the path.
+      built: new Set(sfCrawl.urls.map(u => u.split("?")[0]!)), documents: sfCrawl.documents, pages,
+      ...(storefront.url !== undefined ? { siteUrl: storefront.url.endsWith("/") ? storefront.url : `${storefront.url}/` } : {}),
+      workbench: { url: wbUrl, routes, variants },
+    });
+    if (links.problems.length) {
+      await server.close();
+      throw new Error(`pd build: the storefront has broken links, so nothing was written:\n${links.problems.map(p => `  - ${p}`).join("\n")}`);
+    }
+    for (const [url, on] of links.external) externalNotes.push(`an external link, not checked: ${url} (on ${on.join(", ")})`);
+    linkSummary = { pages: pages.length, references: links.references, external: links.external.size };
+    log(`… links checked: ${links.references} references on ${pages.length} pages`);
+  }
 
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
-  const origin = `http://127.0.0.1:${server.port}`;
   const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], ms: 0 };
   const { capture, store } = createSnapshotWriter({ outDir, basePath, origin, report });
 
@@ -274,7 +314,8 @@ export async function buildStaticSite(
         report.notes.push("storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
           + "and there is no sitemap: set storefront.url to the site's address, such as \"https://example.com/\"");
       }
-      report.notes.push(...storefrontNotes);
+      report.notes.push(...storefrontNotes, ...externalNotes);
+      if (linkSummary) report.links = linkSummary;
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
 

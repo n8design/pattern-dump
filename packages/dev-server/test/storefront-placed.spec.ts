@@ -29,7 +29,7 @@ const ADDED: Record<string, string> = {
     image: { type: "string" }, alt: { type: "string" }, caption: { type: "string", contentMediaType: "text/markdown" } } }),
   "src/styles/molecules/slider.scss": ".carousel {\n  display: flex;\n}\n",
   "src/styles/atoms/slide.scss": ".carousel-slide {\n  margin: 0;\n}\n",
-  "pages/talks.md": `---\ntitle: Talks\n---\n\n# Talks\n\n<pd-molecules-slider label="Recent talks" per-view="1" loop>\n  <pd-atoms-slide image="talks/espc.svg" alt="On stage">ESPC **2025**</pd-atoms-slide>\n  <pd-atoms-slide image="talks/collab.svg" alt="Audience">Collab Summit</pd-atoms-slide>\n</pd-molecules-slider>\n`,
+  "pages/talks.md": `---\ntitle: Talks\n---\n\n# Talks\n\n<pd-molecules-slider label="Recent talks" per-view="1" loop>\n  <pd-atoms-slide image="/assets/images/bench-blocks.svg" alt="On stage">ESPC **2025**</pd-atoms-slide>\n  <pd-atoms-slide image="/assets/images/bench-blocks.svg" alt="Audience">Collab Summit</pd-atoms-slide>\n</pd-molecules-slider>\n`,
 };
 const CASES: Record<string, [body: string, problem: string]> = {
   "case-1": [`<pd-molecules-slidr label="x"></pd-molecules-slidr>\n`,
@@ -90,10 +90,11 @@ describe("a storefront page that places a component", () => {
   it("renders it into the page, children as data, and links its stylesheets and its children's", async () => {
     const page = await get("/talks/");
     expect(page.status).toBe(200);
-    // (The page layout indents the body's lines, hence the four spaces after each line break.)
-    expect(page.body).toContain(`<section class="carousel" aria-label="Recent talks" data-per-view="1">`
-      + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/espc.svg" alt="On stage" width="320" height="180"><figcaption><p>ESPC <strong>2025</strong></p>\n    </figcaption></figure>\n    </div>`
-      + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/collab.svg" alt="Audience" width="320" height="180"><figcaption><p>Collab Summit</p>\n    </figcaption></figure>\n    </div></section>`);
+    // (The page layout indents the body's lines, hence the four spaces after each line break. The slides' image is
+    // a real asset, so the storefront host stamps it: compared without its stamp.)
+    expect(page.body.replace(/(bench-blocks\.svg)\?v=[0-9a-f]{10}/g, "$1")).toContain(`<section class="carousel" aria-label="Recent talks" data-per-view="1">`
+      + `<div class="carousel-item"><figure class="carousel-slide"><img src="/assets/images/bench-blocks.svg" alt="On stage" width="320" height="180"><figcaption><p>ESPC <strong>2025</strong></p>\n    </figcaption></figure>\n    </div>`
+      + `<div class="carousel-item"><figure class="carousel-slide"><img src="/assets/images/bench-blocks.svg" alt="Audience" width="320" height="180"><figcaption><p>Collab Summit</p>\n    </figcaption></figure>\n    </div></section>`);
     // The placed component's stylesheet, and the nested slide's, each stamped with its content hash.
     expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/molecules\/slider\.css\?v=[0-9a-f]{10}" data-pd-comp="molecules\/slider">/);
     expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/atoms\/slide\.css\?v=[0-9a-f]{10}" data-pd-comp="atoms\/slide">/);

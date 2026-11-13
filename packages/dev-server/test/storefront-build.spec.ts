@@ -115,6 +115,8 @@ describe("pd build — the storefront root", () => {
     expect(report.notes).toEqual([
       "the pages folder is not in a git repository: no page has dates",
       `guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"`,
+      // The bench's one link to another host, listed by the link check, not fetched.
+      `an external link, not checked: https://example.test/source (on /, /guides/, /guides/setup/, /about/, /404.html)`,
     ]);
     expect(report.warnings).toEqual([]);
     const setup = files.get("guides/setup/index.html")!.bytes.toString("utf8");

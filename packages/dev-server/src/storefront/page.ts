@@ -33,6 +33,8 @@ import type { PageImage, PageImageCheck } from "./page-image.js";
 import { jsonLdScript } from "./json-ld.js";
 import { checkHeadMarkup, HEAD_PARTIAL } from "./head-partial.js";
 import { checkImages, type ImageFinding } from "./image-checks.js";
+import { checkLinks } from "./links.js";
+import { redirectsOf } from "./redirects.js";
 
 /** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
 export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
@@ -495,6 +497,15 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (imageProblems.length) {
     if (!a.live) return fail(imageProblems);
     notes.push(...imageProblems.map(p => `warning: ${p}`));
+  }
+  // pd dev: the page's links to the site's pages (and old routes that forward), and its own anchors, as warnings
+  // (links.ts). pd build checks every link of every page once the whole site is built (static-build.ts).
+  if (a.live) {
+    const self = isNotFound ? PD_ROUTES.notFound : route;
+    const routes = new Set<string>([...model.files.keys(), ...[...model.files.values()].flatMap(redirectsOf), PD_ROUTES.notFound]);
+    routes.add(self);
+    const links = checkLinks({ built: routes, documents: new Map([[self, html]]), pages: [self], pagesOnly: true });
+    notes.push(...links.problems.map(p => `warning: ${page!.path}${p.slice(self.length)}`));
   }
   return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
 }
