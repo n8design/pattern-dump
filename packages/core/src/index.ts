@@ -53,6 +53,12 @@ export async function runBuild(
     console.log(`[pd build] links: ${report.links.references} references on ${report.links.pages} pages, none broken`
       + (report.links.external ? `; ${report.links.external} external, not checked (notes)` : ""));
   }
+  if (report.accessibility) {
+    const n = report.accessibility.warnings.length;
+    console.log(`[pd build] accessibility: ${report.accessibility.pages} pages, no errors`
+      + (n ? `; ${n} rule${n === 1 ? "" : "s"} with warnings:` : ""));
+    for (const w of report.accessibility.warnings) console.log(`[pd build]   warning: ${w}`);
+  }
   for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
   for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
 }

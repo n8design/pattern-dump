@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- `pd build` now checks every page of a storefront with axe before it writes anything, and **stops on an
+  accessibility error**: a WCAG rule rated critical or serious (an image without alt text, a button with no name, a
+  page without a language), or a page without exactly one `<main>` and one `<h1>`. Each error is printed with its
+  page, the rule, the elements it was found on and a link to the rule's explanation; moderate and minor findings,
+  and axe's best practices, are listed as warnings and don't stop the build. To see them before a build, run
+  `pd build` locally: nothing is written while there are errors. In `pd dev`, a page without one `<main>` and one
+  `<h1>` is a warning in the terminal.
+
 ## 0.2.0-alpha.0
 
 The storefront: a website written as markdown pages, dressed by a skin made of ordinary components, served by

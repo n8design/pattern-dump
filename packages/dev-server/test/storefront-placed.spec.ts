@@ -29,7 +29,7 @@ const ADDED: Record<string, string> = {
     image: { type: "string" }, alt: { type: "string" }, caption: { type: "string", contentMediaType: "text/markdown" } } }),
   "src/styles/molecules/slider.scss": ".carousel {\n  display: flex;\n}\n",
   "src/styles/atoms/slide.scss": ".carousel-slide {\n  margin: 0;\n}\n",
-  "pages/talks.md": `---\ntitle: Talks\n---\n\n# Talks\n\n<pd-molecules-slider label="Recent talks" per-view="1" loop>\n  <pd-atoms-slide image="/assets/images/bench-blocks.svg" alt="On stage">ESPC **2025**</pd-atoms-slide>\n  <pd-atoms-slide image="/assets/images/bench-blocks.svg" alt="Audience">Collab Summit</pd-atoms-slide>\n</pd-molecules-slider>\n`,
+  "pages/talks.md": `---\ntitle: Talks\n---\n\n## Recent talks\n\n<pd-molecules-slider label="Recent talks" per-view="1" loop>\n  <pd-atoms-slide image="/assets/images/bench-blocks.svg" alt="On stage">ESPC **2025**</pd-atoms-slide>\n  <pd-atoms-slide image="/assets/images/bench-blocks.svg" alt="Audience">Collab Summit</pd-atoms-slide>\n</pd-molecules-slider>\n`,
 };
 const CASES: Record<string, [body: string, problem: string]> = {
   "case-1": [`<pd-molecules-slidr label="x"></pd-molecules-slidr>\n`,

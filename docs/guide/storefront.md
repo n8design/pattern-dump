@@ -637,6 +637,27 @@ pd build: the storefront has broken links, so nothing was written:
 Code examples are text, so a link written in one is not checked. In `pd dev`, a page's links to pages that don't
 exist and to anchors it doesn't have are warnings in the terminal; the full check runs in `pd build`.
 
+### The accessibility check
+
+After the link check, `pd build` checks every page of the site (not the previews or the pages that forward from old
+routes) with [axe](https://github.com/dequelabs/axe-core), the WCAG 2.x A and AA rules and axe's best practices:
+
+- **Errors stop the build:** a WCAG rule axe rates critical or serious (an image without alt text, a button with no
+  name, a page without a language), and a page that doesn't have exactly one main landmark (`<main>`) and exactly one
+  `<h1>`.
+- **Warnings are listed in the report**, one line per rule with the pages it is found on: a WCAG rule rated moderate
+  or minor, and every best-practice rule (headings that skip a level, content outside any landmark).
+
+```
+pd build: the storefront has accessibility problems, so nothing was written:
+  - /about/: image-alt (critical): Images must have alternative text, on img (https://dequeuniversity.com/rules/axe/…/image-alt)
+  - /guides/: the page has 2 <h1> headings: one names the page, the others are <h2> or lower
+```
+
+The check runs without a browser, so it leaves out what only a rendered page can tell: colour contrast, and axe's
+rules that need layout. The project's own [`pd audit`](cli.md) checks each component on its own; this check is the
+assembled page. In `pd dev`, a page without one `<main>` and one `<h1>` is a warning in the terminal.
+
 **The workbench on the storefront's host.** One host can serve both: the website at its root and the
 workbench under a path. Set `workbenchUrl` to that path and build the workbench for it:
 

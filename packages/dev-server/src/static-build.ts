@@ -27,6 +27,8 @@ import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 import { createSnapshotWriter } from "./snapshot-writer.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
+import { checkPageBasics } from "./storefront/page-basics.js";
+import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { workbenchRobotsTxt } from "./storefront/site-files.js";
 
 export interface StaticBuildOptions {
@@ -65,6 +67,9 @@ export interface StaticBuildReport {
   storefront?: { outDir: string; pages: number; files: number; bytes: number };
   /** The storefront's link check: the site pages read, the references checked, the other hosts listed in the notes. */
   links?: { pages: number; references: number; external: number };
+  /** The storefront's accessibility check (axe in jsdom, and one <main> and one <h1> per page): the site pages read,
+   *  and one line per rule that only warns, with its pages. An error stops the build instead. */
+  accessibility?: { pages: number; warnings: string[] };
   ms: number;
 }
 
@@ -145,6 +150,7 @@ export async function buildStaticSite(
   // its 404 page; not the previews and redirect stubs it writes) resolves to what this build writes, a link into the
   // workbench to a component and variant the workbench snapshot has. Other hosts are listed in the notes.
   let linkSummary: StaticBuildReport["links"];
+  let a11ySummary: StaticBuildReport["accessibility"];
   const externalNotes: string[] = [];
   if (storefront && sfGet && sfCrawl) {
     const { pages: list } = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
@@ -176,6 +182,38 @@ export async function buildStaticSite(
     for (const [url, on] of links.external) externalNotes.push(`an external link, not checked: ${url} (on ${on.join(", ")})`);
     linkSummary = { pages: pages.length, references: links.references, external: links.external.size };
     log(`… links checked: ${links.references} references on ${pages.length} pages`);
+
+    // Accessibility (step 6b), also before anything is written: one main landmark and one <h1> per site page, and
+    // axe's rules that jsdom decides (@pattern-dump/a11y). A critical or serious WCAG finding, and a page without
+    // exactly one main and one <h1>, stop the build; the rest are warnings in the report, grouped by rule.
+    const errors: string[] = [];
+    const warned = new Map<string, { finding: PageA11yFinding; pages: string[]; elements: number }>();
+    for (const page of pages) {
+      const html = sfCrawl.documents.get(page);
+      if (html === undefined) continue;
+      for (const p of checkPageBasics(html)) errors.push(`${page}: ${p}`);
+      for (const f of await runPageA11y(html)) {
+        const where = f.nodes.map(n => n.target).join(", ");
+        if (f.severity === "error") {
+          errors.push(`${page}: ${f.ruleId} (${f.impact}): ${f.help}, on ${where} (${f.helpUrl})`);
+          continue;
+        }
+        const w = warned.get(f.ruleId) ?? { finding: f, pages: [], elements: 0 };
+        w.pages.push(page);
+        w.elements += f.nodes.length;
+        warned.set(f.ruleId, w);
+      }
+    }
+    if (errors.length) {
+      await server.close();
+      throw new Error(`pd build: the storefront has accessibility problems, so nothing was written:\n${errors.map(e => `  - ${e}`).join("\n")}`);
+    }
+    a11ySummary = {
+      pages: pages.length,
+      warnings: [...warned.values()].map(w => `${w.finding.ruleId} (${w.finding.impact}): ${w.finding.help}, ${w.elements} `
+        + `element${w.elements === 1 ? "" : "s"} on ${w.pages.join(", ")} (${w.finding.helpUrl})`),
+    };
+    log(`… accessibility checked on ${pages.length} pages`);
   }
 
   await rm(outDir, { recursive: true, force: true });
@@ -316,6 +354,7 @@ export async function buildStaticSite(
       }
       report.notes.push(...storefrontNotes, ...externalNotes);
       if (linkSummary) report.links = linkSummary;
+      if (a11ySummary) report.accessibility = a11ySummary;
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
 

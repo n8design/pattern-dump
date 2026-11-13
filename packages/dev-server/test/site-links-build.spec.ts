@@ -23,7 +23,7 @@ const schema = JSON.stringify({ type: "object", required: ["title"], properties:
 async function project(pages: Record<string, string>): Promise<string> {
   const root = join(tmp, `site-${n++}`);
   for (const [rel, body] of Object.entries({
-    "src/patterns/layouts/page/page.hbs": `<main>{{{body}}}</main>\n`,
+    "src/patterns/layouts/page/page.hbs": `<header><p>Site</p></header><main><h1>{{title}}</h1>{{{body}}}</main><footer><p>Footer</p></footer>\n`,
     "src/patterns/layouts/page/page.schema.json": schema,
     "src/patterns/components/callout/callout.hbs": `<aside>Note</aside>\n`,
     "src/patterns/components/callout/callout~warning.hbs": `<aside>Careful</aside>\n`,
@@ -96,7 +96,7 @@ describe("the link check in pd dev", () => {
         });
         expect(status).toBe(200);
       }
-      const said = log.mock.calls.map(c => String(c[0])).filter(s => s.includes("warning: index.md"));
+      const said = log.mock.calls.map(c => String(c[0])).filter(s => s.includes("warning: index.md: <a"));
       expect(said).toEqual([
         `[storefront] warning: index.md: <a href="/guids/">: no page or file is built at /guids/`,
         `[storefront] warning: index.md: <a href="#gone">: / has no element with id "gone"`,
