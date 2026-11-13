@@ -8,8 +8,7 @@
 // chokidar's drop needs: the OS may report each as one change or two, and the watcher can handle the file
 // between the truncate and the write (a swap of its own). So the spec asserts what the page ends with, the
 // last save in the preview, and a bound on the swaps: at least one per save, at most two per in-place save
-// (2 to 4), never an exact count of what was handled. FINDINGS-fix-watcher-linux.md has the hold that would
-// make it exactly 2.
+// (2 to 4), never an exact count of what was handled.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
