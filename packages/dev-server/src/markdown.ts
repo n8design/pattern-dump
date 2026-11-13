@@ -23,8 +23,8 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import MarkdownIt from "markdown-it";
-import type { DiscoveryMap } from "@pattern-dump/contracts";
-import { highlight, wrapWithCopyButton, deepMerge, readExampleHeight } from "@pattern-dump/renderer";
+import type { DiscoveryMap, ImageLookup } from "@pattern-dump/contracts";
+import { highlight, imageTag, wrapWithCopyButton, deepMerge, readExampleHeight, type ProseSlot } from "@pattern-dump/renderer";
 import { escapeAttr, escapeHtml } from "./http-utils.js";
 import { usePlacedTags, type PlacedBlock } from "./placed-tags.js";
 import { placeBlock, type PlacementDeps } from "./storefront/placed.js";
@@ -48,6 +48,8 @@ export type DocEmbed =
   | { embed: "inline" }
   | {
     embed: "frame"; workbenchUrl: string; problems: string[]; placed?: DocPlacing; headings?: PageHeading[];
+    /** The page's images, checked and written with their variants (proseImages below). Without it, as markdown writes them. */
+    prose?: ProseImages;
     /** Ids the page already has besides its headings (its layout's): a heading's anchor never takes one. */
     takenIds?: string[];
   };
@@ -59,6 +61,26 @@ export type DocEmbed =
  * with their positions, and every tag that has one renders as a marker instead of the component.
  */
 export interface DocPlacing { deps: PlacementDeps; lineOffset: number; problems: PlacedProblem[] }
+
+/**
+ * A storefront page's images (frame mode only; the workbench's docs keep markdown's own <img>). Every image needs a
+ * non-blank alt: markdown can't say "decorative on purpose", so one that is goes in through a component, with
+ * alt="". An image under /assets/ is looked up in the image index (ready for this render): a raster is written as
+ * {{pd-image}} writes it (renderer's imageTag), in the slot the page's layout declares (x-pd-prose-images), lazy with
+ * `sizes="auto, <sizes>"`, the first `eager` images from the assets at once with `<sizes>` alone; an SVG as one file
+ * at its size. A raster with no slot, a path the index doesn't have and an image that can't be encoded are problems.
+ * Any other image (remote, relative) is left as markdown writes it. Problems carry their line in the page's file.
+ */
+export interface ProseImages {
+  layoutId: string;
+  /** The layout's x-pd-prose-images, when it declares a valid one; what is wrong with it, when it is invalid. */
+  slot?: ProseSlot;
+  slotProblem?: string;
+  lookup: ImageLookup;
+  /** Lines before the body in its file (the frontmatter). */
+  lineOffset: number;
+  problems: Array<{ line: number; message: string }>;
+}
 
 const INLINE: DocEmbed = { embed: "inline" };
 
@@ -80,6 +102,11 @@ function createDocMarkdown(placing: boolean): MarkdownIt {
     const map = (env as { resolvedFences?: Map<number, string> }).resolvedFences;
     return map?.get(idx) ?? _mdPlainPre(tokens[idx]?.content ?? "");
   };
+
+  // A storefront page's image, written with its variants (proseImages), else as markdown writes it.
+  const image = md.renderer.rules["image"]!;
+  md.renderer.rules["image"] = (tokens, idx, opts, env, self) =>
+    (tokens[idx]?.meta as { pdImage?: string } | null)?.pdImage ?? image(tokens, idx, opts, env, self);
 
   if (placing) {
     usePlacedTags(md);
@@ -177,6 +204,8 @@ export async function renderDoc(
   // Resolve pattern: cross-links synchronously (discoveryMap.has is sync).
   _resolvePatternLinks(tokens, discoveryMap, embed);
 
+  if (embed.embed === "frame" && embed.prose) proseImages(md, tokens, embed.prose);
+
   // Frame mode only (a storefront page): every heading gets its anchor as its id.
   if (embed.embed === "frame") {
     const headings = headingAnchors(tokens, embed.takenIds);
@@ -204,6 +233,43 @@ export async function renderDoc(
   }
 
   return md.renderer.render(tokens, md.options, { resolvedFences, resolvedPlaced });
+}
+
+/** Checks a storefront page's images and resolves the markup of those from the assets (ProseImages). */
+function proseImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, prose: ProseImages): void {
+  let eager = prose.slot?.eager ?? 0;
+  for (const block of tokens) {
+    if (block.type !== "inline" || !block.children) continue;
+    let line = (block.map?.[0] ?? 0) + 1 + prose.lineOffset;
+    for (const child of block.children) {
+      if (child.type === "softbreak" || child.type === "hardbreak") { line++; continue; }
+      if (child.type !== "image") continue;
+      const src = child.attrGet("src") ?? "";
+      const problem = (message: string) => prose.problems.push({ line, message: `the image ${src}${message}` });
+      const alt = md.renderer.renderInlineAsText(child.children ?? [], md.options, {});
+      if (alt.trim() === "") {
+        problem(` has no alt text: write what it shows between the brackets; a decorative image goes in through a component, with alt=""`);
+        continue;
+      }
+      if (!src.startsWith("/assets/")) continue;
+      const source = prose.lookup(src);
+      if (!source) { problem(` is not an image in the assets`); continue; }
+      if (source.kind === "unavailable") { problem(`: ${source.reason}`); continue; }
+      if (source.kind === "variants" && !prose.slot) {
+        problem(` needs its layout's slot for prose images: ${prose.layoutId} `
+          + (prose.slotProblem ? `has an invalid x-pd-prose-images (${prose.slotProblem})` : `declares no x-pd-prose-images`));
+        continue;
+      }
+      const title = child.attrGet("title");
+      const atOnce = eager > 0;
+      if (atOnce) eager--;
+      const slot = prose.slot;
+      child.meta = { pdImage: imageTag(source, {
+        widths: slot?.widths ?? [], sizes: slot ? (atOnce ? slot.sizes : `auto, ${slot.sizes}`) : "",
+        alt, eager: atOnce, settings: "site", ...(title !== null ? { title } : {}),
+      }) };
+    }
+  }
 }
 
 /** The text a heading reads as: its text and inline code; emphasis and link text kept, markup dropped. */

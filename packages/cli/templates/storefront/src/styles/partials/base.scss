@@ -8,4 +8,6 @@
 .site-nav ul { display: flex; gap: tokens.$space-md; margin: 0; padding: 0; list-style: none; }
 .site-nav a[aria-current="page"] { font-weight: 700; }
 .site-main { margin-block: tokens.$space-lg; }
+// An image never overflows the column: with its width and height it keeps its aspect ratio as it scales down.
+.site img { max-inline-size: 100%; block-size: auto; }
 .site-footer { border-top: 1px solid var(--color-border, #6b7280); color: var(--color-text-muted, #4b5563); }

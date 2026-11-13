@@ -3,6 +3,10 @@
   "title": "Doc layout",
   "description": "The frontmatter a page using layout: doc may set, besides layout and order. It also shows what the storefront derives for the page.",
   "type": "object",
+  "x-pd-prose-images": {
+    "widths": [480, 960, 1920],
+    "sizes": "(min-width: 62rem) 60rem, calc(100vw - 2rem)"
+  },
   "required": [
     "title"
   ],

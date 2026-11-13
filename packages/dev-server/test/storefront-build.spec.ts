@@ -79,9 +79,13 @@ describe("pd build — the storefront root", () => {
       "_pd/components/partials/header.css",
       "_pd/components/partials/nav.css",
       // The guides page's photo slide, at its slot's five widths, the widest being the photo's own 2400 (the name
-      // is the variant's key, a hash of the photo's bytes and the width).
+      // is the variant's key, a hash of the photo's bytes and the width); and the same photo in the setup guide's
+      // prose, at the doc layout's three (480, 960, 1920).
       "_pd/images/images/cable-cars.56599118ae.1280.webp",
+      "_pd/images/images/cable-cars.5dcc6d839f.1920.webp",
+      "_pd/images/images/cable-cars.826bce8ef6.480.webp",
       "_pd/images/images/cable-cars.9f3b14a5c3.2400.webp",
+      "_pd/images/images/cable-cars.a95d087638.960.webp",
       "_pd/images/images/cable-cars.b05f7eb8ef.640.webp",
       "_pd/images/images/cable-cars.cec7974822.320.webp",
       "_pd/images/images/cable-cars.f21cb99719.1600.webp",
@@ -103,7 +107,7 @@ describe("pd build — the storefront root", () => {
       "sitemap.xml",
       "start/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 29, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 32, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
