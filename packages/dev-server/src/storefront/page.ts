@@ -34,6 +34,7 @@ import { jsonLdScript } from "./json-ld.js";
 import { checkHeadMarkup, HEAD_PARTIAL } from "./head-partial.js";
 import { checkImages, type ImageFinding } from "./image-checks.js";
 import { checkLinks } from "./links.js";
+import { checkPageBasics } from "./page-basics.js";
 import { redirectsOf } from "./redirects.js";
 
 /** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
@@ -506,6 +507,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     routes.add(self);
     const links = checkLinks({ built: routes, documents: new Map([[self, html]]), pages: [self], pagesOnly: true });
     notes.push(...links.problems.map(p => `warning: ${page!.path}${p.slice(self.length)}`));
+    // One main landmark and one <h1> (page-basics.ts): errors in pd build, warnings here.
+    notes.push(...checkPageBasics(html).map(p => `warning: ${page!.path}: ${p}`));
   }
   return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
 }
