@@ -3,6 +3,7 @@
   "title": "Page",
   "description": "The layout every page renders with. Its properties are what a page's frontmatter may set.",
   "type": "object",
+  "x-pd-prose-images": { "widths": [480, 672, 1344], "sizes": "(min-width: 44rem) 42rem, calc(100vw - 2rem)" },
   "required": ["title"],
   "properties": {
     "title": { "type": "string", "description": "The page's heading, its title in the navigation and in search results" },

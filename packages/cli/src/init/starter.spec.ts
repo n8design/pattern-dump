@@ -14,6 +14,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { crc32, deflateSync } from "node:zlib";
 import type { ComponentDetailResponse, ComponentTree, TreeNode } from "@pattern-dump/contracts";
 import { loadConfig } from "@pattern-dump/core";
 import { runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
@@ -59,6 +60,26 @@ afterAll(async () => {
 });
 
 /** A GET on a named host of the server (fetch ignores an overridden Host header). */
+/** A PNG of one flat colour, made here: the starter ships no image, so its spec makes the one it needs. */
+function flatPng(width: number, height: number, rgb: [number, number, number]): Buffer {
+  const row = Buffer.alloc(1 + width * 3);
+  for (let x = 0; x < width; x++) row.set(rgb, 1 + x * 3);
+  const chunk = (type: string, data: Buffer) => {
+    const typed = Buffer.concat([Buffer.from(type, "ascii"), data]);
+    const out = Buffer.alloc(8 + data.length + 4);
+    out.writeUInt32BE(data.length, 0);
+    typed.copy(out, 4);
+    out.writeUInt32BE(crc32(typed), 8 + data.length);
+    return out;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8); // 8 bits per channel, RGB
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header),
+    chunk("IDAT", deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))), chunk("IEND", Buffer.alloc(0))]);
+}
+
 const onHost = (port: number, host: string, path: string) => new Promise<{ status: number; body: string }>((resolve, reject) => {
   request({ host: "127.0.0.1", port, path, headers: { host: `${host}:${port}` } }, res => {
     let body = "";
@@ -181,6 +202,25 @@ describe("the starter project with a website (--storefront, no examples)", () =>
   it("type-checks with its own tsconfig", async () => {
     expect(await typecheck(siteDir)).toEqual({ code: 0, output: "" });
   }, 60_000);
+
+  it("writes a photo in a page's prose with its variants, in the slot the starter's layout declares", async () => {
+    await save(join(siteDir, "assets", "images", "flat.png"), flatPng(1600, 1000, [40, 90, 160]));
+    await save(join(siteDir, "pages", "photo.md"), `---\ntitle: Photo\norder: 99\n---\n\n![A flat blue field](/assets/images/flat.png)\n`);
+    const config = await loadConfig(siteDir);
+    const server = await startDevServer(config, siteDir, { port: 0, wsPort: 0 });
+    try {
+      const page = await onHost(server.port, "live.localhost", "/photo/");
+      expect(page.status).toBe(200);
+      const img = /<img [^>]*>/.exec(page.body)?.[0] ?? "";
+      expect(img).toContain(`sizes="auto, (min-width: 44rem) 42rem, calc(100vw - 2rem)"`);
+      expect(img).toContain(`width="1344" height="840" alt="A flat blue field" loading="lazy" decoding="async"`);
+      const srcset = /srcset="([^"]+)"/.exec(img)![1]!.split(",").map(c => c.trim().split(/\s+/));
+      expect(srcset.map(([, w]) => w)).toEqual(["480w", "672w", "1344w"]);
+      for (const [url] of srcset) expect((await onHost(server.port, "live.localhost", url!)).status, url).toBe(200);
+    } finally {
+      await server.close();
+    }
+  }, 120_000);
 });
 
 // The README's "Try breaking it" step, done as it says on a running server: the page then shows the
