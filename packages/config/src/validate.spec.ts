@@ -52,10 +52,25 @@ describe("configProblems", () => {
   });
 
   it("names a missing required key, and the typo that probably meant it", () => {
-    const { styles, ...rest } = valid;
-    expect(configProblems({ ...rest, style: styles }))
-      .toEqual([`missing required "styles" (found "style" — did you mean "styles"?)`]);
-    expect(configProblems({ ...rest })).toEqual([`missing required "styles"`]);
+    const { outDir, ...rest } = valid;
+    expect(configProblems({ ...rest, outdir: outDir }))
+      .toEqual([`missing required "outDir" (found "outdir" — did you mean "outDir"?)`]);
+    expect(configProblems({ ...rest })).toEqual([`missing required "outDir"`]);
+    // styles is optional, so a typo of it is an unknown key.
+    const { styles, ...noStyles } = valid;
+    expect(configProblems({ ...noStyles, style: styles })).toEqual([`unknown key "style" — did you mean "styles"?`]);
+  });
+
+  it("sourceDir, patternsDir and styles are optional: a site whose patterns all come from packages names none", () => {
+    expect(configProblems({ outDir: "o" })).toEqual([]);
+    const defaults = { sourceDir: "./src", patternsDir: "./src/patterns", styles: { strategy: "parallel", dir: "./src/styles" } };
+    expect(validateConfig({ outDir: "o" }, "test")).toEqual({ outDir: "o", ...defaults });
+    expect(defineConfig({ outDir: "o" })).toEqual({ outDir: "o", ...defaults });
+    // The other two follow sourceDir.
+    expect(defineConfig({ outDir: "o", sourceDir: "./site" })).toMatchObject({ patternsDir: "./site/patterns", styles: { dir: "./site/styles" } });
+    // What is given is kept, and still checked.
+    expect(defineConfig({ outDir: "o", patternsDir: "./p", styles: { dir: "./s" } })).toMatchObject({ sourceDir: "./src", patternsDir: "./p", styles: { dir: "./s" } });
+    expect(configProblems({ outDir: "o", patternsDir: 3 })).toEqual([`"patternsDir" must be a string`]);
   });
 
   it("rejects unknown keys at any depth, with a suggestion when one is close", () => {
@@ -346,9 +361,7 @@ describe("validateConfig", () => {
   it("throws one error listing every problem, prefixed with the file", () => {
     expect(() => validateConfig({ sourceDir: 1 }, "pattern-dump.config.json")).toThrow(
       `pattern-dump.config.json: invalid config\n` +
-      `  - missing required "patternsDir"\n` +
       `  - missing required "outDir"\n` +
-      `  - missing required "styles"\n` +
       `  - "sourceDir" must be a string`);
   });
 

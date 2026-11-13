@@ -23,7 +23,7 @@ describe("loadConfig", () => {
       JSON.stringify({ sourceDir: "s", patternsDir: "p", outDir: "o", style: { dir: "d" } }));
     await expect(loadConfig(root)).rejects.toMatchObject({
       name: "ConfigError",
-      message: `pattern-dump.config.json: invalid config\n  - missing required "styles" (found "style" — did you mean "styles"?)`,
+      message: `pattern-dump.config.json: invalid config\n  - unknown key "style" — did you mean "styles"?`,
     });
   });
 

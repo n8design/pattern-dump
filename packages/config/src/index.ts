@@ -2,7 +2,8 @@
 // Load and validate pattern-dump.config (.ts/.json, TS wins). Shared config types.
 import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/contracts";
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
-export { ConfigError, configProblems, sameHostWorkbenchPath, suggest, validateConfig } from "./validate.js";
+export { ConfigError, configProblems, sameHostWorkbenchPath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
+import { withSourceDefaults } from "./validate.js";
 
 export interface AssetsConfig {
   /** Where assets live. Only 'central' (the default: one assets dir, served at /assets/) is supported
@@ -238,6 +239,14 @@ export type StorefrontNavEntry =
   | { href: string; label: string }
   | { label: string; children: StorefrontNavEntry[] };
 
-export function defineConfig(config: PatternDumpConfig): PatternDumpConfig {
-  return config;
+/**
+ * What a project writes: the config, where `sourceDir`, `patternsDir` and `styles` may be left out (a site whose
+ * patterns and styles all come from pattern packages has none of its own). `defineConfig` and `validateConfig` fill
+ * them in (`withSourceDefaults`), so everything that reads a config gets all three.
+ */
+export type PatternDumpConfigInput = Omit<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">
+  & Partial<Pick<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">>;
+
+export function defineConfig(config: PatternDumpConfigInput): PatternDumpConfig {
+  return withSourceDefaults(config);
 }

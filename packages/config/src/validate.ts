@@ -4,7 +4,7 @@
 // undefined" from whichever reader touches the key first.
 
 import { relative, resolve, sep } from "node:path";
-import type { PatternDumpConfig } from "./index.js";
+import type { PatternDumpConfig, PatternDumpConfigInput } from "./index.js";
 
 type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
@@ -68,7 +68,9 @@ const SHAPE: Shape = {
   },
 };
 
-const REQUIRED = ["sourceDir", "patternsDir", "outDir", "styles"] as const;
+// sourceDir, patternsDir and styles are optional (withSourceDefaults): a site whose patterns and styles all come from
+// pattern packages names none of them.
+const REQUIRED = ["outDir"] as const;
 
 /** A root-relative path of plain segments: "/workbench/", "/docs/workbench". Never "//…" (another host), and
  *  no "." or ".." segment (the path a browser resolves would not be the one written). */
@@ -276,12 +278,28 @@ export function configProblems(raw: unknown): string[] {
 const withOneTrailingSlash = (url: string): string => `${url.replace(/\/+$/, "")}/`;
 
 /** Check a loaded config and return it typed, or throw one error listing every problem. */
+/**
+ * A config with its source folders filled in where it names none: `sourceDir` is "./src", and `patternsDir` and
+ * `styles.dir` are its `patterns` and `styles` folders. None of them has to exist: a site whose patterns and styles
+ * all come from pattern packages has none of its own. What the config names is kept as it is.
+ */
+export function withSourceDefaults(config: PatternDumpConfigInput): PatternDumpConfig {
+  if (config.sourceDir !== undefined && config.patternsDir !== undefined && config.styles !== undefined) return config as PatternDumpConfig;
+  const sourceDir = config.sourceDir ?? "./src";
+  const base = sourceDir.replace(/\/+$/, "");
+  return {
+    ...config, sourceDir,
+    patternsDir: config.patternsDir ?? `${base}/patterns`,
+    styles: config.styles ?? { strategy: "parallel", dir: `${base}/styles` },
+  };
+}
+
 export function validateConfig(raw: unknown, source: string): PatternDumpConfig {
   const problems = configProblems(raw);
   if (problems.length > 0) {
     throw new ConfigError(`${source}: invalid config\n${problems.map(p => `  - ${p}`).join("\n")}`);
   }
-  const config = raw as PatternDumpConfig;
+  const config = withSourceDefaults(raw as PatternDumpConfigInput);
   // Normalized here, once, so every reader gets the same form: links are `<workbenchUrl><path>`.
   // The input is never changed: a config that needs no normalizing is returned as it is, one that does
   // is returned as a copy.
