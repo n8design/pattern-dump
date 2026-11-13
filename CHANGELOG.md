@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- `sourceDir`, `patternsDir` and `styles` are optional. A site whose components, skin and styles all come from
+  pattern packages names none of them; they default to `./src`, `./src/patterns` and `./src/styles`, and the folders
+  don't have to exist.
+
 ### Changed
 
 - `pd build` now checks every page of a storefront with axe before it writes anything, and **stops on an

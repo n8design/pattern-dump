@@ -11,7 +11,7 @@ wrong type stops `pd` with a list of every problem, and a likely typo gets a sug
 
 ```
 [pd] Error: pattern-dump.config.json: invalid config
-  - missing required "styles" (found "style" — did you mean "styles"?)
+  - missing required "outDir" (found "outdir" — did you mean "outDir"?)
 ```
 
 ```ts
@@ -53,10 +53,18 @@ export default defineConfig({
 
 | Option | Type | Description |
 |---|---|---|
-| `sourceDir` | string | The project's source folder |
-| `patternsDir` | string | Where components live. Every `.hbs` below it is a component ([authoring.md](authoring.md#components)) |
 | `outDir` | string | Default output folder, used by `pd build` when neither `--out` nor `build.outDir` is given |
-| `styles` | object | See [styles](#styles) |
+
+### Source folders
+
+All three are optional. A site whose components, skin and styles all come from [pattern packages](pattern-packages.md)
+names none of them, and the folders don't have to exist.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `sourceDir` | string | `./src` | The project's source folder |
+| `patternsDir` | string | `<sourceDir>/patterns` | Where components live. Every `.hbs` below it is a component ([authoring.md](authoring.md#components)) |
+| `styles` | object | `{ dir: "<sourceDir>/styles" }` | See [styles](#styles) |
 
 ### styles
 
