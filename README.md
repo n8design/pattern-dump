@@ -42,7 +42,7 @@ To try changes that are not released yet, build the package from this repository
 from the file:
 
 ```bash
-git clone <this repository> pattern-dump
+git clone https://github.com/n8design/pattern-dump.git
 cd pattern-dump
 npm install
 npm run pack:pd          # → .pd-pack/pattern-dump-<version>.tgz
@@ -70,6 +70,7 @@ npx pd build             # a static site in ./dist
 | [Themes](docs/guide/themes.md) | Writing and switching themes |
 | [Pattern packages](docs/guide/pattern-packages.md) | Using and publishing design systems as npm packages |
 | [Static build](docs/guide/static-build.md) | `pd build`: options, hosting and troubleshooting |
+| [Storefront](docs/guide/storefront.md) | A website written in markdown, with live examples, beside the workbench |
 | [Command line](docs/guide/cli.md) | Every `pd` command and option |
 
 ## Developing Pattern Dump
