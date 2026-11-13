@@ -18,6 +18,7 @@
 // path to itself (routes.ts), so a stylesheet's hash covers its own stamped `url()`s.
 
 import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
+import { ATTRIBUTE, startTags } from "./html-tags.js";
 
 /** The stamp of a served path, or undefined when nothing is served there. */
 export type HashOf = (path: string) => Promise<string | undefined>;
@@ -48,13 +49,6 @@ async function stamp(ref: string, hashOf: HashOf): Promise<string> {
   const hash = await hashOf(path);
   return hash === undefined ? ref : `${path}?v=${hash}`;
 }
-
-// A comment; or a start tag: its name, then its attributes (a quoted value may hold ">").
-const MARKUP = /<!--[\s\S]*?-->|<([a-zA-Z][\w:-]*)((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/g;
-// One attribute: what precedes it, its name, and its value as written.
-const ATTRIBUTE = /(\s+)([^\s"'>/=]+)(?:(\s*=\s*)("[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
-/** Elements whose content is text to the parser, however much it looks like markup. */
-const RAW_TEXT = new Set(["script", "style", "textarea", "title"]);
 
 /** A srcset with each candidate's URL stamped. */
 async function stampSrcset(value: string, hashOf: HashOf): Promise<string> {
@@ -90,24 +84,18 @@ async function stampTag(name: string, attrs: string, hashOf: HashOf): Promise<st
 export async function stampHtml(html: string, hashOf: HashOf): Promise<string> {
   const parts: string[] = [];
   let last = 0;
-  // Its own copy: the loop awaits between matches, and two documents may be stamped at once.
-  const markup = new RegExp(MARKUP.source, "g");
-  for (let m = markup.exec(html); m; m = markup.exec(html)) {
-    parts.push(html.slice(last, m.index));
-    last = markup.lastIndex;
-    const name = m[1];
-    if (name === undefined) { parts.push(m[0]); continue; }
-    parts.push(`<${name}${await stampTag(name, m[2] ?? "", hashOf)}${m[0].slice(1 + name.length + (m[2] ?? "").length)}`);
-    const lower = name.toLowerCase();
-    if (!RAW_TEXT.has(lower)) continue;
-    // Its content runs to its end tag, copied as it is; a JSON-LD block's "image" is stamped.
-    const end = html.toLowerCase().indexOf(`</${lower}`, last);
-    const content = html.slice(last, end < 0 ? html.length : end);
-    parts.push(lower === "script" && /\stype=["']?application\/ld\+json/i.test(m[2] ?? "")
+  for (const tag of startTags(html)) {
+    parts.push(html.slice(last, tag.start));
+    const attrsAt = tag.start + 1 + tag.name.length;
+    parts.push(`<${tag.name}${await stampTag(tag.name, tag.attrs, hashOf)}${html.slice(attrsAt + tag.attrs.length, tag.end)}`);
+    last = tag.end;
+    if (!tag.content) continue;
+    // A raw-text element's content is copied as it is; a JSON-LD block's "image" is stamped.
+    const content = html.slice(tag.content.start, tag.content.end);
+    parts.push(tag.name.toLowerCase() === "script" && /\stype=["']?application\/ld\+json/i.test(tag.attrs)
       ? await replaceAsync(content, /("image":"https?:\/\/[^/"]+)([^"]*)"/g, async j => `${j[1]}${await stamp(j[2]!, hashOf)}"`)
       : content);
-    last = end < 0 ? html.length : end;
-    markup.lastIndex = last;
+    last = tag.content.end;
   }
   parts.push(html.slice(last));
   return parts.join("");
