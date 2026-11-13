@@ -5,7 +5,7 @@
 import { readFile } from "node:fs/promises";
 import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
 import { assetFile } from "../asset-file.js";
-import { imageInfo, type RasterFormat } from "./image-info.js";
+import { imageInfo, type RasterFormat } from "@pattern-dump/build";
 
 export type PageImage = { path: string; format: RasterFormat; width: number; height: number };
 export type PageImageCheck = { ok: true; image: PageImage } | { ok: false; message: string };

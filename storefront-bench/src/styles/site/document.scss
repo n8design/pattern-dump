@@ -5,3 +5,10 @@ body {
   font-family: var(--wf-font);
   line-height: 1.5;
 }
+
+// An image never overflows its box: with its width and height attributes it keeps its aspect ratio and scales down
+// with the column, so a responsive image is shown at the size its `sizes` describes.
+img {
+  max-inline-size: 100%;
+  block-size: auto;
+}

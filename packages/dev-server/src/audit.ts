@@ -11,6 +11,7 @@
 //
 // Public contract: packages/core imports `runDiagnosticsAudit`, so index.ts re-exports it.
 
+import { createImageService } from "./image-service.js";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import type { DiagnosticsGraph } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
@@ -32,15 +33,23 @@ import { createDisplayPath } from "./display-path.js";
  */
 export async function runDiagnosticsAudit(
   config: PatternDumpConfig, cwd: string,
-): Promise<{ graph: DiagnosticsGraph; reaudited: string[]; reused: number; artifactPath: string }> {
+): Promise<{ graph: DiagnosticsGraph; reaudited: string[]; reused: number; artifactPath: string; imageWarning?: string }> {
   const cfg = resolveServerConfig(config, cwd, {}, loadPatternPackages(config.packages, cwd));
   const { patternsDir, patternRoots, patternDirs, themesDir, defaultTheme } = cfg;
   const helperRegistrars: Awaited<ReturnType<typeof loadHelperRegistrars>> = [];
   for (const path of cfg.helperPaths) helperRegistrars.push(...await loadHelperRegistrars(path));
   const globalData = cfg.dataDirs.length ? await loadGlobalData(cfg.dataDirs) : undefined;
+  // Images as pd dev shows them (image-service.ts): when sharp can't be loaded, originals at their size, and the
+  // warning said once, in the audit's summary, not per component.
+  let imageWarning: string | undefined;
+  const images = createImageService({
+    assetRoots: cfg.assetRoots, assetRootNames: cfg.assetRootNames, images: cfg.images, build: false,
+    warn: message => { imageWarning ??= message; },
+  });
+  await images.ready("audit");
   const render = createRenderer({
     patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme,
-    displayPath: createDisplayPath(cwd, cfg.packages),
+    displayPath: createDisplayPath(cwd, cfg.packages), images: images.lookup,
     ...(helperRegistrars.length ? { helperRegistrars } : {}),
     ...(globalData ? { globalData } : {}),
   }) as CheckRenderer;
@@ -53,5 +62,5 @@ export async function runDiagnosticsAudit(
   // nor the composition registry, so build the registry here for the pass.
   const registry = await buildCompositionRegistry(patternDirs, discovery.handleMap, discovery.discoveryMap);
   await surfaceFlattening(discovery.discoveryMap, registry, cwd);
-  return { graph, reaudited, reused, artifactPath: graphArtifactPath(cwd) };
+  return { graph, reaudited, reused, artifactPath: graphArtifactPath(cwd), ...(imageWarning ? { imageWarning } : {}) };
 }

@@ -57,8 +57,8 @@ describe("the placement schema extensions", () => {
 
   it("an unknown x-pd- key is an error, at the top and in a property", () => {
     expect(check({ "x-pd-contnet": "caption", properties: { caption: { type: "string", "x-pd-componnet": "atoms/slide" } } })).toEqual([
-      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`,
-      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`,
+      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image)`,
+      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image)`,
     ]);
   });
 
@@ -74,7 +74,7 @@ describe("the placement schema extensions", () => {
     }
     // In a property it is not a known key.
     expect(check({ properties: { a: { type: "string", "x-pd-example-height": 10 } } })).toEqual([
-      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height)`,
+      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image)`,
     ]);
   });
 

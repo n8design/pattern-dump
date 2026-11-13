@@ -28,7 +28,25 @@ export interface RenderInput {
   variant?: string;
   /** Live-control overrides; highest precedence in the cascade. */
   data?: Record<string, unknown>;
+  /** Which image settings the variant URLs this render writes are keyed with: "site" for a storefront page and the
+   *  previews its host serves (`storefront.images` over `images`), else the project's (`images`). */
+  images?: "site";
 }
+
+/**
+ * What an image in the assets is, for `{{pd-image}}`: looked up by its URL (`/assets/…`), synchronously, from an
+ * index built before rendering. Sizes are as the image is displayed (EXIF orientation applied).
+ *  - `variants`: a raster image, served as WebP variants; `variantUrl(width, settings)` is a variant's URL.
+ *  - `single`: one file, as it is (an SVG, or a raster image pd dev shows as it is when it can't encode).
+ *  - `unavailable`: a raster image that can't be served as variants; `reason` says why (the build fails the page).
+ */
+export type ImageSource =
+  | { kind: "variants"; width: number; height: number; variantUrl(width: number, settings?: "site"): string }
+  | { kind: "single"; url: string; width: number; height: number }
+  | { kind: "unavailable"; reason: string };
+
+/** Looks an asset up by its URL; undefined when the assets have no image there. */
+export type ImageLookup = (src: string) => ImageSource | undefined;
 
 export interface RenderMeta {
   componentId: string;
@@ -135,6 +153,8 @@ export type Render = (input: RenderInput) => Promise<RenderOutput>;
 export interface RendererOptions {
   /** Root containing the atomic pattern folders (atoms/, molecules/, ...). */
   patternsDir: string;
+  /** The images in the assets, for `{{pd-image}}`. Without it, `{{pd-image}}` fails the render. */
+  images?: ImageLookup;
   /** Every patterns folder, project first, when pattern packages are in use. Takes precedence over
    *  `patternsDir` for discovery. */
   patternRoots?: PatternRoot[];

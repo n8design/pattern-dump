@@ -7,7 +7,17 @@
   "x-pd-content": "caption",
   "properties": {
     "image": {
-      "type": "string"
+      "type": "string",
+      "x-pd-image": {
+        "widths": [
+          320,
+          640,
+          1280,
+          1600,
+          2400
+        ],
+        "sizes": "(max-width: 40rem) 33vw, 19rem"
+      }
     },
     "alt": {
       "type": "string"

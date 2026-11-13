@@ -36,9 +36,9 @@ test.describe("the built storefront on a static host", () => {
       expect(written, `${s.in}: ${s.path}`).not.toBeNull();
       expect(s.v, `${s.in}: ${s.path}`).toBe(createHash("sha256").update(written!).digest("hex").slice(0, 10));
     }
-    // Nothing served is linked bare from a page.
+    // Nothing served is linked bare from a page, except an image variant: its name is its key, so it is never stamped.
     for (const f of files.filter(f => f.endsWith(".html"))) {
-      expect(await readFile(f, "utf8"), relative(ROOT, f)).not.toMatch(/(?:href|src)="\/(?:_pd|assets)\/[^"?]+"/);
+      expect(await readFile(f, "utf8"), relative(ROOT, f)).not.toMatch(/(?:href|src)="\/(?:_pd\/(?!images\/)|assets\/)[^"?]+"/);
     }
   });
 

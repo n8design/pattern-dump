@@ -7,7 +7,7 @@ test("the guides page shows the slider placed on it, styled", async ({ page }) =
   await page.goto("/guides/");
   const slider = page.locator(`section.slider[aria-label="The bench in pictures"]`);
   await expect(slider).toBeVisible();
-  await expect(slider.locator(".slider-item")).toHaveCount(2);
+  await expect(slider.locator(".slider-item")).toHaveCount(3);
   // The slider's stylesheet and the slides' (placed inside it) both paint.
   await expect(slider).toHaveCSS("display", "flex");
   await expect(slider.locator("figure.slide").first()).toHaveCSS("border-top-style", "solid");

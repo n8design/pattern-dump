@@ -167,5 +167,11 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps): Promi
   });
   problems.push(...checked.problems, ...await unsafeOutputs(id, block.root.at, deps), ...await sampleDataProblems(id, block.root.at, deps));
   if (problems.length) return { problems };
-  return { html: (await deps.render({ component: id, data: checked.value })).html, problems };
+  // A placement that fails to render (an image that can't be served as variants, a helper that isn't registered)
+  // is a problem of the page at the tag, listed and escaped like any other, never an unhandled 500.
+  try {
+    return { html: (await deps.render({ component: id, data: checked.value })).html, problems };
+  } catch (e) {
+    return { problems: [{ at: block.root.at, message: `<${block.root.name}>: ${e instanceof Error ? e.message : String(e)}` }] };
+  }
 }

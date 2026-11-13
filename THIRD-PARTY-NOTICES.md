@@ -73,3 +73,6 @@ These files are in the git repository, in test fixtures and benches. They are no
 - **Licence:** [Unsplash License](https://unsplash.com/license). This is not the MIT licence and not an open-source
   licence: it covers these images only, and the repository's MIT licence does not cover them.
 
+- **Cable cars**, Cody Hiscox: https://unsplash.com/photos/kzb0Mo0YQDw
+- **Used in:** `storefront-bench/src/assets/images/cable-cars.jpg` (cropped and scaled; how, in the README beside it).
+- **Licence:** [Unsplash License](https://unsplash.com/license), as above: not the MIT licence.

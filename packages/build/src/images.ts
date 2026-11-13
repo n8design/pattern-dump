@@ -56,7 +56,16 @@ export function loadSharp(importer?: () => Promise<{ default: SharpModule }>): P
  * exactly when the variant's bytes would.
  */
 export function imageVariantKey(source: Uint8Array, width: number, encoding: ImageEncoding): string {
-  const sourceHash = createHash("sha256").update(source).digest("hex");
+  return imageVariantKeyFromSourceHash(imageSourceHash(source), width, encoding);
+}
+
+/** The full SHA-256 (hex) of a source's bytes: what an image index keeps, so keys need no second read. */
+export function imageSourceHash(source: Uint8Array): string {
+  return createHash("sha256").update(source).digest("hex");
+}
+
+/** imageVariantKey, from the source's hash (imageSourceHash) instead of its bytes. */
+export function imageVariantKeyFromSourceHash(sourceHash: string, width: number, encoding: ImageEncoding): string {
   return createHash("sha256")
     .update(`${sourceHash}|webp|orient=auto|w=${width}|q=${encoding.quality}|e=${encoding.effort}|sharp=${SHARP_VERSION}`)
     .digest("hex").slice(0, 10);

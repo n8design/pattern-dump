@@ -24,12 +24,15 @@ export function plainWrites(source: string): string[] {
   return found;
 }
 
-// The two that may, each with what it may do and why.
+// The three that may, each with what it may do and why.
 const ALLOWED: Record<string, string[]> = {
   // The harness's barrier: a one-character append, so no emptied file in between, and always a change.
   "packages/dev-server/test/watch-harness.ts": ["import appendFile"],
   // Not a test's own save: it stands in for the server's writeFile, to tear the server's write in half.
   "packages/dev-server/test/diagnostics-artifact-write.spec.ts": ["fs.writeFile("],
+  // Rewrites a file in place on purpose (same inode, same size) to prove the image index's stat shortcut; no
+  // watcher runs in it, so the truncate-then-write this rule guards against can't be seen by anything.
+  "packages/build/test/image-index.spec.ts": ["import writeFile"],
 };
 // This file, whose samples are plain writes, written as strings.
 const SELF = "packages/dev-server/test/raw-writes-guard.spec.ts";
@@ -43,7 +46,7 @@ describe("plain writes", () => {
     expect(plainWrites(`import { save } from "../../../test-support/save.js";\nawait save(p, "x");`)).toEqual([]);
   });
 
-  it("are in no test file but the two allowed", () => {
+  it("are in no test file but the ones allowed", () => {
     const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { cwd: repo, encoding: "utf8" }).split("\n")
       .filter(f => f !== SELF && /\.(ts|mts|mjs|js)$/.test(f) && (/(^|\/)(test|e2e)\//.test(f) || /\.(spec|test)\.ts$/.test(f)));
     expect(files.length).toBeGreaterThan(100);
