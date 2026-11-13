@@ -20,7 +20,7 @@ import { basename, extname, join, relative } from "node:path";
 import { readFile } from "node:fs/promises";
 import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
 import type {
-  ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview,
+  ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
 } from "@pattern-dump/contracts";
 import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
@@ -100,6 +100,8 @@ export interface RouteContext {
   readonly settle?: () => Promise<void>;
   /** storefront.site as the server holds it now (the watcher replaces it when the config changes only it). */
   readonly site: SiteValuesHandle;
+  /** The image index, ready for the current generation: a storefront page's prose images are looked up in it. */
+  readonly images?: () => Promise<ImageLookup>;
 }
 
 /** What the running process knows about itself, frozen at startup. The wire shape adds `protocol`. */
@@ -645,6 +647,7 @@ async function routeRequest(
         ...(siteUrl !== undefined ? { siteUrl } : {}),
         lang: cfg.storefront.lang, siteIndex: cfg.storefront.index,
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
+        ...(ctx.images ? { images: ctx.images } : {}),
       });
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
       for (const note of page.notes) {

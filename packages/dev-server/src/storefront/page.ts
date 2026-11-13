@@ -13,11 +13,11 @@
 // never show on a real page. A layout that declares `page` gets what is derived for the page (derived.ts),
 // each declared sub-key present and null where nothing is.
 
-import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
+import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
-import { isHelperNameProblem } from "@pattern-dump/renderer";
-import { renderDoc } from "../markdown.js";
+import { isHelperNameProblem, readProseSlot } from "@pattern-dump/renderer";
+import { renderDoc, type ProseImages } from "../markdown.js";
 import { readSchema, type PlacedProblem } from "./declared-values.js";
 import { checkPageFrontmatter } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageModel } from "./pages.js";
@@ -67,6 +67,9 @@ export interface PageAssembly {
   lang?: string;
   /** storefront.index: false gives every page noindex. Default: true. */
   siteIndex?: boolean;
+  /** The image index, ready for this render: a page's images from the assets are written with their variants
+   *  (markdown.ts, ProseImages). Without it, a page's images are written as markdown writes them. */
+  images?: () => Promise<ImageLookup>;
 }
 
 export interface AssembledPage {
@@ -290,8 +293,17 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     }
   }
 
+  // The layout's slot for the page's images (x-pd-prose-images), and the image index they are looked up in.
+  const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath)).schema;
+  const proseSlot = readProseSlot(layoutSchema);
+  const imageLookup = a.images ? await a.images() : undefined;
+
   /** The page's markdown, rendered; its headings' anchors never take one of `takenIds`. */
   const renderBody = async (takenIds: string[] = []) => {
+    const prose: ProseImages | undefined = imageLookup ? {
+      layoutId: checked.layoutId, lookup: imageLookup, lineOffset: frontmatterBodyOffset(source), problems: [],
+      ...(proseSlot.slot ? { slot: proseSlot.slot } : {}), ...(proseSlot.problem ? { slotProblem: proseSlot.problem } : {}),
+    } : undefined;
     const docProblems: string[] = [];
     const placedProblems: PlacedProblem[] = [];
     const headings: PageHeading[] = [];
@@ -300,7 +312,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       (id, variant) => a.render({ component: id, variant }).then(r => r.html),
       a.discoveryMap,
       {
-        embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings, takenIds,
+        embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings, takenIds, ...(prose ? { prose } : {}),
         // Components placed with values (pd- tags): checked against their schemas, rendered into the page.
         placed: {
           lineOffset: frontmatterBodyOffset(source),
@@ -313,14 +325,14 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
         },
       },
     );
-    return { body, headings, docProblems, placedProblems };
+    return { body, headings, docProblems, placedProblems, imageProblems: prose?.problems ?? [] };
   };
   const first = await renderBody();
   problems.push(...first.docProblems.map(p => `${page.path}: ${p}`));
   problems.push(...first.placedProblems.map(p => `${page.path}:${p.at.line}:${p.at.column}: ${p.message}`));
+  problems.push(...first.imageProblems.map(p => `${page.path}:${p.line}: ${p.message}`));
 
   // The layout's sample data, and that of every partial it includes, must stay out of real pages.
-  const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath)).schema;
   const siteSchema = (await readSchema(a.discoveryMap.get(SITE_SCHEMA_OWNER)?.schemaPath)).schema;
   const layoutDeclared = Object.keys(layoutSchema?.properties ?? {});
   const siteDeclared = Object.keys(siteSchema?.properties?.site?.properties ?? {});
