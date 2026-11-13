@@ -61,6 +61,8 @@
   height: 0.875rem;
   transform: translateY(-50%);
   pointer-events: none;
+
+  // The chevron: drawn by Stefan Bauer, part of this repository, MIT.
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg transform='rotate(90 8 8)'%3E%3Cpath d='M6 3.5 L10.5 8 L6 12.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E");
   mask-repeat: no-repeat;
   mask-position: center;
