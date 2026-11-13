@@ -1,3 +1,5 @@
+// Drawn by Stefan Bauer, part of this repository, MIT.
+//
 // pd-mcm-dark — warm Mid-Century-Modern syntax theme on a deepened slate ground (#22292E).
 // Authored in OKLCH (see ./oklch.ts), computed to sRGB hex at load, gamut-checked (fail-loud).
 //
