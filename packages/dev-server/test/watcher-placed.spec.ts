@@ -26,8 +26,6 @@ async function bench(): Promise<Bench> {
     await mkdir(dirname(to), { recursive: true });
     await cp(join(repo, file), to);
   }
-  // The slide gets data, so a data edit can be made too.
-  await save(join(root, SLIDE, "slide.json"), `{ "image": "x.svg" }\n`);
   const b = new Bench(root, "components/slider");
   await b.start(validateConfig(benchConfig, "storefront-bench"));
   return b;
@@ -45,7 +43,7 @@ describe("a placed component's files", () => {
   for (const [what, file, edit] of [
     ["its schema", `${SLIDE}/slide.schema.json`, (s: string) => s.replace(`"alt": {`, `"credit": { "type": "string" },\n    "alt": {`)],
     ["its template", `${SLIDE}/slide.hbs`, (s: string) => `${s}<!-- edited -->\n`],
-    ["its data", `${SLIDE}/slide.json`, (s: string) => s.replace("x.svg", "y.svg")],
+    ["its data", `${SLIDE}/slide.json`, (s: string) => s.replace("A harbour at dusk", "The harbour at dusk")],
   ] as const) {
     it(`reload what shows it when ${what} changes`, async () => {
       const b = await bench();
