@@ -1,19 +1,87 @@
 # Changelog
 
-## Unreleased
+## 0.2.0-alpha.0
 
-### Changed
+The storefront: a website written as markdown pages, dressed by a skin made of ordinary components, served by
+`pd dev` on a host of its own and built by `pd build` next to the workbench. With it come responsive images, link
+and image checks, and live examples of your components on the site's pages.
 
-- Pattern Dump now needs Node.js 22.22 or later (it was 20.10).
+Pattern Dump now needs Node.js 22.22 or later (it was 20.10).
 
-### Fixed
+### Workbench
 
-- A component added while `pd dev` runs gets its own stylesheet even when the stylesheet is saved before
-  the template. Until the template existed its rules counted as base-layer rules, and they stayed there
-  until a restart: linked on every preview and missing from the component's own CSS.
-- A variant reached by its own id (`/preview/atoms/toggle-demo~alt`) is now the same document as
-  `?variant=alt`: it gets its base's behaviour scripts (`requireScript`), layout and CSS. It used to
-  lose the base's scripts.
+- Pattern packages linked into a project (a `file:` dependency or a workspace) are watched like the project's own
+  files, and each is read from its real folder. Global data, assets and helper modules reload while `pd dev` runs.
+- A pattern package's TypeScript helpers are refused with a message naming them, and diagnostics name files by
+  project or package path, never by an absolute path.
+- Live reload is dependable: changes are handled one at a time, in the order they happen; a page or preview that
+  missed a change fetches it again and never shows an older one; a save the file watcher drops is still handled; a
+  folder added while `pd dev` runs (as `git checkout` or `git pull` does) is seen with every file in it.
+- A component added while `pd dev` runs gets its own stylesheet even when the stylesheet is saved before the
+  template.
+- A variant reached by its own id (`/preview/atoms/toggle-demo~alt`) is the same document as `?variant=alt`, with
+  its base's behaviour scripts, layout and CSS.
+- An overview tile picks up a stylesheet that was still empty when it rendered.
+- Behaviour scripts are stamped with their content hash, so a browser fetches a script again exactly when it
+  changed.
+- Every base-layer file whose rules no component owns and no `documentBase` entry lists is named in
+  `BASE-LAYER.generated.md`, with its rule count.
+
+### Storefront
+
+- Pages: every markdown file in `storefront.pagesDir` is a page, rendered with a layout from your patterns. Its
+  frontmatter is checked against the layout's schema, `storefront.site` against `partials/base`'s, and every
+  problem names its file and line. `pd dev` serves the site at `http://live.localhost:4000/`, `pd build` writes it
+  to `storefront.outDir`.
+- Live examples: a `pattern` fence shows a component's own preview in a frame, with links to its variants. A
+  component can declare the height its example starts at (`x-pd-example-height`), and `pd dev` warns when that
+  height is too tall.
+- Placing components with values: `<pd-…>` tags in a page's markdown, checked against the component's schema at
+  every level (`x-pd-component`, `x-pd-content`, `text/markdown` properties), with the file, line and column of any
+  problem.
+- What a page knows about itself, for layouts that ask for it: its headings (with GitHub's anchors), section,
+  breadcrumbs, previous and next pages, dates from git, and declared navigations.
+- Search engines and link previews: canonical URLs, Open Graph, the site's language, JSON-LD, `sitemap.xml`,
+  `robots.txt`, a 404 page, `redirectFrom` for old routes, `index: false`, and a link-preview image per page or site.
+- A skin can add to every page's `<head>` through a `partials/head` component, and can be a pattern package.
+- `pd init --storefront` starts a project with a website: pages, a plain skin, the workbench under `/workbench/`
+  on the same host, and a GitHub Pages workflow.
+- Every file a page references (stylesheets, scripts, fonts, images) carries the content hash of the file as
+  served, so a visitor's browser fetches it again exactly when it changed.
+
+### Images
+
+- Every raster image is served as WebP variants of the widths it is shown at, encoded with sharp on first use and
+  cached in `node_modules/.cache/pattern-dump/images/`. `images` (quality, effort) sets the encoding, and
+  `storefront.images` overrides it for the site.
+- Image slots: a component declares where an image goes and how wide it is shown (`x-pd-image`), and its template
+  writes it with `{{pd-image field alt=…}}`. Alt text is required; `alt=""` marks a decorative image.
+- Images in a page's markdown get their variants in the slot the page's layout declares (`x-pd-prose-images`),
+  with `sizes="auto"`, and the first ones can load at once (`eager`).
+- Every `<img>` carries its width and height, so the page doesn't shift as images load. Photos are turned upright
+  by their EXIF orientation.
+
+### Checks
+
+- `pd build` checks every link on every page of the site before it writes anything: pages, files, `#` anchors (a
+  heading's too), the site's own address and links into the workbench. A broken link stops the build; links to other
+  sites are listed in the build's notes. `pd dev` warns about a page's links to pages that don't exist.
+- `pd build` refuses a page with an `<img>` that has no width and height, or a raster image served without its WebP
+  variants, and names the fix; `pd dev` shows the same as warnings.
+- A schema field named like a registered helper is an error, and so is an unknown `x-pd-` key in a schema.
+- The shape check tells a list from an object (an array property was reported as a mismatch).
+
+### Fixes
+
+- `pd dev` answers only requests addressed to its own host names, accepts live-reload connections only from its own
+  pages, binds its live-reload socket to 127.0.0.1 like its HTTP server, and serves files only from inside each
+  route's folder.
+- The starter's body defaults no longer override a pattern package's document styles (hTWOo's dark themes showed
+  dark text on a white page).
+- Two config loads in the same millisecond no longer share a temporary file.
+- The audit reuses a cached result only when it was made by the same version of the check.
+- The live-reload socket reports the port it is actually bound to.
+- A code example on a page that quotes `<img src="/assets/…">` is shown as written, not with a cache stamp added.
 
 ## 0.1.0-alpha.4
 

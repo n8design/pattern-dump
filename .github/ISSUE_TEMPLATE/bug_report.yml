@@ -48,7 +48,7 @@ body:
     attributes:
       label: Pattern Dump version
       description: The output of `npm ls pattern-dump` in your project.
-      placeholder: pattern-dump@0.1.0-alpha.0
+      placeholder: pattern-dump@0.2.0-alpha.0
     validations:
       required: true
   - type: input
