@@ -16,7 +16,7 @@
           1600,
           2400
         ],
-        "sizes": "(max-width: 40rem) 33vw, 19rem"
+        "sizes": "(min-width: 62rem) calc((60rem - 2rem) / 3), calc((100vw - 4rem) / 3)"
       }
     },
     "alt": {
