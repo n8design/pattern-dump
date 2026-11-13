@@ -43,7 +43,7 @@ describe("a placed component's files", () => {
   for (const [what, file, edit] of [
     ["its schema", `${SLIDE}/slide.schema.json`, (s: string) => s.replace(`"alt": {`, `"credit": { "type": "string" },\n    "alt": {`)],
     ["its template", `${SLIDE}/slide.hbs`, (s: string) => `${s}<!-- edited -->\n`],
-    ["its data", `${SLIDE}/slide.json`, (s: string) => s.replace("A harbour at dusk", "The harbour at dusk")],
+    ["its data", `${SLIDE}/slide.json`, (s: string) => s.replace("Colourful cable cars", "Bright cable cars")],
   ] as const) {
     it(`reload what shows it when ${what} changes`, async () => {
       const b = await bench();

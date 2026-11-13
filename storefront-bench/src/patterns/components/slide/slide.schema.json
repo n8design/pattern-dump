@@ -11,7 +11,10 @@
       "x-pd-image": {
         "widths": [
           320,
-          640
+          640,
+          1280,
+          1600,
+          2400
         ],
         "sizes": "(max-width: 40rem) 33vw, 19rem"
       }
