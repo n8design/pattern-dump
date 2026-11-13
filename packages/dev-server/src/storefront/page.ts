@@ -32,6 +32,7 @@ import { readFile } from "node:fs/promises";
 import type { PageImage, PageImageCheck } from "./page-image.js";
 import { jsonLdScript } from "./json-ld.js";
 import { checkHeadMarkup, HEAD_PARTIAL } from "./head-partial.js";
+import { checkImages, type ImageFinding } from "./image-checks.js";
 
 /** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
 export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
@@ -390,6 +391,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   };
   const isFailed = (r: Awaited<ReturnType<Render>> | AssembledPage): r is AssembledPage => "status" in r;
   let rendered = await renderLayout(first.body, first.headings);
+  let finalBody = first.body;
   if (isFailed(rendered)) return rendered;
   // A layout field named like a registered helper can never be shown by its name: the page fails, as the
   // workbench shows the same SCHEMA_INVALID on the layout.
@@ -405,6 +407,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (colliding.length) {
     const second = await renderBody(layoutIds);
     rendered = await renderLayout(second.body, second.headings);
+    finalBody = second.body;
     if (isFailed(rendered)) return rendered;
     const still = collidingHeadings(second.headings, idsBesides(rendered.html, second.headings));
     if (still.length) {
@@ -463,6 +466,35 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
           + `so it only works from the site's root: ${instead}`;
       }));
     }
+  }
+  // The page's images (image-checks.ts): its body's named by its file, the rest (its layout and the partials that
+  // layout includes) by the layout. In pd build a missing size and a raster served as it is fail the page; in pd dev
+  // they are warnings, so editing is never blocked. An external image is a note in both.
+  // The layout's are the page's less the body's: a layout's partial block indents what it wraps, so the body can't
+  // be cut out of the page as written. An image both have is the body's.
+  const ofBody = checkImages(finalBody);
+  const ofLayout = checkImages(html);
+  for (const f of ofBody) {
+    const i = ofLayout.findIndex(g => g.kind === f.kind && g.src === f.src);
+    if (i >= 0) ofLayout.splice(i, 1);
+  }
+  const imageProblems: string[] = [];
+  const said = (where: string, f: ImageFinding) => {
+    const tag = `<img src="${f.src.length > 80 ? `${f.src.slice(0, 77)}...` : f.src}">`;
+    if (f.kind === "external") {
+      notes.push(`${where}: ${tag} is an external image: Pattern Dump can't make WebP variants of it, so it is served as it is`);
+    } else {
+      imageProblems.push(f.kind === "size"
+        ? `${where}: ${tag} has no width and height, so the page shifts when it loads: give both, or place it with {{pd-image}}`
+        : `${where}: ${tag} is a raster image served as it is: place it with {{pd-image}} in a template, or as a markdown `
+          + `image in a page, so it gets its WebP variants`);
+    }
+  };
+  for (const f of ofBody) said(page.path, f);
+  for (const f of ofLayout) said(checked.layoutId, f);
+  if (imageProblems.length) {
+    if (!a.live) return fail(imageProblems);
+    notes.push(...imageProblems.map(p => `warning: ${p}`));
   }
   return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
 }

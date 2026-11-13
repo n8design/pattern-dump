@@ -24,12 +24,12 @@ const ADDED: Record<string, string> = {
   "src/patterns/molecules/slider/slider.schema.json": json({ required: ["label", "slides"], properties: {
     label: { type: "string" }, perView: { type: "integer", enum: [1, 2, 3] }, loop: { type: "boolean" },
     slides: { type: "array", items: { "x-pd-component": "atoms/slide" } } } }),
-  "src/patterns/atoms/slide/slide.hbs": `<figure class="carousel-slide"><img src="{{image}}" alt="{{alt}}">{{#if caption}}<figcaption>{{{caption}}}</figcaption>{{/if}}</figure>\n`,
+  "src/patterns/atoms/slide/slide.hbs": `<figure class="carousel-slide"><img src="{{image}}" alt="{{alt}}" width="320" height="180">{{#if caption}}<figcaption>{{{caption}}}</figcaption>{{/if}}</figure>\n`,
   "src/patterns/atoms/slide/slide.schema.json": json({ "x-pd-content": "caption", required: ["image", "alt"], properties: {
     image: { type: "string" }, alt: { type: "string" }, caption: { type: "string", contentMediaType: "text/markdown" } } }),
   "src/styles/molecules/slider.scss": ".carousel {\n  display: flex;\n}\n",
   "src/styles/atoms/slide.scss": ".carousel-slide {\n  margin: 0;\n}\n",
-  "pages/talks.md": `---\ntitle: Talks\n---\n\n# Talks\n\n<pd-molecules-slider label="Recent talks" per-view="1" loop>\n  <pd-atoms-slide image="talks/espc.jpg" alt="On stage">ESPC **2025**</pd-atoms-slide>\n  <pd-atoms-slide image="talks/collab.jpg" alt="Audience">Collab Summit</pd-atoms-slide>\n</pd-molecules-slider>\n`,
+  "pages/talks.md": `---\ntitle: Talks\n---\n\n# Talks\n\n<pd-molecules-slider label="Recent talks" per-view="1" loop>\n  <pd-atoms-slide image="talks/espc.svg" alt="On stage">ESPC **2025**</pd-atoms-slide>\n  <pd-atoms-slide image="talks/collab.svg" alt="Audience">Collab Summit</pd-atoms-slide>\n</pd-molecules-slider>\n`,
 };
 const CASES: Record<string, [body: string, problem: string]> = {
   "case-1": [`<pd-molecules-slidr label="x"></pd-molecules-slidr>\n`,
@@ -92,8 +92,8 @@ describe("a storefront page that places a component", () => {
     expect(page.status).toBe(200);
     // (The page layout indents the body's lines, hence the four spaces after each line break.)
     expect(page.body).toContain(`<section class="carousel" aria-label="Recent talks" data-per-view="1">`
-      + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/espc.jpg" alt="On stage"><figcaption><p>ESPC <strong>2025</strong></p>\n    </figcaption></figure>\n    </div>`
-      + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/collab.jpg" alt="Audience"><figcaption><p>Collab Summit</p>\n    </figcaption></figure>\n    </div></section>`);
+      + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/espc.svg" alt="On stage" width="320" height="180"><figcaption><p>ESPC <strong>2025</strong></p>\n    </figcaption></figure>\n    </div>`
+      + `<div class="carousel-item"><figure class="carousel-slide"><img src="talks/collab.svg" alt="Audience" width="320" height="180"><figcaption><p>Collab Summit</p>\n    </figcaption></figure>\n    </div></section>`);
     // The placed component's stylesheet, and the nested slide's, each stamped with its content hash.
     expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/molecules\/slider\.css\?v=[0-9a-f]{10}" data-pd-comp="molecules\/slider">/);
     expect(page.body).toMatch(/<link rel="stylesheet" href="\/_pd\/components\/atoms\/slide\.css\?v=[0-9a-f]{10}" data-pd-comp="atoms\/slide">/);

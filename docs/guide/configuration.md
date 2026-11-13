@@ -103,6 +103,15 @@ documentBase: ["00-base", "03-organisms/hero"],
 | `assets.dir` | string or string[] | Served at `/assets/`. With several folders, each is served under its folder name (`/assets/images/…`). References that start with a folder's name, relative (`../../images/x.svg`) or root-absolute (`/images/x.svg`), are rewritten to `/assets/images/x.svg` in markup and in `url()` in your compiled CSS. If two folders share a name (a project's `images` and a package's `images`), the first one listed wins and the other is not served; `pd dev` warns about it and `pd build` leaves it out. Your own folders come before packages' |
 | `assets.css` | string[] | Stylesheets linked into every preview before the component styles: a path relative to the assets folder, or a full URL such as a web-font stylesheet |
 
+### images
+
+How the storefront's images are encoded as WebP variants ([Storefront: Images](storefront.md#images)).
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `images.quality` | number | `75` | WebP quality, a whole number from 1 to 100 |
+| `images.effort` | number | `4` | Encoding effort, a whole number from 0 (fastest) to 6 (smallest files) |
+
 ### Scripts
 
 | Option | Type | Description |
@@ -163,6 +172,7 @@ in [storefront.md](storefront.md).
 | `storefront.lang` | string | `en` | The language of every page, for `<html lang>`: a language tag such as `de-AT` |
 | `storefront.index` | boolean | `true` | `false` keeps the whole site out of search engines, for a staging site: every page `noindex`, `robots.txt` disallows everything, no sitemap |
 | `storefront.image` | string | — | The link-preview image of every page that names none: a PNG, JPEG, GIF or WebP file in the assets, such as `/assets/images/share.png` |
+| `storefront.images` | object | — | The site's own `quality` and `effort` for its images, over `images` (above) |
 | `storefront.site` | object | — | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
 
 ## When changes take effect

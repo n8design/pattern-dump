@@ -9,7 +9,12 @@
 // `?v=` gets the content stamp instead; one with any other query or a fragment is left as written. A path
 // whose file doesn't exist is left unstamped (the crawler reports it; link checking is step 6).
 //
-// The pass only rewrites text. `hashOf` says what a path's stamp is: the server answers it by serving the
+// Only real references are stamped: the attributes of the document's elements, never its text. A code example
+// that quotes `<img src="/assets/…">` (in a plain fence its quotes are not escaped) is shown as written. So the
+// pass reads the document as tags and text: comments and text are copied as they are, and so is the content of a
+// <script> or <style>, except a JSON-LD block's "image".
+//
+// `hashOf` says what a path's stamp is: the server answers it by serving the
 // path to itself (routes.ts), so a stylesheet's hash covers its own stamped `url()`s.
 
 import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
@@ -44,21 +49,68 @@ async function stamp(ref: string, hashOf: HashOf): Promise<string> {
   return hash === undefined ? ref : `${path}?v=${hash}`;
 }
 
+// A comment; or a start tag: its name, then its attributes (a quoted value may hold ">").
+const MARKUP = /<!--[\s\S]*?-->|<([a-zA-Z][\w:-]*)((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>/g;
+// One attribute: what precedes it, its name, and its value as written.
+const ATTRIBUTE = /(\s+)([^\s"'>/=]+)(?:(\s*=\s*)("[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
+/** Elements whose content is text to the parser, however much it looks like markup. */
+const RAW_TEXT = new Set(["script", "style", "textarea", "title"]);
+
+/** A srcset with each candidate's URL stamped. */
+async function stampSrcset(value: string, hashOf: HashOf): Promise<string> {
+  const entries = await Promise.all(value.split(",").map(async entry => {
+    const [, lead = "", url = "", rest = ""] = /^(\s*)(\S+)(.*)$/s.exec(entry) ?? [];
+    return url ? `${lead}${await stamp(url, hashOf)}${rest}` : entry;
+  }));
+  return entries.join(",");
+}
+
+/** A start tag with its references stamped: href, src and srcset; and the content of a link-preview <meta>,
+ *  an absolute URL on the site's own address, whose path is taken. */
+async function stampTag(name: string, attrs: string, hashOf: HashOf): Promise<string> {
+  const isPreview = name.toLowerCase() === "meta" && /\s(?:property="og:image"|name="twitter:image")/.test(attrs);
+  return replaceAsync(attrs, ATTRIBUTE, async m => {
+    const [whole, lead, attr, eq, quoted] = m as unknown as [string, string, string, string?, string?];
+    if (quoted === undefined || eq === undefined) return whole;
+    const q = quoted[0] === '"' || quoted[0] === "'" ? quoted[0] : "";
+    const value = q ? quoted.slice(1, -1) : quoted;
+    const key = attr.toLowerCase();
+    let stamped = value;
+    if (key === "href" || key === "src") stamped = await stamp(value, hashOf);
+    else if (key === "srcset") stamped = await stampSrcset(value, hashOf);
+    else if (key === "content" && isPreview) {
+      const at = /^(https?:\/\/[^/"']+)(.*)$/.exec(value);
+      if (at) stamped = `${at[1]}${await stamp(at[2]!, hashOf)}`;
+    }
+    return `${lead}${attr}${eq}${q}${stamped}${q}`;
+  });
+}
+
 /** An HTML document with every reference to a served file stamped. */
 export async function stampHtml(html: string, hashOf: HashOf): Promise<string> {
-  let out = await replaceAsync(html, /\b(href|src)="([^"]*)"/g, async m => `${m[1]}="${await stamp(m[2]!, hashOf)}"`);
-  out = await replaceAsync(out, /\bsrcset="([^"]*)"/g, async m => {
-    const entries = await Promise.all(m[1]!.split(",").map(async entry => {
-      const [, lead = "", url = "", rest = ""] = /^(\s*)(\S+)(.*)$/s.exec(entry) ?? [];
-      return url ? `${lead}${await stamp(url, hashOf)}${rest}` : entry;
-    }));
-    return `srcset="${entries.join(",")}"`;
-  });
-  // Absolute URLs on the site's own address: link previews and structured data.
-  out = await replaceAsync(out, /(<meta (?:property="og:image"|name="twitter:image") content="https?:\/\/[^/"]+)([^"]*)"/g,
-    async m => `${m[1]}${await stamp(m[2]!, hashOf)}"`);
-  out = await replaceAsync(out, /("image":"https?:\/\/[^/"]+)([^"]*)"/g, async m => `${m[1]}${await stamp(m[2]!, hashOf)}"`);
-  return out;
+  const parts: string[] = [];
+  let last = 0;
+  // Its own copy: the loop awaits between matches, and two documents may be stamped at once.
+  const markup = new RegExp(MARKUP.source, "g");
+  for (let m = markup.exec(html); m; m = markup.exec(html)) {
+    parts.push(html.slice(last, m.index));
+    last = markup.lastIndex;
+    const name = m[1];
+    if (name === undefined) { parts.push(m[0]); continue; }
+    parts.push(`<${name}${await stampTag(name, m[2] ?? "", hashOf)}${m[0].slice(1 + name.length + (m[2] ?? "").length)}`);
+    const lower = name.toLowerCase();
+    if (!RAW_TEXT.has(lower)) continue;
+    // Its content runs to its end tag, copied as it is; a JSON-LD block's "image" is stamped.
+    const end = html.toLowerCase().indexOf(`</${lower}`, last);
+    const content = html.slice(last, end < 0 ? html.length : end);
+    parts.push(lower === "script" && /\stype=["']?application\/ld\+json/i.test(m[2] ?? "")
+      ? await replaceAsync(content, /("image":"https?:\/\/[^/"]+)([^"]*)"/g, async j => `${j[1]}${await stamp(j[2]!, hashOf)}"`)
+      : content);
+    last = end < 0 ? html.length : end;
+    markup.lastIndex = last;
+  }
+  parts.push(html.slice(last));
+  return parts.join("");
 }
 
 /** A stylesheet with every `url()` to a served file stamped, except one to another stylesheet. */

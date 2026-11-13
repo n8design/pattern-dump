@@ -14,6 +14,7 @@ import { frontmatterBody } from "../src/frontmatter.js";
 import { readPages } from "../src/storefront/pages.js";
 import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
 import { checkPageImage } from "../src/storefront/page-image.js";
+import { createImageService, type ImageService } from "../src/image-service.js";
 import { save } from "../../../test-support/save.js";
 
 const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
@@ -26,6 +27,8 @@ let map: DiscoveryMap;
 let composition: CompositionRegistry;
 let render: Render;
 let assets = "";
+/** The bench's own images, indexed as the server indexes them, for the pages' prose images. */
+let images: ImageService;
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "pd-page-"));
@@ -38,6 +41,9 @@ beforeAll(async () => {
   // A PNG header is all the check reads: 1200 × 630.
   await save(join(assets, "share.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 4, 0xb0, 0, 0, 2, 0x76, 8, 6, 0, 0, 0]));
   await save(join(assets, "logo.svg"), `<svg xmlns="http://www.w3.org/2000/svg"/>`);
+  images = createImageService({ assetRoots: [join(bench, "src", "assets")], assetRootNames: ["assets"],
+    images: { quality: 75, effort: 4 }, build: false, warn: () => {} });
+  await images.ready("bench");
 });
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
@@ -45,6 +51,7 @@ const assembly = (over: Partial<PageAssembly> = {}): PageAssembly => ({
   discoveryMap: map, composition, render, site: SITE, workbenchUrl: WB,
   head: async (layoutId) => `<link rel="stylesheet" href="/_pd/head-for/${layoutId}">`,
   image: path => checkPageImage(path, [assets], ["assets"]),
+  images: async () => images.lookup,
   ...over,
 });
 
