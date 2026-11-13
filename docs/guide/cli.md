@@ -12,7 +12,7 @@ built-in help.
 `pd` is installed per project: `pd init` adds `pattern-dump` as a development dependency, and the
 project's `pattern-dump.config.ts` imports `defineConfig` from it.
 
-You can also install `pd` globally (`npm install --global pattern-dump@alpha`) to create projects with
+You can also install `pd` globally (`npm install --global pattern-dump`) to create projects with
 `pd init` from anywhere. Keep two things in mind:
 
 - **A project still needs its local dependency.** The config's `import … from "pattern-dump"` resolves

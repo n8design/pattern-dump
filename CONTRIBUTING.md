@@ -98,14 +98,20 @@ request form. For a bug, a minimal project or component that shows the problem h
 The version lives in `packages/cli/package.json`; everything else (the tarball name, the range `pd init`
 installs, the static build's version stamp) reads it from there.
 
+Releases are plain 0.x versions (0.3.0, 0.4.0, …), published under npm's `latest` tag. Pack the tarball
+from a clean checkout of the release's tag, never from a working copy on another branch:
+
 ```bash
+git worktree add ../pd-release v<version>   # a separate folder at the tag
+cd ../pd-release
+npm ci
 npm run pack:pd          # → .pd-pack/pattern-dump-<version>.tgz
 npm run verify:install   # install it outside the repository and check it works
-npm publish .pd-pack/pattern-dump-<version>.tgz --tag alpha
+npm publish .pd-pack/pattern-dump-<version>.tgz
 ```
 
-Publish pre-releases with `--tag alpha`. Without a tag npm moves `latest`, and a plain
-`npm install pattern-dump` would pick up the alpha.
+If your shell exports `NX_WORKSPACE_ROOT_PATH`, unset it in the release folder first: it points Nx at another
+checkout. npm makes the version available a few minutes after it accepts the upload.
 
 ## Rules the code base depends on
 
