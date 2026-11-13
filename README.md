@@ -80,4 +80,4 @@ code base depends on. [docs/development/architecture.md](docs/development/archit
 
 ## License
 
-[MIT](LICENSE) © 2026 [n8d](https://n8d.at) and contributors
+[MIT](LICENSE) © 2026 Stefan Bauer (N8D e.U.)

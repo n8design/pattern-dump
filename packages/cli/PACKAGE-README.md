@@ -102,4 +102,4 @@ export default defineConfig({
 
 ## License
 
-[MIT]({{repo}}/blob/main/LICENSE) © 2026 [n8d](https://n8d.at) and contributors
+[MIT]({{repo}}/blob/main/LICENSE) © 2026 Stefan Bauer (N8D e.U.)
