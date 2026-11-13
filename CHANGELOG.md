@@ -17,7 +17,7 @@
 
 ## 0.1.0-alpha.4
 
-Fixes found while moving a third PatternLab styleguide (CTS) to Pattern Dump with hTWOo consumed only as
+Fixes found while moving a third PatternLab styleguide to Pattern Dump with hTWOo consumed only as
 pattern packages: its templates, data, scripts and CSS all come from `@n8d/htwoo-patterns` and
 `@n8d/htwoo-core`, and the project compiles only its own SCSS.
 
