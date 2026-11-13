@@ -15,6 +15,10 @@
 //                        short: the frame can grow to its content but never shrink below this. One value
 //                        covers every variant, so it is the height at the widest column and no taller than
 //                        the shortest variant.
+//   x-pd-prose-images    at a layout's top: the slot of the images in its pages' prose, `{ widths, sizes, eager }`.
+//                        A raster image from the assets in a page's markdown is written as an <img> with its variants
+//                        and `sizes="auto, <sizes>"`; the first `eager` (optional, default 0) load at once, with
+//                        `sizes` alone. A page with a raster image whose layout declares no slot fails.
 //
 // Any other `x-pd-` key is an error (a typo would otherwise do nothing); other `x-` keys are left alone. A
 // schema that uses a placement extension says its component can be placed, so its template is checked too:
@@ -22,7 +26,7 @@
 // render, so a broken schema shows on its component in the workbench before any page places it; the
 // storefront refuses to place it as well.
 import { unescapedOutputs } from "./unescaped";
-import { imageCalls, readSlot } from "./image-slots";
+import { imageCalls, readSlot, type ImageSlot } from "./image-slots";
 
 /** One problem, with the JSON pointer of the schema keyword it is about. */
 export interface SchemaExtensionProblem { path: string; message: string }
@@ -35,8 +39,8 @@ export interface SchemaExtensionContext {
 
 type Prop = Record<string, unknown>;
 const KNOWN_PROPERTY_KEYS = new Set(["x-pd-component", "x-pd-image"]);
-const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height"]);
-const KNOWN_LIST = "x-pd-component, x-pd-content, x-pd-example-height, x-pd-image";
+const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-prose-images"]);
+const KNOWN_LIST = "x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images";
 const isObject = (v: unknown): v is Prop => typeof v === "object" && v !== null && !Array.isArray(v);
 const typesOf = (p: Prop): unknown[] => p["type"] === undefined ? [] : Array.isArray(p["type"]) ? p["type"] : [p["type"]];
 
@@ -48,6 +52,25 @@ export function readExampleHeight(schema: unknown): { height?: number; problem?:
   if (typeof value === "number" && Number.isInteger(value) && value > 0) return { height: value };
   return { problem: `x-pd-example-height must be a whole number of pixels above 0 (got ${JSON.stringify(value)}): `
     + `the live example's height at the widest column, no taller than its shortest variant` };
+}
+
+/** A layout's slot for the images in its pages' prose: its widths and sizes, and how many of a page's first images
+ *  load at once. */
+export interface ProseSlot extends ImageSlot { eager: number }
+
+/** A schema's x-pd-prose-images: the slot when it declares a valid one, the problem when it is invalid, nothing when
+ *  it declares none. The schema check and the storefront's markdown both read it here. */
+export function readProseSlot(schema: unknown): { slot?: ProseSlot; problem?: string } {
+  if (!isObject(schema) || !("x-pd-prose-images" in schema)) return {};
+  const value = schema["x-pd-prose-images"];
+  if (isObject(value)) {
+    const { eager = 0, ...rest } = value;
+    const slot = readSlot(rest);
+    if (slot && typeof eager === "number" && Number.isInteger(eager) && eager >= 0) return { slot: { ...slot, eager } };
+  }
+  return { problem: `x-pd-prose-images must be { "widths": [...], "sizes": "...", "eager": n }: `
+    + `widths whole numbers above 0 in ascending order, sizes the <img> sizes value (with no double quote), `
+    + `eager (optional) how many of a page's first images load at once, a whole number from 0` };
 }
 
 /** Every problem with a schema's placement extensions (and, when it uses them, its template's). */
@@ -105,6 +128,8 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
 
   const exampleHeight = readExampleHeight(schema).problem;
   if (exampleHeight) problems.push({ path: "#/x-pd-example-height", message: exampleHeight });
+  const proseImages = readProseSlot(schema).problem;
+  if (proseImages) problems.push({ path: "#/x-pd-prose-images", message: proseImages });
 
   if (template !== undefined) {
     for (const call of imageCalls(template, schema)) if (call.problem) problems.push({ path: "#", message: call.problem });

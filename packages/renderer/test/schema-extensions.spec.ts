@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
-import { checkSchemaExtensions, createRenderer, readExampleHeight } from "../src/index";
+import { checkSchemaExtensions, createRenderer, readExampleHeight, readProseSlot } from "../src/index";
 import { save } from "../../../test-support/save.js";
 
 const ctx = {
@@ -57,8 +57,8 @@ describe("the placement schema extensions", () => {
 
   it("an unknown x-pd- key is an error, at the top and in a property", () => {
     expect(check({ "x-pd-contnet": "caption", properties: { caption: { type: "string", "x-pd-componnet": "atoms/slide" } } })).toEqual([
-      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image)`,
-      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image)`,
+      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
     ]);
   });
 
@@ -74,8 +74,36 @@ describe("the placement schema extensions", () => {
     }
     // In a property it is not a known key.
     expect(check({ properties: { a: { type: "string", "x-pd-example-height": 10 } } })).toEqual([
-      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image)`,
+      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
     ]);
+  });
+
+  it("x-pd-prose-images: a layout's slot for the images in its pages' prose, at a schema's top", () => {
+    const slot = { widths: [480, 960], sizes: "(min-width: 60rem) 40rem, 100vw" };
+    expect(check({ "x-pd-prose-images": { ...slot, eager: 1 }, properties: { title: { type: "string" } } })).toEqual([]);
+    expect(readProseSlot({ "x-pd-prose-images": { ...slot, eager: 1 } })).toEqual({ slot: { ...slot, eager: 1 } });
+    // eager is optional: no image of the page loads at once.
+    expect(readProseSlot({ "x-pd-prose-images": slot })).toEqual({ slot: { ...slot, eager: 0 } });
+    expect(readProseSlot({ properties: {} })).toEqual({});
+    const wording = `#/x-pd-prose-images: x-pd-prose-images must be { "widths": [...], "sizes": "...", "eager": n }: `
+      + `widths whole numbers above 0 in ascending order, sizes the <img> sizes value (with no double quote), `
+      + `eager (optional) how many of a page's first images load at once, a whole number from 0`;
+    for (const value of [
+      { widths: [960, 480], sizes: "100vw" }, { widths: [], sizes: "100vw" }, { widths: [480], sizes: "" },
+      { widths: [480], sizes: 'a"b' }, { widths: [480], sizes: "100vw", eager: -1 }, { widths: [480], sizes: "100vw", eager: 1.5 },
+      { widths: [480], sizes: "100vw", eager: "1" }, { widths: [480], sizes: "100vw", lazy: true }, "480", null,
+    ]) {
+      expect(check({ "x-pd-prose-images": value })).toEqual([wording]);
+      expect(readProseSlot({ "x-pd-prose-images": value }).problem).toBe(wording.slice("#/x-pd-prose-images: ".length));
+    }
+    // In a property it is not a known key.
+    expect(check({ properties: { body: { type: "string", "x-pd-prose-images": slot } } })).toEqual([
+      `#/properties/body/x-pd-prose-images: "x-pd-prose-images" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+    ]);
+  });
+
+  it("x-pd-prose-images doesn't make a layout placeable: its template is not checked", () => {
+    expect(check({ "x-pd-prose-images": { widths: [480], sizes: "100vw" }, properties: { body: { type: "string" } } }, `<main>{{{body}}}</main>`)).toEqual([]);
   });
 
   it("x-pd-example-height doesn't make a component placeable: its template is not checked", () => {
