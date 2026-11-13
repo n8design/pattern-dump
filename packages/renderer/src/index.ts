@@ -14,7 +14,7 @@ import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
 import type {
   CreateRenderer, RendererOptions, Diagnostic, RenderMeta,
-  ImageLookup,
+  ImageLookup, ImageSource,
 } from "@pattern-dump/contracts";
 import { HtmlValidate } from "html-validate";
 import Handlebars from "handlebars";
@@ -86,9 +86,30 @@ async function readDataFile(path: string, display: (absPath: string) => string):
   }
 }
 
+/**
+ * An image as an <img>: with its variants (the slot's widths the image has as displayed, at least its own width when
+ * every slot width is wider; `src` the largest), or a single file at its size. Shared by `{{pd-image}}` and the
+ * storefront's prose images, so both write the same markup.
+ */
+export function imageTag(
+  source: Exclude<ImageSource, { kind: "unavailable" }>,
+  o: { widths: readonly number[]; sizes: string; alt: string; title?: string; eager: boolean; settings?: "site" },
+): string {
+  const esc = Handlebars.escapeExpression;
+  const rest = `alt="${esc(o.alt)}"${o.title !== undefined ? ` title="${esc(o.title)}"` : ""} `
+    + `loading="${o.eager ? "eager" : "lazy"}" decoding="async"`;
+  if (source.kind === "single") return `<img src="${esc(source.url)}" width="${source.width}" height="${source.height}" ${rest}>`;
+  const widths = o.widths.filter(w => w <= source.width);
+  if (widths.length === 0) widths.push(source.width);
+  const urls = widths.map(w => source.variantUrl(w, o.settings));
+  const top = widths[widths.length - 1]!;
+  const srcset = urls.map((u, i) => `${esc(u)} ${widths[i]}w`).join(", ");
+  return `<img src="${esc(urls[urls.length - 1]!)}" srcset="${srcset}" sizes="${esc(o.sizes)}" `
+    + `width="${top}" height="${Math.round(top * source.height / source.width)}" ${rest}>`;
+}
+
 /** `{{pd-image field alt=… [loading="eager"]}}`: an image in its slot (image-slots.ts) as an <img> with its variants. */
 function registerImageHelper(env: ReturnType<typeof Handlebars.create>, images: ImageLookup | undefined): void {
-  const esc = Handlebars.escapeExpression;
   env.registerHelper("pd-image", function (value: unknown, options: { hash?: Record<string, unknown>; data?: { pdImages?: "site" } }) {
     const raw = options.hash?.[SLOT_KEY];
     if (typeof raw !== "string") {
@@ -104,18 +125,11 @@ function registerImageHelper(env: ReturnType<typeof Handlebars.create>, images: 
     const source = images(value);
     if (!source) throw new Error(`{{pd-image}}: "${value}" is not an image in the assets`);
     if (source.kind === "unavailable") throw new Error(source.reason);
-    const rest = `alt="${esc(String(alt))}" loading="${options.hash?.["loading"] === "eager" ? "eager" : "lazy"}" decoding="async"`;
-    if (source.kind === "single") {
-      return new env.SafeString(`<img src="${esc(source.url)}" width="${source.width}" height="${source.height}" ${rest}>`);
-    }
-    // Only widths the image has as displayed; at least its own width when every slot width is wider.
-    const widths = slot.widths.filter(w => w <= source.width);
-    if (widths.length === 0) widths.push(source.width);
-    const urls = widths.map(w => source.variantUrl(w, options.data?.pdImages));
-    const top = widths[widths.length - 1]!;
-    const srcset = urls.map((u, i) => `${esc(u)} ${widths[i]}w`).join(", ");
-    return new env.SafeString(`<img src="${esc(urls[urls.length - 1]!)}" srcset="${srcset}" sizes="${esc(slot.sizes)}" `
-      + `width="${top}" height="${Math.round(top * source.height / source.width)}" ${rest}>`);
+    const settings = options.data?.pdImages;
+    return new env.SafeString(imageTag(source, {
+      widths: slot.widths, sizes: slot.sizes, alt: String(alt), eager: options.hash?.["loading"] === "eager",
+      ...(settings ? { settings } : {}),
+    }));
   });
 }
 
