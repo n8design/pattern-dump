@@ -32,7 +32,7 @@ export async function runDev(
 export async function runBuild(
   root: string,
   configPath: string | undefined,
-  options: { out?: string; base?: string; audit?: boolean; pdVersion: string },
+  options: { out?: string; base?: string; audit?: boolean; browser?: boolean; pdVersion: string },
 ): Promise<void> {
   const config = await loadConfig(root, configPath);
   const outDir = resolve(root, options.out ?? config.build?.outDir ?? config.outDir ?? "dist");
@@ -40,6 +40,7 @@ export async function runBuild(
     outDir,
     ...(options.base !== undefined ? { basePath: options.base } : {}),
     ...(options.audit !== undefined ? { audit: options.audit } : {}),
+    ...(options.browser ? { browser: true } : {}),
     pdVersion: options.pdVersion,
     log: line => console.log(`[pd build] ${line}`),
   });
@@ -55,9 +56,14 @@ export async function runBuild(
   }
   if (report.accessibility) {
     const n = report.accessibility.warnings.length;
-    console.log(`[pd build] accessibility: ${report.accessibility.pages} pages, no errors`
+    console.log(`[pd build] accessibility: ${report.accessibility.pages} pages${report.accessibility.browser ? ", in jsdom and Chromium" : ""}, no errors`
       + (n ? `; ${n} rule${n === 1 ? "" : "s"} with warnings:` : ""));
     for (const w of report.accessibility.warnings) console.log(`[pd build]   warning: ${w}`);
+  }
+  if (report.images) {
+    const n = report.images.warnings.length;
+    console.log(`[pd build] images: ${n ? `${n} with a variant that doesn't fit:` : "every variant fits its box"}`);
+    for (const w of report.images.warnings) console.log(`[pd build]   warning: ${w}`);
   }
   for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
   for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
