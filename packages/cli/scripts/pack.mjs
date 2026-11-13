@@ -127,7 +127,7 @@ const pkg = {
     "design-system", "pattern-library", "styleguide", "patternlab", "handlebars", "scss",
     "component-library", "workbench", "living-styleguide", "accessibility", "static-site", "htwoo",
   ],
-  author: "Stefan Bauer <stefan.bauer@n8d.at> (https://n8d.at)",
+  author: { name: "Stefan Bauer (N8D e.U.)", email: "stefan.bauer@n8d.at", url: "https://n8d.at" },
   license: "MIT",
   homepage: `${REPO_URL}#readme`,
   repository: { type: "git", url: `git+${REPO_URL}.git` },

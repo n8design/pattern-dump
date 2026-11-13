@@ -3,7 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "description": "A workbench for HTML and CSS design systems: live component previews, docs, checks and static publishing.",
-  "author": "Stefan Bauer <stefan.bauer@n8d.at> (https://n8d.at)",
+  "author": {
+    "name": "Stefan Bauer (N8D e.U.)",
+    "email": "stefan.bauer@n8d.at",
+    "url": "https://n8d.at"
+  },
   "license": "MIT",
   "homepage": "https://github.com/n8design/pattern-dump#readme",
   "repository": {
