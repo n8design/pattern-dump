@@ -10,7 +10,7 @@
 
 import { basename, join, resolve } from "node:path";
 import type { ImageEncoding } from "@pattern-dump/build";
-import type { PatternDumpConfig } from "@pattern-dump/config";
+import { storefrontBasePath, type PatternDumpConfig } from "@pattern-dump/config";
 import { PD_HOSTS, type ThemeSwitch } from "@pattern-dump/contracts";
 import type { PatternRoot } from "@pattern-dump/discovery";
 import type { ResolvedPackage } from "./packages.js";
@@ -85,8 +85,11 @@ export interface ResolvedConfig {
     readonly workbenchUrl: string | undefined;
     /** storefront.image: the link-preview image of every page that names none (a /assets/… path). */
     readonly image: string | undefined;
-    /** storefront.url: the site's address, an origin with one slash; undefined when it is not set. */
+    /** storefront.url: the site's address, with one trailing slash; undefined when it is not set. */
     readonly url: string | undefined;
+    /** The path the site is published under: storefront.url's path, "/" at a host's root or with no url. pd dev
+     *  serves the site under it too; every reference its pages and stylesheets make gets it (base-path.ts). */
+    readonly basePath: string;
     /** storefront.lang, for <html lang>: "en" unless set. */
     readonly lang: string;
     /** How the site's image variants are encoded: the project's `images`, with `storefront.images` over it. */
@@ -226,6 +229,7 @@ export function resolveServerConfig(
       workbenchUrl: config.storefront.workbenchUrl,
       image: config.storefront.image,
       url: config.storefront.url,
+      basePath: storefrontBasePath(config.storefront),
       lang: config.storefront.lang ?? "en",
       index: config.storefront.index !== false,
       images: { ...images, ...config.storefront.images },
