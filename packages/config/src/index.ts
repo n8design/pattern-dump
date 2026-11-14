@@ -3,6 +3,7 @@
 import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/contracts";
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
 export { ConfigError, configProblems, sameHostWorkbenchPath, storefrontBasePath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
+export { withOwnManifest } from "./own-manifest.js";
 import { withSourceDefaults } from "./validate.js";
 
 export interface AssetsConfig {

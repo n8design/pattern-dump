@@ -58,7 +58,9 @@ export default defineConfig({
 ### Source folders
 
 All three are optional. A site whose components, skin and styles all come from [pattern packages](pattern-packages.md)
-names none of them, and the folders don't have to exist.
+names none of them, and the folders don't have to exist. A project that is a pattern package itself (its
+`package.json` has a `patternDump` field) takes every folder its config leaves out from there, and a folder named in
+both must be the same ([pattern-packages.md](pattern-packages.md#making-a-package)).
 
 | Option | Type | Default | Description |
 |---|---|---|---|

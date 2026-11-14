@@ -52,4 +52,23 @@ describe("loadConfig", () => {
   it("reports a missing config file as a ConfigError", async () => {
     await expect(loadConfig(join(dir, "nothing-here"))).rejects.toMatchObject({ name: "ConfigError" });
   });
+
+  it("takes the folders a style guide's own package.json names, and refuses a config that names them differently", async () => {
+    const root = await project("own-manifest", "pattern-dump.config.ts", `export default { outDir: "./dist" };`);
+    await save(join(root, "package.json"), JSON.stringify({ name: "@acme/ds", patternDump: { patterns: "patterns", styles: { dir: "styles", documentBase: ["base"] }, assets: ["media"] } }));
+    const config = await loadConfig(root);
+    expect([config.patternsDir, config.styles.dir, config.documentBase, config.assets?.dir]).toEqual(["patterns", "styles", ["base"], ["media"]]);
+    const clash = await project("own-manifest-clash", "pattern-dump.config.ts", `export default { outDir: "./dist", patternsDir: "./src/patterns" };`);
+    await save(join(clash, "package.json"), JSON.stringify({ name: "@acme/ds", patternDump: { patterns: "patterns" } }));
+    await expect(loadConfig(clash)).rejects.toMatchObject({ name: "ConfigError",
+      message: `pattern-dump.config.ts: the config and the project's own package manifest disagree
+  - "patternsDir" is "./src/patterns" in pattern-dump.config.ts, `
+        + `but "patternDump.patterns" is "patterns" in package.json: name it in one of them, or give both the same value` });
+  });
+
+  it("leaves a config alone whose package.json has no patternDump field", async () => {
+    const root = await project("no-manifest", "pattern-dump.config.ts", `export default { outDir: "./dist" };`);
+    await save(join(root, "package.json"), JSON.stringify({ name: "site" }));
+    expect((await loadConfig(root)).patternsDir).toBe("./src/patterns");
+  });
 });

@@ -19,6 +19,10 @@
   sitemap carry it. Every page names its path in `<meta name="pd-base-path">` for a skin's own scripts, and
   `pd build --browser` stops on a request outside the path. Under a path there is no `robots.txt` (the build says what
   the host's own needs) and previews carry a robots `noindex` tag, as a workbench's do when it is built with `--base`.
+- A project that is a pattern package itself (a style guide with its own workbench) describes its folders once: its
+  config takes each folder it doesn't name from its `package.json`'s `patternDump` field (patterns, data, helpers,
+  assets, styles with `entry` and `documentBase`, themes, scripts, `globalScripts`, `exclude`). A folder named in
+  both with different values is a config error naming both files.
 - `date`, `tags` and `draft` in a page's frontmatter. `date` (`YYYY-MM-DD`) is the page's date for listings and its
   JSON-LD `datePublished`, which falls back to the page's first commit. `draft: true` shows a page in `pd dev` and
   leaves it out of `pd build`, which names the drafts it left out.

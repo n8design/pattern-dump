@@ -10,7 +10,7 @@ import { basename, join, dirname, resolve, relative, isAbsolute } from "node:pat
 import { tmpdir } from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
-import { ConfigError, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
+import { ConfigError, validateConfig, withOwnManifest, type PatternDumpConfig } from "@pattern-dump/config";
 
 export async function runDev(
   root: string,
@@ -234,15 +234,26 @@ export async function loadConfig(root: string, configPath?: string): Promise<Pat
     if (!existsSync(configPath)) {
       throw new ConfigError(`--config file not found: ${configPath}`);
     }
-    return validateConfig(await readConfigFile(configPath), configPath);
+    return validateConfig(await withRootManifest(root, await readConfigFile(configPath), configPath), configPath);
   }
 
   const path = configFileOf(root);
-  if (path) return validateConfig(await readConfigFile(path), basename(path));
+  if (path) return validateConfig(await withRootManifest(root, await readConfigFile(path), basename(path)), basename(path));
 
   throw new ConfigError(
     `No pattern-dump.config.ts or pattern-dump.config.json found in ${root} (and no --config given)`
   );
+}
+
+/** A project that is also a pattern package takes the folders its config doesn't name from its own package.json's
+ *  `patternDump` field (withOwnManifest). Without a package.json, or one without the field, the config as it is. */
+async function withRootManifest(root: string, raw: unknown, configName: string): Promise<unknown> {
+  const pkgPath = join(root, "package.json");
+  if (!existsSync(pkgPath)) return raw;
+  let pkg: unknown;
+  try { pkg = JSON.parse(await readFile(pkgPath, "utf-8")); } catch { return raw; }
+  const manifest = typeof pkg === "object" && pkg !== null ? (pkg as { patternDump?: unknown }).patternDump : undefined;
+  return manifest === undefined ? raw : withOwnManifest(raw, manifest, { config: configName, manifest: "package.json" });
 }
 
 /** The file loadConfig reads: `configPath` when given, else the root's own config file; undefined when
