@@ -96,6 +96,10 @@ export interface ResolvedConfig {
     readonly images: ImageEncoding;
     /** storefront.index: false keeps the whole site out of search engines. */
     readonly index: boolean;
+    /** storefront.head, resolved against the root: the site's own head additions (a Handlebars file). */
+    readonly head: string | undefined;
+    /** storefront.head as the config writes it, for messages. */
+    readonly headName: string | undefined;
   } | null;
 
   readonly overviewsEnabled: boolean;
@@ -233,6 +237,8 @@ export function resolveServerConfig(
       lang: config.storefront.lang ?? "en",
       index: config.storefront.index !== false,
       images: { ...images, ...config.storefront.images },
+      head: config.storefront.head !== undefined ? resolve(cwd, config.storefront.head) : undefined,
+      headName: config.storefront.head,
     } : null,
     images,
     overviewsEnabled:    config.overviews !== false,

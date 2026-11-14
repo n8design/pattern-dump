@@ -15,7 +15,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import MarkdownIt from "markdown-it";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
-import { checkSchemaExtensions, unescapedOutputs } from "@pattern-dump/renderer";
+import { checkSchemaExtensions, isHelperNameProblem, unescapedOutputs } from "@pattern-dump/renderer";
 import type { CompositionRegistry } from "../composition.js";
 import { toPlaced, type PlacedBlock, type PlacedResolver } from "../placed-tags.js";
 import { checkPlaced, type ObjectSchema, type PlacedProblem, type PropertySchema } from "./declared-values.js";
@@ -141,6 +141,13 @@ async function schemaProblems(id: string, at: PlacedProblem["at"], deps: Placeme
       hasSchema: c => deps.discoveryMap.get(c)?.schemaPath !== undefined,
     })) {
       problems.push({ at, message: `${component} cannot be placed: its schema (${deps.shown(entry.schemaPath)}, ${p.path}): ${p.message}` });
+    }
+    // A field named like a registered helper (the render's own check, schema-helper-names.ts): its value could
+    // never show, so the component can't be placed, as a layout with one fails its pages.
+    const rendered = await deps.render({ component }).catch(() => undefined);
+    for (const d of rendered?.meta?.diagnostics ?? []) {
+      if (d.kind !== "SCHEMA_INVALID" || !isHelperNameProblem(d.message)) continue;
+      problems.push({ at, message: `${component} cannot be placed: its schema (${deps.shown(entry.schemaPath)}, ${d.path ?? "#"}): ${d.message}` });
     }
   }
   return problems;

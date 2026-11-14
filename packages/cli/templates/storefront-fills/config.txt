@@ -6,10 +6,11 @@
     // The workbench is published on the website's own host, under /workbench/ (and built for that path,
     // build.basePath below).
     workbenchUrl: "/workbench/",
-    // Your domain, once you have one: canonical URLs, link previews and the sitemap are built from it. For a
-    // GitHub project page, its address with the path ("https://<owner>.github.io/<repository>/"): the site is
-    // then served under the path, and the workbench goes under "/<repository>/workbench/" (here and below).
+    // The site's address, once you know it: canonical URLs, link previews and the sitemap are built from it.
     // url: "https://www.example.com/",
+    // Or a subfolder, such as a GitHub project page: the site is then served under the path, in `npm run dev` too,
+    // and the workbench goes under it as well (workbenchUrl and build.basePath "/<repository>/workbench/").
+    // url: "https://<owner>.github.io/<repository>/",
     site: { title: __PD_BRAND_JSON__, footer: "Made with Pattern Dump." },
   },
   build: { basePath: "/workbench/" },

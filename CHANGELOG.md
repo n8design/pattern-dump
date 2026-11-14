@@ -19,9 +19,40 @@
   sitemap carry it. Every page names its path in `<meta name="pd-base-path">` for a skin's own scripts, and
   `pd build --browser` stops on a request outside the path. Under a path there is no `robots.txt` (the build says what
   the host's own needs) and previews carry a robots `noindex` tag, as a workbench's do when it is built with `--base`.
+- A project that is a pattern package itself (a style guide with its own workbench) describes its folders once: its
+  config takes each folder it doesn't name from its `package.json`'s `patternDump` field (patterns, data, helpers,
+  assets, styles with `entry` and `documentBase`, themes, scripts, `globalScripts`, `exclude`). A folder named in
+  both with different values is a config error naming both files.
+- `storefront.head`: a site's own additions to every page's head (an analytics script, a verification tag), a
+  Handlebars file rendered with `site` after the skin's `partials/head` and checked like it. For a site whose skin
+  is a shared package.
+- A `HELPER_SHADOW` warning on a component whose template has a bare `{{name}}` that calls a registered helper
+  while its data has a field of that name, at any depth: `{{id}}` inside `{{#each palettes}}` showed the `id`
+  helper's output instead of each palette's `id`, silently. Read the field as `{{this.id}}`, or rename it.
+- `pd init --storefront` writes an `articles/` collection (a listing page and one dated, tagged article) with a
+  `listing` layout, shows a page's date and tags in its page layout, and its config shows a `storefront.url` for a
+  subfolder.
 - `date`, `tags` and `draft` in a page's frontmatter. `date` (`YYYY-MM-DD`) is the page's date for listings and its
   JSON-LD `datePublished`, which falls back to the page's first commit. `draft: true` shows a page in `pd dev` and
   leaves it out of `pd build`, which names the drafts it left out.
+
+### Fixed
+
+- A storefront page loads the behaviour scripts its components bring (`requireScript` of its layout's components and
+  of the components it places, and `globalScripts`), as their workbench previews do. Before, only the markup and CSS
+  reached the page.
+- A code block on a storefront page, or in a component's `<pre>`, keeps its lines as written when its partial is
+  included on an indented line (as a skin's `{{> @partial-block }}` usually is). Handlebars indented every line after
+  the first by the include's indentation.
+- A schema field named like a registered helper (`id`, `eq`, …) is no longer an error only the workbench's Diagnostics
+  tab shows: `pd dev` and `pd build` say it in the terminal, a storefront page that places the component fails (as
+  one whose layout has such a field already did), and `pd audit` re-audits a component when its schema changes
+  instead of reusing a verdict cached before.
+- An image in a site page's markdown from a pattern package's assets, when that package's folder is the site's only
+  asset folder, gets its variants. Before, the page failed with "is not an image in the assets" for a URL that was
+  served.
+- `pd dev` no longer keeps base-layer rules that a component's stylesheet stopped writing (through a mixin) until it is
+  restarted.
 
 ### Changed
 

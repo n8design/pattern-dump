@@ -1,11 +1,16 @@
 # Pattern Dump
 
-A workbench for HTML and CSS design systems, and a successor to PatternLab. Write components as
+A workbench for HTML and CSS design systems, and a successor to Pattern Lab. Write components as
 Handlebars templates with SCSS, data and Markdown docs; Pattern Dump shows them live, checks them, maps
 how they relate, and publishes the result as a static site.
 
-> **Alpha.** Pattern Dump works end to end, but options and file conventions can
-> still change between releases.
+**Demo:** a style guide and the website built from it, at https://lab.n8d.studio/pattern-dump-demo/
+
+> **0.x.** Pattern Dump works end to end, but breaking changes are possible between minor versions
+> (0.3 to 0.4); the [changelog](CHANGELOG.md) names each one.
+
+**Coming from Pattern Lab?** Point `patternsDir` at your patterns folder: Handlebars templates, `.json` data and
+`~` variants work as they are, and no build step of your own is needed.
 
 ![Your project goes into Pattern Dump, which gives you a live workbench, an audit report and a static site](docs/guide/how-it-works.svg)
 
@@ -21,14 +26,12 @@ how they relate, and publishes the result as a static site.
   and a corpus-wide audit (`pd audit`) with machine-readable output for CI.
 - **Static publishing.** `pd build` writes the whole workbench as plain files for any static host.
 - **Pattern packages.** Use a design system from npm next to your own components.
-- **Your conventions.** Components are found wherever their templates live; PatternLab-style `~`
+- **Your conventions.** Components are found wherever their templates live; Pattern Lab-style `~`
   variants and existing Handlebars helpers work.
 
 ## Requirements
 
 Node.js 22.22 or later, and npm.
-
-Pattern Dump is at 0.x, so breaking changes are possible between minor versions (0.3 to 0.4); the [changelog](CHANGELOG.md) names them.
 
 ## Quick start
 

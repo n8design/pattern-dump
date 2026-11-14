@@ -30,13 +30,16 @@ import {
 /** Recompile a single SCSS entry file with source map and return the updated own-origin CSS
  *  for the given component id. Used by the HMR watcher to update perComponentCssCache.
  *  `inBase` marks files listed in documentBase: their rules belong to the base layer, never to the
- *  component, exactly as in buildAllStyleData. Returns null if compilation fails. */
+ *  component, exactly as in buildAllStyleData. Returns null if compilation fails. `out.baseRules`
+ *  receives the entry's base-layer rules (from documentBase files, and from files no component owns, such
+ *  as a mixin's partial), joined as buildAllStyleData's `baseRulesByEntry` holds them. */
 export async function recomputeComponentCss(
   entryFile: string,
   compId: string,
   stylesDir: string,
   componentIds: Set<string>,
   inBase: (absPath: string) => boolean = () => false,
+  out?: { baseRules?: string },
 ): Promise<string | null> {
   try {
     const compiled = sass.compile(entryFile, { sourceMap: true, ...sassPackageOptions(entryFile) });
@@ -46,6 +49,7 @@ export async function recomputeComponentCss(
     const consumer = new SourceMapConsumer(rawMap as any);
     const root = postcss.parse(compiled.css);
     const bucket = new Set<string>();
+    const base = new Set<string>();
     root.each(node => {
       const pos = node.source?.start;
       if (!pos) return;
@@ -54,10 +58,12 @@ export async function recomputeComponentCss(
       const originPath = original.source.startsWith("file://")
         ? fileURLToPath(original.source)
         : resolve(dirname(entryFile), original.source);
-      if (inBase(originPath)) return;
+      if (inBase(originPath)) { addLastOccurrence(base, cssNodeText(node)); return; }
       const originComp = resolveScssToComponent(originPath, stylesDir, componentIds);
       if (originComp === compId) addLastOccurrence(bucket, cssNodeText(node));
+      else if (originComp === null) addLastOccurrence(base, cssNodeText(node));
     });
+    if (out) out.baseRules = joinCssChunks(base);
     return joinCssChunks(bucket);
   } catch {
     return null;

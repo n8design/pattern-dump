@@ -141,7 +141,8 @@ if (failures.length === 0) {
   try {
     const json = execFileSync("bash", ["-o", "pipefail", "-c", `"${pd}" audit --format json 2>/dev/null | cat`], { cwd: project, encoding: "utf8" });
     const report = JSON.parse(json);
-    check(report.totals.defects === 0 && report.totals.components === 4, "pd audit: 4 components, 0 defects", report.headline);
+    // Every component the starter has, whatever their number (a new starter component must not break this): 0 defects.
+    check(report.totals.defects === 0 && report.totals.components > 0, `pd audit: ${report.totals.components} components, 0 defects`, report.headline);
   } catch (e) {
     check(false, "pd audit --format json parses through a pipe", String(e).slice(0, 500));
   }
@@ -273,7 +274,7 @@ if (failures.length === 0 && tmp) {
   try {
     const json = execFileSync("bash", ["-o", "pipefail", "-c", `"${spd}" audit --format json 2>/dev/null | cat`], { cwd: starter, encoding: "utf8" });
     const report = JSON.parse(json);
-    check(report.totals.defects === 0 && report.totals.components === 4, "pd audit on the website starter: 4 components, 0 defects", report.headline);
+    check(report.totals.defects === 0 && report.totals.components > 0, `pd audit on the website starter: ${report.totals.components} components, 0 defects`, report.headline);
   } catch (e) {
     check(false, "pd audit on the website starter", String(e).slice(0, 500));
   }

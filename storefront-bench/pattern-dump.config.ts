@@ -12,6 +12,8 @@ export default defineConfig({
   // The skin's document defaults: linked into every page and every preview.
   documentBase: ["site"],
   assets: { dir: "./src/assets" },
+  // Behaviour scripts (requireScript): two test fixtures, the header's and the slider's.
+  scriptsDir: "./src/scripts",
   storefront: {
     pagesDir: "./pages",
     outDir: "./.out/storefront",

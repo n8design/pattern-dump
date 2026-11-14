@@ -775,7 +775,13 @@ async function patchStyles(filePath: string): Promise<boolean> {
     const root = styleRootOf(resolve(recompiledFile));
     if (compId && root) {
       // Recompile with source map to get updated per-origin CSS for this component.
-      const newCss = await recomputeComponentCss(recompiledFile, compId, root.dir, allIds, root.inBase);
+      const out: { baseRules?: string } = {};
+      const newCss = await recomputeComponentCss(recompiledFile, compId, root.dir, allIds, root.inBase, out);
+      // Its base-layer rules changed (a mixin's partial stopped or started writing rules into it): the base
+      // layer is everyone's, so the whole style data is rebuilt, as for a file no component owns.
+      if (newCss !== null && (out.baseRules ?? "") !== (state.entryBaseRules.get(resolve(recompiledFile)) ?? "")) {
+        return restyleAll(discovery, timestamp, effectiveFiles, compileErrors.length > 0);
+      }
       if (newCss !== null) {
         const wasEmpty = (state.perComponentCss.get(compId) ?? "") === "";
         state.perComponentCss.set(compId, newCss);

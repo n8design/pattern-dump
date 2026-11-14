@@ -10,7 +10,7 @@ type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object"
+  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object" | "hbs-file"
   | "quality" | "effort";
 type Shape = Readonly<Record<string, Rule>>;
 
@@ -62,7 +62,7 @@ const SHAPE: Shape = {
   storefront: {
     keys: {
       pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", site: "plain-object",
-      url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES,
+      url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES, head: "hbs-file",
     },
     required: ["pagesDir", "outDir"],
   },
@@ -187,6 +187,13 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     // A BCP 47 tag's shape (language, then optional script, region and variants), as <html lang> takes it.
     if (typeof value !== "string" || !/^[a-z]{2,3}(?:-[a-z]{4})?(?:-(?:[a-z]{2}|\d{3}))?(?:-(?:[a-z\d]{5,8}|\d[a-z\d]{3}))*$/i.test(value)) {
       fail(`a language tag, such as "en", "de-AT" or "zh-Hant-TW"`);
+    }
+    return;
+  }
+  if (rule === "hbs-file") {
+    // A template file of the project's, relative to its root; that it exists is checked when a page is built.
+    if (typeof value !== "string" || !/\.hbs$/.test(value) || /^(?:\/|[a-zA-Z]:)/.test(value)) {
+      fail(`a Handlebars file relative to the project's root, such as "./head.hbs"`);
     }
     return;
   }

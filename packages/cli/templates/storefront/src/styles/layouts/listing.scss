@@ -1,0 +1,15 @@
+@use "../base/tokens";
+
+.listing-entries { margin: tokens.$space-lg 0 0; padding: 0; list-style: none; }
+.listing-entry { margin-block-end: tokens.$space-lg; }
+.listing-title { font-weight: 600; }
+.listing-date { margin-inline-start: tokens.$space-sm; color: var(--color-text-muted, #4b5563); }
+.listing-teaser {
+  margin: 0;
+  // The teaser is never shortened in the data: three lines at most here.
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}

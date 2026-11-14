@@ -124,6 +124,21 @@ List the second as a `peerDependency` of the first; Pattern Dump follows peer de
 
 Make sure the folders named in `patternDump` are included in the package's `files`.
 
+**A package with a workbench of its own.** A style guide that you design in its own `pd dev` and publish for sites
+to use describes its folders once, in `patternDump`. Its `pattern-dump.config.ts` takes every folder it doesn't
+name from there: `patterns` (as `patternsDir`), `data`, `helpers`, `assets` (as `assets.dir`), `styles` (with
+`entry` and `documentBase`), `themes`, `scripts` (as `scriptsDir`), `globalScripts` and `exclude`. Its config then
+holds only what is about the workbench, such as `outDir` and `build`:
+
+```ts
+// pattern-dump.config.ts beside the package.json above
+export default defineConfig({ outDir: "./dist" });
+```
+
+A field in both must have the same value in both (`"./patterns"` and `"patterns"` are the same). Different values
+stop `pd` with a config error naming both files, since the workbench and the sites using the package would
+otherwise read different folders.
+
 ### Helpers ship compiled
 
 A package's helpers are JavaScript. Write them in TypeScript if you like, but publish the `.js` built from

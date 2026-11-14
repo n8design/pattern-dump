@@ -72,6 +72,9 @@ export interface ServerState {
   perComponentCss: Map<string, string>;
   /** Base-origin CSS: reset + font-face rules, no component rules. */
   baseCss: string;
+  /** Each entry file's own base-layer rules, from the last full build and the saves since (watch.ts): a save
+   *  whose recompile changes them changes the base layer, so it restyles everything. */
+  entryBaseRules: Map<string, string>;
   /** Bumped each time `baseCss` changes after the first index build. Stamped on the preview's base
    *  `<link>` as `?v=`, so a reloaded preview never reuses a stale base sheet. 0 = never changed. */
   baseCssVersion: number;
@@ -111,6 +114,7 @@ export function createServerState(): ServerState {
 
     perComponentCss: new Map<string, string>(),
     baseCss: "",
+    entryBaseRules: new Map(),
     baseCssVersion: 0,
     discovery: createLazy<DiscoveryResult>("discovery", { slow: { afterMs: DISCOVERY_SLOW_MS, what: "the component index" } }),
     audit: createLazy<Map<string, AuditedSlice>>("audit"),
@@ -151,6 +155,7 @@ export function applyStyleData(state: ServerState, data: AllStyleData): StyleDat
   state.baseProvenance = data.baseProvenance;
   state.perComponentCss = data.componentCssMap;
   state.baseCss = data.baseCss;
+  state.entryBaseRules = new Map(data.baseRulesByEntry);
   return { changedComponents: changedComponents.sort(), baseChanged };
 }
 

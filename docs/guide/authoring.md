@@ -100,6 +100,12 @@ Built in:
 
 Add your own with the `helpers` config option ([configuration.md](configuration.md#data-and-helpers)).
 
+**A field named like a helper is shadowed.** In a template, a bare `{{id}}` calls the `id` helper whenever there is
+one, so a field called `id` is never read there, at any depth (`{{#each palettes}}{{id}}{{/each}}` too). Read the
+field by its path, `{{this.id}}` (or `{{../id}}`, `{{@root.id}}`), or give it another name. A schema property named
+like a helper is an error (`SCHEMA_INVALID`), and a field in a component's data that a bare `{{name}}` would shadow
+is a warning (`HELPER_SHADOW`), both on the component's **Diagnostics** tab.
+
 ## Docs and metadata: `<name>.md`
 
 The Markdown body is shown in the Inspector's **Docs** tab. The frontmatter at the top holds metadata:

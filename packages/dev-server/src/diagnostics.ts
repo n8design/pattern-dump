@@ -234,8 +234,8 @@ async function writeDiagnosticsArtifact(root: string, art: PersistedDiagnostics)
 }
 
 /**
- * Per-component content hash = hash(id + template source + own data + global-data digest + check-code
- * digest). A matching hash means the static findings cannot have changed: the same input, judged by the
+ * Per-component content hash = hash(id + template source + own data + own schema + global-data digest +
+ * check-code digest). The schema is the input of the schema checks (a field named like a helper among them). A matching hash means the static findings cannot have changed: the same input, judged by the
  * same check code (renderer, a11y, contracts; check-code.ts).
  *
  * NOTE (recon corrects section 4): the spec's hash includes "relevant CSS", but the covered static
@@ -251,9 +251,10 @@ export async function componentContentHash(
   const entry = discoveryMap.get(id);
   const hbs = entry?.hbsPath ? await readFile(entry.hbsPath, "utf-8").catch(() => "") : "";
   const json = entry?.jsonPath ? await readFile(entry.jsonPath, "utf-8").catch(() => "") : "";
+  const schema = entry?.schemaPath ? await readFile(entry.schemaPath, "utf-8").catch(() => "") : "";
   // The check code too (check-code.ts): a verdict cached by other code is not this code's verdict.
   return createHash("sha1")
-    .update(id).update(" ").update(hbs).update(" ").update(json).update(" ").update(globalDataDigest)
+    .update(id).update(" ").update(hbs).update(" ").update(json).update(" ").update(schema).update(" ").update(globalDataDigest)
     .update(" ").update(checkCode)
     .digest("hex");
 }

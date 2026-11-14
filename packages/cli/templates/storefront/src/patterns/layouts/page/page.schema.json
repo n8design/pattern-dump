@@ -12,7 +12,9 @@
       "type": "object",
       "description": "What the storefront works out for the page",
       "properties": {
-        "next": { "description": "The page after this one in the navigation" }
+        "next": { "description": "The page after this one in the navigation" },
+        "date": { "description": "The page's date, from its frontmatter, for an article" },
+        "tags": { "description": "The page's tags, from its frontmatter" }
       }
     }
   }

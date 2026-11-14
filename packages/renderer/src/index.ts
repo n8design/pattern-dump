@@ -9,6 +9,8 @@ export { initHighlighter, highlight, getShikiCSS, wrapWithCopyButton } from "./h
 export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
 export { checkSchemaExtensions, readExampleHeight, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
 export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
+export { helperShadows, type HelperShadow } from "./helper-shadow";
+import { helperShadows } from "./helper-shadow";
 import { checkSchemaExtensions } from "./schema-extensions";
 import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
@@ -22,6 +24,11 @@ import { readFile } from "node:fs/promises";
 import { basename, isAbsolute, relative, sep } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 
+/** How every template compiles. `preventIndent`: a partial included on a line of its own is not indented by the
+ *  include's indentation, which Handlebars otherwise adds to every line of its output, the content of a <pre>
+ *  (a code block) included. */
+const COMPILE = { preventIndent: true } as const;
+
 // Fragment-scoped HTML content-model validator (M4.9 finalise).
 // Only content-model rules — no document-structure checks (no doctype/html/head noise).
 const htmlValidator = new HtmlValidate({
@@ -30,6 +37,12 @@ const htmlValidator = new HtmlValidate({
     "element-permitted-parent": "error",
   },
 });
+
+/** A template outside the patterns (a site's own head file): plain Handlebars, escaping as templates do, with no
+ *  helpers but Handlebars' own and no partials, compiled as every template is (preventIndent). */
+export function renderPlainTemplate(source: string, data: Record<string, unknown>): string {
+  return Handlebars.create().compile(source, COMPILE)(data);
+}
 
 export function deepMerge(
   target: Record<string, unknown>,
@@ -404,7 +417,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         const baseData = baseJsonPath ? await readDataFile(baseJsonPath, display) : {};
         const childDefaults: Record<string, unknown> = deepMerge(structuredClone(baseData.data ?? {}), childData.data);
 
-        const childTemplate = env.compile(await slotted(partialSrc, compId));
+        const childTemplate = env.compile(await slotted(partialSrc, compId), COMPILE);
         const capturedDefaults = childDefaults;
         const partialSlug = safePart(compId.replace(/[\\/]/g, "-"));
 
@@ -484,7 +497,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // render an empty block rather than throw. Block invocations override this with the real body.
     let html: string;
     try {
-      html = env.compile(await slotted(templateSrc, componentId))(data, {
+      html = env.compile(await slotted(templateSrc, componentId), COMPILE)(data, {
         partials: { ...env.partials, "@partial-block": () => "" },
         // The render's image settings, for {{pd-image}} here and in every partial (data frames pass on).
         data: { pdImages: input.images },
@@ -580,6 +593,21 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         }
       }
     } catch { /* no schema file — skip */ }
+
+    // A data field a bare {{name}} never reads, since a helper of that name answers (helper-shadow.ts). A field the
+    // schema declares is the schema check's error already (SCHEMA_INVALID), and not said twice.
+    const schemaNamed = new Set(diagnostics.filter(d => d.kind === "SCHEMA_INVALID" && d.path)
+      .map(d => /\/properties\/([^/]+)$/.exec(d.path!)?.[1]).filter((n): n is string => !!n));
+    for (const s of helperShadows(templateSrc, data, Object.keys(env.helpers), schemaNamed)) {
+      diagnostics.push({
+        kind: "HELPER_SHADOW",
+        severity: "warning",
+        source: "render",
+        message: `{{${s.name}}} calls the helper "${s.name}", so the data's "${s.at}" is never read here: write {{this.${s.name}}} `
+          + `to read the field, or give the field another name`,
+        location: { file: display(entry.hbsPath), line: s.line, column: s.column },
+      });
+    }
 
     const meta: RenderMeta | undefined = diagnostics.length > 0
       ? { componentId, variant, diagnostics }

@@ -174,7 +174,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const { graph } = await runDiagnosticsAudit(config, siteDir);
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
-      [["components/note", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"]]);
+      [["components/note", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"]]);
   }, 120_000);
 
   it("serves the website: the home page with its placed note, the about page, the 404 page and robots.txt", async () => {
@@ -188,6 +188,13 @@ describe("the starter project with a website (--storefront, no examples)", () =>
       expect(home.body).toContain(`<iframe src="/preview/components/note"`);
       expect(home.body).toContain(`<a rel="next" href="/about/">Next: About</a>`);
       expect((await onHost(server.port, "live.localhost", "/about/")).status).toBe(200);
+      // The articles collection: its listing names the example article with its date, and the article shows its tags.
+      const articles = await onHost(server.port, "live.localhost", "/articles/");
+      expect(articles.status).toBe(200);
+      expect(articles.body).toMatch(/<a class="listing-title" href="\/articles\/hello\/">Hello, articles<\/a>\s*<time class="listing-date" datetime="2026-11-14">/);
+      const hello = await onHost(server.port, "live.localhost", "/articles/hello/");
+      expect(hello.status).toBe(200);
+      expect(hello.body).toContain(`<ul class="page-tags" aria-label="Tags"><li>getting-started</li><li>notes</li></ul>`);
       const missing = await onHost(server.port, "live.localhost", "/no-such-page/");
       expect(missing.status).toBe(404);
       expect(missing.body).toContain("Page not found");
