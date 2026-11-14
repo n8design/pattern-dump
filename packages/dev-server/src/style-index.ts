@@ -186,6 +186,9 @@ export interface AllStyleData {
   /** Base-layer rules from files that no component owns and that a root's `documentBase` does not
    *  list: absolute path → rule count. Only for roots that declare a `documentBase`. */
   baseOutsideList: Map<string, number>;
+  /** Each entry file's own base-layer rules (absolute path → its rules joined), so a save that recompiles one
+   *  entry can tell whether the base layer changed with it (watch.ts). */
+  baseRulesByEntry: Map<string, string>;
 }
 
 // ---- documentBase: paths whose rules always form the base layer ----
@@ -401,6 +404,7 @@ export async function buildAllStyleData(
   const baseCssByRoot: string[][] = [];
   // Distinct rule texts per unlisted, unowned file (a shared partial compiles into several entries).
   const outsideRules = new Map<string, Set<string>>();
+  const baseRulesByEntry = new Map<string, string>();
 
   for (const id of componentIds) styleUsesModules.set(id, []);
 
@@ -481,6 +485,7 @@ export async function buildAllStyleData(
     }
 
     // CSS bucketing: walk top-level nodes (rules + at-rules: @font-face, @keyframes, etc.)
+    const entryBase = new Set<string>();
     root.each(node => {
       const originPath = originPathFor(node);
       if (originPath === null) return;
@@ -491,6 +496,7 @@ export async function buildAllStyleData(
         : resolveScssToComponent(originPath, stylesDir, componentIds) ?? "__base__";
       if (owner === "__base__") {
         addLastOccurrence(baseCssBucket, nodeText);
+        addLastOccurrence(entryBase, nodeText);
         if (reportOutside && !inBase(originPath)) {
           const seen = outsideRules.get(originPath) ?? new Set<string>();
           seen.add(nodeText);
@@ -502,6 +508,7 @@ export async function buildAllStyleData(
         componentCssBuckets.set(owner, bucket);
       }
     });
+    baseRulesByEntry.set(resolve(entryFile), joinCssChunks(entryBase));
 
     // Class owner index: delegate to the shared attribution core so the per-save patch
     // (patchClassOwnerIndex via attributeClassesFromFile) and this full build cannot drift.
@@ -542,6 +549,7 @@ export async function buildAllStyleData(
     // Packages' base rules first (later roots), the project's last — its own base wins the cascade.
     baseCss: joinCssChunks([...baseCssByRoot].reverse().flat()),
     baseOutsideList: new Map([...outsideRules].map(([path, rules]) => [path, rules.size])),
+    baseRulesByEntry,
   };
 }
 
