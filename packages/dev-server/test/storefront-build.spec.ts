@@ -113,7 +113,7 @@ describe("pd build — the storefront root", () => {
       "sitemap.xml",
       "start/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 7, files: 38, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 7, files: 38, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
@@ -384,7 +384,8 @@ describe("pd build — the storefront's settings", () => {
   // storefront.url's origin): its previews are kept out by the storefront's robots.txt, at the host's root, so
   // the build no longer asks for its rule to be copied there.
   const sameHostNote = "robots.txt is written to the workbench's root, but crawlers read it only at a host's root: "
-    + "with the base path /workbench/, add its rule (Disallow: /workbench/preview/) to the robots.txt the host serves at /";
+    + "with the base path /workbench/, each preview carries a robots noindex tag instead; where you can, also add its rule "
+    + "(Disallow: /workbench/preview/) to the robots.txt the host serves at /";
   const buildAt = (root: string, out: string, cfg: PatternDumpConfig) =>
     buildStaticSite(cfg, root, { outDir: out, basePath: "/workbench/", pdVersion: "0.0.0-test", now: NOW });
 

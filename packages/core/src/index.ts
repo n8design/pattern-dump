@@ -48,7 +48,7 @@ export async function runBuild(
   console.log(`[pd build] ${report.components} components → ${report.files} files, ${mb} MB in ${report.ms} ms`);
   console.log(`[pd build] ${report.outDir}  (served from ${report.basePath})`);
   if (report.storefront) {
-    console.log(`[pd build] storefront: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from /)`);
+    console.log(`[pd build] storefront: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from ${report.storefront.basePath})`);
   }
   if (report.links) {
     console.log(`[pd build] links: ${report.links.references} references on ${report.links.pages} pages, none broken`

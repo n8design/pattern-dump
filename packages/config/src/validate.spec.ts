@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { configProblems, sameHostWorkbenchPath, validateConfig } from "./validate.js";
+import { configProblems, sameHostWorkbenchPath, storefrontBasePath, validateConfig } from "./validate.js";
 import { defineConfig } from "./index.js";
 
 const valid = {
@@ -156,14 +156,15 @@ describe("configProblems — storefront", () => {
     }
   });
 
-  it("takes the site's address as an origin only: no path, query or fragment", () => {
+  it("takes the site's address, with or without a path, and no query or fragment", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
-    for (const ok of ["https://example.com", "https://example.com/", "http://localhost:4300", "https://docs.example.com/"]) {
+    for (const ok of ["https://example.com", "https://example.com/", "http://localhost:4300", "https://docs.example.com/",
+      "https://example.com/docs/", "https://example.com/docs", "https://n8design.github.io/pattern-dump-demo/", "https://example.com/a/b/"]) {
       expect(storefront({ ...base, url: ok }), ok).toEqual([]);
     }
-    const message = `"storefront.url" must be the site's absolute http(s) address, with no path, query or fragment, such as "https://example.com/"`;
-    for (const bad of ["example.com", "/", "ftp://example.com", "", 42, "https://example.com/docs/", "https://example.com/docs",
-      "https://example.com/?v=1", "https://example.com/#top", "https://example.com?"]) {
+    const message = `"storefront.url" must be the site's absolute http(s) address, with no query or fragment, such as "https://example.com/", or "https://example.github.io/project/" for a site published under a path`;
+    for (const bad of ["example.com", "/", "/docs/", "ftp://example.com", "", 42, "https://example.com/?v=1", "https://example.com/#top",
+      "https://example.com?", "https://example.com/docs/?v=1", "https://example.com/docs#top", "https://example.com/a//b/"]) {
       expect(storefront({ ...base, url: bad }), String(bad)).toEqual([message]);
     }
   });
@@ -293,6 +294,13 @@ describe("sameHostWorkbenchPath — a workbench published on the storefront's ow
     expect(path("https://example.com/", "https://example.com/")).toBe("/");
   });
 
+  it("is the workbench's full path on a site published under a path", () => {
+    expect(path("https://example.github.io/project/styleguide/", "https://example.github.io/project/")).toBe("/project/styleguide/");
+    expect(path("/project/styleguide/", "https://example.github.io/project/")).toBe("/project/styleguide/");
+    // Same origin, outside the site's path: still the same host.
+    expect(path("https://example.github.io/other/", "https://example.github.io/project/")).toBe("/other/");
+  });
+
   it("is undefined for a workbench on a host of its own, or with no workbenchUrl", () => {
     expect(path("https://workbench.example.com/", "https://example.com/")).toBeUndefined();
     expect(path("https://example.com:8443/workbench/", "https://example.com/")).toBeUndefined();
@@ -339,7 +347,7 @@ describe("validateConfig — storefront.workbenchUrl is stored with exactly one 
   });
 });
 
-describe("validateConfig — storefront.url is stored as its origin with one slash", () => {
+describe("validateConfig — storefront.url is stored as its origin and path with one trailing slash", () => {
   const load = (url: string) =>
     validateConfig({ ...valid, storefront: { pagesDir: "./pages", outDir: "./www", url } }, "test").storefront?.url;
 
@@ -347,6 +355,13 @@ describe("validateConfig — storefront.url is stored as its origin with one sla
     expect(load("https://example.com")).toBe("https://example.com/");
     expect(load("https://example.com/")).toBe("https://example.com/");
     expect(load("http://localhost:4300")).toBe("http://localhost:4300/");
+  });
+
+  it("keeps a path, with exactly one trailing slash", () => {
+    expect(load("https://example.github.io/project")).toBe("https://example.github.io/project/");
+    expect(load("https://example.github.io/project/")).toBe("https://example.github.io/project/");
+    expect(load("https://example.github.io/project//")).toBe("https://example.github.io/project/");
+    expect(load("https://example.com/a/b")).toBe("https://example.com/a/b/");
   });
 
   it("returns a copy when it normalizes, and never changes the config it was given", () => {
@@ -367,5 +382,21 @@ describe("validateConfig", () => {
 
   it("returns a valid config unchanged", () => {
     expect(validateConfig(valid, "x")).toBe(valid);
+  });
+});
+
+describe("storefrontBasePath — the path the site is published under", () => {
+  const base = (url?: string) => storefrontBasePath(validateConfig({ ...valid, storefront: { pagesDir: "./pages", outDir: "./www",
+    ...(url !== undefined ? { url } : {}) } }, "test").storefront);
+
+  it("is the path of storefront.url, with one trailing slash", () => {
+    expect(base("https://example.github.io/project")).toBe("/project/");
+    expect(base("https://example.com/a/b/")).toBe("/a/b/");
+  });
+
+  it("is / at the root of a host, for a site with no address, and with no storefront", () => {
+    expect(base("https://example.com")).toBe("/");
+    expect(base()).toBe("/");
+    expect(storefrontBasePath(undefined)).toBe("/");
   });
 });

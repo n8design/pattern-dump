@@ -36,6 +36,24 @@ describe("checkLinks", () => {
     expect(r.references).toBe(16);
   });
 
+  it("under a path: resolves references as served, under the path, and reports one outside it", () => {
+    const r = check({ "/about/": page(`
+      <a href="/sub/guides/">guides</a> <a href="../guides/setup/#pages">relative</a> <a href="https://site.test/sub/guides/setup/">absolute</a>
+      <link rel="stylesheet" href="/sub/_pd/base.css?v=0123456789"> <a href="https://wb.test/components">workbench</a>
+      <a href="/guides/">outside</a> <a href="/sub/sub/about/">doubled</a>`) }, { siteUrl: "https://site.test/sub/", basePath: "/sub/" });
+    expect(r.problems).toEqual([
+      `/about/: <a href="/guides/">: /guides/ is outside /sub/, the path the site is published under (storefront.url)`,
+      `/about/: <a href="/sub/sub/about/">: no page or file is built at /sub/about/: the link is written with the site's path /sub/ already; `
+        + "write it from the site's root, such as /about/, and the path is put in front of it",
+    ]);
+  });
+
+  it("in pd dev, before the path is put in front, gives the same hint for a link written with it", () => {
+    const r = check({ "/about/": page(`<a href="/sub/guides/">doubled</a>`) }, { pagesOnly: true, pathHint: "/sub/" });
+    expect(r.problems).toEqual([`/about/: <a href="/sub/guides/">: no page or file is built at /sub/guides/: the link is written with `
+      + "the site's path /sub/ already; write it from the site's root, such as /guides/, and the path is put in front of it"]);
+  });
+
   it("reports what doesn't, naming the page and the element", () => {
     const r = check({ "/about/": page(`
       <a href="/guides/instal/">a typo</a> <a href="/guides/setup/#no-such">a missing anchor</a> <a href="#nowhere">a local one</a>

@@ -203,7 +203,8 @@ workbench snapshot is written exactly as it would be without one. Deploy each fo
 [pd build]   note: guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"
 ```
 
-The storefront is always served from the root of its host. Unlike a component that fails to render in the
+The storefront is served at `storefront.url`: the root of its host, or a path under it, which the second line
+names ([storefront.md](storefront.md#publishing-under-a-path)). Unlike a component that fails to render in the
 workbench, a problem on a storefront page fails the build, and then neither folder is written.
 
 **"note"** lines are about pages that were built as they are: nothing is left out for them. A heading's

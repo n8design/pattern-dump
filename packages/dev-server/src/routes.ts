@@ -44,6 +44,7 @@ import { compiledScript, ScriptMissing } from "./scripts.js";
 import { contentHash } from "./content-hash.js";
 import { serveImageVariant } from "./image-route.js";
 import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
+import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
@@ -123,8 +124,34 @@ export async function handleRequest(
   // On the storefront's host, every HTML and CSS response leaves with its references to served files
   // stamped with their content hashes (storefront/asset-stamps.ts). The workbench's hosts are not stamped.
   const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
-  if (cfg.storefront && host === cfg.storefront.host) return stampedResponse(req, res, ctx);
+  if (cfg.storefront && host === cfg.storefront.host) {
+    if (!underBasePath(req, res, cfg.storefront.basePath)) return;
+    return stampedResponse(req, res, ctx);
+  }
   return routeRequest(req, res, ctx);
+}
+
+/**
+ * A site published under a path (storefront.basePath) is served under it, in pd dev as in pd build: the path is
+ * taken off the request, and the storefront's routes see site paths. The host's root forwards to the path (and the
+ * path without its slash to the path), so the host alone still opens the site; any other address outside the path
+ * is the site's 404 page. False when the request was answered here. The test hook is the server's, not the site's.
+ */
+function underBasePath(req: IncomingMessage, res: ServerResponse, base: string): boolean {
+  if (base === "/") return true;
+  const raw = req.url ?? "/";
+  const at = raw.search(/[?#]/);
+  const path = at < 0 ? raw : raw.slice(0, at);
+  const query = at < 0 ? "" : raw.slice(at);
+  if (path === TEST_SETTLE_ROUTE) return true;
+  if (path.startsWith(base)) { req.url = `/${raw.slice(base.length)}`; return true; }
+  if (path === "/" || `${path}/` === base) {
+    res.writeHead(302, { Location: `${base}${query}` });
+    res.end();
+    return false;
+  }
+  req.url = PD_ROUTES.notFound;
+  return true;
 }
 
 /** A response held in memory: what a route wrote, to be stamped before it is sent, or hashed. */
@@ -189,8 +216,16 @@ async function stampedResponse(req: IncomingMessage, res: ServerResponse, ctx: R
   await routeRequest(req, held.res, ctx);
   const type = String(held.headers["content-type"] ?? "");
   let body: Buffer | string = held.body();
-  if (/^text\/html\b/.test(type)) body = await stampHtml(body.toString("utf8"), hashOfFor(req, ctx));
-  else if (/^text\/css\b/.test(type)) body = await stampCss(body.toString("utf8"), hashOfFor(req, ctx));
+  // Stamps first, by site path; then the site's base path in front of every root-relative reference.
+  const sf = ctx.cfg.storefront!;
+  const base = { base: sf.basePath, workbenchPath: sameHostWorkbenchPath(sf) };
+  // Under a path, a preview is kept out of search engines by its own head: no robots.txt is read there.
+  const preview = sf.basePath !== "/" && (req.url ?? "").startsWith(PD_ROUTE_PREFIX.preview);
+  if (/^text\/html\b/.test(type)) {
+    const html = withBaseHtml(await stampHtml(body.toString("utf8"), hashOfFor(req, ctx), sf.basePath), base);
+    body = preview ? withNoindex(html) : html;
+  }
+  else if (/^text\/css\b/.test(type)) body = withBaseCss(await stampCss(body.toString("utf8"), hashOfFor(req, ctx)), base);
   res.writeHead(held.status(), held.headers);
   res.end(body);
 }
@@ -598,10 +633,12 @@ async function routeRequest(
         return;
       }
       // With storefront.url set, pages carry absolute URLs: the configured address in a build, and in
-      // pd dev the address the browser is on, so every link it shows works there.
+      // pd dev the address the browser is on (under the site's path), so every link it shows works there.
       const siteUrl = cfg.storefront.url === undefined ? undefined
-        : ctx.live ? `http://${req.headers.host ?? cfg.storefront.host}/` : cfg.storefront.url;
-      if (pathname === PD_ROUTES.robots) {
+        : ctx.live ? `http://${req.headers.host ?? cfg.storefront.host}${cfg.storefront.basePath}` : cfg.storefront.url;
+      // Crawlers read robots.txt only at a host's root, so a site under a path has none (pd build says what to add
+      // to the host's own): it is the 404 page there, like any address with no page.
+      if (pathname === PD_ROUTES.robots && cfg.storefront.basePath === "/") {
         res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
         res.end(storefrontRobotsTxt({ siteUrl, index: cfg.storefront.index, workbenchPath: sameHostWorkbenchPath(cfg.storefront) }));
         return;
@@ -646,7 +683,7 @@ async function routeRequest(
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
         image: path => checkPageImage(path, assetRoots, assetRootNames),
         ...(siteUrl !== undefined ? { siteUrl } : {}),
-        lang: cfg.storefront.lang, siteIndex: cfg.storefront.index,
+        lang: cfg.storefront.lang, siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
       });

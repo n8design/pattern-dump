@@ -8,6 +8,9 @@
 //   - every image with variants (`img[srcset]`), brought into view so a lazy one loads, against its rendered box:
 //     too large when a smaller variant would have covered the box × the pixel ratio, too small when it doesn't cover
 //     it and a larger variant exists. Warnings: they depend on the layout.
+//   - on a site published under a path: every request the page makes to the site's own host outside that path is an
+//     error. The base-path pass puts the path in front of every reference in the markup and CSS, so such a request
+//     comes from a script that builds its URL itself (it can read <meta name="pd-base-path">).
 //
 // Playwright is the project's own (`npm install --save-dev playwright`); Pattern Dump does not depend on it. Without
 // it, or without its Chromium, the build stops with a named error before anything is built.
@@ -68,12 +71,15 @@ export interface BrowserCheckResult {
 interface AxeViolation { id: string; impact?: string | null; tags: string[]; help: string; helpUrl: string; nodes: Array<{ target: unknown[] }> }
 interface ImageSeen { src: string; sizes: string; box: number; chosen: number | null; candidates: number[] }
 
-/** The browser checks over `pages`, each fetched through `get` (the build's server, as the crawl fetches it). */
+/** The browser checks over `pages` (site paths), each fetched through `get` (the build's server, as the crawl fetches
+ *  it, by site path). `basePath`: the path the site is published under; pages are opened under it, as served. */
 export async function runBrowserChecks(o: {
   pages: readonly string[];
   get: (url: string) => Promise<Response>;
   playwright: PlaywrightModule;
+  basePath?: string;
 }): Promise<BrowserCheckResult> {
+  const base = o.basePath ?? "/";
   let browser: PwBrowser;
   try {
     browser = await o.playwright.chromium.launch({ headless: true });
@@ -89,6 +95,8 @@ export async function runBrowserChecks(o: {
     f.at.push(at);
     found.set(key, f);
   };
+  /** The page being checked: the requests it makes are named by it. */
+  let current = "";
   try {
     for (const vp of VIEWPORTS) {
       const context = await browser.newContext({ viewport: vp.viewport, deviceScaleFactor: vp.dpr });
@@ -96,7 +104,17 @@ export async function runBrowserChecks(o: {
       await context.route("**/*", async route => {
         const url = new URL(route.request().url());
         if (url.origin !== origin) { await route.abort(); return; }
-        const res = await o.get(`${url.pathname}${url.search}`);
+        if (!url.pathname.startsWith(base)) {
+          // The browser's own favicon request is not the page's.
+          if (url.pathname !== "/favicon.ico") {
+            const text = `${current}: a request to ${url.pathname}${url.search} is outside ${base}, the path the site is published under `
+              + `(storefront.url): a script that builds this URL needs the site's path, which <meta name="pd-base-path"> names`;
+            note("error", `outside ${text}`, text, vp.name);
+          }
+          await route.fulfill({ status: 404, body: Buffer.from("") });
+          return;
+        }
+        const res = await o.get(`/${url.pathname.slice(base.length)}${url.search}`);
         const headers: Record<string, string> = {};
         const type = res.headers.get("content-type");
         if (type) headers["content-type"] = type;
@@ -104,7 +122,8 @@ export async function runBrowserChecks(o: {
       });
       const page = await context.newPage();
       for (const path of o.pages) {
-        await page.goto(`${origin}${path}`, { waitUntil: "load" });
+        current = path;
+        await page.goto(`${origin}${base}${path.slice(1)}`, { waitUntil: "load" });
         await page.addScriptTag({ content: axe });
         const violations = await page.evaluate(async (rules: string[]) => {
           const r = await (window as unknown as { axe: { run(c: unknown, o: unknown): Promise<{ violations: unknown[] }> } }).axe
@@ -140,7 +159,9 @@ export async function runBrowserChecks(o: {
           if (img.chosen === null || img.box === 0) continue;
           const need = Math.round(img.box * vp.dpr);
           const covering = img.candidates.filter(w => w >= need).sort((a, b) => a - b)[0];
-          const src = img.src.replace(/\?v=[0-9a-f]+$/, "");
+          const written = img.src.replace(/\?v=[0-9a-f]+$/, "");
+          // Named by its site path.
+          const src = base !== "/" && written.startsWith(base) ? `/${written.slice(base.length)}` : written;
           // An image with variants is named by its asset (/_pd/images/images/harbour.<key>.<width>.webp → images/harbour).
           const asset = /^\/_pd\/images\/(.+)\.[0-9a-f]{10}\.\d+\.webp$/.exec(src)?.[1];
           const what = asset ? `the image ${asset}` : `<img src="${src}">`;

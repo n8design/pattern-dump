@@ -5,6 +5,8 @@
 //   - a `#fragment` to an element with that id (or an <a name>) in the target document; headings carry their anchors
 //     as ids, so a link to a heading is checked;
 //   - a URL on the site's own address (storefront.url) as its path;
+//   - on a site published under a path (storefront.url with one), a root-relative reference under that path: one
+//     outside it is a problem, and one written with the path already (doubled by the base-path pass) says so;
 //   - a URL into the workbench (storefront.workbenchUrl) to a page the workbench snapshot has: a component, its
 //     variants page, a folder; a `#fragment` there names one of the component's variants.
 // Other hosts are not fetched: they are listed, with the pages that link them, for the build report's notes.
@@ -24,6 +26,12 @@ export interface LinkSite {
   pages: readonly string[];
   /** storefront.url, ending with "/". */
   siteUrl?: string;
+  /** The path the site is published under ("/project/"), which every root-relative reference on its pages carries
+   *  as served. `built`, `documents` and `pages` are by site path. Default "/". */
+  basePath?: string;
+  /** The site's path, for the hint on a link written with it already. Default: `basePath`. pd dev checks a page
+   *  before the path is put in front (basePath "/"), and still gives the hint. */
+  pathHint?: string;
   /** storefront.workbenchUrl (ending with "/") and what the workbench snapshot has: its routes without the leading
    *  slash ("" for its home, "components/callout", "components/callout/variants", "components"), and each
    *  component's variants. */
@@ -121,6 +129,8 @@ export function checkLinks(site: LinkSite): LinkCheck {
     return undefined;
   };
 
+  const base = site.basePath ?? "/";
+  const hint = site.pathHint ?? base;
   let references = 0;
   for (const page of site.pages) {
     const html = site.documents.get(page);
@@ -137,7 +147,7 @@ export function checkLinks(site: LinkSite): LinkCheck {
         continue;
       }
       let href = ref;
-      if (site.siteUrl && ref.startsWith(site.siteUrl)) href = `/${ref.slice(site.siteUrl.length)}`;
+      if (site.siteUrl && ref.startsWith(site.siteUrl)) href = `${base}${ref.slice(site.siteUrl.length)}`;
       else if (OTHER_HOST.test(ref)) {
         if (site.pagesOnly) continue;
         const list = external.get(ref) ?? [];
@@ -145,18 +155,29 @@ export function checkLinks(site: LinkSite): LinkCheck {
         external.set(ref, list);
         continue;
       }
-      const url = new URL(href, `http://site.invalid${page}`);
-      const path = decodeURIComponent(url.pathname);
+      // Resolved where the page is served: under the site's path.
+      const url = new URL(href, `http://site.invalid${base}${page.slice(1)}`);
+      const served = decodeURIComponent(url.pathname);
       const hash = url.hash.slice(1);
       // A workbench on the site's own host, by its path.
-      if (wb && wb.url.startsWith("/") && path.startsWith(wb.url)) {
-        const why = workbenchProblem(path.slice(wb.url.length), hash);
+      if (wb && wb.url.startsWith("/") && served.startsWith(wb.url)) {
+        const why = workbenchProblem(served.slice(wb.url.length), hash);
         if (why) say(why);
         continue;
       }
+      if (!served.startsWith(base)) { say(`${served} is outside ${base}, the path the site is published under (storefront.url)`); continue; }
+      const path = `/${served.slice(base.length)}`;
       if (site.pagesOnly && /^\/(?:_pd|assets|preview)\//.test(path)) continue;
       const target = builtAs(path);
-      if (target === undefined) { say(`no page or file is built at ${path}`); continue; }
+      if (target === undefined) {
+        // Written with the site's path already: the pass put it in front a second time.
+        const doubled = hint !== "/" && path.startsWith(hint) && builtAs(`/${path.slice(hint.length)}`) !== undefined;
+        say(doubled
+          ? `no page or file is built at ${path}: the link is written with the site's path ${hint} already; write it from the site's root, `
+            + `such as /${path.slice(hint.length)}, and the path is put in front of it`
+          : `no page or file is built at ${path}`);
+        continue;
+      }
       if (!hash) continue;
       const targetIds = ids(target);
       if (targetIds && !targetIds.has(decodeURIComponent(hash))) say(`${target} has no element with id "${decodeURIComponent(hash)}"`);

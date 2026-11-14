@@ -13,6 +13,12 @@
   a page without a description is listed with the first paragraph of its body. `partials/base` can list folders
   under `site.collections` to show their pages on every page, such as a home page's latest articles. Layouts can
   show a page's own `page.date` and `page.tags`.
+- A storefront can be published under a path, such as a GitHub project page: `storefront.url` takes the full
+  address (`https://example.github.io/project/`). Every page, stylesheet, script and image is then served under the
+  path, in `pd dev` too, with links still written from the site's root; canonical URLs, Open Graph, JSON-LD and the
+  sitemap carry it. Every page names its path in `<meta name="pd-base-path">` for a skin's own scripts, and
+  `pd build --browser` stops on a request outside the path. Under a path there is no `robots.txt` (the build says what
+  the host's own needs) and previews carry a robots `noindex` tag, as a workbench's do when it is built with `--base`.
 - `date`, `tags` and `draft` in a page's frontmatter. `date` (`YYYY-MM-DD`) is the page's date for listings and its
   JSON-LD `datePublished`, which falls back to the page's first commit. `draft: true` shows a page in `pd dev` and
   leaves it out of `pd build`, which names the drafts it left out.

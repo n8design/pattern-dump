@@ -59,9 +59,15 @@ async function stampSrcset(value: string, hashOf: HashOf): Promise<string> {
   return entries.join(",");
 }
 
+/** An absolute URL's path, stamped: the site's base path is taken off first (stamps are by site path) and kept. */
+async function stampAbsolute(path: string, hashOf: HashOf, base: string): Promise<string> {
+  if (base === "/" || !path.startsWith(base)) return stamp(path, hashOf);
+  return `${base}${(await stamp(`/${path.slice(base.length)}`, hashOf)).slice(1)}`;
+}
+
 /** A start tag with its references stamped: href, src and srcset; and the content of a link-preview <meta>,
  *  an absolute URL on the site's own address, whose path is taken. */
-async function stampTag(name: string, attrs: string, hashOf: HashOf): Promise<string> {
+async function stampTag(name: string, attrs: string, hashOf: HashOf, base: string): Promise<string> {
   const isPreview = name.toLowerCase() === "meta" && /\s(?:property="og:image"|name="twitter:image")/.test(attrs);
   return replaceAsync(attrs, ATTRIBUTE, async m => {
     const [whole, lead, attr, eq, quoted] = m as unknown as [string, string, string, string?, string?];
@@ -74,26 +80,27 @@ async function stampTag(name: string, attrs: string, hashOf: HashOf): Promise<st
     else if (key === "srcset") stamped = await stampSrcset(value, hashOf);
     else if (key === "content" && isPreview) {
       const at = /^(https?:\/\/[^/"']+)(.*)$/.exec(value);
-      if (at) stamped = `${at[1]}${await stamp(at[2]!, hashOf)}`;
+      if (at) stamped = `${at[1]}${await stampAbsolute(at[2]!, hashOf, base)}`;
     }
     return `${lead}${attr}${eq}${q}${stamped}${q}`;
   });
 }
 
-/** An HTML document with every reference to a served file stamped. */
-export async function stampHtml(html: string, hashOf: HashOf): Promise<string> {
+/** An HTML document with every reference to a served file stamped. `base`: the site's base path ("/project/"),
+ *  which the absolute URLs (link previews, JSON-LD) carry and the root-relative ones don't yet (base-path.ts). */
+export async function stampHtml(html: string, hashOf: HashOf, base = "/"): Promise<string> {
   const parts: string[] = [];
   let last = 0;
   for (const tag of startTags(html)) {
     parts.push(html.slice(last, tag.start));
     const attrsAt = tag.start + 1 + tag.name.length;
-    parts.push(`<${tag.name}${await stampTag(tag.name, tag.attrs, hashOf)}${html.slice(attrsAt + tag.attrs.length, tag.end)}`);
+    parts.push(`<${tag.name}${await stampTag(tag.name, tag.attrs, hashOf, base)}${html.slice(attrsAt + tag.attrs.length, tag.end)}`);
     last = tag.end;
     if (!tag.content) continue;
     // A raw-text element's content is copied as it is; a JSON-LD block's "image" is stamped.
     const content = html.slice(tag.content.start, tag.content.end);
     parts.push(tag.name.toLowerCase() === "script" && /\stype=["']?application\/ld\+json/i.test(tag.attrs)
-      ? await replaceAsync(content, /("image":"https?:\/\/[^/"]+)([^"]*)"/g, async j => `${j[1]}${await stamp(j[2]!, hashOf)}"`)
+      ? await replaceAsync(content, /("image":"https?:\/\/[^/"]+)([^"]*)"/g, async j => `${j[1]}${await stampAbsolute(j[2]!, hashOf, base)}"`)
       : content);
     last = tag.content.end;
   }

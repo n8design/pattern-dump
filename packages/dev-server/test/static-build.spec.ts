@@ -86,7 +86,8 @@ describe("pd build — test-bench under /pd/", () => {
   it("writes robots.txt keeping crawlers out of the previews under the base path, and says where it must go", async () => {
     expect(await readFile(join(site, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /pd/preview/\n");
     expect(report.notes).toContain("robots.txt is written to the workbench's root, but crawlers read it only at a host's root: "
-      + "with the base path /pd/, add its rule (Disallow: /pd/preview/) to the robots.txt the host serves at /");
+      + "with the base path /pd/, each preview carries a robots noindex tag instead; where you can, also add its rule "
+      + "(Disallow: /pd/preview/) to the robots.txt the host serves at /");
   });
 
   it("every PD URL inside the snapshot carries the base path and resolves to a file", async () => {

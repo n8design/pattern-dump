@@ -2,7 +2,7 @@
 // Load and validate pattern-dump.config (.ts/.json, TS wins). Shared config types.
 import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/contracts";
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
-export { ConfigError, configProblems, sameHostWorkbenchPath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
+export { ConfigError, configProblems, sameHostWorkbenchPath, storefrontBasePath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
 import { withSourceDefaults } from "./validate.js";
 
 export interface AssetsConfig {
@@ -198,10 +198,11 @@ export interface StorefrontConfig {
    */
   workbenchUrl?: string;
   /**
-   * The site's address, such as `https://example.com/`: an absolute http(s) URL with no path (the storefront
-   * is served from the root of its host), no query or fragment; loaded as its origin followed by `/`. With it,
-   * pages get a canonical URL, Open Graph and JSON-LD, and `pd build` writes a sitemap; without it they are
-   * left out, and `pd build` says so once.
+   * The site's address, such as `https://example.com/`: an absolute http(s) URL with no query or fragment; loaded
+   * with exactly one trailing slash. It may have a path, such as `https://example.github.io/project/`: the site is
+   * then published under that path (its base path), and every page, stylesheet, script and image it links is
+   * served under it, in `pd dev` too. With it, pages get a canonical URL, Open Graph and JSON-LD, and `pd build`
+   * writes a sitemap; without it they are left out, `pd build` says so once, and the site is served from `/`.
    */
   url?: string;
   /** The language of every page, as `<html lang>` takes it (a BCP 47 tag such as `de-AT`). Default: `en`. */

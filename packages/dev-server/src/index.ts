@@ -332,7 +332,7 @@ export async function startDevServer(
   // Where to open it, for a person reading the terminal (pd dev only; pd build runs this server too). The
   // storefront and the workbench are told apart by host name, so these are the addresses to use, not 127.0.0.1.
   if (live) {
-    if (cfg.storefront) console.log(`[dev-server] Website:   http://${cfg.storefront.host}:${actualPort}/`);
+    if (cfg.storefront) console.log(`[dev-server] Website:   http://${cfg.storefront.host}:${actualPort}${cfg.storefront.basePath}`);
     console.log(`[dev-server] Workbench: http://${cfg.storefront ? PD_HOSTS.workbench : "localhost"}:${actualPort}/`);
   }
   const startupDiscovery = await cachedDiscovery(state);

@@ -1,5 +1,6 @@
-# Builds the website and the workbench, and publishes both to GitHub Pages:
-# the website at the root of your domain, the workbench under /workbench/.
+# Builds the website and the workbench, and publishes both to GitHub Pages: the website at the address in
+# storefront.url (your domain, or a project page's address with its path), the workbench inside it at
+# workbench/ (build.basePath gives its full path).
 # Before the first run: Settings → Pages → Source: "GitHub Actions", and your custom domain: see "Publish it" in the README.
 name: Pages
 

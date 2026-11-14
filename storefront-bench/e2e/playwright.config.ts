@@ -32,7 +32,7 @@ export default defineConfig({
   use: { trace: "on-first-retry", video: "retain-on-failure" },
   projects: [
     // pd dev, on the storefront host. dom-parity also reads the static root.
-    { name: "storefront", testMatch: /\b(pages|js-off|workbench-links|hmr|live-handshake|add-page|new-files|workbench|dom-parity|placed|config-reload|derived-page|headings|position|dates|navigations|seo|not-found|redirects|example-height|example-height-check|asset-stamps|image-slots|prose-images|build-browser|collections|collections-reload)\.spec\.ts$/,
+    { name: "storefront", testMatch: /\b(pages|js-off|workbench-links|hmr|live-handshake|add-page|new-files|workbench|dom-parity|placed|config-reload|derived-page|headings|position|dates|navigations|seo|not-found|redirects|example-height|example-height-check|asset-stamps|image-slots|prose-images|build-browser|collections|collections-reload|base-path)\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: `http://live.localhost:${DEV_PORT}` } },
     // The built storefront root, from a static host.
     { name: "storefront-static", testMatch: /\b(pages|js-off|workbench-links|static|placed|headings|position|dates|navigations|seo|not-found|redirects|example-height|example-height-check|asset-stamps|image-slots|prose-images|collections)\.spec\.ts$/,

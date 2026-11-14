@@ -38,7 +38,7 @@ async function file(path) {
   return real;
 }
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   let pathname;
   try { pathname = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname); } catch { pathname = null; }
   if (pathname === null || !pathname.startsWith(base)) { res.writeHead(404); res.end("outside base"); return; }
@@ -53,4 +53,6 @@ createServer(async (req, res) => {
   }
   res.writeHead(200, { "Content-Type": TYPES[extname(found)] ?? "application/octet-stream" });
   res.end(await readFile(found));
-}).listen(Number(values.port), "127.0.0.1", () => console.log(`static-server: ${root} at http://127.0.0.1:${values.port}${base}`));
+});
+// --port 0 takes a free port: the line names the one it got.
+server.listen(Number(values.port), "127.0.0.1", () => console.log(`static-server: ${root} at http://127.0.0.1:${server.address().port}${base}`));
