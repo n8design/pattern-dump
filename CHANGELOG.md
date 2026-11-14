@@ -35,6 +35,9 @@
   tab shows: `pd dev` and `pd build` say it in the terminal, a storefront page that places the component fails (as
   one whose layout has such a field already did), and `pd audit` re-audits a component when its schema changes
   instead of reusing a verdict cached before.
+- An image in a site page's markdown from a pattern package's assets, when that package's folder is the site's only
+  asset folder, gets its variants. Before, the page failed with "is not an image in the assets" for a URL that was
+  served.
 - `pd dev` no longer keeps base-layer rules that a component's stylesheet stopped writing (through a mixin) until it is
   restarted.
 

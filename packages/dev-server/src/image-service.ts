@@ -35,9 +35,10 @@ export interface ImageService {
   lookup: ImageLookup;
 }
 
-/** Every file under the asset roots, at the URL the asset route serves it at (asset-file.ts): with several roots
- *  /assets/<root's folder name>/…, and the first root's files at /assets/… too. */
-async function assetFiles(roots: readonly string[], names: readonly string[]): Promise<Array<{ url: string; path: string }>> {
+/** Every file under the asset roots, at each URL the asset route serves it at (asset-file.ts): /assets/<root's folder
+ *  name>/… for every root, one root or several, and the first root's files at /assets/… too, unless that path starts
+ *  with a root's folder name (the route then serves that root's file there). */
+export async function assetFiles(roots: readonly string[], names: readonly string[]): Promise<Array<{ url: string; path: string }>> {
   const files: Array<{ url: string; path: string }> = [];
   for (const [i, root] of roots.entries()) {
     const entries = await readdir(root, { recursive: true, withFileTypes: true }).catch(() => []);
@@ -45,8 +46,8 @@ async function assetFiles(roots: readonly string[], names: readonly string[]): P
       if (!e.isFile()) continue;
       const path = join(e.parentPath, e.name);
       const rel = relative(root, path).split(sep).join("/");
-      if (roots.length > 1) files.push({ url: `${PD_ROUTE_PREFIX.assets}${names[i]}/${rel}`, path });
-      if (i === 0) files.push({ url: `${PD_ROUTE_PREFIX.assets}${rel}`, path });
+      files.push({ url: `${PD_ROUTE_PREFIX.assets}${names[i]}/${rel}`, path });
+      if (i === 0 && !names.includes(rel.split("/")[0]!)) files.push({ url: `${PD_ROUTE_PREFIX.assets}${rel}`, path });
     }
   }
   return files;
