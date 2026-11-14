@@ -8,6 +8,21 @@
   and the other accessibility rules that need a rendered page (a critical or serious finding stops the build), and
   each image's variant against the box it is laid out in (a warning when its slot's `sizes` doesn't match). It uses
   the project's own Playwright: `npm install --save-dev playwright`, then `npx playwright install chromium`.
+- Collections: a folder of storefront pages is a collection. A layout that declares `page.children` lists the
+  folder's pages on its `index.md` (route, title, description, date, image, tags), newest first with `sort: date`;
+  a page without a description is listed with the first paragraph of its body. `partials/base` can list folders
+  under `site.collections` to show their pages on every page, such as a home page's latest articles. Layouts can
+  show a page's own `page.date` and `page.tags`.
+- `date`, `tags` and `draft` in a page's frontmatter. `date` (`YYYY-MM-DD`) is the page's date for listings and its
+  JSON-LD `datePublished`, which falls back to the page's first commit. `draft: true` shows a page in `pd dev` and
+  leaves it out of `pd build`, which names the drafts it left out.
+
+### Changed
+
+- **Breaking:** `date`, `tags`, `draft` and `sort` are now frontmatter keys of the build, like `layout` and
+  `image`. A layout whose schema declares one of them fails every page that uses it; rename the field in the
+  layout's schema (and show the page's date or tags through `page.date` and `page.tags`).
+- A storefront page's JSON-LD carries `datePublished`.
 
 ## 0.3.0
 

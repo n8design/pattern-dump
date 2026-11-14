@@ -18,11 +18,18 @@ test("a page in a folder: its section, breadcrumbs through the folder, and its n
   await expect(page.locator(".doc-next")).toHaveAttribute("rel", "next");
 });
 
-test("the last page in the nav: its own section, Home as its breadcrumb, and no next page", async ({ page }) => {
+test("a top-level page: its own section, Home as its breadcrumb, its neighbours across sections", async ({ page }) => {
   await page.goto("/about/");
   await expect(page.locator(".doc-section")).toHaveText("About");
   expect(await links(page, ".doc-breadcrumbs a")).toEqual([["/", "Storefront bench"]]);
-  expect(await links(page, ".doc-pager a")).toEqual([["/guides/setup/", "Setup"]]);
+  expect(await links(page, ".doc-pager a")).toEqual([["/guides/setup/", "Setup"], ["/articles/", "Articles"]]);
+});
+
+test("the last page in the nav: its folder's section, breadcrumbs through the folder, and no next page", async ({ page }) => {
+  await page.goto("/articles/plain/");
+  await expect(page.locator(".doc-section")).toHaveText("Articles");
+  expect(await links(page, ".doc-breadcrumbs a")).toEqual([["/", "Storefront bench"], ["/articles/", "Articles"]]);
+  expect(await links(page, ".doc-pager a")).toEqual([["/articles/harbour/", "A harbour of cable cars"]]);
   // The sample data's next page never stands in for the one this page does not have.
   await expect(page.locator(".doc-next")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("Sample next page");

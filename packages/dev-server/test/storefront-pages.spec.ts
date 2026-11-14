@@ -48,7 +48,7 @@ describe("routeFor", () => {
 });
 
 describe("readPages — the storefront bench", () => {
-  it("reads its four pages, their titles and layouts, and its nav, with no problems", async () => {
+  it("reads its pages, their titles and layouts, and its nav, with no problems", async () => {
     const bench = fileURLToPath(new URL("../../../storefront-bench/pages/", import.meta.url));
     const model = await readPages(bench);
     expect(model.problems).toEqual([]);
@@ -57,14 +57,21 @@ describe("readPages — the storefront bench", () => {
       { route: "/guides/", title: "Guides", layout: "page" },
       { route: "/guides/setup/", title: "Setup", layout: "doc", redirectFrom: ["/setup/", "/start/"] },
       { route: "/about/", title: "About", layout: "doc" },
+      { route: "/articles/", title: "Articles", layout: "listing" },
+      { route: "/articles/harbour/", title: "A harbour of cable cars", layout: "article" },
+      { route: "/articles/plain/", title: "Plain on purpose", layout: "doc" },
     ]);
     expect(model.nav).toEqual([
       { route: "/", title: "Storefront bench", description: "A small website rendered from markdown, with the bench's own skin." },
       { route: "/guides/", title: "Guides", description: "Longer texts about the bench.",
         children: [{ route: "/guides/setup/", title: "Setup", description: "How the bench is put together." }] },
       { route: "/about/", title: "About", description: "What the bench is for." },
+      { route: "/articles/", title: "Articles", description: "Everything written for the bench, newest first.", children: [
+        { route: "/articles/harbour/", title: "A harbour of cable cars" },
+        { route: "/articles/plain/", title: "Plain on purpose", description: "Why the bench's skin is a wireframe." },
+      ] },
     ]);
-    expect([...model.files.keys()]).toEqual(["/", "/guides/", "/guides/setup/", "/about/"]);
+    expect([...model.files.keys()]).toEqual(["/", "/guides/", "/guides/setup/", "/about/", "/articles/", "/articles/harbour/", "/articles/plain/"]);
     expect(model.files.get("/guides/setup/")?.path).toBe("guides/setup.md");
   });
 });
@@ -232,7 +239,7 @@ describe("readPages — problems (each one fatal to the caller)", () => {
   it("an empty pages folder has no home page", async () => {
     const model = await readPages(await pages({}));
     expect(model).toEqual({
-      pages: [], nav: [], files: new Map(),
+      pages: [], nav: [], files: new Map(), entries: new Map(), folders: new Map(), drafts: [],
       problems: ["there is no home page: the pages folder needs an index.md at its top, the page at /"],
     });
   });
@@ -245,7 +252,7 @@ describe("readPages — problems (each one fatal to the caller)", () => {
 
   it("a pages folder that does not exist", async () => {
     const missing = join(await pages({}), "no-such-folder");
-    expect(await readPages(missing)).toEqual({ pages: [], nav: [], files: new Map(), problems: [`the pages folder ${missing} does not exist`] });
+    expect(await readPages(missing)).toEqual({ pages: [], nav: [], files: new Map(), entries: new Map(), folders: new Map(), drafts: [], problems: [`the pages folder ${missing} does not exist`] });
   });
 
   it("a pages path that is a file, not a folder", async () => {

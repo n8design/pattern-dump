@@ -204,10 +204,15 @@ lede: Three folders make a site.
 | `image` | Its link-preview image: a raster file in the assets (PNG, JPEG, GIF or WebP), such as `/assets/images/setup.png`. An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `storefront.image` |
 | `index` | `false` keeps the page out of search engines: `noindex`, and no sitemap entry |
 | `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. See [Redirects](#redirects) |
+| `date` | The page's date, a real calendar date written `YYYY-MM-DD`: what a listing sorts and shows, and its JSON-LD `datePublished`. Without it, the day git first saw the page. See [Collections](#collections) |
+| `tags` | One tag or a list, each lowercase letters, digits and hyphens, none twice: `tags: [css, design-systems]` |
+| `draft` | `true` shows the page in `pd dev` and leaves it out of `pd build`. See [Drafts](#drafts) |
+| `sort` | On a folder's `index.md` only: `date` lists the folder's pages newest first; `order`, the default, in the folder's order |
 | any other key | Must be declared by the layout's schema |
 
-`layout`, `order`, `image`, `index` and `redirectFrom` belong to the build: they never reach the layout, and a
-layout's schema may not declare any of them.
+`layout`, `order`, `image`, `index`, `redirectFrom`, `date`, `tags`, `draft` and `sort` belong to the build: they
+never reach the layout as keys of their own, and a layout's schema may not declare any of them (a layout shows a
+page's date and tags through `page.date` and `page.tags`).
 
 **The layout's schema is the frontmatter contract.** A layout is a component, and its
 `<name>.schema.json` lists the keys a page using it may set (`properties`) and must set (`required`). A
@@ -313,6 +318,9 @@ keys below, at any depth.
 | `breadcrumbs` | Home, then each folder above the page by its `index.md`, as `{ route, title }`; empty on the home page. They reach pages the one-level nav does not list |
 | `prev`, `next` | The pages before and after this one in the nav, read entry by entry with each folder's pages after it, across sections; `null` at either end and for a page the nav does not list |
 | `created`, `modified` | The page's first and last commit, from git: the author date, ISO 8601. A renamed page keeps the date it was first added |
+| `children` | On a folder's `index.md`: the folder's pages, an entry each, sorted as its `sort` says (see [Collections](#collections)); `[]` on any other page |
+| `date` | The page's `date`, else the day git first saw it (`YYYY-MM-DD`), else `null` |
+| `tags` | The page's `tags`, else `[]` |
 
 ```hbs
 {{#each page.headings}}<a href="#{{anchor}}">{{text}}</a>{{/each}}
@@ -361,6 +369,73 @@ entry that is none of the three forms or an unknown key is a problem with its pl
 A layout gets `site.navigations.<name>` for every name the skin lists, resolved for the page: entries of
 `{ label, route }`, `{ label, href }` or `{ label, children }`, with `current: true` on the page's own entry
 and `ancestor: true` on every group above it; `null` for a name the config does not set.
+
+### Collections
+
+A folder of pages is a collection: its `index.md` can list the folder's pages, and any page can show them.
+
+```
+pages/articles/index.md       layout: listing, sort: date
+pages/articles/first-post.md  date: 2026-11-02, tags: [css]
+```
+
+**On the folder's own page.** A layout that declares `page.children` gets the folder's pages: its direct pages
+and each subfolder (by its `index.md`), as on the nav. `sort: date` on the `index.md` puts the newest first,
+pages with the same date by their route; without it they come in the folder's order (`order`). Each entry
+has the same fixed shape:
+
+| Entry | |
+|---|---|
+| `route`, `title` | The page's route and title |
+| `description` | The page's `description`; without one, the first paragraph of its body as plain text (links keep their text, markup and images are left out, a paragraph that is only an image or a placed component is skipped), or `null` |
+| `date` | The page's `date`, else the day git first saw it, else `null` |
+| `image` | The page's `image`, a path in the assets, or `null` |
+| `tags` | The page's `tags`, or `[]` |
+| `draft` | `true` for a draft in `pd dev` |
+
+The description is never shortened: limit it in the skin's CSS, for example to three lines with
+`line-clamp: 3` (and `-webkit-line-clamp`, `display: -webkit-box` and `-webkit-box-orient: vertical` for the
+browsers that still need them).
+
+To show an entry's image with its variants, pass it to a component with an image slot, inside the loop:
+
+```hbs
+{{#each page.children}}<li>{{> components-card }}</li>{{/each}}
+```
+
+where `components/card` declares `image` with `x-pd-image` and writes `{{pd-image image alt=""}}`. A component
+a layout includes may not have sample data of keys the layout doesn't declare; give it a variant
+(`card~article.json`) to show it filled in the workbench.
+
+With `sort: date`, a page with no date at all (no `date` and no commit, such as a new file) is a problem in
+`pd build` and a note in `pd dev`, where it is listed last. From a shallow clone, a date git would give is
+refused by `pd build`, as for `page.created`.
+
+**On any page.** `partials/base`'s schema lists the collections the skin shows under
+`site.properties.collections.properties`, by the folder's path (`articles`, or `blog/news` for a nested folder,
+read as `site.collections.[blog/news]`), each with a description at most, as it lists navigations. Every page
+gets `site.collections.<name>`: the folder's entries, sorted as above. A listed name the site has no folder for is
+an empty list and a note naming the nearest folder; a name in `required` is a problem instead. The config can't
+set `site.collections`.
+
+```hbs
+{{#each site.collections.articles}}{{#if (lt @index 3)}}<a href="{{route}}">{{title}}</a>{{/if}}{{/each}}
+```
+
+In `pd dev` an edit to what a listing shows of a page (its date, description, first paragraph, image, tags or
+draft) reloads every open page, as a title edit does.
+
+### Drafts
+
+`draft: true` keeps a page out of the published site. `pd dev` shows it, listed with `draft: true` so the skin
+can mark it, and notes once that `pd build` leaves it out. `pd build` builds the site as if the file weren't
+there: no page, no entry in the nav, a listing or `site.collections`, no sitemap entry, none of its old routes,
+and a link to it from a published page is a broken link. A folder whose `index.md` is a draft takes the
+folder's pages with it. The build's report names what it left out:
+
+```
+[pd build] drafts: 1 left out (articles/first-post.md)
+```
 
 The page's `<head>` links the stylesheets of the layout and everything it includes, and the project's
 base layer (`documentBase`), which also reaches every preview. It does not link themes: a skin's colours
@@ -489,8 +564,8 @@ must be encoded.
 - a canonical URL, and `og:url`
 - Open Graph (`og:type`, `og:site_name`, `og:title`, `og:description`, `og:image` with its width and height)
   and a Twitter card, large when the page has an image
-- one JSON-LD graph: the `WebSite`, the `WebPage` with its last change from git (`dateModified`), and a
-  `BreadcrumbList` from Home down to the page
+- one JSON-LD graph: the `WebSite`, the `WebPage` with its date (`datePublished`: its `date`, else its first
+  commit) and its last change from git (`dateModified`), and a `BreadcrumbList` from Home down to the page
 
 and `pd build` writes `sitemap.xml`. Without it, those are left out and `pd build` says so once. In `pd dev`
 the same tags carry the address the browser is on. Every page has `<html lang>` from `storefront.lang`

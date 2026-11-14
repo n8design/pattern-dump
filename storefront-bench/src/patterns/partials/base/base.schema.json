@@ -42,6 +42,15 @@
               "description": "Links in the footer of every page"
             }
           }
+        },
+        "collections": {
+          "type": "object",
+          "description": "The collections the skin shows, by the folder's path: their entries are Pattern Dump's",
+          "properties": {
+            "articles": {
+              "description": "The pages of pages/articles, newest first"
+            }
+          }
         }
       }
     }

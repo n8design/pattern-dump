@@ -170,7 +170,7 @@ describe("checkSite — navigations", () => {
 
   it("takes navigations apart from the other values, checked by their own shape", async () => {
     const r = await checkSite({ title: "Docs", navigations: { footer: [{ page: "about.md" }] } }, maps.navs!, PAGES);
-    expect(r).toEqual({ values: { title: "Docs" }, navigations: { footer: [{ page: "about.md" }] }, listed: ["footer"], problems: [] });
+    expect(r).toEqual({ values: { title: "Docs" }, navigations: { footer: [{ page: "about.md" }] }, listed: ["footer"], collections: [], problems: [], notes: [] });
   });
 
   it("reports a navigation's problem once, by its own check, beside the other values' problems", async () => {

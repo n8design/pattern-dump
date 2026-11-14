@@ -10,12 +10,18 @@ const SHARE = ["/assets/images/share.png", "240", "126"] as const;
 const PAGES = [
   ["/", "Storefront bench", SHARE], ["/about/", "About", ["/assets/images/about.png", "200", "100"]],
   ["/guides/", "Guides", SHARE], ["/guides/setup/", "Setup", SHARE],
+  ["/articles/", "Articles", SHARE], ["/articles/harbour/", "A harbour of cable cars", ["/assets/images/cable-cars.jpg", "2400", "1600"]],
+  ["/articles/plain/", "Plain on purpose", SHARE],
 ] as const;
 /** The trail each page's JSON-LD gives, Home first, the page last; the home page has none. */
 const TRAILS: Record<string, string[]> = {
   "/": [], "/about/": ["Storefront bench", "About"], "/guides/": ["Storefront bench", "Guides"],
   "/guides/setup/": ["Storefront bench", "Guides", "Setup"],
+  "/articles/": ["Storefront bench", "Articles"], "/articles/harbour/": ["Storefront bench", "Articles", "A harbour of cable cars"],
+  "/articles/plain/": ["Storefront bench", "Articles", "Plain on purpose"],
 };
+/** A page's own date (frontmatter date), which its JSON-LD gives as datePublished. */
+const PUBLISHED: Record<string, string> = { "/articles/harbour/": "2026-11-01", "/articles/plain/": "2026-10-02" };
 
 for (const [route, title, [image, width, height]] of PAGES) {
   test(`${route}: canonical, Open Graph and the card, at the site's address`, async ({ page, request }, info) => {
@@ -39,7 +45,7 @@ for (const [route, title, [image, width, height]] of PAGES) {
     // stamped with the content hash of what is served there, so a changed image gets a new URL.
     const res = await request.get(image);
     expect(res.status(), image).toBe(200);
-    expect(res.headers()["content-type"]).toContain("image/png");
+    expect(res.headers()["content-type"]).toContain(image.endsWith(".jpg") ? "image/jpeg" : "image/png");
     const stamp = createHash("sha256").update(await res.body()).digest("hex").slice(0, 10);
     expect(head.meta["og:image"]).toBe(`${new URL(image.slice(1), site).href}?v=${stamp}`);
     expect(head.meta["robots"]).toBeUndefined();
@@ -55,6 +61,9 @@ for (const [route, title, [image, width, height]] of PAGES) {
     expect(graph[1]).toMatchObject({ url, name: title });
     // Every bench page is committed, so git dates it (the checkout has its full history, in CI too).
     expect(graph[1]!["dateModified"]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/);
+    // datePublished: the page's own date where it has one, else the day git first saw it.
+    if (PUBLISHED[route]) expect(graph[1]!["datePublished"]).toBe(PUBLISHED[route]);
+    else expect(graph[1]!["datePublished"]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/);
     const trail = graph[1]!.breadcrumb?.itemListElement ?? [];
     expect(trail.map(i => i.name)).toEqual(TRAILS[route]);
     if (trail.length) expect(trail.at(-1)!.item).toBe(url);

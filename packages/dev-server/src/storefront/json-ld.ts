@@ -1,5 +1,5 @@
 // A storefront page's structured data: one JSON-LD graph, derived from what the site already has — the
-// site (WebSite), the page (WebPage, with its last change from git) and where it sits (a BreadcrumbList from
+// site (WebSite), the page (WebPage, with its date and its last change from git) and where it sits (a BreadcrumbList from
 // the folders, ending at the page). Richer types (Article, FAQ, …) are not core's; a plugin adds a node to
 // the same @graph.
 
@@ -16,6 +16,8 @@ export interface JsonLdPage {
   breadcrumbs: PageLink[];
   /** The page's last change, ISO 8601, or null when git has no reliable date for it. */
   modified: string | null;
+  /** The page's date: its own (frontmatter `date`, YYYY-MM-DD), else git's first commit of it (ISO 8601), or null. */
+  published?: string | null;
 }
 
 /** The page's JSON-LD as a <script> element. Every "<" in it is written <, so no value can end the
@@ -30,6 +32,7 @@ export function jsonLdScript(p: JsonLdPage): string {
       "@type": "WebPage", "@id": abs(p.route), url: abs(p.route), name: p.title,
       ...(p.description ? { description: p.description } : {}),
       isPartOf: { "@id": site },
+      ...(p.published ? { datePublished: p.published } : {}),
       ...(p.modified ? { dateModified: p.modified } : {}),
       ...(p.breadcrumbs.length ? {
         breadcrumb: {

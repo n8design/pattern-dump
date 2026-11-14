@@ -1,0 +1,11 @@
+{
+  "title": "Articles",
+  "description": "Everything written for the bench, newest first.",
+  "body": "<p>The folder's pages, listed by its index.md.</p>",
+  "page": {
+    "children": [
+      { "route": "/articles/harbour/", "title": "A harbour of cable cars", "description": "The bench's one photograph, and how a listing shows a page's image.", "date": "2026-11-01", "image": "/assets/images/cable-cars.jpg", "tags": ["images"], "draft": false },
+      { "route": "/articles/plain/", "title": "Plain on purpose", "description": "Why the bench's skin is a wireframe.", "date": "2026-10-02", "image": null, "tags": [], "draft": false }
+    ]
+  }
+}

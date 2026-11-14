@@ -72,6 +72,7 @@ describe("pd build — the storefront root", () => {
       "404.html",
       "_pd/base.css",
       "_pd/components/components/callout.css",
+      "_pd/components/components/card.css",
       "_pd/components/components/slide.css",
       "_pd/components/components/slider.css",
       "_pd/components/partials/base.css",
@@ -83,6 +84,7 @@ describe("pd build — the storefront root", () => {
       // prose, at the doc layout's three (480, 960, 1920).
       "_pd/images/images/cable-cars.56599118ae.1280.webp",
       "_pd/images/images/cable-cars.5dcc6d839f.1920.webp",
+      "_pd/images/images/cable-cars.710900a530.160.webp",
       "_pd/images/images/cable-cars.826bce8ef6.480.webp",
       "_pd/images/images/cable-cars.9f3b14a5c3.2400.webp",
       "_pd/images/images/cable-cars.a95d087638.960.webp",
@@ -90,9 +92,13 @@ describe("pd build — the storefront root", () => {
       "_pd/images/images/cable-cars.cec7974822.320.webp",
       "_pd/images/images/cable-cars.f21cb99719.1600.webp",
       "about/index.html",
-      // The link-preview images: the site's, and about.md's own (crawled from og:image).
+      "articles/harbour/index.html",
+      "articles/index.html",
+      "articles/plain/index.html",
+      // The link-preview images: the site's, about.md's own and the harbour article's (crawled from og:image).
       "assets/images/about.png",
       "assets/images/bench-blocks.svg",
+      "assets/images/cable-cars.jpg",
       // The favicon the skin's head partial links on every page.
       "assets/images/favicon.png",
       "assets/images/share.png",
@@ -107,7 +113,7 @@ describe("pd build — the storefront root", () => {
       "sitemap.xml",
       "start/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 4, files: 32, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 7, files: 38, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
@@ -116,7 +122,7 @@ describe("pd build — the storefront root", () => {
       "the pages folder is not in a git repository: no page has dates",
       `guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"`,
       // The bench's one link to another host, listed by the link check, not fetched.
-      `an external link, not checked: https://example.test/source (on /, /guides/, /guides/setup/, /about/, /404.html)`,
+      `an external link, not checked: https://example.test/source (on /, /guides/, /guides/setup/, /about/, /articles/, /articles/harbour/, /articles/plain/, /404.html)`,
     ]);
     expect(report.warnings).toEqual([]);
     const setup = files.get("guides/setup/index.html")!.bytes.toString("utf8");
@@ -185,7 +191,8 @@ describe("pd build — the storefront root", () => {
     // characters. The copy is outside any repository, so no page has a date and none has a <lastmod>.
     expect(sitemap.startsWith(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`)).toBe(true);
     const locs = [...sitemap.matchAll(/<url><loc>([^<]+)<\/loc><\/url>/g)].map(m => m[1]!);
-    expect(locs).toEqual(["https://bench.example.test/", "https://bench.example.test/about/", "https://bench.example.test/guides/", "https://bench.example.test/guides/setup/"]);
+    expect(locs).toEqual(["https://bench.example.test/", "https://bench.example.test/about/", "https://bench.example.test/articles/",
+      "https://bench.example.test/articles/harbour/", "https://bench.example.test/articles/plain/", "https://bench.example.test/guides/", "https://bench.example.test/guides/setup/"]);
     expect(sitemap.match(/<url>/g)).toHaveLength(locs.length);
     for (const loc of locs) expect(loc.length).toBeLessThanOrEqual(2048);
   });
@@ -204,7 +211,8 @@ describe("pd build — the storefront root", () => {
   it("is what pd dev serves, apart from the live-reload client, the workbench's address and the site's", async () => {
     const server = await startDevServer(config(), root, { port: 0, wsPort: 0 });
     try {
-      for (const [route, file] of [["/", "index.html"], ["/about/", "about/index.html"], ["/guides/", "guides/index.html"], ["/guides/setup/", "guides/setup/index.html"]]) {
+      for (const [route, file] of [["/", "index.html"], ["/about/", "about/index.html"], ["/guides/", "guides/index.html"], ["/guides/setup/", "guides/setup/index.html"],
+        ["/articles/", "articles/index.html"], ["/articles/harbour/", "articles/harbour/index.html"]]) {
         const live = await new Promise<string>((resolve, reject) => {
           const req = request({ host: "127.0.0.1", port: server.port, path: route, headers: { host: `live.localhost:${server.port}` } }, res => {
             let body = ""; res.setEncoding("utf8"); res.on("data", c => { body += c; }); res.on("end", () => resolve(body));

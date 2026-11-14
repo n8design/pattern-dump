@@ -1,10 +1,11 @@
 // A storefront page's frontmatter, checked against the layout it uses.
 //
-// Five keys belong to the build, not to a layout: `layout` (which layout; `page` when absent), `order`
-// (where in the nav), and the page's search and link-preview keys — `redirectFrom` (old routes that forward
+// Nine keys belong to the build, not to a layout: `layout` (which layout; `page` when absent), `order`
+// (where in the nav), the page's search and link-preview keys — `redirectFrom` (old routes that forward
 // here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
-// image, a raster file in the assets; checked against the files in page-image.ts). A layout cannot declare
-// any of the five. Every other key must be declared by the chosen layout's schema — the
+// image, a raster file in the assets; checked against the files in page-image.ts) — and its listing keys
+// (listing-keys.ts): `date`, `tags`, `draft`, and `sort` on a folder's index.md. A layout cannot declare
+// any of the nine. Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
 // declares. Nothing is inferred: a key the schema does not declare is an error, and a layout with no
 // schema declares nothing. Four more keys are filled by the storefront itself (`body`, the rendered
@@ -18,9 +19,11 @@ import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { suggest } from "@pattern-dump/config";
 import { checkDeclared, readSchema, type PropertySchema } from "./declared-values.js";
 import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
+import type { FrontmatterValue } from "../frontmatter.js";
+import { readDate, readDraft, readSort, readTags, type Read, type SortBy } from "./listing-keys.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
-export const RESERVED_KEYS = ["layout", "order", "redirectFrom", "index", "image"] as const;
+export const RESERVED_KEYS = ["layout", "order", "redirectFrom", "index", "image", "date", "tags", "draft", "sort"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
 export const ASSEMBLY_KEYS = ["body", "nav", "site", "page"] as const;
 
@@ -40,6 +43,12 @@ export interface BuildKeys {
   index?: boolean;
   /** A /assets/… path. */
   image?: string;
+  /** The page's date, YYYY-MM-DD. */
+  date?: string;
+  tags?: string[];
+  draft?: boolean;
+  /** On a folder's index.md: how its pages are listed. */
+  sort?: SortBy;
 }
 
 /** An old route: root-relative, slash-wrapped, plain segments only (no query, fragment, "." or ".."). */
@@ -47,7 +56,7 @@ const OLD_ROUTE = /^\/(?:(?!\.\.?\/)[^/?#\s]+\/)+$/;
 /** The same rule as storefront.image in the config. */
 const ASSET_PATH = /^\/assets\/[^?#]+[^/?#]$/;
 
-function checkBuildKeys(values: Record<string, unknown>, at: (key: string, message: string) => void): BuildKeys {
+function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, at: (key: string, message: string) => void): BuildKeys {
   const out: BuildKeys = {};
   const redirect = values["redirectFrom"];
   if (redirect !== undefined) {
@@ -68,6 +77,16 @@ function checkBuildKeys(values: Record<string, unknown>, at: (key: string, messa
     if (typeof image === "string" && ASSET_PATH.test(image)) out.image = image;
     else at("image", `image must be a path to a file in the assets, such as "/assets/images/share.png"`);
   }
+  const take = <K extends "date" | "tags" | "draft" | "sort">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
+    if (r === undefined) return;
+    if (r.ok) out[key] = r.value;
+    else at(key, r.message);
+  };
+  const v = (key: string) => values[key];
+  take("date", v("date") === undefined ? undefined : readDate(v("date")!));
+  take("tags", v("tags") === undefined ? undefined : readTags(v("tags")!));
+  take("draft", v("draft") === undefined ? undefined : readDraft(v("draft")!));
+  take("sort", v("sort") === undefined ? undefined : readSort(v("sort")!, path));
   return out;
 }
 
@@ -112,14 +131,14 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
         ? `layout "${layout}" is not a layout — the layouts are ${known.map(n => `"${n}"`).join(", ")}`
         : `layout "${layout}" is not a layout — the project has no layouts (components in a layouts/ folder of its patterns)`);
     }
-    return { layoutId, values: {}, build: checkBuildKeys(values, at), problems };
+    return { layoutId, values: {}, build: checkBuildKeys(values, page.path, at), problems };
   }
 
   // ---- the layout's schema: what a page may set ----
   const read = await readSchema(entry.schemaPath);
   if (read.error !== undefined) {
     problems.push({ file: page.path, message: `the schema of layout "${layout}" cannot be read: ${read.error}` });
-    return { layoutId, values: {}, build: checkBuildKeys(values, at), problems };
+    return { layoutId, values: {}, build: checkBuildKeys(values, page.path, at), problems };
   }
   const schema: LayoutSchema = read.schema ?? {};
   const hasSchema = read.schema !== undefined;
@@ -131,7 +150,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
         + `not for its layout: rename it in the layout's schema` });
     }
   }
-  const build = checkBuildKeys(values, at);
+  const build = checkBuildKeys(values, page.path, at);
 
   // ---- every key the page sets ----
   const out: Record<string, unknown> = {};

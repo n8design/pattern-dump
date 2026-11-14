@@ -10,6 +10,7 @@
 // every page using the layout.
 
 import type { StorefrontNavItem, StorefrontPagesResponse } from "@pattern-dump/contracts";
+import type { Entry } from "./collections.js";
 
 /** A link to another page. */
 export interface PageLink { route: string; title: string }
@@ -25,12 +26,21 @@ export interface DerivedPage {
   next: PageLink | null;
   created: string | null;
   modified: string | null;
+  /** A folder's index.md: its pages (collections.ts); [] on any other page. */
+  children: Entry[];
+  /** The page's date, YYYY-MM-DD: its own, else the day git first saw it. */
+  date: string | null;
+  tags: string[];
 }
 
 /** A value with no keys of its own; an object with exactly these fields; a list of one shape. */
 export type Shape = "value" | { fields: Record<string, Shape> } | { items: Shape };
 
 const LINK: Shape = { fields: { route: "value", title: "value" } };
+/** An entry of a listing (collections.ts). */
+export const ENTRY: Shape = {
+  fields: { route: "value", title: "value", description: "value", date: "value", image: "value", tags: "value", draft: "value" },
+};
 
 /** The shape of `page`, field by field. */
 export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
@@ -42,11 +52,14 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
     next: LINK,
     created: "value",
     modified: "value",
+    children: { items: ENTRY },
+    date: "value",
+    tags: "value",
   },
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified"];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified", "children", "date", "tags"];
 
 /** A page's place in the site. */
 export type Position = Pick<DerivedPage, "section" | "breadcrumbs" | "prev" | "next">;

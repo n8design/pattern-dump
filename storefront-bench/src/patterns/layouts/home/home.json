@@ -6,7 +6,31 @@
     "title": "Storefront bench",
     "tagline": "A website written in markdown",
     "href": "/",
-    "footer": "Built with Pattern Dump from the storefront bench."
+    "footer": "Built with Pattern Dump from the storefront bench.",
+    "collections": {
+      "articles": [
+        {
+          "route": "/articles/harbour/",
+          "title": "A harbour of cable cars",
+          "description": "The bench's one photograph.",
+          "date": "2026-11-01",
+          "image": null,
+          "tags": [
+            "images"
+          ],
+          "draft": false
+        },
+        {
+          "route": "/articles/plain/",
+          "title": "Plain on purpose",
+          "description": "Why the bench's skin is a wireframe.",
+          "date": "2026-10-02",
+          "image": null,
+          "tags": [],
+          "draft": false
+        }
+      ]
+    }
   },
   "nav": [
     {

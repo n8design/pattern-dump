@@ -26,9 +26,11 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { PD_ROUTES, type StorefrontNavItem, type StorefrontPage, type StorefrontPagesResponse } from "@pattern-dump/contracts";
-import { readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
+import { frontmatterBody, readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
 import { redirectProblems, redirectsOf, workbenchPlace } from "./redirects.js";
+import { readDate, readDraft, readSort, readTags, type SortBy } from "./listing-keys.js";
+import { teaserOf } from "./teaser.js";
 
 /** The layout a page uses when its frontmatter names none. */
 export const DEFAULT_LAYOUT = "page";
@@ -45,9 +47,36 @@ export interface PageFile {
   frontmatter: FrontmatterReading;
 }
 
+/** What a listing shows of a page, from its file alone (collections.ts adds the date from git). */
+export interface PageEntryFields {
+  /** Its description, else the first paragraph of its body (teaser.ts), else null. */
+  description: string | null;
+  /** Its frontmatter date, YYYY-MM-DD, or null. */
+  date: string | null;
+  /** Its image, a path in the assets, or null. */
+  image: string | null;
+  tags: string[];
+  draft: boolean;
+}
+
+/** A folder's listing: its pages and subfolders (each by its index.md), in the folder's order, and how to sort them. */
+export interface FolderListing {
+  sort: SortBy;
+  /** Routes, in the folder's order (the nav's rule, at any depth). */
+  children: string[];
+}
+
 export interface PageModel extends StorefrontPagesResponse {
   /** Every page by route, in the order of `pages`. */
   files: Map<string, PageFile>;
+  /** What a listing shows of each page, by route. A value that fails its check is left out here (null, [] or
+   *  false); the page's own check reports it. */
+  entries: Map<string, PageEntryFields>;
+  /** Each folder's listing, by the folder's route ("/" for the top). */
+  folders: Map<string, FolderListing>;
+  /** Drafts, by their path in the pages folder: shown ones with `drafts: "show"`; with "leave-out", every page left
+   *  out (a draft, and each page under a folder whose index.md is one). */
+  drafts: string[];
   /** 404.md at the top of the pages folder, at the route /404.html: not a page of the site, so in neither
    *  `pages`, `files` nor the nav. Absent when the site has none (a built-in one is used). */
   notFound?: PageFile;
@@ -94,13 +123,18 @@ const scalar = (v: string | string[] | undefined): string | undefined => typeof 
  * `workbenchPath`: the path of a workbench published on the storefront's host (sameHostWorkbenchPath), where no
  * page and no old route may be, since the published workbench would take its place.
  */
-export async function readPages(pagesDir: string, opts: { workbenchPath?: string | undefined } = {}): Promise<PageModel> {
+/**
+ * `drafts`: "show" (pd dev, the default) keeps drafts as pages; "leave-out" (pd build) drops every page whose
+ * frontmatter says `draft: true`, and every page under a folder whose index.md does, as if their files weren't there.
+ */
+export async function readPages(pagesDir: string, opts: { workbenchPath?: string | undefined; drafts?: "show" | "leave-out" } = {}): Promise<PageModel> {
   const problems: string[] = [];
   const files = new Map<string, PageFile>();
   let notFound: PageFile | undefined;
   if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
-    return { pages: [], nav: [], files, problems: [`the pages folder ${pagesDir} does not exist`] };
+    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], problems: [`the pages folder ${pagesDir} does not exist`] };
   }
+  const bodies = new Map<string, string>();
   for (const path of (await markdownFiles(pagesDir, pagesDir, problems)).sort()) {
     const route = routeFor(path);
     const other = files.get(route);
@@ -111,7 +145,23 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
     if (text === null) continue;
     if (path === NOT_FOUND_FILE) { notFound = { route: PD_ROUTES.notFound, file, path, frontmatter: readFrontmatterStrict(text) }; continue; }
     files.set(route, { route, file, path, frontmatter: readFrontmatterStrict(text) });
+    bodies.set(route, text);
   }
+
+  // Drafts: shown, or left out with every page under a draft folder's index.md (the top's index.md is only itself).
+  const isDraft = (f: PageFile | undefined): boolean => {
+    const v = f?.frontmatter.values["draft"];
+    return v !== undefined && (() => { const r = readDraft(v); return r.ok && r.value; })();
+  };
+  const drafts: string[] = [];
+  for (const [route, f] of [...files]) {
+    const segments = route.split("/").filter(Boolean);
+    const folderDraft = segments.slice(0, -1).some((_, i) => isDraft(files.get(`/${segments.slice(0, i + 1).join("/")}/`)));
+    if (!isDraft(f) && !(opts.drafts === "leave-out" && folderDraft)) continue;
+    drafts.push(f.path);
+    if (opts.drafts === "leave-out") { files.delete(route); bodies.delete(route); }
+  }
+  drafts.sort();
 
   const pageOf = (f: PageFile): StorefrontPage => {
     const redirectFrom = redirectsOf(f);
@@ -201,5 +251,35 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
   }
   // Redirects across pages: an old route that is a page, or that two pages claim.
   problems.push(...redirectProblems(files, workbenchPath));
-  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), problems, ...(notFound ? { notFound } : {}) };
+
+  // What listings show of each page, and each folder's listing.
+  const ok = <T>(v: string | string[] | undefined, read: (v: string | string[]) => { ok: true; value: T } | { ok: false }): T | undefined => {
+    if (v === undefined) return undefined;
+    const r = read(v);
+    return r.ok ? r.value : undefined;
+  };
+  const entries = new Map<string, PageEntryFields>();
+  for (const route of routes) {
+    const f = files.get(route)!;
+    const v = f.frontmatter.values;
+    const description = scalar(v["description"]);
+    const image = scalar(v["image"]);
+    entries.set(route, {
+      description: description ?? teaserOf(frontmatterBody(bodies.get(route)!)),
+      date: ok(v["date"], readDate) ?? null,
+      image: image !== undefined && /^\/assets\/[^?#]+[^/?#]$/.test(image) ? image : null,
+      tags: ok(v["tags"], readTags) ?? [],
+      draft: ok(v["draft"], readDraft) ?? false,
+    });
+  }
+  const listings = new Map<string, FolderListing>();
+  for (const folder of ["/", ...[...folders].sort()]) {
+    const index = files.get(folder);
+    if (!index) continue;
+    listings.set(folder, {
+      sort: ok(index.frontmatter.values["sort"], v => readSort(v, index.path)) ?? "order",
+      children: ordered(folder).map(c => c.route).filter(r => files.has(r)),
+    });
+  }
+  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, problems, ...(notFound ? { notFound } : {}) };
 }

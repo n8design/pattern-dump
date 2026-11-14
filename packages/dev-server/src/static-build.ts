@@ -25,6 +25,7 @@ import { imageCacheDir } from "./image-route.js";
 import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 import { createSnapshotWriter } from "./snapshot-writer.js";
+import { readPages } from "./storefront/pages.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
@@ -78,6 +79,9 @@ export interface StaticBuildReport {
   accessibility?: { pages: number; warnings: string[]; browser?: boolean };
   /** `--browser`: one line per image whose chosen variant doesn't fit the box it is laid out in. */
   images?: { warnings: string[] };
+  /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
+   *  their path in the pages folder. Absent when there are none. */
+  drafts?: string[];
   ms: number;
 }
 
@@ -383,6 +387,8 @@ export async function buildStaticSite(
       if (linkSummary) report.links = linkSummary;
       if (a11ySummary) report.accessibility = a11ySummary;
       if (imageSummary) report.images = imageSummary;
+      const drafts = (await readPages(storefront.pagesDir, { drafts: "leave-out" })).drafts;
+      if (drafts.length) report.drafts = drafts;
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
 

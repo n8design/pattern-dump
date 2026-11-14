@@ -144,7 +144,7 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
     const md = "---\ntitle: T\nlayout: <img src=x onerror=alert(1)>\n---\n";
     const page = await build("/", await pagesOf({ "index.md": md }));
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`index.md:3: layout "<img src=x onerror=alert(1)>" is not a layout — the layouts are "article", "doc", "home", "page"`]);
+    expect(page.problems).toEqual([`index.md:3: layout "<img src=x onerror=alert(1)>" is not a layout — the layouts are "article", "doc", "home", "listing", "page"`]);
     expect(page.html).not.toContain("<img src=x");
     expect(page.html).toContain(`<li>index.md:3: layout &quot;&lt;img src=x onerror=alert(1)&gt;&quot; is not a layout`.replace(/&quot;/g, `"`));
   });
@@ -248,7 +248,7 @@ describe("the skin's templates", () => {
     };
     await walk(join(patterns, "layouts"));
     await walk(join(patterns, "partials"));
-    expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/doc/doc.hbs: {{{body}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}"]);
+    expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/doc/doc.hbs: {{{body}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/listing/listing.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}"]);
   });
 });
 

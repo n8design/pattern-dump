@@ -1010,18 +1010,20 @@ async function handleConfig(filePath: string): Promise<boolean> {
 
 // Storefront pages. Nothing is cached server-side — every page request reads the folder — so all a
 // change needs is a reload of the pages it touches. An edited page reloads itself, unless the edit changed
-// what other pages show of it: its title, description or order is in every page's nav, so then every page
-// reloads. A file or folder added or removed can change the nav (or the folder's problems), so every page
+// what other pages show of it: its title, description or order is in every page's nav, and what a listing shows
+// of it (its date, tags, image, draft, or its first paragraph when it has no description) is on its folder's
+// listing and in site.collections, so then every page reloads. A file or folder added or removed can change the nav (or the folder's problems), so every page
 // reloads. Dotfiles are not pages and change nothing. Checked first, with a folder boundary, because the
 // other handlers match on a path prefix.
 const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p);
 
-/** What every page shows of the others: the nav, and each page's route, title and layout. Null without a
+/** What every page shows of the others: the nav, each page's route, title and layout, what a listing shows of it
+ *  (its description or first paragraph, date, image, tags, draft) and each folder's listing. Null without a
  *  storefront. Compared, never parsed. */
 async function pagesFingerprint(): Promise<string | null> {
   if (!pagesDir) return null;
   const model = await readPages(pagesDir, { workbenchPath });
-  return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems });
+  return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems, entries: [...model.entries], folders: [...model.folders] });
 }
 
 async function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): Promise<boolean> {

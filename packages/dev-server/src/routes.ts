@@ -590,7 +590,8 @@ async function routeRequest(
     if (cfg.storefront && host === cfg.storefront.host) {
       const discovery = await currentDiscovery(state, patternRoots);
       const discoveryMap = discovery.discoveryMap;
-      const model = await readPages(cfg.storefront.pagesDir, { workbenchPath: sameHostWorkbenchPath(cfg.storefront) });
+      // pd dev shows drafts; pd build leaves them out, as if their files weren't there.
+      const model = await readPages(cfg.storefront.pagesDir, { workbenchPath: sameHostWorkbenchPath(cfg.storefront), drafts: ctx.live ? "show" : "leave-out" });
       if (pathname === PD_ROUTES.pages) {
         if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
         json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);

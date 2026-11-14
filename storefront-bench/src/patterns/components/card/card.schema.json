@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "description": "One entry of a listing, as Pattern Dump fills it.",
+  "properties": {
+    "route": { "type": "string" },
+    "title": { "type": "string" },
+    "description": { "type": ["string", "null"] },
+    "date": { "type": ["string", "null"] },
+    "image": {
+      "type": ["string", "null"],
+      "x-pd-image": { "widths": [160, 320, 640], "sizes": "8rem" }
+    },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "draft": { "type": "boolean" }
+  }
+}
