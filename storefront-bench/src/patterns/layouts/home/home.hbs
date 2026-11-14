@@ -3,5 +3,15 @@
   <h1 class="page-title">{{title}}</h1>
   {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
   <div class="page-body">{{{body}}}</div>
+  {{#if site.collections.articles.length}}
+  <section class="home-latest" aria-labelledby="home-latest-title">
+    <h2 id="home-latest-title">Latest articles</h2>
+    <ul>
+      {{#each site.collections.articles}}{{#if (lt @index 2)}}
+      <li><a href="{{route}}">{{title}}</a>{{#if date}} <time datetime="{{date}}">{{date}}</time>{{/if}}</li>
+      {{/if}}{{/each}}
+    </ul>
+  </section>
+  {{/if}}
 </article>
 {{/partials-base}}

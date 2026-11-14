@@ -6,6 +6,9 @@ const PAGES: Array<[route: string, title: string, heading: string, current: stri
   ["/about/", "About — Storefront bench", "About", "About"],
   ["/guides/", "Guides — Storefront bench", "Guides", "Guides"],
   ["/guides/setup/", "Setup — Storefront bench", "Setup", "Setup"],
+  ["/articles/", "Articles — Storefront bench", "Articles", "Articles"],
+  ["/articles/harbour/", "A harbour of cable cars — Storefront bench", "A harbour of cable cars", "A harbour of cable cars"],
+  ["/articles/plain/", "Plain on purpose — Storefront bench", "Plain on purpose", "Plain on purpose"],
 ];
 
 test.describe("storefront pages", () => {
@@ -22,8 +25,8 @@ test.describe("storefront pages", () => {
 
   test("the nav lists the pages in order, one level deep", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About"]);
-    await expect(page.locator(".site-nav-sub a")).toHaveText(["Setup"]);
+    await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About", "Articles"]);
+    await expect(page.locator(".site-nav-sub a")).toHaveText(["Setup", "A harbour of cable cars", "Plain on purpose"]);
   });
 
   test("loads no workbench shell stylesheet", async ({ page }) => {

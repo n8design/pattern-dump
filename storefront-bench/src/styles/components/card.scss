@@ -1,0 +1,37 @@
+// The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design.
+.card {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  column-gap: 1rem;
+  padding: 0.5rem;
+  border: 1px solid;
+
+  img {
+    grid-row: span 3;
+    inline-size: 8rem;
+    block-size: auto;
+  }
+}
+
+.card-title,
+.card-date,
+.card-teaser {
+  grid-column: 2;
+  margin: 0;
+}
+
+// The teaser comes unshortened: three lines of it here.
+.card-teaser {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.listing-entries {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}

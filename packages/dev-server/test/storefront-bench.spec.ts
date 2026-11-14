@@ -43,6 +43,10 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
     ["Setup", "Three folders make a site", "Pages", "Layouts", "Each markdown file in pages/ is a page"]],
   ["layouts/home", "Home", "The front page — the site's name as its heading, an optional description, and the page's body.", "full",
     ["Storefront bench", "A small website rendered from markdown", "The home page: the site’s name", "Guides", "Setup", "About"]],
+  ["layouts/listing", "Listing", "A folder's index.md that lists the folder's pages, each as a card.", "full",
+    ["Articles", "Everything written for the bench, newest first.", "A harbour of cable cars", "Plain on purpose"]],
+  // A card is included by a layout, so it has no sample data of its own (its article variant has).
+  ["components/card", "Card", "One entry of a listing (layouts/listing, page.children): a title linking to the page, its date, its teaser and its image.", "centered", []],
   ["partials/base", "Base", "The frame every layout fills — header, navigation, the page's content, footer.", "centered",
     ["Storefront bench", "Guides", "Built with Pattern Dump from the storefront bench."]],
   ["partials/header", "Header", "The site title and tagline, linking home.", "centered",
@@ -85,6 +89,13 @@ describe("storefront bench in the workbench", () => {
       for (const text of shows) expect(p.text, `${id} shows "${text}"`).toContain(text);
     });
   }
+
+  it("renders the card's article variant from its own data", async () => {
+    const p = await preview("components/card~article");
+    expect(p.status).toBe(200);
+    expect(p.text).toContain("A harbour of cable cars");
+    expect(p.text).toContain("2026-11-01");
+  });
 
   it("renders the callout's warning variant from its own data", async () => {
     const p = await preview("components/callout~warning");

@@ -306,7 +306,8 @@ describe("checkPageFrontmatter — the storefront bench", () => {
     const model = await readPages(join(bench, "pages"));
     const checked = await Promise.all([...model.files.values()].map(f => checkPageFrontmatter(f, benchMap)));
     expect(checked.flatMap(c => c.problems)).toEqual([]);
-    expect(checked.map(c => c.layoutId)).toEqual(["layouts/home", "layouts/page", "layouts/doc", "layouts/doc"]);
+    expect(checked.map(c => c.layoutId)).toEqual(["layouts/home", "layouts/page", "layouts/doc", "layouts/doc",
+      "layouts/listing", "layouts/article", "layouts/doc"]);
     expect(checked[2].values).toEqual({
       title: "Setup", description: "How the bench is put together.",
       lede: "Three folders make a site — the pages, the layouts that dress them, and the components they show.",

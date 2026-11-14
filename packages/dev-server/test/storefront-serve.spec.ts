@@ -72,7 +72,7 @@ describe("storefront pages on the storefront host", () => {
       expect(r.body, path).toContain(`<title>${title}</title>`);
     }
     const pages = JSON.parse((await get(port, "live.localhost", "/api/pages")).body) as { pages: Array<{ route: string }> };
-    expect(pages.pages.map(p => p.route)).toEqual(["/", "/guides/", "/guides/setup/", "/about/"]);
+    expect(pages.pages.map(p => p.route)).toEqual(["/", "/guides/", "/guides/setup/", "/about/", "/articles/", "/articles/harbour/", "/articles/plain/"]);
     expect((await get(port, "live.localhost", "/nope/")).status).toBe(404);
   });
 

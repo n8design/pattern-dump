@@ -112,7 +112,9 @@ describe("pd dev reloads storefront pages", () => {
 describe("a change to the base layer, with no workbench open", () => {
   // The base layer is in every page's head, so every page changed. Nothing has asked for a component
   // (state.lastComponentId is unset), so the workbench's own reload message has no component to name.
-  const everyPage = ["/", "/guides/", "/guides/setup/", "/about/"].map(route => ({ type: "page-changed", route }));
+  // In the page list's order.
+  const everyPage = ["/", "/guides/", "/guides/setup/", "/about/", "/articles/", "/articles/harbour/", "/articles/plain/"]
+    .map(route => ({ type: "page-changed", route }));
   let root = "";
   let messages: Message[] = [];
   beforeAll(async () => {
@@ -120,7 +122,7 @@ describe("a change to the base layer, with no workbench open", () => {
     messages = await watch(root, config);
   }, 120_000);
   const settled = async (act: () => Promise<void>) => {
-    await after(messages, act, m => m.type === "page-changed" && m.route === "/about/");
+    await after(messages, act, m => m.type === "page-changed" && m.route === everyPage.at(-1)!.route);
     await new Promise(r => setTimeout(r, 300));
   };
 
@@ -152,7 +154,8 @@ describe("script edits and new components, with no workbench open", () => {
   // Storefront pages load scripts and embed components whether or not a workbench is open, so each page
   // is told, page by page (watch-harness.ts: no waiting for quiet).
   afterAll(closeAll);
-  const everyPage = ["/", "/about/", "/guides/", "/guides/setup/"].map(route => JSON.stringify({ type: "page-changed", route })).sort();
+  const everyPage = ["/", "/about/", "/articles/", "/articles/harbour/", "/articles/plain/", "/guides/", "/guides/setup/"]
+    .map(route => JSON.stringify({ type: "page-changed", route })).sort();
   async function bench(name: string): Promise<Bench> {
     const root = await benchCopy(name);
     await mkdir(join(root, "src", "scripts"), { recursive: true });

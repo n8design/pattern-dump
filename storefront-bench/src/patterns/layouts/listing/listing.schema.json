@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Listing layout",
+  "description": "A folder's index.md that lists the folder's pages, each as a card.",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "title":       { "type": "string", "description": "The listing's heading, and its title in the nav" },
+    "description": { "type": "string", "description": "One sentence under the heading, and the page's meta description" },
+    "page": {
+      "type": "object",
+      "description": "What Pattern Dump derives for the page",
+      "properties": {
+        "children": { "description": "The folder's pages, sorted as its index.md says" }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+<article class="card">
+  {{#if image}}{{pd-image image alt=""}}{{/if}}
+  {{#if title}}<h2 class="card-title"><a href="{{route}}">{{title}}</a></h2>{{/if}}
+  {{#if date}}<p class="card-date"><time datetime="{{date}}">{{date}}</time>{{#if draft}} <span class="card-draft">Draft</span>{{/if}}</p>{{/if}}
+  {{#if description}}<p class="card-teaser">{{description}}</p>{{/if}}
+</article>

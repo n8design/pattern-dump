@@ -60,7 +60,7 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
       JSON.stringify({ type: "object", required: ["title"], properties: { title: { type: "string" }, description: { type: "string" } } }));
     await put("pages/zz-new.md", "---\nlayout: zz-plain\ntitle: New page\norder: 9\n---\n\nA page on a new layout.\n");
     await reloaded(page);
-    await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About", "New page"]);
+    await expect(page.locator(".site-nav-list > li > a")).toHaveText(["Storefront bench", "Guides", "About", "Articles", "New page"]);
     // The page and its layout are two saves, and each reloads every open page. The nav above can show
     // after the first, so a click can be lost to the second: click again until the new page is shown
     // on its new layout. Each attempt waits longer than one reload; the whole stays within reloaded()'s.

@@ -19,7 +19,7 @@ test.describe("the skin in the workbench", () => {
     await page.goto(`${WORKBENCH}/layouts/page`);
     await page.waitForSelector("#preview-frame[srcdoc]");
     const hrefs = await page.locator(".sidebar-tree a.tree-link").evaluateAll(as => as.map(a => a.getAttribute("href")));
-    expect(hrefs.sort()).toEqual(["/components/callout", "/components/slide", "/components/slider", "/layouts/article", "/layouts/doc", "/layouts/home", "/layouts/page", "/partials/base", "/partials/footer", "/partials/head", "/partials/header", "/partials/nav"]);
+    expect(hrefs.sort()).toEqual(["/components/callout", "/components/card", "/components/slide", "/components/slider", "/layouts/article", "/layouts/doc", "/layouts/home", "/layouts/listing", "/layouts/page", "/partials/base", "/partials/footer", "/partials/head", "/partials/header", "/partials/nav"]);
   });
 
   test("documents partials/head, whose preview shows nothing: its markup all belongs in a head", async ({ page }) => {
