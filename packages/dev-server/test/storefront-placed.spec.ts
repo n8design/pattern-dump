@@ -27,6 +27,9 @@ const ADDED: Record<string, string> = {
   "src/patterns/atoms/slide/slide.hbs": `<figure class="carousel-slide"><img src="{{image}}" alt="{{alt}}" width="320" height="180">{{#if caption}}<figcaption>{{{caption}}}</figcaption>{{/if}}</figure>\n`,
   "src/patterns/atoms/slide/slide.schema.json": json({ "x-pd-content": "caption", required: ["image", "alt"], properties: {
     image: { type: "string" }, alt: { type: "string" }, caption: { type: "string", contentMediaType: "text/markdown" } } }),
+  // A field named like a registered helper (`id`): {{id}} calls the helper, so the value could never show.
+  "src/patterns/atoms/badge/badge.hbs": `<span class="badge" id="{{id}}">{{label}}</span>\n`,
+  "src/patterns/atoms/badge/badge.schema.json": json({ required: ["label"], properties: { label: { type: "string" }, id: { type: "string" } } }),
   "src/styles/molecules/slider.scss": ".carousel {\n  display: flex;\n}\n",
   "src/styles/atoms/slide.scss": ".carousel-slide {\n  margin: 0;\n}\n",
   "pages/talks.md": `---\ntitle: Talks\n---\n\n## Recent talks\n\n<pd-molecules-slider label="Recent talks" per-view="1" loop>\n  <pd-atoms-slide image="/assets/images/bench-blocks.svg" alt="On stage">ESPC **2025**</pd-atoms-slide>\n  <pd-atoms-slide image="/assets/images/bench-blocks.svg" alt="Audience">Collab Summit</pd-atoms-slide>\n</pd-molecules-slider>\n`,
@@ -42,6 +45,9 @@ const CASES: Record<string, [body: string, problem: string]> = {
     `case-4.md:6:3: <pd-molecules-slider>.<pd-atoms-slide>[1]: "alt" is required by atoms/slide`],
   "case-5": [`<pd-molecules-slider label="x">\n  <pd-atoms-slide image="a.jpg" alt="a"></pd-atoms-slide>\n  <pd-molecules-slider label="inner"></pd-molecules-slider>\n</pd-molecules-slider>\n`,
     `case-5.md:7:3: <pd-molecules-slider> cannot be placed inside <pd-molecules-slider> — it takes <pd-atoms-slide>`],
+  "case-6": [`<pd-atoms-badge label="New"></pd-atoms-badge>\n`,
+    `case-6.md:5:1: atoms/badge cannot be placed: its schema (src/patterns/atoms/badge/badge.schema.json, #/properties/id): `
+      + `"id" is the name of a registered helper, so {{id}} would call the helper, not read this field`],
 };
 
 let tmp = "";

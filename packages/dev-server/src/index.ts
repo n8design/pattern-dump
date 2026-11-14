@@ -18,13 +18,13 @@
 //   /source/:id/data             — Shiki-highlighted JSON data fragment
 //   *                            — SPA shell
 import type { PatternDumpConfig } from "@pattern-dump/config";
-import { PD_HOSTS, type Render } from "@pattern-dump/contracts";
+import { PD_HOSTS, type Diagnostic, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 // Re-exported so the export/CLI orchestration (core) can key its report on the SAME handle derivation
 // as discovery/export, without core depending on discovery directly.
 export { deriveHandle } from "@pattern-dump/discovery";
 import {
-  createRenderer,
+  createRenderer, isHelperNameProblem,
   initHighlighter, } from "@pattern-dump/renderer";
 import { createSassDependencyTracker, compileSassFile } from "@pattern-dump/build";
 import { createHotReloader, type HotReloader } from "@pattern-dump/hotreloader";
@@ -198,13 +198,31 @@ export async function startDevServer(
     ...(cfg.storefront ? { siteImages: cfg.storefront.images } : {}),
     build: opts.live === false, warn: message => console.warn(`[dev-server] ${message}`),
   });
+  // A schema field named like a registered helper is an error the template can never show: said in the terminal,
+  // once per field for this server, the first time a render finds it (the workbench shows it on the component,
+  // a storefront page that uses the component fails, pd audit counts it).
+  const helperNamesSaid = new Set<string>();
+  const reportHelperNames = (diagnostics: readonly Diagnostic[] | undefined): void => {
+    for (const d of diagnostics ?? []) {
+      if (d.kind !== "SCHEMA_INVALID" || !isHelperNameProblem(d.message)) continue;
+      const line = `${d.location?.file ?? "a schema"} (${d.path ?? "#"}): ${d.message}`;
+      if (helperNamesSaid.has(line)) continue;
+      helperNamesSaid.add(line);
+      console.error(`[dev-server] error: ${line}`);
+    }
+  };
   const buildRenderer: BuildRenderer = (registrars, data) => {
     const renderWith = createRenderer({
       patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme, displayPath, images: images.lookup,
       ...(registrars.length ? { helperRegistrars: [...registrars] } : {}),
       ...(data ? { globalData: data } : {}),
     });
-    return async input => { await images.ready(generationNow()); return renderWith(input); };
+    return async input => {
+      await images.ready(generationNow());
+      const result = await renderWith(input);
+      reportHelperNames(result.meta?.diagnostics);
+      return result;
+    };
   };
   const rendering = createRenderingHandle(buildRenderer, helperRegistrars, globalData);
   const render: Render = input => rendering.current.render(input);

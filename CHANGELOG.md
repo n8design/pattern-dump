@@ -31,6 +31,10 @@
 - A code block on a storefront page, or in a component's `<pre>`, keeps its lines as written when its partial is
   included on an indented line (as a skin's `{{> @partial-block }}` usually is). Handlebars indented every line after
   the first by the include's indentation.
+- A schema field named like a registered helper (`id`, `eq`, …) is no longer an error only the workbench's Diagnostics
+  tab shows: `pd dev` and `pd build` say it in the terminal, a storefront page that places the component fails (as
+  one whose layout has such a field already did), and `pd audit` re-audits a component when its schema changes
+  instead of reusing a verdict cached before.
 - `pd dev` no longer keeps base-layer rules that a component's stylesheet stopped writing (through a mixin) until it is
   restarted.
 
