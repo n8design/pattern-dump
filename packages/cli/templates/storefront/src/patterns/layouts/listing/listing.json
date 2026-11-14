@@ -1,0 +1,13 @@
+{
+  "title": "Articles",
+  "description": "Everything written here, newest first.",
+  "body": "<p>The folder's index.md, rendered.</p>",
+  "site": { "title": __PD_BRAND_JSON__, "footer": "Made with Pattern Dump." },
+  "nav": [{ "route": "/", "title": "Home" }, { "route": "/articles/", "title": "Articles", "current": true }],
+  "page": {
+    "children": [
+      { "route": "/articles/second/", "title": "A second article", "description": "Its teaser: the page's description, or its first paragraph.", "date": "2026-11-14", "image": null, "tags": ["notes"], "draft": false },
+      { "route": "/articles/first/", "title": "A first article", "description": "Listed below the newer one.", "date": "2026-11-01", "image": null, "tags": [], "draft": false }
+    ]
+  }
+}

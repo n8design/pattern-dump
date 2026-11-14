@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Listing",
+  "description": "A folder's index.md that lists the folder's pages: a collection, such as articles.",
+  "type": "object",
+  "required": ["title"],
+  "properties": {
+    "title": { "type": "string", "description": "The listing's heading, and its title in the navigation" },
+    "description": { "type": "string", "description": "One sentence under the heading, and the page's description for search results" },
+    "page": {
+      "type": "object",
+      "description": "What the storefront works out for the page",
+      "properties": {
+        "children": { "description": "The folder's pages, newest first with sort: date" }
+      }
+    }
+  }
+}

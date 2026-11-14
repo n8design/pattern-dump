@@ -30,6 +30,9 @@ returns by itself. How `pd-` tags work:
 | `src/patterns/components/note/` | the component the home page shows |
 | `pattern-dump.config.ts` | `storefront`: the website's name and footer (`site`), and where it is published |
 
+`pages/articles/` is a collection: its `index.md` (layout `listing`, `sort: date`) lists every page in the folder,
+newest first, by its `date`. Copy `hello.md` to write another; `draft: true` keeps one out of the build.
+
 A page that doesn't exist shows a built-in 404 page; write `pages/404.md` to change it. A page that moved
 can forward from its old address (`redirectFrom: [/old/]`), and `index: false` keeps a page out of search
 engines. All of it is in the [storefront guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/storefront.md).

@@ -1,0 +1,16 @@
+{{#> partials-base }}
+<article class="page listing">
+  <h1 class="page-title">{{title}}</h1>
+  {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
+  <div class="page-body">{{{body}}}</div>
+  <ul class="listing-entries" role="list">
+    {{#each page.children}}
+    <li class="listing-entry">
+      <a class="listing-title" href="{{route}}">{{title}}</a>
+      {{#if date}}<time class="listing-date" datetime="{{date}}">{{date}}</time>{{/if}}
+      {{#if description}}<p class="listing-teaser">{{description}}</p>{{/if}}
+    </li>
+    {{/each}}
+  </ul>
+</article>
+{{/partials-base}}

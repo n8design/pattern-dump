@@ -4,3 +4,6 @@
 .page-description { margin-block: 0 tokens.$space-lg; color: var(--color-text-muted, #4b5563); }
 .page-body iframe { width: 100%; border: 0; }
 .page-next { margin-top: tokens.$space-lg; }
+.page-meta { margin-block: 0 tokens.$space-lg; color: var(--color-text-muted, #4b5563); }
+.page-tags { display: inline; margin: 0; padding: 0; list-style: none; }
+.page-tags li { display: inline; margin-inline-start: tokens.$space-sm; }
