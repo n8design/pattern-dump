@@ -36,7 +36,7 @@ import { checkImages, type ImageFinding } from "./image-checks.js";
 import { checkLinks } from "./links.js";
 import { checkPageBasics } from "./page-basics.js";
 import { redirectsOf } from "./redirects.js";
-import { dateOf, entriesOf, type Entry } from "./collections.js";
+import { dateOf, entriesOf, resolveCollections, type Entry } from "./collections.js";
 
 /** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
 export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
@@ -281,7 +281,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const line = page.frontmatter.lines["redirectFrom"];
     problems.push(`${page.path}${line !== undefined ? `:${line}` : ""}: the 404 page can't have redirectFrom: it is served for every address that has no page`);
   }
-  const site = await checkSite(a.site, a.discoveryMap, new Set([...model.files.values()].map(f => f.path)));
+  const site = await checkSite(a.site, a.discoveryMap, new Set([...model.files.values()].map(f => f.path)), {
+    folders: new Set([...model.folders.keys()].filter(r => r !== "/").map(r => r.slice(1, -1))), leftOut: model.drafts,
+  });
   siteWide = site.problems;
   problems.push(...site.problems);
 
@@ -379,13 +381,17 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     notes.push(...dated.notes);
   }
   if (declares("tags")) listing.tags = model.entries.get(route)?.tags ?? [];
+  // The collections the skin lists (site.collections), on every page.
+  const collections = site.collections.length ? await resolveCollections(site.collections, model, { dates: a.dates, mode }) : undefined;
+  if (collections) { problems.push(...collections.problems); notes.push(...collections.notes); }
+  notes.push(...site.notes ?? []);
   if (a.discoveryMap.has(checked.layoutId)) {
-    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed));
+    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed, site.collections));
   }
   // The skin's head partial: the same for every page, so its problems are the whole site's.
   const hasHead = a.discoveryMap.has(HEAD_PARTIAL);
   if (hasHead) {
-    const headSample = await checkSampleData(HEAD_PARTIAL, a.discoveryMap, a.composition, [], siteDeclared, undefined, site.listed);
+    const headSample = await checkSampleData(HEAD_PARTIAL, a.discoveryMap, a.composition, [], siteDeclared, undefined, site.listed, site.collections);
     siteWide = [...siteWide, ...headSample];
     problems.push(...headSample);
   }
@@ -397,6 +403,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const siteData = {
     ...withDeclaredAbsentAsNull(site.values, siteDeclared),
     ...(site.listed.length ? { navigations: resolveNavigations(site.navigations, site.listed, model, route) } : {}),
+    ...(collections ? { collections: collections.collections } : {}),
   };
   const dataFor = (body: string, headings: PageHeading[]) => ({
     ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),

@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { readPages } from "../src/storefront/pages.js";
-import { entriesOf } from "../src/storefront/collections.js";
+import { checkCollections, entriesOf } from "../src/storefront/collections.js";
 import { firstParagraph, teaserOf, teaserStats } from "../src/storefront/teaser.js";
 import type { DatedPage, GitDates } from "../src/storefront/git-dates.js";
 import { save } from "../../../test-support/save.js";
@@ -233,5 +233,92 @@ describe("assemblePage: page.children, page.date, page.tags, and datePublished",
     const { page: p } = await assemble("/articles/", { ...site, "articles/undated.md": page("Undated") }, ["children"]);
     expect(p.status).toBe(500);
     expect(p.problems).toEqual(["articles/index.md: sort: date, but articles/undated.md has no date: give it one (date: YYYY-MM-DD), or commit it so git dates it"]);
+  });
+});
+
+describe("checkCollections: the names partials/base lists under site.collections", () => {
+  const folders = new Set(["articles", "blog/news"]);
+  const owner = "partials/base";
+
+  it("lists folders' paths, a nested one included, and required names", () => {
+    expect(checkCollections({ properties: { articles: {}, "blog/news": { description: "News" } } }, owner, folders, [], undefined))
+      .toEqual({ listed: ["articles", "blog/news"], problems: [], notes: [] });
+    expect(checkCollections({ required: ["articles"] }, owner, folders, [], undefined)).toEqual({ listed: ["articles"], problems: [], notes: [] });
+    expect(checkCollections(undefined, owner, folders, [], undefined)).toEqual({ listed: [], problems: [], notes: [] });
+  });
+
+  it("a name with no such folder is an empty list and a note suggesting the nearest; a required one is refused", () => {
+    expect(checkCollections({ properties: { article: {} } }, owner, folders, [], undefined)).toEqual({ listed: ["article"], problems: [], notes: [
+      `partials/base lists site.collections.article, but the pages folder has no folder "article" with an index.md, so it is an empty list — did you mean "articles"?`] });
+    expect(checkCollections({ properties: { article: {} }, required: ["article"] }, owner, folders, [], undefined).problems).toEqual([
+      `partials/base lists site.collections.article, but the pages folder has no folder "article" with an index.md, and partials/base requires it — did you mean "articles"?`]);
+  });
+
+  it("takes a folder a build leaves out as a draft: an empty list, with nothing to say", () => {
+    expect(checkCollections({ properties: { notes: {} }, required: ["notes"] }, owner, folders, ["notes/index.md", "notes/a.md"], undefined))
+      .toEqual({ listed: ["notes"], problems: [], notes: [] });
+  });
+
+  it("refuses a shape, for a name or for the whole, and a config that sets collections", () => {
+    expect(checkCollections({ properties: { articles: { type: "array" } } }, owner, folders, [], undefined).problems).toEqual([
+      `partials/base declares "type" for site.collections.articles: the shape of an entry is Pattern Dump's, so list the name only (a description at most)`]);
+    expect(checkCollections({ type: "array", properties: {} }, owner, folders, [], undefined).problems).toEqual([
+      `partials/base declares a shape for site.collections: the shape of an entry is Pattern Dump's, so list the folders' names under properties only`]);
+    expect(checkCollections({ properties: { articles: {} } }, owner, folders, [], { collections: { articles: [] } }).problems).toEqual([
+      `storefront.site.collections is filled by Pattern Dump from the pages folders: list the names in partials/base's schema, and don't set it in the config`]);
+  });
+});
+
+describe("assemblePage: site.collections", () => {
+  async function assemble(route: string, files: Record<string, string>, base: unknown, site?: Record<string, unknown>) {
+    const root = await pages({});
+    const patterns = join(root, "patterns");
+    for (const [rel, body] of Object.entries({
+      "layouts/page/page.hbs": "{{#> partials-base}}<main><h1>{{title}}</h1>{{{body}}}</main>{{/partials-base}}",
+      "layouts/page/page.schema.json": JSON.stringify({ properties: { title: { type: "string" } } }),
+      "partials/base/base.hbs": "<div>{{> @partial-block}}<ol>{{#each site.collections.articles}}<li>{{title}}</li>{{/each}}</ol></div>",
+      "partials/base/base.schema.json": JSON.stringify(base),
+    })) await save(join(patterns, ...rel.split("/")), body);
+    for (const [rel, body] of Object.entries(files)) await save(join(root, "pages", ...rel.split("/")), body);
+    const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
+    const render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap });
+    const inputs: RenderInput[] = [];
+    const p = await assemblePage(route, await readPages(join(root, "pages")), {
+      discoveryMap, handleMap, composition: await buildCompositionRegistry(patterns, handleMap, discoveryMap),
+      site, workbenchUrl: "https://wb.example/", shown: x => x, head: async () => "",
+      image: async () => ({ ok: false, message: "no images here" }),
+      render: input => { inputs.push(input); return render(input); },
+    } as PageAssembly);
+    return { page: p, site: (inputs.at(-1)?.data as { site?: Record<string, unknown> } | undefined)?.site };
+  }
+  const files = {
+    "index.md": page("Home"),
+    "articles/index.md": page("Articles", "sort: date\n"),
+    "articles/a.md": page("A", "date: 2026-01-01\n"),
+    "articles/b.md": page("B", "date: 2026-02-01\n"),
+  };
+  const base = { properties: { site: { properties: { title: { type: "string" }, collections: { properties: { articles: {} } } } } } };
+
+  it("every page gets each listed collection's entries, sorted as the folder's index.md says", async () => {
+    const { page: p, site } = await assemble("/", files, base, { title: "S" });
+    expect(p.problems).toEqual([]);
+    expect((site?.["collections"] as Record<string, Array<{ route: string }>>)["articles"]!.map(e => e.route)).toEqual(["/articles/b/", "/articles/a/"]);
+    expect(p.html).toContain("<ol><li>B</li><li>A</li></ol>");
+  });
+
+  it("a page gets no collections when the skin lists none", async () => {
+    const { site } = await assemble("/", files, { properties: { site: { properties: { title: { type: "string" } } } } }, { title: "S" });
+    expect(Object.hasOwn(site ?? {}, "collections")).toBe(false);
+  });
+
+  it("a listed name with no folder is an empty list and a note; a required one fails every page", async () => {
+    const listed = { properties: { posts: {} } };
+    const { page: p, site } = await assemble("/", files, { properties: { site: { properties: { collections: listed } } } });
+    expect(p.status).toBe(200);
+    expect(site?.["collections"]).toEqual({ posts: [] });
+    expect(p.notes).toContain(`partials/base lists site.collections.posts, but the pages folder has no folder "posts" with an index.md, so it is an empty list (its folders: "articles")`);
+    const { page: q } = await assemble("/", files, { properties: { site: { properties: { collections: { ...listed, required: ["posts"] } } } } });
+    expect(q.status).toBe(500);
+    expect(q.problems).toEqual([`partials/base lists site.collections.posts, but the pages folder has no folder "posts" with an index.md, and partials/base requires it (its folders: "articles")`]);
   });
 });

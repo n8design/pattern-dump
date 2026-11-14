@@ -135,6 +135,13 @@ describe("checkSampleData", () => {
     ]);
   });
 
+  it("refuses a sample collection partials/base does not list", async () => {
+    const p = await project({ "partials/header/header.json": JSON.stringify({ site: { collections: { articles: [], posts: [{ title: "Sample" }] } } }) });
+    expect(await checkSampleData("layouts/page", p.map, p.composition, ["title"], ["title", "collections"], undefined, [], ["articles"])).toEqual([
+      `the sample data of partials/header (header.json) sets "site.collections.posts", which partials/base does not list, so it would show on every page using layouts/page`,
+    ]);
+  });
+
   it("reports sample data that cannot be read", async () => {
     const problems = await check({ "partials/header/header.json": "{ not json" });
     expect(problems).toHaveLength(1);

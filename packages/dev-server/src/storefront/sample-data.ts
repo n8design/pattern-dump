@@ -8,7 +8,7 @@
 // merges key by key, the same holds for each key partials/base does not declare for it. `page` is there
 // only when the layout declares it, with only the sub-keys it declares; below them, its shape is
 // Pattern Dump's (derived.ts), and every key outside it, at any depth, is refused too. `site.navigations`
-// merges by name the same way: a sample may only use the names partials/base lists.
+// and `site.collections` merge by name the same way: a sample may only use the names partials/base lists.
 //
 // So every sample file in a layout's include tree — the layout's own and each partial it includes,
 // however deep — may only use those keys. Anything else is a problem, fatal to every page using the
@@ -46,6 +46,8 @@ export async function checkSampleData(
   pageDeclared?: string[],
   /** The navigation names partials/base lists under site.navigations. */
   navigationNames: string[] = [],
+  /** The collection names partials/base lists under site.collections. */
+  collectionNames: string[] = [],
 ): Promise<string[]> {
   const problems: string[] = [];
   const allowed = new Set<string>([...layoutDeclared, ...ASSEMBLY_KEYS].filter(k => k !== "page" || pageDeclared !== undefined));
@@ -81,10 +83,11 @@ export async function checkSampleData(
         for (const [sub, v] of Object.entries(value)) {
           if (!siteDeclared.includes(sub)) {
             problems.push(`${where} sets "site.${sub}", which ${SITE_SCHEMA_OWNER} does not declare for site, so it would show on every page using ${layoutId}`);
-          } else if (sub === "navigations" && isPlainObject(v)) {
+          } else if ((sub === "navigations" || sub === "collections") && isPlainObject(v)) {
+            const names = sub === "navigations" ? navigationNames : collectionNames;
             for (const name of Object.keys(v)) {
-              if (!navigationNames.includes(name)) {
-                problems.push(`${where} sets "site.navigations.${name}", which ${SITE_SCHEMA_OWNER} does not list, so it would show on every page using ${layoutId}`);
+              if (!names.includes(name)) {
+                problems.push(`${where} sets "site.${sub}.${name}", which ${SITE_SCHEMA_OWNER} does not list, so it would show on every page using ${layoutId}`);
               }
             }
           }

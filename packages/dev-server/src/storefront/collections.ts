@@ -3,6 +3,8 @@
 // skin lists the name (the folder's path, "articles" or "blog/news") in partials/base's schema, as it lists
 // navigations.
 //
+// A listed name the pages folder has no folder for is an empty list and a note, or an error when the skin requires it.
+//
 // An entry has Pattern Dump's fixed shape: route, title, description (the page's, else its first paragraph),
 // date, image, tags, draft. Its date is the page's `date`, else the day git first saw it (`page.created`), else
 // null. In pd build a page whose date would come from a shallow clone stops the listing, as a layout that shows
@@ -10,6 +12,7 @@
 // ties by route; a page with no date at all is then a problem in pd build and a note in pd dev, where it sorts
 // last.
 
+import { suggest } from "@pattern-dump/config";
 import type { DatesMode, GitDates } from "./git-dates.js";
 import type { PageModel } from "./pages.js";
 
@@ -66,4 +69,62 @@ export async function entriesOf(folder: string, model: PageModel, o: { dates?: G
       : a.date === null ? 1 : b.date === null ? -1 : a.date < b.date ? 1 : -1);
   }
   return { entries, problems: [...new Set(problems)], notes: [...new Set(notes)] };
+}
+
+export const COLLECTIONS_KEY = "collections";
+type Obj = Record<string, unknown>;
+const isObject = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/**
+ * What partials/base lists under site.collections (`declared`, its schema there): names only, each a folder's path
+ * in the pages folder, with no shape of their own. `folders`: every folder's path ("articles", "blog/news");
+ * `leftOut`: the drafts a build leaves out (a name whose folder's index.md is one of them is an empty list, not an
+ * error). `configured`: storefront.site from the config, which can't set collections.
+ */
+export function checkCollections(
+  declared: Obj | undefined, owner: string, folders: ReadonlySet<string>, leftOut: readonly string[], configured: Obj | undefined,
+): { listed: string[]; problems: string[]; notes: string[] } {
+  const problems: string[] = [], notes: string[] = [];
+  if (configured && Object.hasOwn(configured, COLLECTIONS_KEY)) {
+    problems.push(`storefront.site.${COLLECTIONS_KEY} is filled by Pattern Dump from the pages folders: list the names in ${owner}'s schema, and don't set it in the config`);
+  }
+  if (!declared) return { listed: [], problems, notes };
+  const names = isObject(declared["properties"]) ? declared["properties"] : {};
+  const extra = Object.keys(declared).filter(k => !["type", "description", "title", "properties", "required"].includes(k));
+  if (extra.length || (declared["type"] !== undefined && declared["type"] !== "object")) {
+    problems.push(`${owner} declares a shape for site.${COLLECTIONS_KEY}: the shape of an entry is Pattern Dump's, so list the folders' names under properties only`);
+  }
+  const required = Array.isArray(declared["required"]) ? declared["required"].map(String) : [];
+  const listed = [...new Set([...Object.keys(names), ...required])];
+  for (const name of listed) {
+    const schema = names[name];
+    const own = Object.keys(isObject(schema) ? schema : {}).filter(k => k !== "description" && k !== "title");
+    if (own.length) {
+      problems.push(`${owner} declares ${own.map(k => `"${k}"`).join(", ")} for site.${COLLECTIONS_KEY}.${name}: the shape of an entry is Pattern Dump's, so list the name only (a description at most)`);
+    }
+    // A skin can list a collection a site doesn't have (a skin is shared): an empty list, and a note naming the
+    // nearest folder, unless the skin requires it.
+    if (!folders.has(name) && !leftOut.includes(`${name}/index.md`)) {
+      const near = suggest(name, [...folders]);
+      const text = `${owner} lists site.${COLLECTIONS_KEY}.${name}, but the pages folder has no folder "${name}" with an index.md`;
+      const hint = near ? ` — did you mean "${near}"?` : folders.size ? ` (its folders: ${[...folders].map(f => `"${f}"`).join(", ")})` : "";
+      if (required.includes(name)) problems.push(`${text}, and ${owner} requires it${hint}`);
+      else notes.push(`${text}, so it is an empty list${hint}`);
+    }
+  }
+  return { listed, problems, notes };
+}
+
+/** Every listed collection's entries, by name, for the page being rendered. */
+export async function resolveCollections(listed: readonly string[], model: PageModel, o: { dates?: GitDates | undefined; mode: DatesMode })
+  : Promise<{ collections: Record<string, Entry[]>; problems: string[]; notes: string[] }> {
+  const collections: Record<string, Entry[]> = {};
+  const problems: string[] = [], notes: string[] = [];
+  for (const name of listed) {
+    const r = await entriesOf(`/${name}/`, model, o);
+    collections[name] = r.entries;
+    problems.push(...r.problems);
+    notes.push(...r.notes);
+  }
+  return { collections, problems, notes };
 }
