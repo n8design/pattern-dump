@@ -678,7 +678,7 @@ async function routeRequest(
         discoveryMap, handleMap: discovery.handleMap, shown: createDisplayPath(cwd, cfg.packages),
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
-        head: (layoutId, html) => pageStylesheets(cfg, state, discovery, layoutId, html),
+        head: (layoutId, html, placed) => pageStylesheets(cfg, state, discovery, layoutId, html, placed),
         ...(ctx.dates ? { dates: ctx.dates } : {}),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
         image: path => checkPageImage(path, assetRoots, assetRootNames),

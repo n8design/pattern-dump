@@ -91,6 +91,9 @@ describe("pd build — the storefront root", () => {
       "_pd/images/images/cable-cars.b05f7eb8ef.640.webp",
       "_pd/images/images/cable-cars.cec7974822.320.webp",
       "_pd/images/images/cable-cars.f21cb99719.1600.webp",
+      // The behaviour scripts of the header (every layout's) and of the slider the guides page places.
+      "_pd/scripts/header-ready.js",
+      "_pd/scripts/slider-ready.js",
       "about/index.html",
       "articles/harbour/index.html",
       "articles/index.html",
@@ -113,7 +116,7 @@ describe("pd build — the storefront root", () => {
       "sitemap.xml",
       "start/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 7, files: 38, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 7, files: 40, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {

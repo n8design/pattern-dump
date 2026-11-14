@@ -275,6 +275,12 @@ link, `description`, `robots`, `og:*`, `twitter:*` or JSON-LD, nor `<base>`. Any
 or text, is a problem for every page. Its workbench preview is empty, since everything in it belongs in a
 head.
 
+**Behaviour scripts.** A page loads the scripts its components bring, as their workbench previews do: the
+project's `globalScripts`, then every `requireScript` of its layout's components (the header's, a partial's) and
+of each component it places with a `pd-` tag, each once, as module scripts after its stylesheets. A layout doesn't
+need a `<script>` tag of its own for them. A live example (a fenced `pattern` block) is a preview in a frame and
+loads its own.
+
 ```hbs
 <link rel="icon" href="/assets/images/favicon.png">
 <meta name="theme-color" content="#1e3c78">

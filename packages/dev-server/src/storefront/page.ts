@@ -52,7 +52,8 @@ export interface PageAssembly {
   composition: CompositionRegistry;
   render: Render;
   /** The stylesheet links for a page rendered with `layoutId` whose markup is `html`. */
-  head(layoutId: string, html: string): Promise<string>;
+  /** The page's stylesheets and scripts: of its layout, and of the components it places (`placed`, by id). */
+  head(layoutId: string, html: string, placed: readonly string[]): Promise<string>;
   /** storefront.site from the config. */
   site: Record<string, unknown> | undefined;
   /** Where links into the workbench start, ending with "/". */
@@ -314,12 +315,15 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const imageLookup = a.images ? await a.images() : undefined;
 
   /** The page's markdown, rendered; its headings' anchors never take one of `takenIds`. */
+  /** The components the page's pd- tags placed (the last rendering of its body). */
+  const placedIds = new Set<string>();
   const renderBody = async (takenIds: string[] = []) => {
     const prose: ProseImages | undefined = imageLookup ? {
       layoutId: checked.layoutId, lookup: imageLookup, lineOffset: frontmatterBodyOffset(source), problems: [],
       ...(proseSlot.slot ? { slot: proseSlot.slot } : {}), ...(proseSlot.problem ? { slotProblem: proseSlot.problem } : {}),
     } : undefined;
     const docProblems: string[] = [];
+    placedIds.clear();
     const placedProblems: PlacedProblem[] = [];
     const headings: PageHeading[] = [];
     const body = await renderDoc(
@@ -333,7 +337,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
           lineOffset: frontmatterBodyOffset(source),
           problems: placedProblems,
           deps: {
-            discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition, render: a.render,
+            discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition,
+            // Each component rendered for a placement: the page loads its behaviour scripts (page-head.ts).
+            render: input => { placedIds.add(input.component.split("~")[0]!); return a.render(input); },
             schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath)).schema,
             shown: a.shown,
           },
@@ -493,7 +499,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published })]
       : []),
     ...(headExtra ? [headExtra] : []),
-    await a.head(checked.layoutId, html),
+    await a.head(checked.layoutId, html, [...placedIds]),
   ].join("\n");
   // The 404 page is served at any depth, so every URL in it (its body's, its layout's, the head's) must be
   // root-relative or absolute: a relative one points somewhere else on every address.

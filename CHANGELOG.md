@@ -23,6 +23,17 @@
   JSON-LD `datePublished`, which falls back to the page's first commit. `draft: true` shows a page in `pd dev` and
   leaves it out of `pd build`, which names the drafts it left out.
 
+### Fixed
+
+- A storefront page loads the behaviour scripts its components bring (`requireScript` of its layout's components and
+  of the components it places, and `globalScripts`), as their workbench previews do. Before, only the markup and CSS
+  reached the page.
+- A code block on a storefront page, or in a component's `<pre>`, keeps its lines as written when its partial is
+  included on an indented line (as a skin's `{{> @partial-block }}` usually is). Handlebars indented every line after
+  the first by the include's indentation.
+- `pd dev` no longer keeps base-layer rules that a component's stylesheet stopped writing (through a mixin) until it is
+  restarted.
+
 ### Changed
 
 - **Breaking:** `date`, `tags`, `draft` and `sort` are now frontmatter keys of the build, like `layout` and
