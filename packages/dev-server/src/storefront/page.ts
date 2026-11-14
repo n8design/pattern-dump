@@ -65,6 +65,9 @@ export interface PageAssembly {
   image(path: string): Promise<PageImageCheck>;
   /** storefront.image: the image of every page that names none. */
   siteImage?: string;
+  /** The path the site is published under ("/project/"), put in front of its references on the way out
+   *  (base-path.ts); here only for the hint on a link written with it already. */
+  basePath?: string;
   /** The site's address, ending with "/", when storefront.url is set: canonical, og:url, og:image and
    *  JSON-LD are built from it. Without it they are left out. */
   siteUrl?: string;
@@ -534,7 +537,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const self = isNotFound ? PD_ROUTES.notFound : route;
     const routes = new Set<string>([...model.files.keys(), ...[...model.files.values()].flatMap(redirectsOf), PD_ROUTES.notFound]);
     routes.add(self);
-    const links = checkLinks({ built: routes, documents: new Map([[self, html]]), pages: [self], pagesOnly: true });
+    const links = checkLinks({ built: routes, documents: new Map([[self, html]]), pages: [self], pagesOnly: true,
+      ...(a.basePath !== undefined ? { pathHint: a.basePath } : {}) });
     notes.push(...links.problems.map(p => `warning: ${page!.path}${p.slice(self.length)}`));
     // One main landmark and one <h1> (page-basics.ts): errors in pd build, warnings here.
     notes.push(...checkPageBasics(html).map(p => `warning: ${page!.path}: ${p}`));

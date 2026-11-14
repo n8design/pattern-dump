@@ -678,7 +678,7 @@ async function routeRequest(
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "" } } : {}),
         image: path => checkPageImage(path, assetRoots, assetRootNames),
         ...(siteUrl !== undefined ? { siteUrl } : {}),
-        lang: cfg.storefront.lang, siteIndex: cfg.storefront.index,
+        lang: cfg.storefront.lang, siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
       });

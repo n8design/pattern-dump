@@ -113,7 +113,7 @@ describe("pd build — the storefront root", () => {
       "sitemap.xml",
       "start/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), pages: 7, files: 38, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 7, files: 38, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {

@@ -9,10 +9,12 @@
 import { request } from "node:http";
 import { PD_ROUTES, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 
-/** fetch() for the storefront host: node:http with the Host header set (fetch() ignores an overridden Host). */
-export function hostTransport(port: number, host: string): (liveUrl: string) => Promise<Response> {
+/** fetch() for the storefront host: node:http with the Host header set (fetch() ignores an overridden Host). It
+ *  asks for a site path ("/guides/setup/"); a site published under a path (`basePath`) is asked under it. */
+export function hostTransport(port: number, host: string, basePath = "/"): (liveUrl: string) => Promise<Response> {
   return liveUrl => new Promise((resolve, reject) => {
-    const req = request({ host: "127.0.0.1", port, path: liveUrl, headers: { host: `${host}:${port}` } }, res => {
+    const path = basePath === "/" || !liveUrl.startsWith("/") ? liveUrl : `${basePath}${liveUrl.slice(1)}`;
+    const req = request({ host: "127.0.0.1", port, path, headers: { host: `${host}:${port}` } }, res => {
       const chunks: Buffer[] = [];
       res.on("data", (c: Buffer) => chunks.push(c));
       res.on("end", () => {
@@ -28,17 +30,23 @@ export function hostTransport(port: number, host: string): (liveUrl: string) => 
 
 const unescapeHtml = (s: string): string => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, `"`).replace(/&amp;/g, "&");
 
+/** A served reference as a site path: the site's base path taken off. Null for one outside it (the link check
+ *  reports those). */
+const toSite = (ref: string, base: string): string | null =>
+  base === "/" ? ref : ref.startsWith(base) ? `/${ref.slice(base.length)}` : null;
+
 /** Root-relative references a document makes to files PD serves, and the page's link-preview image (an
- *  absolute URL on the site's own address, so its path is taken). Page routes are crawled from the page list. */
-const markupRefs = (html: string): string[] => [
-  ...[...html.matchAll(/(?:href|src)="(\/(?:_pd|assets|preview)\/[^"]+)"/g)].map(m => unescapeHtml(m[1])),
+ *  absolute URL on the site's own address, so its path is taken), as site paths. Page routes are crawled from the
+ *  page list. */
+const markupRefs = (html: string, base: string): string[] => [
+  ...[...html.matchAll(/(?:href|src)="(\/[^"]+)"/g)].map(m => unescapeHtml(m[1]!)),
   // Each candidate of a srcset: its URL, before the width or density that describes it.
-  ...[...html.matchAll(/srcset="([^"]+)"/g)].flatMap(m => unescapeHtml(m[1]).split(",").map(c => c.trim().split(/\s+/)[0] ?? ""))
-    .filter(u => /^\/(?:_pd|assets)\//.test(u)),
-  ...[...html.matchAll(/<meta property="og:image" content="https?:\/\/[^/"]+(\/assets\/[^"]+)">/g)].map(m => unescapeHtml(m[1])),
-];
-const cssRefs = (css: string): string[] =>
-  [...css.matchAll(/url\(\s*(['"]?)(\/(?:_pd|assets)\/[^'")\s]+)\1\s*\)/g)].map(m => m[2]);
+  ...[...html.matchAll(/srcset="([^"]+)"/g)].flatMap(m => unescapeHtml(m[1]!).split(",").map(c => c.trim().split(/\s+/)[0] ?? "")),
+  ...[...html.matchAll(/<meta property="og:image" content="https?:\/\/[^/"]+(\/[^"]+)">/g)].map(m => unescapeHtml(m[1]!)),
+].map(u => toSite(u, base)).filter((u): u is string => u !== null && /^\/(?:_pd|assets|preview)\//.test(u));
+const cssRefs = (css: string, base: string): string[] =>
+  [...css.matchAll(/url\(\s*(['"]?)(\/[^'")\s]+)\1\s*\)/g)].map(m => toSite(m[2]!, base))
+    .filter((u): u is string => u !== null && /^\/(?:_pd|assets)\//.test(u));
 
 export interface StorefrontCrawl {
   /** Every URL to write, pages first, each once. */
@@ -49,8 +57,10 @@ export interface StorefrontCrawl {
   documents: Map<string, string>;
 }
 
-/** `files`: the root files to write besides the pages and what they reference (robots.txt, sitemap.xml). */
-export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>, files: readonly string[] = []): Promise<StorefrontCrawl> {
+/** `files`: the root files to write besides the pages and what they reference (robots.txt, sitemap.xml). `get`
+ *  asks for site paths; `basePath`: the path the site is published under, which every reference it finds carries.
+ *  URLs and documents are by site path. */
+export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>, files: readonly string[] = [], basePath = "/"): Promise<StorefrontCrawl> {
   const problems: string[] = [];
   const siteProblems = new Set<string>();
   const list = await get(PD_ROUTES.pages);
@@ -92,9 +102,9 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
     if (/text\/html/.test(type)) {
       const html = await res.text();
       documents.set(url, html);
-      for (const ref of markupRefs(html)) add(ref);
+      for (const ref of markupRefs(html, basePath)) add(ref);
     }
-    else if (/text\/css/.test(type)) for (const ref of cssRefs(await res.text())) add(ref);
+    else if (/text\/css/.test(type)) for (const ref of cssRefs(await res.text(), basePath)) add(ref);
   }
   return { urls, problems, documents };
 }

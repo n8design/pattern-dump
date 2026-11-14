@@ -71,7 +71,7 @@ export interface StaticBuildReport {
    *  layout has that id. Nothing is left out for them. */
   notes: string[];
   /** The storefront's own output root, when the project has a storefront. */
-  storefront?: { outDir: string; pages: number; files: number; bytes: number };
+  storefront?: { outDir: string; basePath: string; pages: number; files: number; bytes: number };
   /** The storefront's link check: the site pages read, the references checked, the other hosts listed in the notes. */
   links?: { pages: number; references: number; external: number };
   /** The storefront's accessibility check (axe in jsdom, and one <main> and one <h1> per page): the site pages read,
@@ -150,10 +150,14 @@ export async function buildStaticSite(
 
   // The storefront, crawled before anything is written: a problem anywhere stops the build with both
   // output roots as they were.
-  const sfGet = storefront ? hostTransport(server.port, storefront.host) : null;
-  // The crawler files: robots.txt always; the sitemap when the site has an address and is indexed.
-  const sfFiles: string[] = storefront ? [PD_ROUTES.robots, PD_ROUTES.notFound, ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
-  const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles) : null;
+  // A site published under a path is asked for under it, as a browser asks: everything is checked as it is served.
+  const sfBase = storefront?.basePath ?? "/";
+  const sfGet = storefront ? hostTransport(server.port, storefront.host, sfBase) : null;
+  // The crawler files: robots.txt at a host's root (a site under a path has none: crawlers would never read it);
+  // the sitemap when the site has an address and is indexed.
+  const sfFiles: string[] = storefront ? [...(sfBase === "/" ? [PD_ROUTES.robots] : []), PD_ROUTES.notFound,
+    ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
+  const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles, sfBase) : null;
   if (sfCrawl && sfCrawl.problems.length) {
     await server.close();
     throw new Error(`pd build: the storefront has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
@@ -189,6 +193,7 @@ export async function buildStaticSite(
       // The crawl records a stamped reference with its ?v=; what is written, and what a link names, is the path.
       built: new Set(sfCrawl.urls.map(u => u.split("?")[0]!)), documents: sfCrawl.documents, pages,
       ...(storefront.url !== undefined ? { siteUrl: storefront.url.endsWith("/") ? storefront.url : `${storefront.url}/` } : {}),
+      basePath: sfBase,
       workbench: { url: wbUrl, routes, variants },
     });
     if (links.problems.length) {
@@ -357,8 +362,9 @@ export async function buildStaticSite(
     await writeFile(join(outDir, "robots.txt"), workbenchRobotsTxt(basePath));
     report.files++;
     // Unless the storefront's own robots.txt, at this host's root, already keeps these previews out: a
-    // workbench published on the storefront's host at this base path (with index: false, it keeps out everything).
-    if (basePath !== "/" && sameHostWorkbenchPath(storefront ?? undefined) !== basePath) {
+    // workbench published on the storefront's host at this base path (with index: false, it keeps out everything),
+    // when the storefront itself is at the host's root and so has a robots.txt.
+    if (basePath !== "/" && (sameHostWorkbenchPath(storefront ?? undefined) !== basePath || sfBase !== "/")) {
       report.notes.push(`robots.txt is written to the workbench's root, but crawlers read it only at a host's root: `
         + `with the base path ${basePath}, add its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
     }
@@ -378,7 +384,17 @@ export async function buildStaticSite(
       counts.files++;
       const stubs = new Set((await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse).pages.flatMap(p => p.redirectFrom ?? []));
       const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u) && !stubs.has(u)).length;
-      report.storefront = { outDir: sfOut, pages, files: counts.files, bytes: counts.bytes };
+      report.storefront = { outDir: sfOut, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };
+      if (sfBase !== "/") {
+        // What the site's robots.txt would have said, for the host's own, if its owner can add to it.
+        const wbPath = sameHostWorkbenchPath(storefront);
+        const rules = storefront.index
+          ? [`Disallow: ${sfBase}preview/`, ...(wbPath !== undefined ? [`Disallow: ${wbPath}preview/`] : []),
+            ...(storefront.url !== undefined ? [`Sitemap: ${storefront.url}sitemap.xml`] : [])]
+          : [`Disallow: ${sfBase}`];
+        report.notes.push(`robots.txt is not written: the site is published under ${sfBase}, and crawlers read robots.txt only at a `
+          + `host's root. Where you can, add to the host's own robots.txt: ${rules.join("; ")}`);
+      }
       if (storefront.url === undefined) {
         report.notes.push("storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
           + "and there is no sitemap: set storefront.url to the site's address, such as \"https://example.com/\"");
