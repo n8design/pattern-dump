@@ -123,6 +123,7 @@ Writes a static snapshot of the workbench: plain files for any static host.
 |---|---|
 | `--out <dir>` | Output folder, relative to the root. Default: `build.outDir`, `outDir`, then `dist`. Emptied first |
 | `--base <path>` | Where it will be hosted: `/` (default) or a subpath such as `/docs/` |
+| `--browser` | Also check the storefront's pages in Chromium: contrast and the other accessibility rules that need a rendered page, and each image's variant against its box ([storefront.md](storefront.md#checks-in-a-browser-pd-build---browser)). Needs the project's own Playwright |
 | `--no-audit` / `--audit` | Leave the corpus audit out (it is not run, and there is no Audit tab), or force it in. Default: `build.audit` |
 
 Full guide: [static-build.md](static-build.md).

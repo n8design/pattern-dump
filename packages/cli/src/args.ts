@@ -14,7 +14,7 @@ export type Command =
   | { kind: "dev"; root: string; configPath?: string; port?: number; wsPort?: number }
   | { kind: "audit"; root: string; configPath?: string; format: AuditFormat }
   | { kind: "export"; root: string; configPath?: string; out?: string }
-  | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean }
+  | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean; browser?: boolean }
   | { kind: "init"; target: string; yes: boolean; name?: string; brand?: string; examples?: boolean;
       storefront?: boolean; install?: boolean; git?: boolean; pdSource?: string }
   | { kind: "help"; topic?: string }
@@ -85,7 +85,7 @@ export function parseCommand(argv: string[], cwd: string): Command {
         args: rest, strict: true, allowPositionals: false,
         options: {
           ...rootAndConfig, out: { type: "string" }, base: { type: "string" },
-          audit: { type: "boolean" }, "no-audit": { type: "boolean" },
+          audit: { type: "boolean" }, "no-audit": { type: "boolean" }, browser: { type: "boolean" },
         },
       });
       if (values.help) return { kind: "help", topic: cmd };
@@ -97,6 +97,7 @@ export function parseCommand(argv: string[], cwd: string): Command {
         ...(values.out !== undefined ? { out: values.out } : {}),
         ...(values.base !== undefined ? { base: values.base } : {}),
         ...(audit !== undefined ? { audit } : {}),
+        ...(values.browser ? { browser: true } : {}),
       };
     }
 
@@ -195,6 +196,9 @@ export const USAGE = `Usage: pd <command> [options]
     --config <path>    Use a config file outside the root
     --out <dir>        Output folder, relative to the root (default: build.outDir, outDir, or dist)
     --base <path>      Where it will be hosted: / (default) or a subpath such as /docs/
+    --browser          Also check the storefront's pages in Chromium: contrast and the accessibility
+                       rules that need a rendered page, and each image's variant against its size.
+                       Uses the project's own Playwright (npm install --save-dev playwright)
     --no-audit         Leave the corpus audit out: it is not run, and the site has no Audit tab
                        (default: build.audit in the config; --audit forces it back in)
 

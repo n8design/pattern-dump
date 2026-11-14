@@ -28,6 +28,7 @@ import { createSnapshotWriter } from "./snapshot-writer.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
+import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule } from "./storefront/browser-checks.js";
 import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { workbenchRobotsTxt } from "./storefront/site-files.js";
 
@@ -45,6 +46,11 @@ export interface StaticBuildOptions {
    *  project are byte-identical. Default: real time. */
   now?: Date;
   log?: (line: string) => void;
+  /** `pd build --browser`: also check the storefront's pages in Chromium (browser-checks.ts), with the project's
+   *  own Playwright. */
+  browser?: boolean;
+  /** Where `browser` gets Playwright from. Default: the project's own (loadProjectPlaywright). */
+  loadPlaywright?: (root: string) => Promise<PlaywrightModule>;
 }
 
 /** Not a test's watcher barrier (`.__testOnly_barrier`, which tests and the settle hook write into watched
@@ -69,7 +75,9 @@ export interface StaticBuildReport {
   links?: { pages: number; references: number; external: number };
   /** The storefront's accessibility check (axe in jsdom, and one <main> and one <h1> per page): the site pages read,
    *  and one line per rule that only warns, with its pages. An error stops the build instead. */
-  accessibility?: { pages: number; warnings: string[] };
+  accessibility?: { pages: number; warnings: string[]; browser?: boolean };
+  /** `--browser`: one line per image whose chosen variant doesn't fit the box it is laid out in. */
+  images?: { warnings: string[] };
   ms: number;
 }
 
@@ -123,6 +131,9 @@ export async function buildStaticSite(
     }
   }
 
+  // --browser: the project's Playwright, loaded before anything is built, so a missing one stops the build at once.
+  const playwright = opts.browser && storefront ? await (opts.loadPlaywright ?? loadProjectPlaywright)(project) : undefined;
+
   const fixed = opts.now;
   const now = fixed ? (): Date => new Date(fixed.getTime()) : (): Date => new Date();
   // A storefront page's notes, once each however often the page is fetched: the report's notes.
@@ -151,6 +162,7 @@ export async function buildStaticSite(
   // workbench to a component and variant the workbench snapshot has. Other hosts are listed in the notes.
   let linkSummary: StaticBuildReport["links"];
   let a11ySummary: StaticBuildReport["accessibility"];
+  let imageSummary: StaticBuildReport["images"];
   const externalNotes: string[] = [];
   if (storefront && sfGet && sfCrawl) {
     const { pages: list } = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
@@ -208,10 +220,24 @@ export async function buildStaticSite(
       await server.close();
       throw new Error(`pd build: the storefront has accessibility problems, so nothing was written:\n${errors.map(e => `  - ${e}`).join("\n")}`);
     }
+    // --browser: the rules that need a rendered page, and the images against their boxes (browser-checks.ts).
+    let imageWarnings: string[] | undefined;
+    const browserWarnings: string[] = [];
+    if (playwright) {
+      const checked = await runBrowserChecks({ pages, get: sfGet, playwright }).catch(async (e: unknown) => { await server.close(); throw e; });
+      if (checked.errors.length) {
+        await server.close();
+        throw new Error(`pd build: the storefront has accessibility problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
+      }
+      browserWarnings.push(...checked.a11yWarnings);
+      imageWarnings = checked.images;
+      log(`… checked in Chromium at ${VIEWPORTS.map(v => `${v.name} @${v.dpr}x`).join(" and ")}`);
+    }
+    imageSummary = imageWarnings ? { warnings: imageWarnings } : undefined;
     a11ySummary = {
-      pages: pages.length,
-      warnings: [...warned.values()].map(w => `${w.finding.ruleId} (${w.finding.impact}): ${w.finding.help}, ${w.elements} `
-        + `element${w.elements === 1 ? "" : "s"} on ${w.pages.join(", ")} (${w.finding.helpUrl})`),
+      pages: pages.length, ...(playwright ? { browser: true } : {}),
+      warnings: [...[...warned.values()].map(w => `${w.finding.ruleId} (${w.finding.impact}): ${w.finding.help}, ${w.elements} `
+        + `element${w.elements === 1 ? "" : "s"} on ${w.pages.join(", ")} (${w.finding.helpUrl})`), ...browserWarnings],
     };
     log(`… accessibility checked on ${pages.length} pages`);
   }
@@ -219,6 +245,7 @@ export async function buildStaticSite(
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
   const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], ms: 0 };
+  if (opts.browser && !storefront) report.notes.push("--browser checks a storefront's pages in Chromium, and this project has no storefront: nothing was checked");
   const { capture, store } = createSnapshotWriter({ outDir, basePath, origin, report });
 
   /** Every /_pd/ stylesheet and script a document references. */
@@ -355,6 +382,7 @@ export async function buildStaticSite(
       report.notes.push(...storefrontNotes, ...externalNotes);
       if (linkSummary) report.links = linkSummary;
       if (a11ySummary) report.accessibility = a11ySummary;
+      if (imageSummary) report.images = imageSummary;
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
 

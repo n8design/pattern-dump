@@ -95,6 +95,14 @@ jobs:
       - name: Check the packed package in a fresh project
         run: npm run verify:install
 
+      # The storefront bench built with --browser (Chromium is installed above): the accessibility rules that need a
+      # rendered page, and every image's variant against its box. An error stops the build; a warning fails this
+      # step too, so the bench stays clean.
+      - name: Build the storefront bench with --browser
+        run: |
+          node packages/cli/dist/index.js build --root storefront-bench --browser 2>&1 | tee "$RUNNER_TEMP/build-browser.log"
+          if grep -q "warning:" "$RUNNER_TEMP/build-browser.log"; then echo "::error::pd build --browser has warnings"; exit 1; fi
+
       - name: Run E2E tests
         run: npm run e2e --workspace @pattern-dump/dev-ui
 

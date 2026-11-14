@@ -51,6 +51,11 @@ describe("pd build", () => {
       .toEqual({ kind: "build", root: "/work/project/ds", out: "site", base: "/docs/" });
   });
 
+  it("--browser also checks the storefront's pages in Chromium; without it, nothing is set", () => {
+    expect(parseCommand(["build", "--browser"], "/w")).toEqual({ kind: "build", root: "/w", browser: true });
+    expect(parseCommand(["build"], "/w")).not.toHaveProperty("browser");
+  });
+
   it("--no-audit and --audit override the config; both together are an error", () => {
     expect(parseCommand(["build", "--no-audit"], "/w")).toEqual({ kind: "build", root: "/w", audit: false });
     expect(parseCommand(["build", "--audit"], "/w")).toEqual({ kind: "build", root: "/w", audit: true });

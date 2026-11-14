@@ -1,5 +1,13 @@
 // The bench's wireframe skin: plain on purpose, so the pipeline's tests depend on no design.
+// Three slides side by side, each a third of the column less the gaps; more scroll sideways. A slide's width is
+// therefore known, and the slide's image slot says it in its sizes.
 .slider {
   display: flex;
   gap: 1rem;
+  overflow-x: auto;
+}
+
+.slider-item {
+  flex: 0 0 calc((100% - 2rem) / 3);
+  min-inline-size: 0;
 }

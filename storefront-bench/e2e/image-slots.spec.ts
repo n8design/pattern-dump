@@ -6,7 +6,7 @@ import { expect, test } from "./fixtures.js";
 test("a slide's photo is served as the variants its slot asks for, an SVG as one file", async ({ page, request }) => {
   await page.goto("/guides/");
   const photo = page.locator(`figure.slide img[alt="Colourful cable cars hanging from their cables against a clear sky"]`);
-  await expect(photo).toHaveAttribute("sizes", "(max-width: 40rem) 33vw, 19rem");
+  await expect(photo).toHaveAttribute("sizes", "(min-width: 62rem) calc((60rem - 2rem) / 3), calc((100vw - 4rem) / 3)");
   const srcset = (await photo.getAttribute("srcset"))!;
   const candidates = srcset.split(",").map(c => c.trim().split(/\s+/));
   expect(candidates.map(([url, w]) => [url!.replace(/\.[0-9a-f]{10}\./, ".<key>."), w])).toEqual([
