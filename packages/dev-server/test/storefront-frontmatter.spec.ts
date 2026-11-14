@@ -24,14 +24,17 @@ const SCHEMAS: Record<string, unknown> = {
   "layouts/claims/claims.schema.json": {
     properties: { title: { type: "string" }, image: { type: "string" }, order: { type: "number" } },
   },
+  "layouts/listing/listing.schema.json": {
+    properties: { title: { type: "string" }, date: { type: "string" }, tags: { type: "array" }, draft: { type: "boolean" }, sort: { type: "string" } },
+  },
   "layouts/typed/typed.schema.json": {
     required: ["title", "body"],
     properties: {
       title: { type: "string" },
       count: { type: "number" },
       n: { type: "integer" },
-      draft: { type: "boolean" },
-      tags: { type: "array", items: { type: "string" } },
+      pinned: { type: "boolean" },
+      labels: { type: "array", items: { type: "string" } },
       scores: { type: "array", items: { type: "number" } },
       tone: { type: "string", enum: ["warning", "info"] },
       either: { type: ["number", "string"] },
@@ -48,6 +51,7 @@ beforeAll(async () => {
     "layouts/page/page~x.json": `{ "title": "A variant" }`,
     "layouts/typed/typed.hbs": "<main>{{title}}</main>",
     "layouts/claims/claims.hbs": "<main>{{title}}</main>",
+    "layouts/listing/listing.hbs": "<main>{{title}}</main>",
     "layouts/bare/bare.hbs": "<main>{{{body}}}</main>",
     "layouts/broken/broken.hbs": "<main></main>",
     "layouts/broken/broken.schema.json": "{ not json",
@@ -71,7 +75,7 @@ const P = (line: number | undefined, message: string) => ({ file: "guides/setup.
 
 describe("layoutNames", () => {
   it("lists the base components directly under layouts/, not variants or partials", () => {
-    expect(layoutNames(map)).toEqual(["bare", "broken", "claims", "page", "typed"]);
+    expect(layoutNames(map)).toEqual(["bare", "broken", "claims", "listing", "page", "typed"]);
   });
 });
 
@@ -90,7 +94,7 @@ describe("checkPageFrontmatter — a valid page", () => {
 });
 
 describe("checkPageFrontmatter — the layout", () => {
-  const known = `the layouts are "bare", "broken", "claims", "page", "typed"`;
+  const known = `the layouts are "bare", "broken", "claims", "listing", "page", "typed"`;
   for (const [label, value] of [["an unknown name", "nope"], ["a partial", "base"], ["a variant", "page~x"], ["a path", "../partials/base"]] as const) {
     it(`refuses ${label}, naming the layouts there are`, async () => {
       expect((await check(`---\ntitle: T\nlayout: ${value}\n---\n`)).problems).toEqual([P(3, `layout "${value}" is not a layout — ${known}`)]);
@@ -151,10 +155,10 @@ describe("checkPageFrontmatter — keys", () => {
 
 describe("checkPageFrontmatter — declared types", () => {
   it("coerces each value to its declared type", async () => {
-    const md = "---\nlayout: typed\ntitle: T\ncount: 2.5\nn: -4\ndraft: true\ntags: [a, b]\nscores:\n  - 1\n  - 2.5\ntone: info\neither: 7\nfree: anything\n---\n";
+    const md = "---\nlayout: typed\ntitle: T\ncount: 2.5\nn: -4\npinned: true\nlabels: [a, b]\nscores:\n  - 1\n  - 2.5\ntone: info\neither: 7\nfree: anything\n---\n";
     expect(await check(md)).toEqual({
       layoutId: "layouts/typed",
-      values: { title: "T", count: 2.5, n: -4, draft: true, tags: ["a", "b"], scores: [1, 2.5], tone: "info", either: 7, free: "anything" },
+      values: { title: "T", count: 2.5, n: -4, pinned: true, labels: ["a", "b"], scores: [1, 2.5], tone: "info", either: 7, free: "anything" },
       build: {},
       problems: [],
     });
@@ -167,14 +171,14 @@ describe("checkPageFrontmatter — declared types", () => {
 
   it("refuses a value that does not coerce, naming the key, the type and the value", async () => {
     const md = [
-      "---", "layout: typed", "title: [not, text]", "count: three", "n: 2.5", "draft: yes", "tags: a", "scores: [1, x]", "tone: danger", "---", "",
+      "---", "layout: typed", "title: [not, text]", "count: three", "n: 2.5", "pinned: yes", "labels: a", "scores: [1, x]", "tone: danger", "---", "",
     ].join("\n");
     expect((await check(md)).problems).toEqual([
       P(3, `"title" must be text, not a list`),
       P(4, `"count" must be a number (got "three")`),
       P(5, `"n" must be a whole number (got "2.5")`),
-      P(6, `"draft" must be true or false (got "yes")`),
-      P(7, `"tags" must be a list (got "a")`),
+      P(6, `"pinned" must be true or false (got "yes")`),
+      P(7, `"labels" must be a list (got "a")`),
       P(8, `"scores" has an item that must be a number (got "x")`),
       P(9, `"tone" must be one of "warning", "info" (got "danger")`),
     ]);
@@ -227,6 +231,54 @@ describe("checkPageFrontmatter — the build's own keys: redirectFrom, index, im
   it("checks them even when the layout does not exist", async () => {
     const r = await check("---\nlayout: nope\nindex: maybe\n---\n");
     expect(r.problems).toContainEqual(P(3, "index must be true or false"));
+  });
+});
+
+describe("checkPageFrontmatter — the listing keys: date, tags, draft, sort", () => {
+  it("reads them for the build and never passes them to the layout", async () => {
+    const r = await check("---\ntitle: T\ndate: 2026-11-02\ntags: [design, css-2]\ndraft: true\n---\n");
+    expect(r.problems).toEqual([]);
+    expect(r.values).toEqual({ title: "T" });
+    expect(r.build).toEqual({ date: "2026-11-02", tags: ["design", "css-2"], draft: true });
+  });
+
+  it("takes one tag written alone, and draft: false", async () => {
+    expect((await check("---\ntitle: T\ntags: design\ndraft: false\n---\n")).build).toEqual({ tags: ["design"], draft: false });
+  });
+
+  it("refuses a date that is not a real calendar date written YYYY-MM-DD", async () => {
+    for (const bad of ["2026-13-01", "2026-02-30", "2026-2-3", "14.11.2026", "2026-11-14T10:00", "[2026-11-14]"]) {
+      const shown = bad.startsWith("[") ? "[2026-11-14]" : `"${bad}"`;
+      expect((await check(`---\ntitle: T\ndate: ${bad}\n---\n`)).problems, bad)
+        .toEqual([P(3, `date ${shown} is not a date: write it YYYY-MM-DD, such as "2026-11-14"`)]);
+    }
+    expect((await check("---\ntitle: T\ndate: 2028-02-29\n---\n")).problems).toEqual([]);
+  });
+
+  it("refuses a tag that can't be a URL segment, and a tag listed twice", async () => {
+    expect((await check("---\ntitle: T\ntags: [Design, ok, a b]\n---\n")).problems).toEqual([
+      P(3, `tags: "Design", "a b" are not a tag: a tag is lowercase letters, digits and hyphens, such as "design-systems"`)]);
+    expect((await check("---\ntitle: T\ntags: [css, html, css]\n---\n")).problems).toEqual([P(3, `tags: "css" is listed twice`)]);
+  });
+
+  it("refuses a draft that is not true or false", async () => {
+    expect((await check("---\ntitle: T\ndraft: yes\n---\n")).problems).toEqual([P(3, "draft must be true or false")]);
+  });
+
+  it("takes sort on a folder's index.md, the root's too, and refuses it on a page", async () => {
+    const at = (md: string, path: string) => checkPageFrontmatter(pageFile(md, path), map);
+    expect((await at("---\ntitle: T\nsort: date\n---\n", "guides/index.md")).build).toEqual({ sort: "date" });
+    expect((await at("---\ntitle: T\nsort: order\n---\n", "index.md")).build).toEqual({ sort: "order" });
+    expect((await at("---\ntitle: T\nsort: newest\n---\n", "guides/index.md")).problems).toEqual([{ file: "guides/index.md", line: 3,
+      message: `sort must be "date" (newest first) or "order" (the folder's order, the default)` }]);
+    expect((await check("---\ntitle: T\nsort: date\n---\n")).problems)
+      .toEqual([P(3, "sort orders a folder's pages, so it belongs on the folder's index.md, not on a page")]);
+  });
+
+  it("refuses a layout that declares one of them", async () => {
+    const r = await check("---\nlayout: listing\ntitle: T\n---\n");
+    expect(r.problems).toEqual(["date", "tags", "draft", "sort"].map(k =>
+      P(undefined, `layout "listing" declares "${k}", which a page sets for the build, not for its layout: rename it in the layout's schema`)));
   });
 });
 
