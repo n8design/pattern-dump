@@ -273,7 +273,7 @@ if (failures.length === 0 && tmp) {
   try {
     const json = execFileSync("bash", ["-o", "pipefail", "-c", `"${spd}" audit --format json 2>/dev/null | cat`], { cwd: starter, encoding: "utf8" });
     const report = JSON.parse(json);
-    check(report.totals.defects === 0 && report.totals.components === 4, "pd audit on the website starter: 4 components, 0 defects", report.headline);
+    check(report.totals.defects === 0 && report.totals.components === 5, "pd audit on the website starter: 5 components (the listing layout among them), 0 defects", report.headline);
   } catch (e) {
     check(false, "pd audit on the website starter", String(e).slice(0, 500));
   }
