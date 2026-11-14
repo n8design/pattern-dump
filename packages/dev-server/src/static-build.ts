@@ -234,10 +234,10 @@ export async function buildStaticSite(
     let imageWarnings: string[] | undefined;
     const browserWarnings: string[] = [];
     if (playwright) {
-      const checked = await runBrowserChecks({ pages, get: sfGet, playwright }).catch(async (e: unknown) => { await server.close(); throw e; });
+      const checked = await runBrowserChecks({ pages, get: sfGet, playwright, basePath: sfBase }).catch(async (e: unknown) => { await server.close(); throw e; });
       if (checked.errors.length) {
         await server.close();
-        throw new Error(`pd build: the storefront has accessibility problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
+        throw new Error(`pd build: the storefront has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
       }
       browserWarnings.push(...checked.a11yWarnings);
       imageWarnings = checked.images;
