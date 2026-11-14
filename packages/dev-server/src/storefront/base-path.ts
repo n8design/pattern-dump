@@ -93,3 +93,11 @@ export function withBaseHtml(html: string, p: BasePath): string {
   parts.push(html.slice(last));
   return parts.join("");
 }
+
+/** A preview document kept out of search engines: a robots noindex meta first in its head. Used under a base path,
+ *  where the robots.txt rule that keeps /preview/ out can't be read (crawlers read robots.txt only at a host's
+ *  root). A document that already says robots is left as it is. */
+export function withNoindex(html: string): string {
+  if (/<meta\s+name=["']?robots["']?/i.test(html)) return html;
+  return html.replace(/<head(\s[^>]*)?>/i, head => `${head}\n<meta name="robots" content="noindex">`);
+}

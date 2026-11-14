@@ -44,7 +44,7 @@ import { compiledScript, ScriptMissing } from "./scripts.js";
 import { contentHash } from "./content-hash.js";
 import { serveImageVariant } from "./image-route.js";
 import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
-import { withBaseCss, withBaseHtml } from "./storefront/base-path.js";
+import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
@@ -219,7 +219,12 @@ async function stampedResponse(req: IncomingMessage, res: ServerResponse, ctx: R
   // Stamps first, by site path; then the site's base path in front of every root-relative reference.
   const sf = ctx.cfg.storefront!;
   const base = { base: sf.basePath, workbenchPath: sameHostWorkbenchPath(sf) };
-  if (/^text\/html\b/.test(type)) body = withBaseHtml(await stampHtml(body.toString("utf8"), hashOfFor(req, ctx), sf.basePath), base);
+  // Under a path, a preview is kept out of search engines by its own head: no robots.txt is read there.
+  const preview = sf.basePath !== "/" && (req.url ?? "").startsWith(PD_ROUTE_PREFIX.preview);
+  if (/^text\/html\b/.test(type)) {
+    const html = withBaseHtml(await stampHtml(body.toString("utf8"), hashOfFor(req, ctx), sf.basePath), base);
+    body = preview ? withNoindex(html) : html;
+  }
   else if (/^text\/css\b/.test(type)) body = withBaseCss(await stampCss(body.toString("utf8"), hashOfFor(req, ctx)), base);
   res.writeHead(held.status(), held.headers);
   res.end(body);

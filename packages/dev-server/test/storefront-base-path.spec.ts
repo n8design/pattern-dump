@@ -1,7 +1,7 @@
 // The storefront's base path as text (base-path.ts): each place a root-relative reference is put under the path,
 // and each one left as written.
 import { describe, expect, it } from "vitest";
-import { withBase, withBaseCss, withBaseHtml } from "../src/storefront/base-path.js";
+import { withBase, withBaseCss, withBaseHtml, withNoindex } from "../src/storefront/base-path.js";
 
 const p = { base: "/project/" };
 
@@ -97,5 +97,14 @@ describe("withBaseCss", () => {
   it("leaves data: URLs, other hosts and relative url()s", () => {
     const css = `.a{background:url(data:image/png;base64,AAA)}.b{background:url(//cdn.example.com/x.png)}.c{background:url(img/x.png)}`;
     expect(withBaseCss(css, p)).toBe(css);
+  });
+});
+
+describe("withNoindex", () => {
+  it("puts a robots noindex meta first in the head, once", () => {
+    const doc = `<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n</head><body></body></html>`;
+    const out = withNoindex(doc);
+    expect(out).toBe(`<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta name="robots" content="noindex">\n<meta charset="UTF-8">\n</head><body></body></html>`);
+    expect(withNoindex(out)).toBe(out);
   });
 });

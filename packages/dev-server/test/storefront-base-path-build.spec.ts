@@ -94,6 +94,26 @@ describe("pd build — a storefront under a path", () => {
       + "host's root. Where you can, add to the host's own robots.txt: Disallow: /sub/preview/; Sitemap: https://bench.example.test/sub/sitemap.xml");
   });
 
+  it("keeps the previews out of search engines in their own head, and only under a path", () => {
+    const previews = [...underPath.keys()].filter(f => f.startsWith("preview/"));
+    expect(previews.length).toBeGreaterThan(0);
+    for (const f of previews) {
+      expect(underPath.get(f), f).toContain(`<head>\n<meta name="robots" content="noindex">`);
+      expect(atRoot.get(f), f).not.toContain(`name="robots"`);
+    }
+  });
+
+  it("keeps the workbench's previews out of search engines when it is built for a path", async () => {
+    const root = await benchCopy();
+    const wb = join(root, "..", "wb-docs");
+    const report = await buildStaticSite(config("https://bench.example.test/"), root, { outDir: wb, basePath: "/docs/", pdVersion: "0.0.0-test", now: NOW });
+    const built = await files(wb);
+    const previews = [...built.keys()].filter(f => f.startsWith("preview/") && f.endsWith(".html"));
+    expect(previews.length).toBeGreaterThan(0);
+    for (const f of previews) expect(built.get(f), f).toContain(`<head>\n<meta name="robots" content="noindex">`);
+    expect(report.notes.some(n => n.includes("each preview carries a robots noindex tag instead"))).toBe(true);
+  }, 120_000);
+
   it("fails on a link written with the path already, and says how to write it", async () => {
     const root = await benchCopy();
     await save(join(root, "pages", "doubled.md"), "---\ntitle: Doubled\n---\n\nSee [about](/sub/about/).\n");

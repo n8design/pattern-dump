@@ -66,7 +66,8 @@ export interface PageAssembly {
   /** storefront.image: the image of every page that names none. */
   siteImage?: string;
   /** The path the site is published under ("/project/"), put in front of its references on the way out
-   *  (base-path.ts); here only for the hint on a link written with it already. */
+   *  (base-path.ts). Here: the page's <meta name="pd-base-path">, and the hint on a link written with it already.
+   *  Default "/". */
   basePath?: string;
   /** The site's address, ending with "/", when storefront.url is set: canonical, og:url, og:image and
    *  JSON-LD are built from it. Without it they are left out. */
@@ -152,13 +153,17 @@ function exampleHeightCheck(): string {
     + `})();`;
 }
 
-function document(head: string, body: string, live: PageAssembly["live"], lang = "en"): string {
+/** `base`: the path the site is published under, written as `<meta name="pd-base-path">` on every page of the site
+ *  ("/" at a host's root), so a skin's own script can build a URL under it; undefined for a page that is not the
+ *  site's (a page with problems). */
+function document(head: string, body: string, live: PageAssembly["live"], lang = "en", base?: string): string {
   return `<!DOCTYPE html>
 <html lang="${escapeAttr(lang)}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-${head}
+${base !== undefined ? `<meta name="pd-base-path" content="${escapeAttr(base)}">
+` : ""}${head}
 </head>
 <body>
 ${body}
@@ -258,7 +263,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (isNotFound && !page) {
     const layoutId = `layouts/${DEFAULT_LAYOUT}`;
     if (!a.discoveryMap.has(layoutId)) {
-      return { status: 404, html: document(`<title>Page not found</title>`, BUILT_IN_NOT_FOUND_DOCUMENT, a.live, a.lang), problems: [],
+      return { status: 404, html: document(`<title>Page not found</title>`, BUILT_IN_NOT_FOUND_DOCUMENT, a.live, a.lang, a.basePath ?? "/"), problems: [],
         notes: [`there is no ${NOT_FOUND_FILE} and no ${layoutId}, so the 404 page is a plain one of Pattern Dump's`] };
     }
     const declared = (await readSchema(a.discoveryMap.get(layoutId)?.schemaPath)).schema?.properties ?? {};
@@ -543,5 +548,5 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     // One main landmark and one <h1> (page-basics.ts): errors in pd build, warnings here.
     notes.push(...checkPageBasics(html).map(p => `warning: ${page!.path}: ${p}`));
   }
-  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang), problems: [], notes };
+  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang, a.basePath ?? "/"), problems: [], notes };
 }

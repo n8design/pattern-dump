@@ -32,6 +32,7 @@ import { checkPageBasics } from "./storefront/page-basics.js";
 import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule } from "./storefront/browser-checks.js";
 import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { workbenchRobotsTxt } from "./storefront/site-files.js";
+import { withNoindex } from "./storefront/base-path.js";
 
 export interface StaticBuildOptions {
   /** Absolute output directory. Emptied first. */
@@ -296,7 +297,8 @@ export async function buildStaticSite(
           // The detail response carries the complete preview document — byte-identical to what
           // /preview/:id serves for the default theme — so write it rather than render it twice.
           const { document } = JSON.parse(detailText) as ComponentDetailResponse;
-          await store(previewUrl(id, variant), document);
+          // Under a base path the robots.txt rule for /preview/ is never read, so each preview says noindex itself.
+          await store(previewUrl(id, variant), basePath === "/" ? document : withNoindex(document));
           for (const ref of referenced(document)) await capture(ref);
         }
         await capture(renderedSourceUrl(id, variant), { optional: true });
@@ -366,7 +368,8 @@ export async function buildStaticSite(
     // when the storefront itself is at the host's root and so has a robots.txt.
     if (basePath !== "/" && (sameHostWorkbenchPath(storefront ?? undefined) !== basePath || sfBase !== "/")) {
       report.notes.push(`robots.txt is written to the workbench's root, but crawlers read it only at a host's root: `
-        + `with the base path ${basePath}, add its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
+        + `with the base path ${basePath}, each preview carries a robots noindex tag instead; where you can, also add `
+        + `its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
     }
 
     // ---- 7. The storefront, into its own root, through its own writer ----

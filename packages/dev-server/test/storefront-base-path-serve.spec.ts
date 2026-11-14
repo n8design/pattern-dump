@@ -139,6 +139,22 @@ describe("a storefront under a path", () => {
     expect(page).toContain(`<link rel="canonical" href="http://${SITE}:${live.port}/sub/about/">`);
   });
 
+  it("names its path in <meta name=\"pd-base-path\"> on every page, and / at the root", async () => {
+    for (const page of ["/sub/", "/sub/about/", "/sub/no-such-page/"]) {
+      expect((await get(sub, page)).text, page).toContain(`<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<meta name="pd-base-path" content="/sub/">`);
+    }
+    expect((await get(root, "/")).text).toContain(`<meta name="pd-base-path" content="/">`);
+  });
+
+  it("keeps its previews out of search engines in their own head, since no robots.txt is read under a path", async () => {
+    const page = (await get(sub, "/sub/")).text;
+    const preview = /<iframe[^>]* src="(\/sub\/preview\/[^"]+)"/.exec(page)![1]!;
+    const doc = (await get(sub, preview)).text;
+    expect(doc).toMatch(/^<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta name="robots" content="noindex">\n<meta charset="UTF-8">/);
+    const atRoot = /<iframe[^>]* src="(\/preview\/[^"]+)"/.exec((await get(root, "/")).text)![1]!;
+    expect((await get(root, atRoot)).text).not.toContain(`name="robots"`);
+  });
+
   it("leaves the workbench's hosts as they were", async () => {
     const shell = await get(sub, "/", PD_HOSTS.workbench);
     expect(shell.status).toBe(200);
