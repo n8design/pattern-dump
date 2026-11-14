@@ -1,6 +1,6 @@
 # Pattern Dump
 
-A workbench for HTML and CSS design systems, and a successor to PatternLab. Write components as
+A workbench for HTML and CSS design systems, and a successor to Pattern Lab. Write components as
 Handlebars templates with SCSS, data and Markdown docs; Pattern Dump shows them live, checks them, maps
 how they relate, and publishes the result as a static site.
 
@@ -9,7 +9,7 @@ how they relate, and publishes the result as a static site.
 > **{{version}}.** Pattern Dump is at 0.x, so breaking changes are possible between minor versions (0.3 to 0.4);
 > the [changelog]({{repo}}/blob/main/CHANGELOG.md) names them.
 
-**Coming from PatternLab?** Point `patternsDir` at your patterns folder: Handlebars templates, `.json` data and
+**Coming from Pattern Lab?** Point `patternsDir` at your patterns folder: Handlebars templates, `.json` data and
 `~` variants work as they are, and no build step of your own is needed.
 
 ## Requirements
