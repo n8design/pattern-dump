@@ -36,6 +36,7 @@ import { checkImages, type ImageFinding } from "./image-checks.js";
 import { checkLinks } from "./links.js";
 import { checkPageBasics } from "./page-basics.js";
 import { redirectsOf } from "./redirects.js";
+import { dateOf, entriesOf, type Entry } from "./collections.js";
 
 /** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
 export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
@@ -348,17 +349,36 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const notes: string[] = [];
   let dates: Partial<PageDates> = {};
   let modified: string | null = null;
-  const showsDates = pageDeclaration.declared?.some(k => k === "created" || k === "modified") ?? false;
+  // datePublished: the page's own date, else the day git first saw it.
+  let published: string | null = checked.build.date ?? null;
+  const mode = a.live ? "dev" : "build";
+  const declares = (k: string) => pageDeclaration.declared?.includes(k) ?? false;
+  const showsDates = declares("created") || declares("modified");
   if (a.dates && !isNotFound && (showsDates || a.siteUrl !== undefined)) {
-    const dated = await a.dates.of(page.path, a.live ? "dev" : "build");
+    const dated = await a.dates.of(page.path, mode);
     if (showsDates) {
       dates = dated.dates;
       notes.push(...dated.notes);
       problems.push(...dated.problems);
     }
     if (dated.shallow) notes.push(SHALLOW_SEO_NOTE);
-    else modified = dated.dates.modified;
+    else { modified = dated.dates.modified; published ??= dated.dates.created; }
   }
+  // A listing's entries, and the page's own date and tags (collections.ts), for a layout that shows them.
+  const listing: { children?: Entry[]; date?: string | null; tags?: string[] } = {};
+  if (declares("children")) {
+    const listed = isNotFound ? { entries: [], problems: [], notes: [] } : await entriesOf(route, model, { dates: a.dates, mode });
+    listing.children = listed.entries;
+    problems.push(...listed.problems);
+    notes.push(...listed.notes);
+  }
+  if (declares("date")) {
+    const dated = isNotFound ? { date: null, problems: [], notes: [] } : await dateOf(route, model, a.dates, mode);
+    listing.date = dated.date;
+    problems.push(...dated.problems);
+    notes.push(...dated.notes);
+  }
+  if (declares("tags")) listing.tags = model.entries.get(route)?.tags ?? [];
   if (a.discoveryMap.has(checked.layoutId)) {
     problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed));
   }
@@ -381,7 +401,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     body,
     nav: markCurrent(model.nav, route),
     site: siteData,
-    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates }) } : {}),
+    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates, ...listing }) } : {}),
   });
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
@@ -453,7 +473,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       index: !isNotFound && a.siteIndex !== false && checked.build.index !== false,
     }),
     ...(a.siteUrl !== undefined && !isNotFound
-      ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified })]
+      ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published })]
       : []),
     ...(headExtra ? [headExtra] : []),
     await a.head(checked.layoutId, html),

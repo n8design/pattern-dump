@@ -10,6 +10,11 @@ import { entriesOf } from "../src/storefront/collections.js";
 import { firstParagraph, teaserOf, teaserStats } from "../src/storefront/teaser.js";
 import type { DatedPage, GitDates } from "../src/storefront/git-dates.js";
 import { save } from "../../../test-support/save.js";
+import type { RenderInput } from "@pattern-dump/contracts";
+import { buildDiscoveryMap } from "@pattern-dump/discovery";
+import { createRenderer } from "@pattern-dump/renderer";
+import { buildCompositionRegistry } from "../src/composition.js";
+import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
 
 const roots: string[] = [];
 afterAll(async () => { await Promise.all(roots.map(r => rm(r, { recursive: true, force: true }))); });
@@ -154,5 +159,71 @@ describe("entriesOf", () => {
   it("is empty for a route that is not a folder", async () => {
     const model = await readPages(await pages(site));
     expect((await entriesOf("/articles/a/", model, { mode: "build" })).entries).toEqual([]);
+  });
+});
+
+describe("assemblePage: page.children, page.date, page.tags, and datePublished", () => {
+  /** A project whose one layout declares `page` with `declared`, and its pages; assembles `route`. */
+  async function assemble(route: string, files: Record<string, string>, declared: string[], extra: Partial<PageAssembly> = {}) {
+    const root = await pages({});
+    const patterns = join(root, "patterns");
+    const props = Object.fromEntries(declared.map(k => [k, {}]));
+    for (const [rel, body] of Object.entries({
+      "layouts/page/page.hbs": "<main><h1>{{title}}</h1>{{{body}}}<ul>{{#each page.children}}<li>{{title}}: {{description}}</li>{{/each}}</ul></main>",
+      "layouts/page/page.schema.json": JSON.stringify({ properties: { title: { type: "string" }, description: { type: "string" }, page: { type: "object", properties: props } } }),
+    })) await save(join(patterns, ...rel.split("/")), body);
+    for (const [rel, body] of Object.entries(files)) await save(join(root, "pages", ...rel.split("/")), body);
+    const { discoveryMap, handleMap } = await buildDiscoveryMap(patterns);
+    const render = createRenderer({ patternsDir: patterns, discoveryMap, handleMap });
+    const inputs: RenderInput[] = [];
+    const page = await assemblePage(route, await readPages(join(root, "pages")), {
+      discoveryMap, handleMap, composition: await buildCompositionRegistry(patterns, handleMap, discoveryMap),
+      site: undefined, workbenchUrl: "https://wb.example/", shown: p => p, head: async () => "",
+      image: async () => ({ ok: false, message: "no images here" }),
+      render: input => { inputs.push(input); return render(input); }, ...extra,
+    } as PageAssembly);
+    return { page, data: (inputs.at(-1)?.data as { page?: Record<string, unknown> } | undefined)?.page };
+  }
+  const site = {
+    "index.md": page("Home"),
+    "articles/index.md": page("Articles", "sort: date\n"),
+    "articles/old.md": page("Old", "date: 2026-01-05\ntags: [css]\n", "The *old* one."),
+    "articles/new.md": page("New", "date: 2026-11-02\ndescription: Newest\n"),
+  };
+
+  it("a folder's index.md gets its pages, sorted, in the entry shape", async () => {
+    const { page: p, data } = await assemble("/articles/", site, ["children"]);
+    expect(p.problems).toEqual([]);
+    expect(data).toEqual({ children: [
+      { route: "/articles/new/", title: "New", description: "Newest", date: "2026-11-02", image: null, tags: [], draft: false },
+      { route: "/articles/old/", title: "Old", description: "The old one.", date: "2026-01-05", image: null, tags: ["css"], draft: false },
+    ] });
+    expect(p.html).toContain("<li>New: Newest</li><li>Old: The old one.</li>");
+  });
+
+  it("any other page gets no children", async () => {
+    expect((await assemble("/articles/old/", site, ["children"])).data).toEqual({ children: [] });
+  });
+
+  it("a page gets its own date and tags, the date from git where it has none", async () => {
+    expect((await assemble("/articles/old/", site, ["date", "tags"])).data).toEqual({ date: "2026-01-05", tags: ["css"] });
+    const fromGit = await assemble("/", site, ["date", "tags"], { dates: fakeDates({ "index.md": "2025-12-24T08:00:00+01:00" }) });
+    expect(fromGit.data).toEqual({ date: "2025-12-24", tags: [] });
+  });
+
+  it("datePublished is the page's date, else git's first commit of it", async () => {
+    const ld = (html: string) => JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/.exec(html)![1]!)["@graph"][1];
+    const own = await assemble("/articles/old/", site, [], { siteUrl: "https://example.com/", dates: fakeDates({ "articles/old.md": "2026-03-01T10:00:00Z" }) });
+    expect(ld(own.page.html)).toMatchObject({ datePublished: "2026-01-05", dateModified: "2026-03-01T10:00:00Z" });
+    const git = await assemble("/", site, [], { siteUrl: "https://example.com/", dates: fakeDates({ "index.md": "2026-03-01T10:00:00Z" }) });
+    expect(ld(git.page.html)).toMatchObject({ datePublished: "2026-03-01T10:00:00Z" });
+    const none = await assemble("/", site, [], { siteUrl: "https://example.com/" });
+    expect(Object.hasOwn(ld(none.page.html), "datePublished")).toBe(false);
+  });
+
+  it("a listing with a page that has no date stops pd build, and the page names why", async () => {
+    const { page: p } = await assemble("/articles/", { ...site, "articles/undated.md": page("Undated") }, ["children"]);
+    expect(p.status).toBe(500);
+    expect(p.problems).toEqual(["articles/index.md: sort: date, but articles/undated.md has no date: give it one (date: YYYY-MM-DD), or commit it so git dates it"]);
   });
 });
