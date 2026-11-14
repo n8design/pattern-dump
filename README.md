@@ -4,8 +4,13 @@ A workbench for HTML and CSS design systems, and a successor to PatternLab. Writ
 Handlebars templates with SCSS, data and Markdown docs; Pattern Dump shows them live, checks them, maps
 how they relate, and publishes the result as a static site.
 
-> **Alpha.** Pattern Dump works end to end, but options and file conventions can
-> still change between releases.
+**Demo:** a style guide and the website built from it, at https://lab.n8d.studio/pattern-dump-demo/
+
+> **0.x.** Pattern Dump works end to end, but breaking changes are possible between minor versions
+> (0.3 to 0.4); the [changelog](CHANGELOG.md) names each one.
+
+**Coming from PatternLab?** Point `patternsDir` at your patterns folder: Handlebars templates, `.json` data and
+`~` variants work as they are, and no build step of your own is needed.
 
 ![Your project goes into Pattern Dump, which gives you a live workbench, an audit report and a static site](docs/guide/how-it-works.svg)
 
@@ -27,8 +32,6 @@ how they relate, and publishes the result as a static site.
 ## Requirements
 
 Node.js 22.22 or later, and npm.
-
-Pattern Dump is at 0.x, so breaking changes are possible between minor versions (0.3 to 0.4); the [changelog](CHANGELOG.md) names them.
 
 ## Quick start
 
