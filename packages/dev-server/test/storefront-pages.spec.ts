@@ -232,7 +232,7 @@ describe("readPages — problems (each one fatal to the caller)", () => {
   it("an empty pages folder has no home page", async () => {
     const model = await readPages(await pages({}));
     expect(model).toEqual({
-      pages: [], nav: [], files: new Map(),
+      pages: [], nav: [], files: new Map(), entries: new Map(), folders: new Map(),
       problems: ["there is no home page: the pages folder needs an index.md at its top, the page at /"],
     });
   });
@@ -245,7 +245,7 @@ describe("readPages — problems (each one fatal to the caller)", () => {
 
   it("a pages folder that does not exist", async () => {
     const missing = join(await pages({}), "no-such-folder");
-    expect(await readPages(missing)).toEqual({ pages: [], nav: [], files: new Map(), problems: [`the pages folder ${missing} does not exist`] });
+    expect(await readPages(missing)).toEqual({ pages: [], nav: [], files: new Map(), entries: new Map(), folders: new Map(), problems: [`the pages folder ${missing} does not exist`] });
   });
 
   it("a pages path that is a file, not a folder", async () => {
