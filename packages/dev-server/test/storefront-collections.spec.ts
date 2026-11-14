@@ -221,6 +221,14 @@ describe("assemblePage: page.children, page.date, page.tags, and datePublished",
     expect(Object.hasOwn(ld(none.page.html), "datePublished")).toBe(false);
   });
 
+  it("pd dev lists a draft with draft: true, and says once that pd build leaves it out", async () => {
+    const files = { ...site, "articles/wip.md": page("Wip", "date: 2026-11-10\ndraft: true\n") };
+    const { page: p, data } = await assemble("/articles/", files, ["children"], { live: { wsPort: 1, generation: "" } });
+    expect((data?.["children"] as Array<{ route: string; draft: boolean }>).map(e => [e.route, e.draft])).toEqual([
+      ["/articles/wip/", true], ["/articles/new/", false], ["/articles/old/", false]]);
+    expect(p.notes).toContain("articles/wip.md is a draft: pd build leaves it out");
+  });
+
   it("a listing with a page that has no date stops pd build, and the page names why", async () => {
     const { page: p } = await assemble("/articles/", { ...site, "articles/undated.md": page("Undated") }, ["children"]);
     expect(p.status).toBe(500);

@@ -65,6 +65,9 @@ export async function runBuild(
     console.log(`[pd build] images: ${n ? `${n} with a variant that doesn't fit:` : "every variant fits its box"}`);
     for (const w of report.images.warnings) console.log(`[pd build]   warning: ${w}`);
   }
+  if (report.drafts) {
+    console.log(`[pd build] drafts: ${report.drafts.length} left out (${report.drafts.join(", ")})`);
+  }
   for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
   for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
 }

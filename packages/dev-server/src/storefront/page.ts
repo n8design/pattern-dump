@@ -390,6 +390,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     problems.push(...headSample);
   }
   if (problems.length) return fail(problems);
+  // pd dev shows drafts; each is said once, whichever page is open.
+  if (a.live) notes.push(...model.drafts.map(d => `${d} is a draft: pd build leaves it out`));
 
   // What the layout gets: its declared values, null where the page sets none, then what the storefront fills.
   const siteData = {

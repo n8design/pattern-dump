@@ -74,6 +74,9 @@ export interface PageModel extends StorefrontPagesResponse {
   entries: Map<string, PageEntryFields>;
   /** Each folder's listing, by the folder's route ("/" for the top). */
   folders: Map<string, FolderListing>;
+  /** Drafts, by their path in the pages folder: shown ones with `drafts: "show"`; with "leave-out", every page left
+   *  out (a draft, and each page under a folder whose index.md is one). */
+  drafts: string[];
   /** 404.md at the top of the pages folder, at the route /404.html: not a page of the site, so in neither
    *  `pages`, `files` nor the nav. Absent when the site has none (a built-in one is used). */
   notFound?: PageFile;
@@ -120,12 +123,16 @@ const scalar = (v: string | string[] | undefined): string | undefined => typeof 
  * `workbenchPath`: the path of a workbench published on the storefront's host (sameHostWorkbenchPath), where no
  * page and no old route may be, since the published workbench would take its place.
  */
-export async function readPages(pagesDir: string, opts: { workbenchPath?: string | undefined } = {}): Promise<PageModel> {
+/**
+ * `drafts`: "show" (pd dev, the default) keeps drafts as pages; "leave-out" (pd build) drops every page whose
+ * frontmatter says `draft: true`, and every page under a folder whose index.md does, as if their files weren't there.
+ */
+export async function readPages(pagesDir: string, opts: { workbenchPath?: string | undefined; drafts?: "show" | "leave-out" } = {}): Promise<PageModel> {
   const problems: string[] = [];
   const files = new Map<string, PageFile>();
   let notFound: PageFile | undefined;
   if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
-    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), problems: [`the pages folder ${pagesDir} does not exist`] };
+    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], problems: [`the pages folder ${pagesDir} does not exist`] };
   }
   const bodies = new Map<string, string>();
   for (const path of (await markdownFiles(pagesDir, pagesDir, problems)).sort()) {
@@ -140,6 +147,21 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
     files.set(route, { route, file, path, frontmatter: readFrontmatterStrict(text) });
     bodies.set(route, text);
   }
+
+  // Drafts: shown, or left out with every page under a draft folder's index.md (the top's index.md is only itself).
+  const isDraft = (f: PageFile | undefined): boolean => {
+    const v = f?.frontmatter.values["draft"];
+    return v !== undefined && (() => { const r = readDraft(v); return r.ok && r.value; })();
+  };
+  const drafts: string[] = [];
+  for (const [route, f] of [...files]) {
+    const segments = route.split("/").filter(Boolean);
+    const folderDraft = segments.slice(0, -1).some((_, i) => isDraft(files.get(`/${segments.slice(0, i + 1).join("/")}/`)));
+    if (!isDraft(f) && !(opts.drafts === "leave-out" && folderDraft)) continue;
+    drafts.push(f.path);
+    if (opts.drafts === "leave-out") { files.delete(route); bodies.delete(route); }
+  }
+  drafts.sort();
 
   const pageOf = (f: PageFile): StorefrontPage => {
     const redirectFrom = redirectsOf(f);
@@ -259,5 +281,5 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
       children: ordered(folder).map(c => c.route).filter(r => files.has(r)),
     });
   }
-  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, problems, ...(notFound ? { notFound } : {}) };
+  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, problems, ...(notFound ? { notFound } : {}) };
 }
