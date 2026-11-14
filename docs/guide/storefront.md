@@ -558,8 +558,9 @@ must be encoded.
 
 ## Search engines and link previews
 
-**The site's address.** `storefront.url` is where the site will be hosted, such as `https://example.com/`
-(an origin: the storefront is served from the root of its host). With it, every page carries:
+**The site's address.** `storefront.url` is where the site will be hosted, such as `https://example.com/`,
+or with a path, such as `https://example.github.io/project/`, for a site published under one
+([below](#publishing-under-a-path)). With it, every page carries:
 
 - a canonical URL, and `og:url`
 - Open Graph (`og:type`, `og:site_name`, `og:title`, `og:description`, `og:image` with its width and height)
@@ -595,7 +596,8 @@ previews only; the workbench itself stays searchable. A workbench on the storefr
   so their text doesn't count toward the page.
 - Crawlers read `robots.txt` only at a host's root. A workbench built with `--base` for a host of its own
   writes it to its own root, so copy its rule into the `robots.txt` that host serves at `/` (the build says
-  so). On the storefront's host there is nothing to copy.
+  so); its previews also carry a robots `noindex` tag then. On the storefront's host there is nothing to copy.
+- A site published under a path has no `robots.txt` at all ([below](#publishing-under-a-path)).
 
 ### The 404 page
 
@@ -628,7 +630,7 @@ to open when it starts:
 
 | Address | Serves |
 |---|---|
-| `http://live.localhost:<port>/` | The storefront (`storefront.host` changes the name) |
+| `http://live.localhost:<port>/` | The storefront (`storefront.host` changes the name), under its path when `storefront.url` has one |
 | `http://pd.localhost:<port>/` | The workbench |
 | `http://localhost:<port>/` | The workbench, as without a storefront |
 
@@ -670,7 +672,8 @@ built site is plain files on a host of its own, with no `*.localhost` name invol
 | `storefront.outDir` | The storefront: one `index.html` per page, plus everything the pages use |
 
 The storefront folder has its own copy of every preview its pages show and of every stylesheet, script,
-font and image they reference, so it is complete on its own. It is served from the root of its host. A
+font and image they reference, so it is complete on its own. It is served at `storefront.url`: the root of its
+host, or the path under it ([Publishing under a path](#publishing-under-a-path)). A
 page built here is the same page `pd dev` serves, apart from the live-reload script and the address of the
 workbench links.
 
@@ -687,6 +690,58 @@ site/
 
 `storefront.workbenchUrl` is required to build, since built pages link to the workbench at its own address.
 
+### Publishing under a path
+
+A site can be published under a path of its host, such as a GitHub project page at
+`https://<owner>.github.io/<repository>/`, without a domain of its own. Give `storefront.url` the full address:
+
+```ts
+storefront: { pagesDir: "./pages", outDir: "./site", url: "https://example.github.io/project/", … },
+```
+
+The path (`/project/`) is the site's base path. `storefront.outDir` holds what is served at it: copy the folder's
+contents to the path, not to the host's root.
+
+**Links stay written from the site's root.** In pages, navigations, layouts and stylesheets, write `/guides/setup/`,
+`/assets/images/hero.jpg`, `url(/assets/fonts/serif.woff2)`, as for a site at the root. Pattern Dump puts the path in
+front of every such reference as it serves a page or stylesheet, in `pd dev` and `pd build` alike: `href`, `src`,
+`srcset` and `imagesrcset`, `poster`, `action` and `formaction`, `<object data>`, a refresh's `url=`, and `url()` in
+`style` attributes, `<style>` and stylesheets (and `@import "…"`). A link written with the path already gets it twice,
+and the link check says so. Text and code examples are left as written, and so are `data-*` attributes, other
+hosts and relative links. The canonical URLs, Open Graph, JSON-LD and the sitemap carry the path, since they are
+built from `storefront.url`.
+
+**`pd dev` serves the site under its path too**, at `http://live.localhost:<port>/project/`; the host's root forwards
+there, and any other address outside the path is the 404 page. That way a URL that misses the path fails while you
+work, not only once the site is published.
+
+**A skin's own scripts.** Pattern Dump can't rewrite a URL that a script puts together itself
+(`fetch("/search.json")`, a path read from a `data-*` attribute). Every page names its path in a meta tag, `/` at
+a host's root, for a script to build its URLs from:
+
+```js
+const base = document.querySelector('meta[name="pd-base-path"]')?.content ?? "/";
+const index = await fetch(`${base}search.json`);
+```
+
+A URL the page already holds needs nothing: `a.href`, `img.src` and the attributes above are already under the path.
+`pd build --browser` stops the build when a page requests anything on the site's host outside the path, naming the
+page and the URL.
+
+**Search engines.** Crawlers read `robots.txt` only at a host's root, so a site under a path gets none. The build's
+notes say what to add to the host's own `robots.txt` where you can (its previews and its sitemap). Each preview
+the site shows carries a robots `noindex` tag instead, and with `storefront.index: false` every page does. The
+sitemap is written at `<path>sitemap.xml`: submit it in the search engine's console.
+
+**The workbench beside it.** A workbench on the same host is built for its own full path:
+
+```ts
+storefront: { …, url: "https://example.github.io/project/", workbenchUrl: "/project/workbench/" },
+build: { basePath: "/project/workbench/" },
+```
+
+Publish the workbench's folder at `/project/workbench/`, inside the site's. Links into it are left as written.
+
 ### The link check
 
 Before it writes anything, `pd build` checks every link on every page of the site (its pages and its 404 page),
@@ -698,6 +753,8 @@ writes.
 - A `#fragment` leads to an element with that `id` in the target page. Headings carry their anchors as ids, so a link
   to a heading is checked too.
 - A URL on the site's own address (`storefront.url`) is checked as its path.
+- On a site published under a path, a path outside it is broken, and so is one written with the path already
+  (the build says how to write it).
 - A link into the workbench (`storefront.workbenchUrl`) leads to a component, a folder or a component's variants
   page the workbench snapshot has; its `#fragment` names one of the component's variants.
 - A link to another site is not fetched: the build lists each one in its notes, with the pages that use it.

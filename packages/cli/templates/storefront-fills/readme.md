@@ -42,9 +42,14 @@ what the GitHub Pages workflow does.
 
 ### Publish it
 
-`.github/workflows/pages.yml` publishes both to GitHub Pages on every push to `main`. The website lives at
-the root of its host, so it needs a custom domain (a project page under `/<repository>/` can't host it).
-Once, in the repository on GitHub:
+`.github/workflows/pages.yml` publishes both to GitHub Pages on every push to `main`, at a custom domain
+or as a project page.
+
+**As a project page** (`https://<owner>.github.io/<repository>/`, no domain needed): in
+`pattern-dump.config.ts`, set `storefront.url` to that address, and `storefront.workbenchUrl` and
+`build.basePath` to `/<repository>/workbench/`. Then **Settings → Pages → Source:** "GitHub Actions".
+
+**At a custom domain**, once, in the repository on GitHub:
 
 1. **Settings → Pages → Source:** "GitHub Actions".
 2. **Settings → Pages → Custom domain:** your domain, then Save. GitHub recommends verifying the domain in
