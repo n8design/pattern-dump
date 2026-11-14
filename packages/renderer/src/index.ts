@@ -9,6 +9,8 @@ export { initHighlighter, highlight, getShikiCSS, wrapWithCopyButton } from "./h
 export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
 export { checkSchemaExtensions, readExampleHeight, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
 export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
+export { helperShadows, type HelperShadow } from "./helper-shadow";
+import { helperShadows } from "./helper-shadow";
 import { checkSchemaExtensions } from "./schema-extensions";
 import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
@@ -591,6 +593,21 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         }
       }
     } catch { /* no schema file — skip */ }
+
+    // A data field a bare {{name}} never reads, since a helper of that name answers (helper-shadow.ts). A field the
+    // schema declares is the schema check's error already (SCHEMA_INVALID), and not said twice.
+    const schemaNamed = new Set(diagnostics.filter(d => d.kind === "SCHEMA_INVALID" && d.path)
+      .map(d => /\/properties\/([^/]+)$/.exec(d.path!)?.[1]).filter((n): n is string => !!n));
+    for (const s of helperShadows(templateSrc, data, Object.keys(env.helpers), schemaNamed)) {
+      diagnostics.push({
+        kind: "HELPER_SHADOW",
+        severity: "warning",
+        source: "render",
+        message: `{{${s.name}}} calls the helper "${s.name}", so the data's "${s.at}" is never read here: write {{this.${s.name}}} `
+          + `to read the field, or give the field another name`,
+        location: { file: display(entry.hbsPath), line: s.line, column: s.column },
+      });
+    }
 
     const meta: RenderMeta | undefined = diagnostics.length > 0
       ? { componentId, variant, diagnostics }
