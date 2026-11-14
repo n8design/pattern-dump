@@ -275,6 +275,23 @@ link, `description`, `robots`, `og:*`, `twitter:*` or JSON-LD, nor `<base>`. Any
 or text, is a problem for every page. Its workbench preview is empty, since everything in it belongs in a
 head.
 
+**The site's own head.** A site whose skin is a shared package can't change the skin's `partials/head`, and
+some head content is the site's, not the skin's: an analytics script, a search engine's verification tag. Name a
+Handlebars file of the site's in the config:
+
+```ts
+storefront: { …, head: "./head.hbs", site: { analyticsKey: "…" } },
+```
+
+```hbs
+<meta name="google-site-verification" content="…">
+<script defer src="https://analytics.example.com/script.js" data-key="{{site.analyticsKey}}"></script>
+```
+
+It is rendered with `site` (plain Handlebars: `{{#if}}`, `{{#each}}` and the like, not Pattern Dump's helpers) into
+every page's head, after the skin's `partials/head` and before the stylesheets, and checked the same way: the same
+elements only, none of those Pattern Dump writes. An edit to it shows when the page is loaded again.
+
 **Behaviour scripts.** A page loads the scripts its components bring, as their workbench previews do: the
 project's `globalScripts`, then every `requireScript` of its layout's components (the header's, a partial's) and
 of each component it places with a `pd-` tag, each once, as module scripts after its stylesheets. A layout doesn't

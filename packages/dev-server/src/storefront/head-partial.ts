@@ -27,10 +27,11 @@ function writtenByPatternDump(tag: string, attrs: string): string | undefined {
   return undefined;
 }
 
-/** Every problem with partials/head's rendered markup, one line each; empty when it may go into every head. */
-export function checkHeadMarkup(html: string): string[] {
+/** Every problem with partials/head's rendered markup, one line each; empty when it may go into every head. `source`
+ *  names what wrote it in the messages: partials/head (the default), or the site's storefront.head file. */
+export function checkHeadMarkup(html: string, source: { label: string; subject: string } = { label: HEAD_PARTIAL, subject: "a head partial" }): string[] {
   const problems: string[] = [];
-  const say = (what: string) => problems.push(`${HEAD_PARTIAL}: ${what}`);
+  const say = (what: string) => problems.push(`${source.label}: ${what.replaceAll("a head partial", source.subject)}`);
   let rest = html.replace(/<!--[\s\S]*?-->/g, "");
   // Elements with content of their own: checked by their start tag, their content left as it is.
   rest = rest.replace(/<(script|style|noscript|title)\b([^>]*)>[\s\S]*?<\/\1\s*>/gi, (_m, rawTag: string, attrs: string) => {

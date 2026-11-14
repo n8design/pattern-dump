@@ -23,6 +23,9 @@
   config takes each folder it doesn't name from its `package.json`'s `patternDump` field (patterns, data, helpers,
   assets, styles with `entry` and `documentBase`, themes, scripts, `globalScripts`, `exclude`). A folder named in
   both with different values is a config error naming both files.
+- `storefront.head`: a site's own additions to every page's head (an analytics script, a verification tag), a
+  Handlebars file rendered with `site` after the skin's `partials/head` and checked like it. For a site whose skin
+  is a shared package.
 - `date`, `tags` and `draft` in a page's frontmatter. `date` (`YYYY-MM-DD`) is the page's date for listings and its
   JSON-LD `datePublished`, which falls back to the page's first commit. `draft: true` shows a page in `pd dev` and
   leaves it out of `pd build`, which names the drafts it left out.

@@ -684,6 +684,7 @@ async function routeRequest(
         image: path => checkPageImage(path, assetRoots, assetRootNames),
         ...(siteUrl !== undefined ? { siteUrl } : {}),
         lang: cfg.storefront.lang, siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
+        ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
       });

@@ -36,6 +36,12 @@ const htmlValidator = new HtmlValidate({
   },
 });
 
+/** A template outside the patterns (a site's own head file): plain Handlebars, escaping as templates do, with no
+ *  helpers but Handlebars' own and no partials, compiled as every template is (preventIndent). */
+export function renderPlainTemplate(source: string, data: Record<string, unknown>): string {
+  return Handlebars.create().compile(source, COMPILE)(data);
+}
+
 export function deepMerge(
   target: Record<string, unknown>,
   ...sources: Array<Record<string, unknown> | undefined>

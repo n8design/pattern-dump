@@ -169,6 +169,13 @@ describe("configProblems — storefront", () => {
     }
   });
 
+  it("takes a Handlebars file relative to the root for head", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    for (const ok of ["./head.hbs", "head.hbs", "site/head.hbs"]) expect(storefront({ ...base, head: ok }), ok).toEqual([]);
+    const message = `"storefront.head" must be a Handlebars file relative to the project's root, such as "./head.hbs"`;
+    for (const bad of ["./head.html", "/abs/head.hbs", "", 42]) expect(storefront({ ...base, head: bad }), String(bad)).toEqual([message]);
+  });
+
   it("takes a language tag for lang", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     for (const ok of ["en", "de", "de-AT", "zh-Hant-TW", "es-419", "sl-rozaj", "de-CH-1901"]) {

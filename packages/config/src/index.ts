@@ -219,6 +219,13 @@ export interface StorefrontConfig {
   /** This site's image encoding, over the project's `images`. */
   images?: ImageSettings;
   /**
+   * The site's own additions to every page's `<head>`, such as an analytics script or a search engine's verification
+   * tag: a Handlebars file relative to the root, such as `./head.hbs`, rendered with `site` (plain Handlebars, without
+   * Pattern Dump's helpers) and placed after the skin's `partials/head`. It is checked as `partials/head` is: only
+   * `<meta>`, `<link>`, `<script>`, `<style>` and `<noscript>`, and none of the tags Pattern Dump writes itself.
+   */
+  head?: string;
+  /**
    * Values every page of the site shares, such as its title or the line in its footer. Every layout gets
    * them as `site`; a page cannot set them. Which keys there are, and their types, is what the `site`
    * property of `partials/base`'s schema declares: they are checked against it, not inferred.

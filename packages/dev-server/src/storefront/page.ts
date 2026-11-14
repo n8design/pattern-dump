@@ -16,7 +16,7 @@
 import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
-import { isHelperNameProblem, readProseSlot } from "@pattern-dump/renderer";
+import { isHelperNameProblem, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
 import { renderDoc, type ProseImages } from "../markdown.js";
 import { readSchema, type PlacedProblem } from "./declared-values.js";
 import { checkPageFrontmatter } from "./frontmatter-contract.js";
@@ -66,6 +66,8 @@ export interface PageAssembly {
   image(path: string): Promise<PageImageCheck>;
   /** storefront.image: the image of every page that names none. */
   siteImage?: string;
+  /** storefront.head: the site's own head file, by its absolute path and as the config names it. */
+  siteHead?: { path: string; name: string };
   /** The path the site is published under ("/project/"), put in front of its references on the way out
    *  (base-path.ts). Here: the page's <meta name="pd-base-path">, and the hint on a link written with it already.
    *  Default "/". */
@@ -483,6 +485,24 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const markup = checkHeadMarkup(headExtra);
     if (markup.length) { siteWide = [...siteWide, ...markup]; return fail(markup); }
   }
+  // The site's own head additions (storefront.head), after the skin's: rendered with the site's values, checked alike.
+  let siteHead = "";
+  if (a.siteHead) {
+    const label = `storefront.head (${a.siteHead.name})`;
+    let source: string;
+    try { source = await readFile(a.siteHead.path, "utf8"); } catch {
+      const p = `${label}: there is no such file`;
+      siteWide = [...siteWide, p];
+      return fail([p]);
+    }
+    try { siteHead = renderPlainTemplate(source, { site: siteData }).trim(); } catch (e) {
+      const p = `${label}: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`;
+      siteWide = [...siteWide, p];
+      return fail([p]);
+    }
+    const markup = checkHeadMarkup(siteHead, { label, subject: "the site's head" });
+    if (markup.length) { siteWide = [...siteWide, ...markup]; return fail(markup); }
+  }
   const title = typeof checked.values["title"] === "string" ? checked.values["title"] : isNotFound ? "Page not found" : route;
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
@@ -499,6 +519,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published })]
       : []),
     ...(headExtra ? [headExtra] : []),
+    ...(siteHead ? [siteHead] : []),
     await a.head(checked.layoutId, html, [...placedIds]),
   ].join("\n");
   // The 404 page is served at any depth, so every URL in it (its body's, its layout's, the head's) must be
