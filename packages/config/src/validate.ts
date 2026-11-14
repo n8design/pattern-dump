@@ -169,16 +169,18 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     return;
   }
   if (rule === "site-url") {
-    // The storefront is served from the root of its host: canonical URLs, og:url and the sitemap are this
-    // value followed by a page's route, so it is an origin, with no path, query or fragment.
+    // The site's address: canonical URLs, og:url and the sitemap are this value followed by a page's route. It may
+    // have a path (a site published under one, such as a GitHub project page), which is then the site's base path;
+    // no query or fragment, since routes are appended to it, and no empty segment in the path.
     let ok = false;
     if (typeof value === "string") {
       try {
         const url = new URL(value);
-        ok = /^https?:$/.test(url.protocol) && url.pathname === "/" && url.search === "" && url.hash === "" && !/[?#]/.test(value);
+        ok = /^https?:$/.test(url.protocol) && url.search === "" && url.hash === "" && !/[?#]/.test(value)
+          && !/\/\/./.test(url.pathname);
       } catch { ok = false; }
     }
-    if (!ok) fail(`the site's absolute http(s) address, with no path, query or fragment, such as "https://example.com/"`);
+    if (!ok) fail(`the site's absolute http(s) address, with no query or fragment, such as "https://example.com/", or "https://example.github.io/project/" for a site published under a path`);
     return;
   }
   if (rule === "lang") {
@@ -306,18 +308,33 @@ export function validateConfig(raw: unknown, source: string): PatternDumpConfig 
   const sf = config.storefront;
   if (!sf) return config;
   const workbenchUrl = sf.workbenchUrl !== undefined ? withOneTrailingSlash(sf.workbenchUrl) : undefined;
-  // The site URL has no path, so its one form is the origin with "/": "https://example.com" → "https://example.com/".
-  const url = sf.url !== undefined ? `${new URL(sf.url).origin}/` : undefined;
+  // The site URL's one form is its origin and path with one trailing slash: "https://example.com" →
+  // "https://example.com/", "https://example.github.io/project" → "https://example.github.io/project/".
+  const url = sf.url !== undefined ? siteUrlForm(sf.url) : undefined;
   if (workbenchUrl === sf.workbenchUrl && url === sf.url) return config;
   return { ...config, storefront: {
     ...sf, ...(workbenchUrl !== undefined ? { workbenchUrl } : {}), ...(url !== undefined ? { url } : {}),
   } };
 }
 
+/** A site URL in its one form: origin, then the path with exactly one trailing slash. */
+function siteUrlForm(value: string): string {
+  const u = new URL(value);
+  return `${u.origin}${withOneTrailingSlash(u.pathname)}`;
+}
+
+/**
+ * The storefront's base path: the path of `storefront.url` ("/" at the root of a host, "/project/" under a path), or
+ * "/" for a site with no address. Reads a validated config, so the URL is already in its one form.
+ */
+export function storefrontBasePath(storefront: { url?: string } | undefined): string {
+  return storefront?.url === undefined ? "/" : new URL(storefront.url).pathname;
+}
+
 /**
  * The path of a workbench published on the storefront's own host, or undefined when it has a host of its own.
  * Same-host means a root-relative `workbenchUrl` ("/workbench/"), or an absolute one on the origin of
- * `storefront.url`. Reads a validated config, so both are already normalised (one trailing slash).
+ * `storefront.url` (whatever the site's own path). The path is the workbench's full path on the host. Reads a validated config, so both are already normalised (one trailing slash).
  */
 export function sameHostWorkbenchPath(storefront: { workbenchUrl?: string; url?: string } | undefined): string | undefined {
   const w = storefront?.workbenchUrl;
@@ -325,5 +342,5 @@ export function sameHostWorkbenchPath(storefront: { workbenchUrl?: string; url?:
   if (w.startsWith("/")) return w;
   if (storefront?.url === undefined) return undefined;
   const u = new URL(w);
-  return `${u.origin}/` === storefront.url ? u.pathname : undefined;
+  return u.origin === new URL(storefront.url).origin ? u.pathname : undefined;
 }
