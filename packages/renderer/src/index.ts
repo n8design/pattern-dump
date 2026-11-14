@@ -22,6 +22,11 @@ import { readFile } from "node:fs/promises";
 import { basename, isAbsolute, relative, sep } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 
+/** How every template compiles. `preventIndent`: a partial included on a line of its own is not indented by the
+ *  include's indentation, which Handlebars otherwise adds to every line of its output, the content of a <pre>
+ *  (a code block) included. */
+const COMPILE = { preventIndent: true } as const;
+
 // Fragment-scoped HTML content-model validator (M4.9 finalise).
 // Only content-model rules — no document-structure checks (no doctype/html/head noise).
 const htmlValidator = new HtmlValidate({
@@ -404,7 +409,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
         const baseData = baseJsonPath ? await readDataFile(baseJsonPath, display) : {};
         const childDefaults: Record<string, unknown> = deepMerge(structuredClone(baseData.data ?? {}), childData.data);
 
-        const childTemplate = env.compile(await slotted(partialSrc, compId));
+        const childTemplate = env.compile(await slotted(partialSrc, compId), COMPILE);
         const capturedDefaults = childDefaults;
         const partialSlug = safePart(compId.replace(/[\\/]/g, "-"));
 
@@ -484,7 +489,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // render an empty block rather than throw. Block invocations override this with the real body.
     let html: string;
     try {
-      html = env.compile(await slotted(templateSrc, componentId))(data, {
+      html = env.compile(await slotted(templateSrc, componentId), COMPILE)(data, {
         partials: { ...env.partials, "@partial-block": () => "" },
         // The render's image settings, for {{pd-image}} here and in every partial (data frames pass on).
         data: { pdImages: input.images },
