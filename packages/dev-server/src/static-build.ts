@@ -349,7 +349,7 @@ export async function buildStaticSite(
     // Through the writer like every other file: the base path is applied there, once, and a route whose
     // file is already written (by a capture) is not written over. That only happens when a pattern folder
     // shares its name with one of PD's own URL prefixes; the route then has no page, so it is reported.
-    const shell = buildShellHtml(runtime);
+    const shell = buildShellHtml(runtime, config.shell?.brand);
     for (const route of routes) {
       const holder = await store(route, shell);
       if (holder !== null) {

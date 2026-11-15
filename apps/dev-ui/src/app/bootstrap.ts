@@ -15,6 +15,7 @@ import type { ComponentTree, RuleTiers, ShellClientConfig, ThemeSummary, TreeNod
 import { PD_ROUTES } from "@pattern-dump/contracts";
 import { dom } from "../core/dom.js";
 import { session } from "../core/session.js";
+import { brandTitle } from "../core/title.js";
 import { store, STORAGE_KEY } from "../core/store.js";
 import { runRenderedA11yScan } from "../dock/a11y-scan.js";
 import { refreshDiagnostics } from "../dock/diagnostics.js";
@@ -87,6 +88,7 @@ export async function init(): Promise<void> {
   session.themeSwitch = shellConfig.themeSwitch;
   session.serverDefaultTheme = shellConfig.defaultTheme;
   renderBrand(shellConfig.shell?.brand);
+  session.brandTitle = brandTitle(shellConfig.shell?.brand?.title);
 
   if (tiersRes) {
     const tiers = await tiersRes.json() as RuleTiers;

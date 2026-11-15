@@ -715,7 +715,7 @@ async function routeRequest(
       return;
     }
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(buildShellHtml({ mode: "live", wsPort }));
+    res.end(buildShellHtml({ mode: "live", wsPort }, config.shell?.brand));
 
   } catch (e) {
     console.error("[dev-server] Unhandled request error:", e);

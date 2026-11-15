@@ -14,6 +14,7 @@ import { session } from "../core/session.js";
 import { store, parseUrlState } from "../core/store.js";
 import { applyCvd } from "../rail/a11y-control.js";
 import { applyViewport } from "../stage/viewport.js";
+import { documentTitle } from "../core/title.js";
 import { navigate, navigateOverview, navigateUnknown, navigateVariants, swapVariant } from "./navigation.js";
 
 
@@ -58,6 +59,11 @@ export async function routeFromCurrentLocation(): Promise<void> {
   }
   // Variant is now in the URL hash (#ghost), not ?v= query param.
   const variant = window.location.hash.slice(1) || undefined;
+  // The tab names the component on a component route (its gallery too), and only the workbench elsewhere.
+  const shown = path.endsWith("/variants") && resolvePathKind(path.slice(0, -"/variants".length)) === "component"
+    ? path.slice(0, -"/variants".length) : path;
+  document.title = documentTitle(session.brandTitle,
+    resolvePathKind(shown) === "component" ? session.componentRegistry.get(shown)?.title : undefined);
   if (!path) return;
 
   if (path.endsWith("/variants")) {

@@ -86,7 +86,7 @@ describe("storefront pages on the storefront host", () => {
   it("serves the workbench on pd.localhost and on plain localhost", async () => {
     for (const host of ["pd.localhost", "localhost", "127.0.0.1"]) {
       const r = await get(port, host, "/");
-      expect(r.body, host).toContain("<title>Pattern Dump Dev</title>");
+      expect(r.body, host).toContain("<title>Pattern Dump</title>");
       expect((await get(port, host, "/api/pages")).status, host).toBe(404);
     }
   });
