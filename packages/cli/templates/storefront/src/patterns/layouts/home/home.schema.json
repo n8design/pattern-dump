@@ -14,7 +14,7 @@
       "properties": {
         "next": { "description": "The page after this one in the navigation" },
         "latest": {
-          "description": "The three newest articles, in the list view. The home page changes one option with latest-<option> (latest-limit: 5), or turns them off with latest: false",
+          "description": "The three newest articles, in the list view. The home page changes options under latest: (limit: 5, indented), or turns them off with latest: false",
           "x-pd-query": { "collections": ["articles"], "sort": "date", "limit": 3, "view": "list" }
         }
       }

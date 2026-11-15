@@ -32,7 +32,7 @@
       "description": "Derived by the storefront for each page; a page cannot set it",
       "properties": {
         "related": {
-          "description": "Up to three pages of the same folder, most related first (shared tags and categories), through the compact view. A page changes it with related-<option> keys, or turns it off with related: false",
+          "description": "Up to three pages of the same folder, most related first (shared tags and categories), through the compact view. A page changes its options under related:, or turns it off with related: false",
           "x-pd-query": {
             "collections": "same",
             "sort": "relevance",

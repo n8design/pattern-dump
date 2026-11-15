@@ -148,7 +148,7 @@
           }
         },
         "related": {
-          "description": "Pages from every folder, newest first, through the compact view; each page sets its own options with related-<option> keys",
+          "description": "Pages from every folder, newest first, through the compact view; each page sets its own options under related:",
           "x-pd-query": {
             "sort": "date",
             "view": "compact"

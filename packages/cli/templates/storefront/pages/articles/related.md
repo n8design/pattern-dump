@@ -7,5 +7,12 @@ tags: [notes]
 
 Below every article is a short list of related articles: up to three from the same folder, the ones sharing most
 tags and categories first. It is a query the article layout declares (`src/patterns/layouts/article`), and the home
-page's latest articles are the same mechanism. An article changes the list in its frontmatter:
-`related-limit: 5`, `related-pages: [articles/hello.md]` to pick pages first, or `related: false` to have none.
+page's latest articles are the same mechanism. An article changes the list in its frontmatter, under `related:`:
+
+```yaml
+related:
+  pages: [articles/hello.md]
+  limit: 5
+```
+
+picks a page first and shows five; `related: false` shows none.

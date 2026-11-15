@@ -8,7 +8,7 @@ description: A longer text — a heading, a lede, and the page's body.
 | `title` | string | required |
 | `description` | string | optional |
 | `lede` | string | optional |
-| `related-<option>` | query option | replaces one of `page.related`'s options for this page; `related: false` turns it off |
+| `related` | `false`, `true`, or options indented under it | replaces those of `page.related`'s options for this page; `false` turns it off |
 
 | Query (`page`) | Defaults | |
 |---|---|---|

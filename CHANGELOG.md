@@ -54,9 +54,12 @@
   articles. A layout declares one as a sub-key of `page` with `x-pd-query` and its defaults: hand-picked `pages`
   first, then the pages of `collections` (or `same`, the page's own folder) matching `categories` and `tags`
   (`match`: any or all), by `sort` (relevance, date or title) and `order`, to `limit`, through a `view`. The layout
-  gets `{ entries, listing }`. A page changes one option with `<name>-<option>` (`related-limit: 5`), or turns the
+  gets `{ entries, listing }`. A page changes options in a block under the query's name, with the same option names (`related:` with
+  `limit: 5` indented under it), or turns the
   query off with `<name>: false`. The current page, drafts and scheduled pages never appear, and a page never comes
   twice. Every value is checked, at the page's line or in the layout, with a "did you mean" where it fits.
+- A page's frontmatter takes one level of keys indented under a key, for a query's options. Under any other key, and
+  any deeper, it is a problem with its line, as before.
 - A layout's default view for its listing: `x-pd-view` on `page.listing`. An `index.md`'s `view:` wins.
 - The website starter has an article layout, which its articles take from their folder, listing three related
   articles in the compact view, and a home layout listing the three newest articles in the list view. Its listing

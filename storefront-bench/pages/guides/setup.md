@@ -5,10 +5,11 @@ redirectFrom: [/setup/, /start/]
 description: How the bench is put together.
 updated: 2026-11-15
 categories: [guides, design-systems]
-related-collections: [articles]
-related-sort: title
-related-order: desc
-related-limit: 1
+related:
+  collections: [articles]
+  sort: title
+  order: desc
+  limit: 1
 lede: Three folders make a site — the pages, the layouts that dress them, and the components they show.
 ---
 

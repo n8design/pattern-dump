@@ -1,5 +1,6 @@
 // Queries: every list of pages that isn't a folder's own listing. A layout names one as a sub-key of page with
-// x-pd-query and its defaults; a page overrides an option with `<name>-<option>`, or turns it off with `<name>: false`.
+// x-pd-query and its defaults; a page overrides options in a block under the query's name (`related:` with `  limit: 5` indented under it), or
+// turns it off with `<name>: false`.
 // The layout gets { entries, listing }: the pages, and the same through the query's view. Hand-picked pages come
 // first, then the pages of the collections that match the categories and tags, sorted, to the limit. The current
 // page, drafts and scheduled pages never appear, and a page never comes twice. Every value is checked.
@@ -92,46 +93,46 @@ describe("a query's pages", () => {
   });
 
   it("sorts by date, newest first, or oldest first with order: asc", async () => {
-    expect((await assemble("/articles/a/", site("related-sort: date\n"))).titles).toEqual(["Bravo", "Charlie", "Delta"]);
-    expect((await assemble("/articles/a/", site("related-sort: date\nrelated-order: asc\n"))).titles).toEqual(["Delta", "Charlie", "Bravo"]);
+    expect((await assemble("/articles/a/", site("related:\n  sort: date\n"))).titles).toEqual(["Bravo", "Charlie", "Delta"]);
+    expect((await assemble("/articles/a/", site("related:\n  sort: date\n  order: asc\n"))).titles).toEqual(["Delta", "Charlie", "Bravo"]);
   });
 
   it("sorts by title, A to Z, or Z to A with order: desc", async () => {
-    expect((await assemble("/articles/a/", site("related-sort: title\n"))).titles).toEqual(["Bravo", "Charlie", "Delta"]);
-    expect((await assemble("/articles/a/", site("related-sort: title\nrelated-order: desc\n"))).titles).toEqual(["Delta", "Charlie", "Bravo"]);
+    expect((await assemble("/articles/a/", site("related:\n  sort: title\n"))).titles).toEqual(["Bravo", "Charlie", "Delta"]);
+    expect((await assemble("/articles/a/", site("related:\n  sort: title\n  order: desc\n"))).titles).toEqual(["Delta", "Charlie", "Bravo"]);
   });
 
   it("stops at the limit", async () => {
-    expect((await assemble("/articles/a/", site("related-limit: 1\n"))).titles).toEqual(["Charlie"]);
+    expect((await assemble("/articles/a/", site("related:\n  limit: 1\n"))).titles).toEqual(["Charlie"]);
   });
 
   it("puts hand-picked pages first, in their order, and never repeats one", async () => {
-    const p = await assemble("/articles/a/", site("related-pages: [notes/n.md, articles/d.md]\n"));
+    const p = await assemble("/articles/a/", site("related:\n  pages: [notes/n.md, articles/d.md]\n"));
     expect(p.problems).toEqual([]);
     expect(p.titles).toEqual(["November", "Delta", "Charlie"]);
   });
 
   it("lists the collections named, and every folder without any", async () => {
-    expect((await assemble("/articles/a/", site("related-collections: notes\n"))).titles).toEqual(["November"]);
+    expect((await assemble("/articles/a/", site("related:\n  collections: notes\n"))).titles).toEqual(["November"]);
     // November shares css (1) and is newer than Bravo (1).
-    expect((await assemble("/articles/a/", site("related-collections: [articles, notes]\n"))).titles).toEqual(["Charlie", "November", "Bravo"]);
+    expect((await assemble("/articles/a/", site("related:\n  collections: [articles, notes]\n"))).titles).toEqual(["Charlie", "November", "Bravo"]);
     // The home page's latest: no collections, by date, two.
     expect((await assemble("/", site())).titles).toEqual(["November", "Alpha"]);
   });
 
   it("keeps the pages with any of the tags, or with all of them", async () => {
-    const note = (q: string) => site("", { "notes/n.md": md("November", `layout: article\ndate: 2026-11-04\ntags: [css]\nrelated-collections: articles\n${q}`) });
-    expect((await assemble("/notes/n/", note("related-tags: [grid]\n"))).titles).toEqual(["Alpha", "Charlie"]);
-    expect((await assemble("/notes/n/", note("related-tags: [css, grid]\nrelated-match: all\n"))).titles).toEqual(["Alpha"]);
-    expect((await assemble("/notes/n/", note("related-tags: [css, grid]\nrelated-match: any\n"))).titles).toEqual(["Alpha", "Bravo", "Charlie"]);
+    const note = (q: string) => site("", { "notes/n.md": md("November", `layout: article\ndate: 2026-11-04\ntags: [css]\nrelated:\n  collections: articles\n${q}`) });
+    expect((await assemble("/notes/n/", note("  tags: [grid]\n"))).titles).toEqual(["Alpha", "Charlie"]);
+    expect((await assemble("/notes/n/", note("  tags: [css, grid]\n  match: all\n"))).titles).toEqual(["Alpha"]);
+    expect((await assemble("/notes/n/", note("  tags: [css, grid]\n  match: any\n"))).titles).toEqual(["Alpha", "Bravo", "Charlie"]);
   });
 
   it("keeps the pages in the categories, an old key with a warning", async () => {
-    expect((await assemble("/articles/a/", site("related-categories: design\n"))).titles).toEqual(["Charlie", "Bravo"]);
-    expect((await assemble("/articles/a/", site("related-categories: [design, guides]\nrelated-match: all\n"))).titles).toEqual(["Charlie"]);
-    const old = await assemble("/articles/a/", site("related-categories: ds\n"));
+    expect((await assemble("/articles/a/", site("related:\n  categories: design\n"))).titles).toEqual(["Charlie", "Bravo"]);
+    expect((await assemble("/articles/a/", site("related:\n  categories: [design, guides]\n  match: all\n"))).titles).toEqual(["Charlie"]);
+    const old = await assemble("/articles/a/", site("related:\n  categories: ds\n"));
     expect(old.titles).toEqual(["Charlie", "Bravo"]);
-    expect(old.notes).toContain(`warning: articles/a.md:6: category "ds" is now "design" (renamed in storefront.categories): write "design"`);
+    expect(old.notes).toContain(`warning: articles/a.md:7: category "ds" is now "design" (renamed in storefront.categories): write "design"`);
   });
 
   it("is off with related: false: no pages, no listing", async () => {
@@ -143,7 +144,7 @@ describe("a query's pages", () => {
   });
 
   it("has no listing when no page matches", async () => {
-    const p = await assemble("/articles/a/", site("related-tags: [css]\nrelated-collections: notes\nrelated-match: all\nrelated-categories: guides\n"));
+    const p = await assemble("/articles/a/", site("related:\n  tags: [css]\n  collections: notes\n  match: all\n  categories: guides\n"));
     expect(p.problems).toEqual([]);
     expect(p.titles).toEqual([]);
     expect(p.listing).toBe("");
@@ -151,24 +152,24 @@ describe("a query's pages", () => {
 
   it("never lists a draft or a scheduled page, in pd dev either", async () => {
     const extra = { "articles/e.md": md("Echo", "date: 2026-11-10\ndraft: true\ntags: [grid]\n"), "articles/f.md": md("Foxtrot", "date: 2999-01-01\ntags: [grid]\n") };
-    expect((await assemble("/articles/a/", site("related-limit: 9\n", extra))).titles).toEqual(["Charlie", "Bravo", "Delta"]);
-    expect((await assemble("/articles/a/", site("related-limit: 9\n", extra), { build: true })).titles).toEqual(["Charlie", "Bravo", "Delta"]);
+    expect((await assemble("/articles/a/", site("related:\n  limit: 9\n", extra))).titles).toEqual(["Charlie", "Bravo", "Delta"]);
+    expect((await assemble("/articles/a/", site("related:\n  limit: 9\n", extra), { build: true })).titles).toEqual(["Charlie", "Bravo", "Delta"]);
   });
 
   it("a hand-picked draft or scheduled page: a warning in pd dev, a problem in pd build", async () => {
     const extra = { "articles/e.md": md("Echo", "draft: true\n"), "articles/f.md": md("Foxtrot", "date: 2999-01-01\n") };
-    const pick = site("related-pages: [articles/e.md, articles/f.md]\n", extra);
+    const pick = site("related:\n  pages: [articles/e.md, articles/f.md]\n", extra);
     const dev = await assemble("/articles/a/", pick);
     expect(dev.problems).toEqual([]);
     expect(dev.titles).toEqual(["Charlie", "Bravo", "Delta"]);
     expect(dev.notes).toEqual(expect.arrayContaining([
-      `warning: articles/a.md:6: pages lists "articles/e.md", which is a draft, so pd build leaves it out; it is not listed`,
-      `warning: articles/a.md:6: pages lists "articles/f.md", which is scheduled for 2999-01-01, so pd build leaves it out; it is not listed`,
+      `warning: articles/a.md:7: pages lists "articles/e.md", which is a draft, so pd build leaves it out; it is not listed`,
+      `warning: articles/a.md:7: pages lists "articles/f.md", which is scheduled for 2999-01-01, so pd build leaves it out; it is not listed`,
     ]));
     const build = await assemble("/articles/a/", pick, { build: true });
     expect(build.problems).toEqual([
-      `articles/a.md:6: pages lists "articles/e.md", which is a draft, so pd build leaves it out: publish it first, or take it out of the list`,
-      `articles/a.md:6: pages lists "articles/f.md", which is scheduled for 2999-01-01, so pd build leaves it out: publish it first, or take it out of the list`,
+      `articles/a.md:7: pages lists "articles/e.md", which is a draft, so pd build leaves it out: publish it first, or take it out of the list`,
+      `articles/a.md:7: pages lists "articles/f.md", which is scheduled for 2999-01-01, so pd build leaves it out: publish it first, or take it out of the list`,
     ]);
   });
 
@@ -182,7 +183,7 @@ describe("a query's pages", () => {
   });
 
   it("checks each page against its view's card", async () => {
-    const p = await assemble("/articles/a/", site("related-view: grid\n"));
+    const p = await assemble("/articles/a/", site("related:\n  view: grid\n"));
     expect(p.problems).toEqual([
       `articles/a.md: articles/c.md has no image, which the card of view "grid" (components/grid-card) requires: give it one (image: /assets/images/<name>.jpg, a raster image in the assets)`,
       `articles/a.md: articles/b.md has no image, which the card of view "grid" (components/grid-card) requires: give it one (image: /assets/images/<name>.jpg, a raster image in the assets)`,
@@ -195,46 +196,61 @@ describe("a query's values, checked", () => {
   const fails = async (extra: string) => (await assemble("/articles/a/", site(extra))).problems;
 
   it("a hand-picked page that is no page, listed twice, or more than the limit", async () => {
-    expect(await fails("related-pages: [articles/dd.md]\n")).toEqual([
-      `articles/a.md:6: pages lists "articles/dd.md", which is no page: did you mean "articles/d.md"? (a page's path in the pages folder, such as "articles/a.md")`,
+    expect(await fails("related:\n  pages: [articles/dd.md]\n")).toEqual([
+      `articles/a.md:7: pages lists "articles/dd.md", which is no page: did you mean "articles/d.md"? (a page's path in the pages folder, such as "articles/a.md")`,
     ]);
-    expect(await fails("related-pages: [articles/d.md, articles/d.md]\n")).toEqual([`articles/a.md:6: pages lists "articles/d.md" twice`]);
-    expect(await fails("related-pages: [articles/b.md, articles/c.md]\nrelated-limit: 1\n")).toEqual([
-      `articles/a.md:6: pages lists 2 pages, more than the limit of 1 (articles/a.md:7): raise the limit, or pick fewer`,
+    expect(await fails("related:\n  pages: [articles/d.md, articles/d.md]\n")).toEqual([`articles/a.md:7: pages lists "articles/d.md" twice`]);
+    expect(await fails("related:\n  pages: [articles/b.md, articles/c.md]\n  limit: 1\n")).toEqual([
+      `articles/a.md:7: pages lists 2 pages, more than the limit of 1 (articles/a.md:8): raise the limit, or pick fewer`,
     ]);
   });
 
   it("an unknown collection, an undeclared category, a tag no page has", async () => {
-    expect(await fails("related-collections: artcles\n")).toEqual([`articles/a.md:6: collections names "artcles", which is no folder of the pages: did you mean "articles"?`]);
-    expect(await fails("related-collections: blog\n")).toEqual([`articles/a.md:6: collections names "blog", which is no folder of the pages: the folders are "articles", "notes", or "same"`]);
-    expect(await fails("related-categories: desgin\n")).toEqual([`articles/a.md:6: categories: "desgin" is not a category: did you mean "design"?`]);
-    expect(await fails("related-tags: csss\n")).toEqual([`articles/a.md:6: no page has the tag "csss": did you mean "css"?`]);
+    expect(await fails("related:\n  collections: artcles\n")).toEqual([`articles/a.md:7: collections names "artcles", which is no folder of the pages: did you mean "articles"?`]);
+    expect(await fails("related:\n  collections: blog\n")).toEqual([`articles/a.md:7: collections names "blog", which is no folder of the pages: the folders are "articles", "notes", or "same"`]);
+    expect(await fails("related:\n  categories: desgin\n")).toEqual([`articles/a.md:7: categories: "desgin" is not a category: did you mean "design"?`]);
+    expect(await fails("related:\n  tags: csss\n")).toEqual([`articles/a.md:7: no page has the tag "csss": did you mean "css"?`]);
   });
 
   it("an unknown sort, match or order, and order with relevance", async () => {
-    expect(await fails("related-sort: relavance\n")).toEqual([`articles/a.md:6: sort "relavance" is not "relevance", "date" or "title": did you mean "relevance"?`]);
-    expect(await fails("related-match: every\n")).toEqual([`articles/a.md:6: match "every" is not "any" or "all"`]);
-    expect(await fails("related-sort: date\nrelated-order: up\n")).toEqual([`articles/a.md:7: order "up" is not "asc" or "desc"`]);
-    expect(await fails("related-order: asc\n")).toEqual([
-      `articles/a.md:6: order doesn't go with sort: relevance, which always puts the most relevant first: leave order out, or sort by date or title`,
+    expect(await fails("related:\n  sort: relavance\n")).toEqual([`articles/a.md:7: sort "relavance" is not "relevance", "date" or "title": did you mean "relevance"?`]);
+    expect(await fails("related:\n  match: every\n")).toEqual([`articles/a.md:7: match "every" is not "any" or "all"`]);
+    expect(await fails("related:\n  sort: date\n  order: up\n")).toEqual([`articles/a.md:8: order "up" is not "asc" or "desc"`]);
+    expect(await fails("related:\n  order: asc\n")).toEqual([
+      `articles/a.md:7: order doesn't go with sort: relevance, which always puts the most relevant first: leave order out, or sort by date or title`,
     ]);
   });
 
   it("a limit that isn't a whole number from 1", async () => {
     for (const bad of ["0", "three", "1.5", "-2"]) {
-      expect(await fails(`related-limit: ${bad}\n`)).toEqual([`articles/a.md:6: limit "${bad}" is not a number of pages: a whole number from 1, such as 3`]);
+      expect(await fails(`related:\n  limit: ${bad}\n`)).toEqual([`articles/a.md:7: limit "${bad}" is not a number of pages: a whole number from 1, such as 3`]);
     }
   });
 
   it("a view that isn't one", async () => {
-    expect(await fails("related-view: lsit\n")).toEqual([`articles/a.md:6: view "lsit" is not a view: did you mean "list"? (the views are "grid", "list")`]);
+    expect(await fails("related:\n  view: lsit\n")).toEqual([`articles/a.md:7: view "lsit" is not a view: did you mean "list"? (the views are "grid", "list")`]);
   });
 
-  it("an on-off value that isn't true or false, and a key for an option there isn't", async () => {
-    expect(await fails("related: [articles/b.md]\n")).toEqual([
-      `articles/a.md:6: related must be true or false (false turns the query off); its options are set with related-<option>, such as related-pages: [articles/a.md]`,
+  it("a related value that is neither true, false nor options; an option there isn't; a value of the wrong type", async () => {
+    for (const bad of ["[articles/b.md]", "maybe"]) {
+      expect(await fails(`related: ${bad}\n`)).toEqual([
+        `articles/a.md:6: related must be true, false (no related on this page), or its options indented under it, such as\nrelated:\n  limit: 5`,
+      ]);
+    }
+    expect(await fails("related: true\n")).toEqual([]);
+    expect(await fails("related:\n  limt: 2\n")).toEqual([
+      `articles/a.md:7: "limt" is not an option of related: did you mean "limit"? (pages, collections, categories, tags, match, sort, order, limit, view)`,
     ]);
-    expect(await fails("related-limt: 2\n")).toEqual([`articles/a.md:6: "related-limt" is not declared by layout "article" (the childLayout of articles/index.md): did you mean "related-limit"?`]);
+    // A wrong type says what is allowed.
+    expect(await fails("related:\n  limit: [3]\n")).toEqual([`articles/a.md:7: limit ["3"] is not a number of pages: a whole number from 1, such as 3`]);
+    expect(await fails("related:\n  sort: [date, title]\n")).toEqual([`articles/a.md:7: sort ["date","title"] is not "relevance", "date" or "title"`]);
+    expect(await fails("related:\n  view: [list]\n")).toEqual([`articles/a.md:7: view must be one view's name, such as "compact"`]);
+  });
+
+  it("takes options indented under a query only: a block under another key fails, an unknown one with a did you mean", async () => {
+    expect(await fails("title2:\n  x: y\n")).toEqual([`articles/a.md:6: "title2" is not declared by layout "article" (the childLayout of articles/index.md): did you mean "title"?`]);
+    expect(await fails("relatd:\n  limit: 2\n")).toEqual([`articles/a.md:6: "relatd" is not declared by layout "article" (the childLayout of articles/index.md): did you mean "related"?`]);
+    expect(await fails("image:\n  x: y\n")).toEqual([`articles/a.md:6: "image" has keys indented under it, which only a query of the layout takes: write its value on the line`]);
   });
 
   it("the layout's own declaration: an unknown option, an unknown value, a name Pattern Dump fills", async () => {
@@ -248,7 +264,7 @@ describe("a query's values, checked", () => {
     expect(taken.problems).toEqual([`layouts/article: page.children is filled by Pattern Dump, so it can't be a query: give the query another name`]);
     const clash = await assemble("/articles/a/", site(), { skin: { ...SKIN,
       "layouts/article/article.schema.json": json({ properties: { title: { type: "string" }, related: { type: "string" }, page: { type: "object", properties: { related: { "x-pd-query": {} } } } } }) } });
-    expect(clash.problems).toEqual([`layouts/article: page.related: a page sets the query with "related", which is already a key of the page: give the query another name`]);
+    expect(clash.problems).toEqual([`layouts/article: page.related: a page sets the query under "related", which is already a key of the page: give the query another name`]);
   });
 
   it("keeps a layout's sample data for a query to entries and listing", async () => {

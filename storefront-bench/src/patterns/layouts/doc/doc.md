@@ -8,7 +8,7 @@ description: A page with a table of contents, from what the storefront derives f
 | `title` | string | required |
 | `description` | string | optional |
 | `lede` | string | optional |
-| `related-<option>` | query option | sets one of `page.related`'s options for this page; `related: false` turns it off |
+| `related` | `false`, `true`, or options indented under it | sets those of `page.related`'s options for this page; `false` turns it off |
 
 | Derived (`page`) | Type | |
 |---|---|---|

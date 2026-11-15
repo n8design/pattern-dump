@@ -4,8 +4,13 @@
 //   - A layout names a query as a sub-key of `page` with `x-pd-query` on it: `page.related`, with its defaults,
 //     `{ "collections": "same", "sort": "relevance", "limit": 3, "view": "compact" }`. Its name is lowercase letters
 //     and digits, first a letter (camelCase allowed), and is no sub-key Pattern Dump fills.
-//   - A page overrides one option at a time, with flat keys named after the query: `related-limit: 5`,
-//     `related-pages: [articles/a.md]`. `related: false` turns it off. The keys are the build's, never the layout's.
+//   - A page overrides options in a block under the query's name, with the option names of x-pd-query; each one given
+//     replaces that option of the layout's, the rest stay. `related: false` turns it off, `related: true` is the
+//     layout's as it is. The key is the build's, never the layout's.
+//
+//       related:
+//         pages: [articles/tokens.md]
+//         limit: 5
 //   - The layout gets `page.related` as `{ entries, listing }`: the pages, in the shape of a listing's entry, and the
 //     same rendered through the query's view (null without a view, or when no page matched).
 //
@@ -33,7 +38,8 @@ export const SAME = "same";
 const SORTS = ["relevance", "date", "title"] as const;
 const MATCHES = ["any", "all"] as const;
 const ORDERS = ["asc", "desc"] as const;
-const NAME = /^[a-z][a-zA-Z0-9]*$/;
+/** A query's name is a frontmatter key, since a page sets the query under it. */
+const NAME = /^[A-Za-z_][\w-]*$/;
 
 type Obj = Record<string, unknown>;
 const isObject = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -55,11 +61,6 @@ export function declaredQueries(schema: unknown): DeclaredQuery[] {
   return out;
 }
 
-/** The frontmatter keys a page can set for the queries named `names`: each name, and `<name>-<option>`. */
-export function queryKeys(names: readonly string[]): string[] {
-  return names.flatMap(n => [n, ...QUERY_OPTIONS.map(o => `${n}-${o}`)]);
-}
-
 /**
  * Every problem with a layout's queries themselves: a name that can't be one (a sub-key Pattern Dump fills, a page
  * key the build or the layout already has), a declaration that isn't an object, sub-properties other than entries and
@@ -73,9 +74,9 @@ export function checkDeclaredQueries(schema: unknown, layoutId: string, taken: r
   for (const q of declaredQueries(schema)) {
     const at = `${layoutId}: page.${q.name}`;
     if (taken.includes(q.name)) problems.push(`${at} is filled by Pattern Dump, so it can't be a query: give the query another name`);
-    else if (!NAME.test(q.name)) problems.push(`${at}: a query's name is letters and digits, starting with a lowercase letter, such as "related"`);
-    for (const key of queryKeys([q.name]).filter(k => pageKeys.includes(k))) {
-      problems.push(`${at}: a page sets the query with "${key}", which is already a key of the page: give the query another name`);
+    else if (!NAME.test(q.name)) problems.push(`${at}: a query's name is a key a page can write: letters, digits, "_" and "-", starting with a letter, such as "related"`);
+    if (pageKeys.includes(q.name)) {
+      problems.push(`${at}: a page sets the query under "${q.name}", which is already a key of the page: give the query another name`);
     }
     const prop = props[q.name] as Obj;
     if (!isObject(prop[QUERY_KEY])) problems.push(`${at}: ${QUERY_KEY} must be an object of options (${QUERY_OPTIONS.join(", ")})`);
@@ -128,7 +129,7 @@ const folderOf = (route: string): string => route === "/" ? "/" : route.replace(
  *  the pages it lists. A page that turns it off gets none. */
 export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise<ResolvedQuery> {
   const problems: string[] = [], notes: string[] = [];
-  const { values, lines } = ctx.frontmatter;
+  const { values, maps, lines } = ctx.frontmatter;
   const pageAt = (key: string) => `${ctx.path}${lines[key] !== undefined ? `:${lines[key]}` : ""}`;
   const layoutAt = `${ctx.layoutId} (${QUERY_KEY} of page.${q.name})`;
   const none = (): ResolvedQuery => ({ name: q.name, entries: [], problems, notes });
@@ -142,17 +143,23 @@ export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise
       problems.push(`${layoutAt}: "${k}" is not an option of a query${near ? `: did you mean "${near}"?` : ""} (${QUERY_OPTIONS.join(", ")})`);
     }
   }
-  for (const o of QUERY_OPTIONS) {
-    const key = `${q.name}-${o}`;
-    if (values[key] !== undefined) set[o] = { value: values[key] as FrontmatterValue, at: pageAt(key) };
+  // The page's block under the query's name: each option it gives replaces the layout's.
+  const block = Object.hasOwn(maps, q.name) ? maps[q.name]! : undefined;
+  for (const [k, v] of Object.entries(block ?? {})) {
+    const at = pageAt(`${q.name}.${k}`);
+    if ((QUERY_OPTIONS as readonly string[]).includes(k)) set[k as QueryOption] = { value: v, at };
+    else {
+      const near = suggest(k, [...QUERY_OPTIONS]);
+      problems.push(`${at}: "${k}" is not an option of ${q.name}${near ? `: did you mean "${near}"?` : ""} (${QUERY_OPTIONS.join(", ")})`);
+    }
   }
   let off = false;
   const toggle = values[q.name];
   if (toggle !== undefined) {
     if (toggle === "false") off = true;
     else if (toggle !== "true") {
-      problems.push(`${pageAt(q.name)}: ${q.name} must be true or false (false turns the query off); its options are set with `
-        + `${q.name}-<option>, such as ${q.name}-pages: [articles/a.md]`);
+      problems.push(`${pageAt(q.name)}: ${q.name} must be true, false (no ${q.name} on this page), or its options indented under it, `
+        + `such as\n${q.name}:\n  limit: 5`);
     }
   }
 

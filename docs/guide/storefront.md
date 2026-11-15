@@ -227,10 +227,12 @@ page fails when:
 - it sets a key the layout does not declare (with a suggestion for a likely typo)
 - a value does not have its declared type. Values are text, read as numbers or booleans only where the
   schema declares `number`, `integer` or `boolean`
-- the frontmatter cannot be read: a line that is not `key: value` or a list item, a nested value, a
-  duplicate key, an unclosed block or quote
+- the frontmatter cannot be read: a line that is not `key: value` or a list item, a value nested deeper
+  than one level, a duplicate key, an unclosed block or quote
+- keys indented under a key that is not one of the layout's [queries](#queries)
 
-Frontmatter is a small fixed grammar, not full YAML: one level of `key: value` pairs and lists.
+Frontmatter is a small fixed grammar, not full YAML: `key: value` pairs and lists, and, for a query's options only,
+one level of keys indented under a key.
 
 ### A folder's default layout
 
@@ -596,9 +598,19 @@ With both `tags` and `categories`, a page must match both. A page with no date s
 is left out, a page never comes twice (a picked page isn't repeated), and drafts and scheduled pages never appear,
 in `pd dev` either.
 
-**A page changes one option** in its frontmatter, with the query's name in front: `related-limit: 5`,
-`related-pages: [articles/setup.md]`, `related-tags: [css]`. The other options stay the layout's. `related: false`
-turns the query off for that page. These keys are the build's: the layout never gets them.
+**A page changes options** in its frontmatter, in a block under the query's name, with the same option names:
+
+```yaml
+related:
+  pages: [articles/tokens-explained.md]
+  tags: [css]
+  limit: 5
+  sort: date
+```
+
+Each option given replaces that one of the layout's; the rest stay. `related: false` turns the query off for that
+page, and `related: true` keeps the layout's as it is. The key is the build's: the layout never gets it. It is the
+one place a page's frontmatter nests: one level of keys under a key, each a value or a list.
 
 **Every value is checked**, at the page's line or in the layout's schema: an option there isn't, a picked page that
 doesn't exist (with a "did you mean"), a folder that isn't one, a category that isn't declared, a tag no page has, an

@@ -38,7 +38,8 @@ newest first, by its `date`, in the listing layout's default view (`list`). Copy
 build. Each page is checked against the view's card: switch to `view: grid` and the listing names every article
 without an `image:`. `childLayout: article` on its `index.md` gives its pages the article layout, which lists each article's related
 articles; the home page lists the latest ones. Both are queries, declared in the layout's schema (`x-pd-query`)
-and changed per page: `related-limit: 5`, `related: false`.
+and changed per page under the query's name (`related:`, with `limit: 5` indented under it), or turned off with
+`related: false`.
 
 A page that doesn't exist shows a built-in 404 page; write `pages/404.md` to change it. A page that moved
 can forward from its old address (`redirectFrom: [/old/]`), and `index: false` keeps a page out of search

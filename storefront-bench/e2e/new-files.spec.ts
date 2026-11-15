@@ -128,7 +128,11 @@ test("new layouts, stylesheets, assets, base-layer files and partials reach the 
   await test.step("an existing page switched to the new layout", async () => {
     await page.goto("/about/");
     await mark(page);
-    await save(about, original.replace("layout: doc", "layout: zz-plain"));
+    // Its related: block is for doc's query; the new layout declares none, so it goes with the switch, as an author
+    // would take it out (kept, the page fails: zz-plain does not declare related).
+    const withoutRelated = original.replace(/^related:\n(?: {2}.*\n)+/m, "");
+    expect(withoutRelated).not.toContain("related:");
+    await save(about, withoutRelated.replace("layout: doc", "layout: zz-plain"));
     await reloaded(page);
     await expect(page.locator("h1")).toHaveClass("zz-plain-title");
     await expect(page.locator("h1")).toHaveCSS("color", "rgb(1, 2, 3)");

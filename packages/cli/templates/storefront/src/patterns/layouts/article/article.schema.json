@@ -15,7 +15,7 @@
         "date": { "description": "The article's date, from its frontmatter" },
         "tags": { "description": "The article's tags, from its frontmatter" },
         "related": {
-          "description": "Up to three articles of the same folder, the ones sharing most tags and categories first, in the compact view. An article changes one option with related-<option> (related-limit: 5), or turns them off with related: false",
+          "description": "Up to three articles of the same folder, the ones sharing most tags and categories first, in the compact view. An article changes options under related: (limit: 5, indented), or turns them off with related: false",
           "x-pd-query": { "collections": "same", "sort": "relevance", "limit": 3, "view": "compact" }
         }
       }
