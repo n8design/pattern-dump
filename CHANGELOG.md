@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.2
+
+### Fixed
+
+- Every code block is written the same way wherever its markdown is: a component's docs, a storefront page, and the
+  content of a component placed on a page. A fence and an indented code block are both highlighted, focusable and
+  have a copy button. Before, a code block in a placed component's content, and an indented code block anywhere,
+  was a plain `<pre>` without `tabindex`, so one that scrolled sideways failed `pd build --browser` at phone width.
+- The copy button on a storefront page's code block copies the code. It is shown by a small script of the page's
+  own, only where the browser can copy; with scripting off there is no button to tab to.
+
+### Changed
+
+- A folder's browser tab names the folder ("Atoms · Acme DS"), as a component's does.
+- No em dash in anything Pattern Dump writes or prints. Separators are a middle dot ("Button · ghost", "Diagnostics
+  audit · <sha>", a docs error marker "[pattern: x · no such component]"), clauses in messages use a colon or a
+  period ("unknown key "x": did you mean …"), and placeholders are words in parentheses ("(no theme)"). This
+  includes `pd audit`'s headline and report lines, terminal and console messages, `pd --help`, `pd init`'s notes
+  and the files it writes, and the docs. A script or test that matches one of these strings needs the new text.
+
 ## 0.4.1
 
 ### Fixed
