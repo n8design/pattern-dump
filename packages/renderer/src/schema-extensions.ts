@@ -5,8 +5,11 @@
 //   x-pd-content       at a schema's top: the property a tag's content fills; it must be a declared string.
 //   contentMediaType   only "text/markdown", only on a string: rendered as markdown, HTML escaped.
 //
-// And two that are not about placement, so they don't switch on the template check below:
+// And three that are not about placement, so they don't switch on the template check below:
 //
+//   x-pd-card            on a list property (a layout's `page.children`, a view's `entries`): the card each page of
+//                        the listing is shown as. It names a component with a schema; the storefront checks every page
+//                        in the listing against that schema (cards.ts in the dev-server).
 //   x-pd-image           on a string property: the image slot that field fills, `{ widths, sizes }`, which
 //                        `{{pd-image field alt=…}}` writes as an <img> with its variants (image-slots.ts). Every
 //                        `{{pd-image}}` call in the template is checked against it.
@@ -38,9 +41,9 @@ export interface SchemaExtensionContext {
 }
 
 type Prop = Record<string, unknown>;
-const KNOWN_PROPERTY_KEYS = new Set(["x-pd-component", "x-pd-image"]);
+const KNOWN_PROPERTY_KEYS = new Set(["x-pd-card", "x-pd-component", "x-pd-image"]);
 const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-prose-images"]);
-const KNOWN_LIST = "x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images";
+const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images";
 const isObject = (v: unknown): v is Prop => typeof v === "object" && v !== null && !Array.isArray(v);
 const typesOf = (p: Prop): unknown[] => p["type"] === undefined ? [] : Array.isArray(p["type"]) ? p["type"] : [p["type"]];
 
@@ -97,6 +100,16 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
       if (typeof component !== "string") problems.push({ path: `${path}/x-pd-component`, message: `x-pd-component must name a component` });
       else if (!ctx.componentExists(component)) problems.push({ path: `${path}/x-pd-component`, message: `x-pd-component names "${component}", which is not a component` });
       else if (!ctx.hasSchema(component)) problems.push({ path: `${path}/x-pd-component`, message: `x-pd-component names "${component}", which has no schema, so it cannot be placed with values` });
+    }
+    // A listing's card: not a placement, so it switches on no template check. A list, or a property with no type of
+    // its own (page.children, whose shape is Pattern Dump's).
+    const card = prop["x-pd-card"];
+    if (card !== undefined) {
+      const types = typesOf(prop);
+      if (types.length && !types.includes("array")) problems.push({ path: `${path}/x-pd-card`, message: `x-pd-card is only for a list: the pages of a listing, each shown as the card` });
+      else if (typeof card !== "string") problems.push({ path: `${path}/x-pd-card`, message: `x-pd-card must name a component` });
+      else if (!ctx.componentExists(card)) problems.push({ path: `${path}/x-pd-card`, message: `x-pd-card names "${card}", which is not a component` });
+      else if (!ctx.hasSchema(card)) problems.push({ path: `${path}/x-pd-card`, message: `x-pd-card names "${card}", which has no schema, so a listing's pages can't be checked against it` });
     }
     const image = prop["x-pd-image"];
     if (image !== undefined) {

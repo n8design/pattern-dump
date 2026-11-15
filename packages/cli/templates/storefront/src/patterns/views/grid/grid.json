@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "route": "/articles/second/",
+      "title": "A second article",
+      "date": "2026-11-14",
+      "image": "/assets/icon.svg"
+    },
+    {
+      "route": "/articles/first/",
+      "title": "A first article",
+      "date": "2026-11-01",
+      "image": "/assets/icon.svg"
+    },
+    {
+      "route": "/articles/third/",
+      "title": "A third article",
+      "date": "2026-10-20",
+      "image": "/assets/icon.svg"
+    }
+  ]
+}

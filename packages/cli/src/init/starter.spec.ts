@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { crc32, deflateSync } from "node:zlib";
-import type { ComponentDetailResponse, ComponentTree, TreeNode } from "@pattern-dump/contracts";
+import { componentCssUrl, type ComponentDetailResponse, type ComponentTree, type TreeNode } from "@pattern-dump/contracts";
 import { loadConfig } from "@pattern-dump/core";
 import { runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { applyPlan, readTemplates } from "./files.js";
@@ -174,7 +174,9 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const { graph } = await runDiagnosticsAudit(config, siteDir);
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
-      [["components/note", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"]]);
+      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"],
+        ["layouts/listing", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
+        ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
   }, 120_000);
 
   it("serves the website: the home page with its placed note, the about page, the 404 page and robots.txt", async () => {
@@ -191,7 +193,10 @@ describe("the starter project with a website (--storefront, no examples)", () =>
       // The articles collection: its listing names the example article with its date, and the article shows its tags.
       const articles = await onHost(server.port, "live.localhost", "/articles/");
       expect(articles.status).toBe(200);
-      expect(articles.body).toMatch(/<a class="listing-title" href="\/articles\/hello\/">Hello, articles<\/a>\s*<time class="listing-date" datetime="2026-11-14">/);
+      // Shown through the list view its index.md names: one listing card per page, and the view's and card's styles.
+      expect(articles.body).toMatch(/<ul class="view-list" role="list">\s*<li>\s*<article class="listing-card">\s*<h2 class="listing-card-title"><a href="\/articles\/hello\/">Hello, articles<\/a><\/h2>\s*<p class="listing-card-date"><time datetime="2026-11-14">/);
+      expect(articles.body).toContain(`href="${componentCssUrl("views/list").replace(/\.css$/, "")}`);
+      expect(articles.body).toContain(`href="${componentCssUrl("components/listing-card").replace(/\.css$/, "")}`);
       const hello = await onHost(server.port, "live.localhost", "/articles/hello/");
       expect(hello.status).toBe(200);
       expect(hello.body).toContain(`<ul class="page-tags" aria-label="Tags"><li>getting-started</li><li>notes</li></ul>`);
@@ -202,6 +207,36 @@ describe("the starter project with a website (--storefront, no examples)", () =>
         .toBe("User-agent: *\nDisallow: /preview/\nDisallow: /workbench/preview/\n");
       expect((await onHost(server.port, "pd.localhost", "/components/note")).status).toBe(200);
     } finally {
+      await server.close();
+    }
+  }, 120_000);
+
+  it("documents and previews each view and card in the workbench, diagnostic-free", async () => {
+    const config = await loadConfig(siteDir);
+    const server = await startDevServer(config, siteDir, { port: 0, wsPort: 0 });
+    try {
+      for (const id of ["views/list", "views/grid", "views/featured", "views/compact", "components/listing-card", "components/grid-card", "components/feature-card", "components/compact-card"]) {
+        const d = await (await fetch(`http://127.0.0.1:${server.port}/api/component/${id}`)).json() as ComponentDetailResponse;
+        expect(d.diagnostics, id).toEqual([]);
+        expect(d.doc, id).toBeTruthy();
+      }
+    } finally {
+      await server.close();
+    }
+  }, 120_000);
+
+  it("checks each article against the view's card: the grid view reports the article without an image", async () => {
+    const index = join(siteDir, "pages", "articles", "index.md");
+    const before = await readFile(index, "utf8");
+    const config = await loadConfig(siteDir);
+    const server = await startDevServer(config, siteDir, { port: 0, wsPort: 0 });
+    try {
+      await save(index, before.replace("view: list", "view: grid"));
+      const page = await onHost(server.port, "live.localhost", "/articles/");
+      expect(page.status).toBe(500);
+      expect(page.body).toContain(`articles/index.md: articles/hello.md has no image, which the card of view "grid" (components/grid-card) requires`);
+    } finally {
+      await save(index, before);
       await server.close();
     }
   }, 120_000);

@@ -1,0 +1,14 @@
+@use "../base/tokens";
+
+.listing-card-title { margin: 0; font-size: 1.125rem; }
+.listing-card-date { margin: tokens.$space-xs 0 0; color: var(--color-text-muted, #4b5563); }
+.listing-card-teaser {
+  margin: tokens.$space-xs 0 0;
+  // The teaser is never shortened in the data: three lines at most here.
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+.listing-card-tags { display: flex; flex-wrap: wrap; gap: tokens.$space-sm; margin: tokens.$space-xs 0 0; padding: 0; list-style: none; color: var(--color-text-muted, #4b5563); }

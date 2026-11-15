@@ -1,0 +1,4 @@
+@use "../base/tokens";
+
+.compact-card { margin: 0; }
+.compact-card-date { margin-inline-start: tokens.$space-sm; color: var(--color-text-muted, #4b5563); }

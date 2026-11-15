@@ -19,7 +19,7 @@ import { basename } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "../composition.js";
 import { ASSEMBLY_KEYS } from "./frontmatter-contract.js";
-import { outsideShape, PAGE_SHAPE } from "./derived.js";
+import { ENTRY, outsideShape, PAGE_SHAPE } from "./derived.js";
 import { SITE_SCHEMA_OWNER } from "./site.js";
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -48,6 +48,9 @@ export async function checkSampleData(
   navigationNames: string[] = [],
   /** The collection names partials/base lists under site.collections. */
   collectionNames: string[] = [],
+  /** The cards in the tree (x-pd-card): each renders with a page of a listing as its context, so its sample data may
+   *  set only that page's fields (ENTRY), not the layout's keys. */
+  cards: readonly string[] = [],
 ): Promise<string[]> {
   const problems: string[] = [];
   const allowed = new Set<string>([...layoutDeclared, ...ASSEMBLY_KEYS].filter(k => k !== "page" || pageDeclared !== undefined));
@@ -60,6 +63,12 @@ export async function checkSampleData(
     try { data = JSON.parse(await readFile(jsonPath, "utf8")); }
     catch (e) { problems.push(`${where} cannot be read: ${e instanceof Error ? e.message : String(e)}`); continue; }
     if (!isPlainObject(data)) continue;
+    if (cards.includes(id)) {
+      for (const at of outsideShape(data, ENTRY, "")) {
+        problems.push(`${where} sets "${at.slice(1)}", which is not a field of a page in a listing, so it would show on every card of ${layoutId}`);
+      }
+      continue;
+    }
     for (const [key, value] of Object.entries(data)) {
       if (!allowed.has(key)) {
         problems.push(`${where} sets "${key}", which ${layoutId} does not declare, so it would show on every page using that layout`);

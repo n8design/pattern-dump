@@ -1,0 +1,4 @@
+@use "../base/tokens";
+
+.view-featured { margin-block-start: tokens.$space-lg; }
+.view-featured-rest { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: tokens.$space-lg; margin: tokens.$space-lg 0 0; padding: 0; list-style: none; }

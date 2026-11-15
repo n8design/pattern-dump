@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Listing card",
+  "description": "One page of a listing, as the list view shows it: its title as a link, its date, its teaser and its tags. It takes a page of the listing as it is.",
+  "type": "object",
+  "required": [
+    "route",
+    "title"
+  ],
+  "properties": {
+    "route": {
+      "type": "string",
+      "description": "The page's address"
+    },
+    "title": {
+      "type": "string",
+      "description": "The page's title, as the card's link"
+    },
+    "date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The page's date, YYYY-MM-DD"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The teaser: the page's description, or its first paragraph. At most three lines are shown"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The page's tags"
+    }
+  }
+}

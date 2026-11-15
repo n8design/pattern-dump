@@ -253,7 +253,7 @@ describe("pd build — the storefront root", () => {
     } finally { await server.close(); }
   }, 60_000);
 
-  it("leaves the workbench snapshot exactly as a build without a storefront makes it", async () => {
+  it("leaves the workbench snapshot exactly as a build without a storefront makes it, but for each layout's pages", async () => {
     // From the same copy: a compiled script's banner names its source path, so two copies' builds would
     // differ by where they are, whatever the storefront does.
     const { storefront: _sf, ...noStorefront } = benchConfig;
@@ -262,7 +262,16 @@ describe("pd build — the storefront root", () => {
     const b = await tree(join(root, "..", "wb-none"));
     expect([...a.keys()].sort()).toEqual([...b.keys()].sort());
     const differing = [...a].filter(([k, v]) => !v.bytes.equals(b.get(k)!.bytes)).map(([k]) => k);
-    expect(differing).toEqual([]);
+    // A layout's detail lists the pages that render with it (relationships.pages), which only a site has: that, and
+    // nothing else, differs.
+    const layouts = ["article", "doc", "home", "listing", "page"].map(l => `api/component/layouts/${l}/index.json`);
+    expect(differing.sort()).toEqual(layouts);
+    for (const k of layouts) {
+      const withSite = JSON.parse(a.get(k)!.bytes.toString("utf8")) as { relationships: { pages?: unknown[] } };
+      expect(withSite.relationships.pages?.length, k).toBeGreaterThan(0);
+      delete withSite.relationships.pages;
+      expect(withSite, k).toEqual(JSON.parse(b.get(k)!.bytes.toString("utf8")));
+    }
   }, 120_000);
 });
 

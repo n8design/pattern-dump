@@ -199,7 +199,8 @@ lede: Three folders make a site.
 
 | Key | |
 |---|---|
-| `layout` | The layout the page renders with: `layouts/<name>` in the skin. `page` when it has none |
+| `layout` | The layout the page renders with: `layouts/<name>` in the skin. Without it, its folder's `childLayout`, else `page`. See [A folder's default layout](#a-folders-default-layout) |
+| `childLayout` | On a folder's `index.md` only: the layout of the pages under it that name none. See [A folder's default layout](#a-folders-default-layout) |
 | `order` | Its position in the navigation, see [Pages](#pages) |
 | `image` | Its link-preview image: a raster file in the assets (PNG, JPEG, GIF or WebP), such as `/assets/images/setup.png`. An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `storefront.image` |
 | `index` | `false` keeps the page out of search engines: `noindex`, and no sitemap entry |
@@ -210,10 +211,11 @@ lede: Three folders make a site.
 | `categories` | One category or a list, each declared in `storefront.categories` (or an old key of one), none twice: `categories: [guides]`. See [Categories](#categories) |
 | `draft` | `true` shows the page in `pd dev` and leaves it out of `pd build`. See [Drafts](#drafts) |
 | `sort` | On a folder's `index.md` only: `date` lists the folder's pages newest first; `order`, the default, in the folder's order |
+| `view` | On a folder's `index.md` only: the view its listing is shown in, `views/<name>` in the skin. See [Listing views](#listing-views) |
 | any other key | Must be declared by the layout's schema |
 
-`layout`, `order`, `image`, `index`, `redirectFrom`, `date`, `updated`, `tags`, `categories`, `draft` and `sort`
-belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
+`layout`, `childLayout`, `order`, `image`, `index`, `redirectFrom`, `date`, `updated`, `tags`, `categories`, `draft`,
+`sort` and `view` belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
 them (a layout shows them through `page.date`, `page.updated`, `page.tags` and `page.categories`).
 
 **The layout's schema is the frontmatter contract.** A layout is a component, and its
@@ -229,6 +231,32 @@ page fails when:
   duplicate key, an unclosed block or quote
 
 Frontmatter is a small fixed grammar, not full YAML: one level of `key: value` pairs and lists.
+
+### A folder's default layout
+
+With many pages in a folder, `childLayout` on its `index.md` saves writing `layout:` on each, and a forgotten line
+can no longer give a page the wrong layout:
+
+```md
+---
+title: Articles
+layout: listing
+childLayout: article
+---
+```
+
+- **A page without its own `layout:`** takes the `childLayout` of the nearest folder above it that sets one; without
+  any, `page`. Its own `layout:` always wins.
+- **A folder's `index.md` is a page of its parent folder:** its own `childLayout` is for the pages under it, and it
+  takes its layout from its parent's, as any page there does.
+- **Checked:** a `childLayout` that names no layout fails on the `index.md`, at its line, and on every page that
+  takes it. Each page is checked against the schema of the layout it ends up with, and a problem about that layout
+  names where it came from: `"subtitle" is required by layout "article" (the childLayout of articles/index.md)`.
+- `404.md` is not a page of the site, so it takes no `childLayout`.
+
+**Which layout a page got:** in the workbench, a layout's Relationships tab lists its **Pages**, each with where its
+layout came from ("its own layout", "childLayout of articles/index.md", "the default layout"). `/api/pages` on the
+website's host gives each page's `layout`, and `layoutFrom` when it came from a folder.
 
 ### Problems
 
@@ -348,6 +376,7 @@ keys below, at any depth.
 | `date` | The page's `date`, else the day git first saw it (`YYYY-MM-DD`), else `null` |
 | `tags` | The page's `tags`, else `[]` |
 | `categories` | The page's categories, in its order, each `{ key, label, description }` (`description` `null` when the config gives none), else `[]` |
+| `listing` | On a folder's `index.md`: the folder's pages rendered through the view its `view:` names, as HTML for `{{{page.listing}}}` (see [Listing views](#listing-views)); `null` on any other page |
 
 ```hbs
 {{#each page.headings}}<a href="#{{anchor}}">{{text}}</a>{{/each}}
@@ -447,9 +476,24 @@ To show an entry's image with its variants, pass it to a component with an image
 {{#each page.children}}<li>{{> components-card }}</li>{{/each}}
 ```
 
-where `components/card` declares `image` with `x-pd-image` and writes `{{pd-image image alt=""}}`. A component
-a layout includes may not have sample data of keys the layout doesn't declare; give it a variant
-(`card~article.json`) to show it filled in the workbench.
+where `components/card` declares `image` with `x-pd-image` and writes `{{pd-image image alt=""}}`.
+
+**The card.** Name that component in the layout's schema, and every page of the listing is checked against the
+card's schema:
+
+```json
+"page": { "properties": { "children": { "x-pd-card": "components/card" } } }
+```
+
+- **A field the card requires** (`required`) that a page doesn't have, `null` or an empty list, fails the listing
+  page, once per page, naming it and what to add: `articles/index.md: articles/plain.md has no image, which the
+  listing's card (components/card) requires: give it one (image: ...)`.
+- **A value a page has** is checked against the type the card declares.
+- **A card declares only fields of an entry** (the table above). The entry's shape is Pattern Dump's and the base
+  every card shares: a page can't add fields to it, so a card says which of them it shows and which it needs.
+- **Its sample data** may set only an entry's fields, since the card renders with an entry as its context. Without
+  `x-pd-card`, a component the layout includes may only have sample data of keys the layout declares; give it a
+  variant (`card~article.json`) to show it filled in the workbench.
 
 With `sort: date`, a page with no date at all (no `date` and no commit, such as a new file) is a problem in
 `pd build` and a note in `pd dev`, where it is listed last. From a shallow clone, a date git would give is
@@ -468,6 +512,45 @@ set `site.collections`.
 
 In `pd dev` an edit to what a listing shows of a page (its date, description, first paragraph, image, tags,
 categories or draft) reloads every open page, as a title edit does.
+
+### Listing views
+
+One listing, several ways to show it. A folder's `index.md` names its view:
+
+```md
+---
+title: Articles
+layout: listing
+view: grid
+sort: date
+---
+```
+
+A **view** is a component directly under `views/` in the skin's style guide (`views/grid`), as a layout is under
+`layouts/`. Pattern Dump has no views of its own: every skin defines its own, and the workbench shows and documents
+them like any component.
+
+- **The layout** declares `page.listing` and writes it unescaped where the listing goes: `{{{page.listing}}}`.
+- **The view** is rendered once per listing with `entries`, the folder's pages in its sort order (each an entry, as
+  above), and nothing else.
+- **The view names its card** in its schema, and that card's `required` are the fields the view needs. Every page
+  of the listing is checked against that card, as for `x-pd-card` on `page.children`:
+
+  ```json
+  { "properties": { "entries": { "type": "array", "x-pd-card": "components/grid-card" } } }
+  ```
+
+  So views are separate components with cards of their own, not variants of one card: a grid's card can require an
+  image while a list's doesn't.
+- **Checked:** a view that doesn't exist fails the page with the views there are (and a "did you mean"); a listing
+  page whose layout shows `page.listing` must name its view; a `view:` on a page whose layout shows no listing, or on
+  a page that is not a folder's `index.md`, is a problem; a view whose schema names no card is a problem.
+- **Sample data:** a view's may set only `entries`, each an entry; its card's only an entry's fields.
+- **Styles and scripts** of the view and its card load on the page as those of a placed component do.
+
+The starter (`pd init --storefront`) ships four plain views, each with its card in `components/`: `list` (title,
+date, teaser and tags), `grid` (cards with an image; every page needs one), `featured` (the first page large, the
+rest as the grid: with `sort: date`, the newest first) and `compact` (title and date only).
 
 ### Categories
 

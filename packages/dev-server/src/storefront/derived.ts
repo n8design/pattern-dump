@@ -36,6 +36,8 @@ export interface DerivedPage {
   tags: string[];
   /** The page's categories (categories.ts), in its order; [] when it has none. */
   categories: Category[];
+  /** A folder's index.md: its pages rendered through the view it names (views.ts), as HTML; null on any other page. */
+  listing: string | null;
 }
 
 /** A value with no keys of its own; an object with exactly these fields; a list of one shape. */
@@ -66,11 +68,12 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
     date: "value",
     tags: "value",
     categories: { items: CATEGORY },
+    listing: "value",
   },
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories"];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories", "listing"];
 
 /** Sub-keys Pattern Dump filled once and no longer does, with what to declare instead. */
 export const RETIRED: Readonly<Record<string, string>> = {

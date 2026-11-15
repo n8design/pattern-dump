@@ -37,6 +37,8 @@ import { checkLinks } from "./links.js";
 import { checkPageBasics } from "./page-basics.js";
 import { redirectsOf } from "./redirects.js";
 import { dateOf, entriesOf, resolveCollections, type Entry } from "./collections.js";
+import { cardOf, checkEntries, readCard } from "./cards.js";
+import { checkViewSampleData, resolveView } from "./views.js";
 import type { Category } from "./categories.js";
 
 /** Said once (the same text from every page) when JSON-LD leaves git's date out for a shallow clone. */
@@ -423,12 +425,41 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     else published ??= dated.dates.created;
   }
   // A listing's entries, and the page's own date and tags (collections.ts), for a layout that shows them.
-  const listing: { children?: Entry[]; date?: string | null; updated?: string | null; tags?: string[]; categories?: Category[] } = {};
+  const listing: { children?: Entry[]; date?: string | null; updated?: string | null; tags?: string[]; categories?: Category[]; listing?: string | null } = {};
+  // The layout's card for them (x-pd-card on page.children): every page of the listing is checked against it.
+  const layoutCard = cardOf(layoutSchema?.properties?.["page"]?.properties?.["children"]);
   if (declares("children")) {
     const listed = isNotFound ? { entries: [], problems: [], notes: [] } : await entriesOf(route, model, { dates: a.dates, mode });
     listing.children = listed.entries;
     problems.push(...listed.problems);
     notes.push(...listed.notes);
+    if (layoutCard !== undefined) {
+      const read = await readCard(layoutCard, checked.layoutId, "the listing's card", a.discoveryMap);
+      problems.push(...read.problems);
+      if (read.card) problems.push(...checkEntries(listed.entries, read.card, page.path, model));
+    }
+  }
+  // The listing through the view the page names (views.ts), for a layout that shows one (page.listing): every page
+  // checked against the view's card, the view rendered once the page has no problems.
+  let view: { id: string; entries: Entry[] } | undefined;
+  if (!isNotFound) {
+    const resolved = await resolveView({
+      view: checked.build.view, line: page.frontmatter.lines["view"], path: page.path,
+      layout: checked.layoutId.slice("layouts/".length), shows: declares("listing"), discoveryMap: a.discoveryMap,
+    });
+    problems.push(...resolved.problems);
+    if (resolved.view) {
+      let entries = listing.children;
+      if (entries === undefined) {
+        const listed = await entriesOf(route, model, { dates: a.dates, mode });
+        entries = listed.entries;
+        problems.push(...listed.problems);
+        notes.push(...listed.notes);
+      }
+      problems.push(...checkEntries(entries, resolved.view.card, page.path, model));
+      problems.push(...await checkViewSampleData(resolved.view, a.discoveryMap));
+      view = { id: resolved.view.id, entries };
+    }
   }
   if (declares("date")) {
     const dated = isNotFound ? { date: null, problems: [], notes: [] } : await dateOf(route, model, a.dates, mode);
@@ -444,7 +475,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (collections) { problems.push(...collections.problems); notes.push(...collections.notes); }
   notes.push(...site.notes ?? []);
   if (a.discoveryMap.has(checked.layoutId)) {
-    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed, site.collections));
+    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed, site.collections,
+      layoutCard !== undefined && declares("children") ? [layoutCard] : []));
   }
   // The skin's head partial: the same for every page, so its problems are the whole site's.
   const hasHead = a.discoveryMap.has(HEAD_PARTIAL);
@@ -454,6 +486,13 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     problems.push(...headSample);
   }
   if (problems.length) return fail(problems);
+  if (view) {
+    try {
+      listing.listing = (await a.render({ component: view.id, data: { entries: view.entries } })).html;
+    } catch (e) {
+      return fail([`${view.id}: ${e instanceof Error ? e.message : String(e)}`]);
+    }
+  } else if (declares("listing")) listing.listing = null;
   notes.push(...checked.notes);
   // pd dev shows drafts and scheduled pages; each is said once, whichever page is open.
   if (a.live) {
@@ -568,7 +607,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       : []),
     ...(headExtra ? [headExtra] : []),
     ...(siteHead ? [siteHead] : []),
-    await a.head(checked.layoutId, html, [...placedIds]),
+    await a.head(checked.layoutId, html, [...placedIds, ...(view ? [view.id] : [])]),
   ].join("\n");
   // The 404 page is served at any depth, so every URL in it (its body's, its layout's, the head's) must be
   // root-relative or absolute: a relative one points somewhere else on every address.

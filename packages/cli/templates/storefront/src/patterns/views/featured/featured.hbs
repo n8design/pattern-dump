@@ -1,0 +1,8 @@
+<div class="view-featured">
+  {{#each entries}}{{#if @first}}{{> components-feature-card }}{{/if}}{{/each}}
+  {{#if entries.[1]}}
+  <ul class="view-featured-rest" role="list">
+    {{#each entries}}{{#unless @first}}<li>{{> components-grid-card }}</li>{{/unless}}{{/each}}
+  </ul>
+  {{/if}}
+</div>

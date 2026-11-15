@@ -1,11 +1,12 @@
 // A storefront page's frontmatter, checked against the layout it uses.
 //
-// Eleven keys belong to the build, not to a layout: `layout` (which layout; `page` when absent), `order`
+// Thirteen keys belong to the build, not to a layout: `layout` (which layout; when absent, the `childLayout` of the
+// nearest folder above the page whose index.md sets one, else `page`), `childLayout` (on a folder's index.md), `order`
 // (where in the nav), the page's search and link-preview keys — `redirectFrom` (old routes that forward
 // here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
 // image, a raster file in the assets; checked against the files in page-image.ts) — and its listing keys
-// (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` on a
-// folder's index.md. A layout cannot declare any of the eleven. Every other key must be declared by the chosen layout's schema — the
+// (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` and `view` on a
+// folder's index.md. A layout cannot declare any of the thirteen. Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
 // declares. Nothing is inferred: a key the schema does not declare is an error, and a layout with no
 // schema declares nothing. Four more keys are filled by the storefront itself (`body`, the rendered
@@ -20,11 +21,11 @@ import { suggest } from "@pattern-dump/config";
 import { checkDeclared, readSchema, type PropertySchema } from "./declared-values.js";
 import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
 import type { FrontmatterValue } from "../frontmatter.js";
-import { readCategories, readDate, readDraft, readSort, readTags, readUpdated, type Read, type SortBy } from "./listing-keys.js";
+import { readCategories, readChildLayout, readDate, readDraft, readSort, readTags, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
 import { categoryIndex, type CategoryIndex } from "./categories.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
-export const RESERVED_KEYS = ["layout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort"] as const;
+export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
 export const ASSEMBLY_KEYS = ["body", "nav", "site", "page"] as const;
 
@@ -54,6 +55,8 @@ export interface BuildKeys {
   draft?: boolean;
   /** On a folder's index.md: how its pages are listed. */
   sort?: SortBy;
+  /** On a folder's index.md: the view its listing is shown in (views.ts checks that it is one). */
+  view?: string;
 }
 
 /** An old route: root-relative, slash-wrapped, plain segments only (no query, fragment, "." or ".."). */
@@ -83,7 +86,7 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
     if (typeof image === "string" && ASSET_PATH.test(image)) out.image = image;
     else at("image", `image must be a path to a file in the assets, such as "/assets/images/share.png"`);
   }
-  const take = <K extends "date" | "updated" | "tags" | "draft" | "sort">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
+  const take = <K extends "date" | "updated" | "tags" | "draft" | "sort" | "view">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
     if (r === undefined) return;
     if (r.ok) out[key] = r.value;
     else at(key, r.message);
@@ -99,6 +102,7 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
   } else if (cats) at("categories", cats.message);
   take("draft", v("draft") === undefined ? undefined : readDraft(v("draft")!));
   take("sort", v("sort") === undefined ? undefined : readSort(v("sort")!, path));
+  take("view", v("view") === undefined ? undefined : readView(v("view")!, path));
   return out;
 }
 
@@ -138,19 +142,33 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   };
   const buildKeys = () => checkBuildKeys(values, page.path, at, categories, renamed);
 
-  // ---- layout ----
+  // ---- layout: its own, else its folder's childLayout (pages.ts), else the default ----
+  const known = layoutNames(discoveryMap);
+  const isLayout = (name: string) => /^[^/~]+$/.test(name) && discoveryMap.has(`layouts/${name}`);
+  const notALayout = (subject: string) => known.length
+    ? `${subject} is not a layout: the layouts are ${known.map(n => `"${n}"`).join(", ")}`
+    : `${subject} is not a layout: the project has no layouts (components in a layouts/ folder of its patterns)`;
+  // The default layout this index.md gives its folder's pages: checked here, once, whether or not a page takes it.
+  const rawChild = values["childLayout"];
+  if (rawChild !== undefined) {
+    const r = readChildLayout(rawChild, page.path);
+    if (!r.ok) at("childLayout", r.message);
+    else if (!isLayout(r.value)) at("childLayout", notALayout(`childLayout "${r.value}"`));
+  }
   const rawLayout = values["layout"];
-  let layout = DEFAULT_LAYOUT;
+  const inherited = rawLayout === undefined ? page.inherited : undefined;
+  let layout = inherited?.layout ?? DEFAULT_LAYOUT;
   if (Array.isArray(rawLayout)) at("layout", "layout must be one layout name, not a list");
   else if (rawLayout !== undefined) layout = rawLayout;
   const layoutId = `layouts/${layout}`;
-  const known = layoutNames(discoveryMap);
-  const entry = /^[^/~]+$/.test(layout) ? discoveryMap.get(layoutId) : undefined;
+  /** The layout as messages name it: with where it came from, when the page took it from its folder. */
+  const named = `layout "${layout}"${inherited ? ` (the childLayout of ${inherited.from})` : ""}`;
+  const entry = isLayout(layout) ? discoveryMap.get(layoutId) : undefined;
   if (!entry || Array.isArray(rawLayout)) {
     if (!Array.isArray(rawLayout)) {
-      at("layout", known.length
-        ? `layout "${layout}" is not a layout: the layouts are ${known.map(n => `"${n}"`).join(", ")}`
-        : `layout "${layout}" is not a layout: the project has no layouts (components in a layouts/ folder of its patterns)`);
+      const problem = notALayout(named);
+      if (inherited) problems.push({ file: page.path, message: problem });
+      else at("layout", problem);
     }
     return { layoutId, values: {}, build: buildKeys(), problems, notes };
   }
@@ -158,7 +176,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   // ---- the layout's schema: what a page may set ----
   const read = await readSchema(entry.schemaPath);
   if (read.error !== undefined) {
-    problems.push({ file: page.path, message: `the schema of layout "${layout}" cannot be read: ${read.error}` });
+    problems.push({ file: page.path, message: `the schema of ${named} cannot be read: ${read.error}` });
     return { layoutId, values: {}, build: buildKeys(), problems, notes };
   }
   const schema: LayoutSchema = read.schema ?? {};
@@ -180,9 +198,9 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     if ((ASSEMBLY_KEYS as readonly string[]).includes(key)) { at(key, `"${key}" is filled by the storefront, not by a page`); continue; }
     const prop = Object.hasOwn(declared, key) ? declared[key] : undefined;
     if (!prop) {
-      if (!hasSchema) { at(key, `"${key}" is not declared by layout "${layout}", which has no schema`); continue; }
+      if (!hasSchema) { at(key, `"${key}" is not declared by ${named}, which has no schema`); continue; }
       const near = suggest(key, [...Object.keys(declared), ...RESERVED_KEYS]);
-      at(key, `"${key}" is not declared by layout "${layout}"${near ? `: did you mean "${near}"?` : ""}`);
+      at(key, `"${key}" is not declared by ${named}${near ? `: did you mean "${near}"?` : ""}`);
       continue;
     }
     const r = checkDeclared(prop, value, "frontmatter");
@@ -193,7 +211,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   // ---- what the layout requires ----
   for (const key of schema.required ?? []) {
     if ((ASSEMBLY_KEYS as readonly string[]).includes(key)) continue;
-    if (!(key in values)) problems.push({ file: page.path, message: `"${key}" is required by layout "${layout}"` });
+    if (!(key in values)) problems.push({ file: page.path, message: `"${key}" is required by ${named}` });
   }
 
   return { layoutId, values: out, build, problems, notes };

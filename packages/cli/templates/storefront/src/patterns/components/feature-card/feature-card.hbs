@@ -1,0 +1,6 @@
+<article class="feature-card">
+  {{#if image}}{{pd-image image alt=""}}{{/if}}
+  <h2 class="feature-card-title"><a href="{{route}}">{{title}}</a></h2>
+  {{#if date}}<p class="feature-card-date"><time datetime="{{date}}">{{date}}</time></p>{{/if}}
+  {{#if description}}<p class="feature-card-teaser">{{description}}</p>{{/if}}
+</article>

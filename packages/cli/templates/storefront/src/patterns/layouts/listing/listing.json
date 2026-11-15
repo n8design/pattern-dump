@@ -5,9 +5,6 @@
   "site": { "title": __PD_BRAND_JSON__, "footer": "Made with Pattern Dump." },
   "nav": [{ "route": "/", "title": "Home" }, { "route": "/articles/", "title": "Articles", "current": true }],
   "page": {
-    "children": [
-      { "route": "/articles/second/", "title": "A second article", "description": "Its teaser: the page's description, or its first paragraph.", "date": "2026-11-14", "image": null, "tags": ["notes"], "draft": false },
-      { "route": "/articles/first/", "title": "A first article", "description": "Listed below the newer one.", "date": "2026-11-01", "image": null, "tags": [], "draft": false }
-    ]
+    "listing": "<ul class=\"view-list\" role=\"list\"><li><article class=\"listing-card\"><h2 class=\"listing-card-title\"><a href=\"/articles/second/\">A second article</a></h2><p class=\"listing-card-date\"><time datetime=\"2026-11-14\">2026-11-14</time></p><p class=\"listing-card-teaser\">Its teaser: the page's description, or its first paragraph.</p><ul class=\"listing-card-tags\" aria-label=\"Tags\"><li>notes</li></ul></article></li><li><article class=\"listing-card\"><h2 class=\"listing-card-title\"><a href=\"/articles/first/\">A first article</a></h2><p class=\"listing-card-date\"><time datetime=\"2026-11-01\">2026-11-01</time></p><p class=\"listing-card-teaser\">Listed below the newer one.</p></article></li></ul>"
   }
 }

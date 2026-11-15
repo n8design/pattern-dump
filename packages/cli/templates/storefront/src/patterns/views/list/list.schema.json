@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "List",
+  "description": "A listing as a list: each page's title, date, teaser and tags.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "type": "array",
+      "x-pd-card": "components/listing-card",
+      "description": "The pages of the listing, in its order (the folder's sort)"
+    }
+  }
+}

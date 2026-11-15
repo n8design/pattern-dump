@@ -109,7 +109,7 @@ export type DiagnosticKind =
   | "HIGHLIGHT_FALLBACK" // M4.1 fence/Shiki degradation note
   | "HANDLE_COLLISION"   // M6: component quarantined — handle held by incumbent; rename to resolve
   | "DATA_INVALID"       // a component or variant .json that does not parse; its data was not used
-  | "SCHEMA_INVALID"     // a schema misuses a placement extension (x-pd-component, x-pd-content, contentMediaType),
+  | "SCHEMA_INVALID"     // a schema misuses a schema extension (x-pd-card, x-pd-component, x-pd-content, contentMediaType),
                          // names an unknown x-pd- key, or its template outputs a non-markdown value unescaped;
                          // or a property, at any depth, is named like a registered helper
   | "HELPER_SHADOW";     // a warning: the template's bare {{name}} calls a registered helper, so the data field of that
@@ -478,6 +478,21 @@ export interface RelationshipsAvailable {
   utilityClasses: boolean;
   /** CSS classes used in markup whose ownership is unrecognised (typos, dead, unregistered). */
   unattributedClasses: string[];
+  /** A layout of a project with a website: every page that renders with it, by path, and how each got it.
+   *  Absent for any other component, and in a project without a website. */
+  pages?: LayoutPageUse[];
+}
+
+/** A storefront page that renders with a layout, and where its layout came from. */
+export interface LayoutPageUse {
+  route: string;
+  /** The page file, relative to the pages folder ("articles/one.md"). */
+  path: string;
+  /** "own": its `layout:`; "folder": the `childLayout` of the index.md in `from`; "default": it names none, and no
+   *  folder above it sets one. */
+  source: "own" | "folder" | "default";
+  /** With source "folder": the index.md whose childLayout the page took ("articles/index.md"). */
+  from?: string;
 }
 
 export type Relationships = RelationshipsAvailable;
@@ -730,6 +745,9 @@ export interface StorefrontPage {
   title: string;
   /** The layout it renders with: the component `layouts/<layout>`. */
   layout: string;
+  /** Where the layout came from when the page names none: the folder's index.md whose `childLayout` it took
+   *  ("articles/index.md", relative to the pages folder). Absent for the page's own `layout:` and for the default. */
+  layoutFrom?: string;
   /** Old routes that forward to this page (frontmatter `redirectFrom`), each root-relative and slash-wrapped.
    *  `pd build` writes a forwarding page at each. Absent when the page has none. */
   redirectFrom?: string[];

@@ -1,5 +1,4 @@
 ---
-layout: article
 title: A harbour of cable cars
 date: 2026-11-01
 tags: [images, layout]

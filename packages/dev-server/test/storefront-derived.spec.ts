@@ -29,8 +29,8 @@ describe("checkPageDeclaration", () => {
   });
 
   it("names what Pattern Dump fills today", () => {
-    const all = "page.headings, page.section, page.breadcrumbs, page.prev, page.next, page.created, page.updated, page.children, page.date, page.tags, page.categories";
-    expect(FILLED).toEqual(["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories"]);
+    const all = "page.headings, page.section, page.breadcrumbs, page.prev, page.next, page.created, page.updated, page.children, page.date, page.tags, page.categories, page.listing";
+    expect(FILLED).toEqual(["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories", "listing"]);
     expect(checkPageDeclaration({ properties: { page: { properties: { toc: {} } } } }, "layouts/doc").problems).toEqual([
       `layouts/doc declares "page.toc", which Pattern Dump does not fill (it fills ${all})`,
     ]);
@@ -121,7 +121,7 @@ describe("assemblePage — page", () => {
   it("a declared sub-key Pattern Dump does not fill fails the page, named", async () => {
     const { page } = await assemble({ properties: { title: { type: "string" }, page: { type: "object", properties: { toc: { type: "array" } } } } });
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`layouts/page declares "page.toc", which Pattern Dump does not fill (it fills page.headings, page.section, page.breadcrumbs, page.prev, page.next, page.created, page.updated, page.children, page.date, page.tags, page.categories)`]);
+    expect(page.problems).toEqual([`layouts/page declares "page.toc", which Pattern Dump does not fill (it fills page.headings, page.section, page.breadcrumbs, page.prev, page.next, page.created, page.updated, page.children, page.date, page.tags, page.categories, page.listing)`]);
   });
 
   it("a layout that declares page.headings gets every heading, with the anchor its id carries", async () => {

@@ -103,4 +103,20 @@ describe("storefront bench in the workbench", () => {
     expect(p.text).toContain("Careful");
     expect(p.text).toContain("A warning callout marks something that can go wrong.");
   });
+
+  // Which pages render with a layout, and how each got it: its own layout:, a folder's childLayout, or the default.
+  it("lists, on each layout, the pages that use it and where each got it from", async () => {
+    const pagesOf = async (id: string) => ((await (await fetch(origin + componentUrl(id))).json()) as ComponentDetailResponse).relationships.pages;
+    expect(await pagesOf("layouts/article")).toEqual([
+      { route: "/articles/harbour/", path: "articles/harbour.md", source: "folder", from: "articles/index.md" },
+    ]);
+    expect(await pagesOf("layouts/doc")).toEqual([
+      { route: "/about/", path: "about.md", source: "own" },
+      { route: "/articles/plain/", path: "articles/plain.md", source: "own" },
+      { route: "/guides/setup/", path: "guides/setup.md", source: "own" },
+    ]);
+    expect(await pagesOf("layouts/page")).toEqual([{ route: "/guides/", path: "guides/index.md", source: "default" }]);
+    // Not a layout: no pages at all.
+    expect(await pagesOf("components/card")).toBeUndefined();
+  });
 });

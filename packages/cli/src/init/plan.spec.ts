@@ -17,6 +17,8 @@ const templates: Templates = {
     { path: "src/patterns/partials/base/base.json", content: '{ "site": { "title": __PD_BRAND_JSON__ } }\n' },
     { path: "src/styles/partials/base.scss", content: ".site {}\n" },
     { path: "assets/icon.svg", content: "<svg/>\n" },
+    { path: "src/patterns/views/list/list.hbs", content: "<ul>{{#each entries}}<li>{{title}}</li>{{/each}}</ul>\n" },
+    { path: "src/styles/views/list.scss", content: ".view-list {}\n" },
     { path: "src/patterns/components/note/note.hbs", content: "<aside>{{heading}}</aside>\n" },
     { path: ".github/workflows/pages.yml", content: "name: Pages\n" },
   ],
@@ -67,7 +69,7 @@ describe("planInit — a new folder", () => {
 
 describe("planInit — the storefront", () => {
   const SKIN = ["src/patterns/layouts/page/page.hbs", "src/patterns/partials/base/base.hbs", "src/patterns/partials/base/base.json",
-    "src/styles/partials/base.scss", "assets/icon.svg"];
+    "src/styles/partials/base.scss", "assets/icon.svg", "src/patterns/views/list/list.hbs", "src/styles/views/list.scss"];
   const REST = ["pages/index.md", "src/patterns/components/note/note.hbs", ".github/workflows/pages.yml"];
   const existing = (files: string[]): ExistingProject => ({ packageJson: null, exists: p => files.includes(p) });
 
@@ -103,8 +105,14 @@ describe("planInit — the storefront", () => {
     const paths = p.writes.map(w => w.path);
     for (const s of SKIN) expect(paths, s).not.toContain(s);
     expect(paths).toEqual(expect.arrayContaining(REST));
-    expect(p.skipped).toEqual([{ path: "src/patterns/partials/base/base.hbs", reason: "already exists: the storefront skin (5 files in src/patterns/layouts, "
-      + "src/patterns/partials and their styles) was left out as a whole, so it isn't mixed with the skin already here" }]);
+    expect(p.skipped).toEqual([{ path: "src/patterns/partials/base/base.hbs", reason: "already exists: the storefront skin (7 files in src/patterns/layouts, "
+      + "src/patterns/partials, src/patterns/views and their styles) was left out as a whole, so it isn't mixed with the skin already here" }]);
+  });
+
+  it("counts the views as the skin: a project with views of its own keeps them, and gets none of the starter's skin", () => {
+    const p = plan({ storefront: true }, existing(["src/patterns/views/list/list.hbs"]));
+    for (const s of SKIN) expect(p.writes.map(w => w.path), s).not.toContain(s);
+    expect(p.skipped.map(s => s.path)).toEqual(["src/patterns/views/list/list.hbs"]);
   });
 
   it("writes the skin beside the project's own other layouts and partials", () => {

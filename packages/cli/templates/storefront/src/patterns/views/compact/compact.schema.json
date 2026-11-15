@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Compact",
+  "description": "A listing as a short list of titles and dates.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "type": "array",
+      "x-pd-card": "components/compact-card",
+      "description": "The pages of the listing, in its order (the folder's sort)"
+    }
+  }
+}
