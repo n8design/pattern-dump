@@ -141,7 +141,7 @@ How the storefront's images are encoded as WebP variants ([Storefront: Images](s
 | Option | Type | Description |
 |---|---|---|
 | `overviews` | boolean | Folder gallery pages. Default `true`; a folder's `index.md` can turn off its own with `overview: false` |
-| `shell.brand.title` | string | Title at the top of the Nav Rail, and the browser tab's title (with the component in front on a component route: "Button · My Design System"), in `pd dev` and in a `pd build` snapshot. Default: "Pattern Dump" |
+| `shell.brand.title` | string | Title at the top of the Nav Rail, and the browser tab's title (with the component or folder in front on its route: "Button · My Design System", "Atoms · My Design System"), in `pd dev` and in a `pd build` snapshot. Default: "Pattern Dump" |
 | `shell.brand.logo` | string or `{ light, dark }` | Image shown instead of the title; `{ light, dark }` switches with the colour scheme |
 | `shell.brand.logoAlt` | string | Alternative text for the logo |
 | `shell.brand.href` | string | Makes the brand a link |

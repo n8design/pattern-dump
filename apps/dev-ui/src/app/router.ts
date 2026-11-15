@@ -18,7 +18,7 @@ import { documentTitle } from "../core/title.js";
 import { navigate, navigateOverview, navigateUnknown, navigateVariants, swapVariant } from "./navigation.js";
 
 
-function resolvePathKind(path: string): "component" | "group" | null {
+function findTreeNode(path: string): TreeNode | null {
   function findNode(nodes: TreeNode[]): TreeNode | null {
     for (const n of nodes) {
       if (n.path === path) return n;
@@ -29,8 +29,11 @@ function resolvePathKind(path: string): "component" | "group" | null {
     }
     return null;
   }
-  const node = findNode(session.tree.roots);
-  return node ? node.kind : null;
+  return findNode(session.tree.roots);
+}
+
+function resolvePathKind(path: string): "component" | "group" | null {
+  return findTreeNode(path)?.kind ?? null;
 }
 
 // Read the current URL and route to the matching view. All navigation paths —
@@ -59,11 +62,11 @@ export async function routeFromCurrentLocation(): Promise<void> {
   }
   // Variant is now in the URL hash (#ghost), not ?v= query param.
   const variant = window.location.hash.slice(1) || undefined;
-  // The tab names the component on a component route (its gallery too), and only the workbench elsewhere.
+  // The tab names the component or folder the route shows (a component's gallery too), and only the workbench on
+  // home and on a route the tree doesn't know.
   const shown = path.endsWith("/variants") && resolvePathKind(path.slice(0, -"/variants".length)) === "component"
     ? path.slice(0, -"/variants".length) : path;
-  document.title = documentTitle(session.brandTitle,
-    resolvePathKind(shown) === "component" ? session.componentRegistry.get(shown)?.title : undefined);
+  document.title = documentTitle(session.brandTitle, path ? findTreeNode(shown)?.title : undefined);
   if (!path) return;
 
   if (path.endsWith("/variants")) {
