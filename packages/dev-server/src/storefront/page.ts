@@ -19,12 +19,13 @@ import { escapeAttr, escapeHtml } from "../http-utils.js";
 import { isHelperNameProblem, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
 import { renderDoc, type ProseImages } from "../markdown.js";
 import { readSchema, type PlacedProblem } from "./declared-values.js";
-import { checkPageFrontmatter } from "./frontmatter-contract.js";
+import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { resolveNavigations } from "./navigations.js";
 import { checkSampleData } from "./sample-data.js";
-import { checkPageDeclaration, pageValue, positionOf, type PageHeading } from "./derived.js";
+import { checkPageDeclaration, FILLED, pageValue, positionOf, RETIRED, type DerivedPage, type PageHeading } from "./derived.js";
+import { checkDeclaredQueries, declaredQueries, resolveQuery, type ResolvedQuery } from "./query.js";
 import { collidingHeadings, idsBesides } from "./anchors.js";
 import type { GitDates, PageDates } from "./git-dates.js";
 import type { CompositionRegistry } from "../composition.js";
@@ -469,6 +470,25 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       view = { id: resolved.view.id, entries };
     }
   }
+  // The layout's queries (query.ts): each resolved for the page, its options checked, its pages checked against its
+  // view's card. The 404 page has no place among the pages, so its queries list none.
+  const queries: ResolvedQuery[] = [];
+  const declaredQs = pageDeclaration.declared ? declaredQueries(layoutSchema) : [];
+  if (declaredQs.length) {
+    const queryProblems = checkDeclaredQueries(layoutSchema, checked.layoutId, [...FILLED, ...Object.keys(RETIRED)],
+      [...RESERVED_KEYS, ...ASSEMBLY_KEYS, ...layoutDeclared]);
+    problems.push(...queryProblems);
+    if (!queryProblems.length) {
+      for (const q of declaredQs) {
+        if (isNotFound) { queries.push({ name: q.name, entries: [], problems: [], notes: [] }); continue; }
+        const r = await resolveQuery(q, { route, path: page.path, frontmatter: page.frontmatter, layoutId: checked.layoutId, model,
+          discoveryMap: a.discoveryMap, dates: a.dates, mode });
+        problems.push(...r.problems);
+        notes.push(...r.notes);
+        queries.push(r);
+      }
+    }
+  }
   if (declares("date")) {
     const dated = isNotFound ? { date: null, problems: [], notes: [] } : await dateOf(route, model, a.dates, mode);
     listing.date = dated.date;
@@ -480,11 +500,20 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (declares("categories")) listing.categories = (checked.build.categories ?? []).map(k => model.categories.byKey.get(k)!);
   // The collections the skin lists (site.collections), on every page.
   const collections = site.collections.length ? await resolveCollections(site.collections, model, { dates: a.dates, mode }) : undefined;
-  if (collections) { problems.push(...collections.problems); notes.push(...collections.notes); }
+  if (collections) {
+    problems.push(...collections.problems);
+    notes.push(...collections.notes);
+    // Deprecated (0.5.0): it keeps working, and a query is the one way to list pages. The same text on every page, so
+    // a build says it once.
+    notes.push(`warning: ${SITE_SCHEMA_OWNER} lists site.collections (${site.collections.join(", ")}), which is deprecated: declare a query `
+      + `on the layouts that show it instead (x-pd-query on a sub-key of page, such as page.latest with `
+      + `{ "collections": ["${site.collections[0]}"], "sort": "date", "limit": 3 })`);
+  }
   notes.push(...site.notes ?? []);
   if (a.discoveryMap.has(checked.layoutId)) {
     problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed, site.collections,
-      layoutCard !== undefined && declares("children") ? [layoutCard] : []));
+      [...(layoutCard !== undefined && declares("children") ? [layoutCard] : []), ...declaredQs.flatMap(q => q.card !== undefined ? [q.card] : [])],
+      declaredQs.map(q => q.name)));
   }
   // The skin's head partial: the same for every page, so its problems are the whole site's.
   const hasHead = a.discoveryMap.has(HEAD_PARTIAL);
@@ -501,6 +530,19 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       return fail([`${view.id}: ${e instanceof Error ? e.message : String(e)}`]);
     }
   } else if (declares("listing")) listing.listing = null;
+  // Each query's pages, and the same through its view: rendered once, and not at all when no page matched.
+  const queryValues: Record<string, { entries: Entry[]; listing: string | null }> = {};
+  for (const q of queries) {
+    let html: string | null = null;
+    if (q.view && q.entries.length) {
+      try {
+        html = (await a.render({ component: q.view.id, data: { entries: q.entries } })).html;
+      } catch (e) {
+        return fail([`${q.view.id}: ${e instanceof Error ? e.message : String(e)}`]);
+      }
+    }
+    queryValues[q.name] = { entries: q.entries, listing: html };
+  }
   notes.push(...checked.notes);
   // pd dev shows drafts and scheduled pages; each is said once, whichever page is open.
   if (a.live) {
@@ -520,7 +562,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     body,
     nav: markCurrent(model.nav, route),
     site: siteData,
-    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates, ...listing }) } : {}),
+    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates, ...listing, ...queryValues } as Partial<DerivedPage>) } : {}),
   });
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
@@ -615,7 +657,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       : []),
     ...(headExtra ? [headExtra] : []),
     ...(siteHead ? [siteHead] : []),
-    await a.head(checked.layoutId, html, [...placedIds, ...(view ? [view.id] : [])]),
+    await a.head(checked.layoutId, html, [...placedIds, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view && queryValues[q.name]?.listing ? [q.view.id] : [])]),
   ].join("\n");
   // The 404 page is served at any depth, so every URL in it (its body's, its layout's, the head's) must be
   // root-relative or absolute: a relative one points somewhere else on every address.

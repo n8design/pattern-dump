@@ -8,6 +8,7 @@ description: A page with a table of contents, from what the storefront derives f
 | `title` | string | required |
 | `description` | string | optional |
 | `lede` | string | optional |
+| `related-<option>` | query option | sets one of `page.related`'s options for this page; `related: false` turns it off |
 
 | Derived (`page`) | Type | |
 |---|---|---|
@@ -18,3 +19,4 @@ description: A page with a table of contents, from what the storefront derives f
 | `page.created` | ISO 8601 date or null | the page's first commit, from git |
 | `page.categories` | list of `{ key, label, description }` | the page's categories, declared in `storefront.categories` |
 | `page.updated` | `YYYY-MM-DD` or null | the page's own `updated:`, set for a real change (never git's last commit) |
+| `page.related` | `{ entries, listing }` | a query (`sort: date`, `view: compact`, every folder): each page picks its own |

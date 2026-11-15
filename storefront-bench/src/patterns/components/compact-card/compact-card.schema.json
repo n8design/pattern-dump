@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Compact card",
+  "description": "One page in the compact view: its title as a link, and its date.",
+  "type": "object",
+  "required": ["route", "title"],
+  "properties": {
+    "route": { "type": "string", "description": "The page's URL" },
+    "title": { "type": "string", "description": "The page's title, as the link" },
+    "date": { "type": ["string", "null"], "description": "The page's date, YYYY-MM-DD" }
+  }
+}

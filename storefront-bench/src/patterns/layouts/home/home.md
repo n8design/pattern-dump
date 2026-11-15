@@ -9,3 +9,7 @@ For the site's own `index.md`: set `layout: home` in its frontmatter.
 |---|---|---|
 | `title` | string | required |
 | `description` | string | optional |
+
+| Query (`page`) | Defaults | |
+|---|---|---|
+| `page.latest` | `collections: [articles]`, `sort: date`, `limit: 2` | `{ entries, listing }`: the layout writes the entries itself |

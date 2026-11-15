@@ -4,6 +4,9 @@ title: About
 description: What the bench is for.
 image: /assets/images/about.png
 order: 2
+related-pages: [guides/setup.md]
+related-categories: [design-systems]
+related-tags: [design, images]
 ---
 
 The bench is where the storefront is tried out: a few pages, a skin, and a component to show.

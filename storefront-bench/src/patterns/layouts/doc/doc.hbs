@@ -30,6 +30,12 @@
   </nav>
   {{/if}}
   <div class="doc-body">{{{body}}}</div>
+  {{#if page.related.listing}}
+  <section class="related" aria-labelledby="related-title">
+    <h2 id="related-title">Related</h2>
+    {{{page.related.listing}}}
+  </section>
+  {{/if}}
   {{#if page.created}}
   <p class="doc-dates">
     Created <time class="doc-created" datetime="{{page.created}}">{{page.created}}</time>{{#if page.updated}},

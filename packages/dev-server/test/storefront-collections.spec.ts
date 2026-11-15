@@ -316,6 +316,16 @@ describe("assemblePage: site.collections", () => {
     expect(p.html).toContain("<ol><li>B</li><li>A</li></ol>");
   });
 
+  it("still works, with one warning: site.collections is deprecated in favour of a query", async () => {
+    const { page: p } = await assemble("/", files, base, { title: "S" });
+    expect(p.notes.filter(n => n.includes("deprecated"))).toEqual([
+      `warning: partials/base lists site.collections (articles), which is deprecated: declare a query on the layouts that show it instead `
+        + `(x-pd-query on a sub-key of page, such as page.latest with { "collections": ["articles"], "sort": "date", "limit": 3 })`,
+    ]);
+    const { page: q } = await assemble("/", files, { properties: { site: { properties: { title: { type: "string" } } } } }, { title: "S" });
+    expect(q.notes.filter(n => n.includes("deprecated"))).toEqual([]);
+  });
+
   it("a page gets no collections when the skin lists none", async () => {
     const { site } = await assemble("/", files, { properties: { site: { properties: { title: { type: "string" } } } } }, { title: "S" });
     expect(Object.hasOwn(site ?? {}, "collections")).toBe(false);

@@ -59,6 +59,11 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
     ["Built with Pattern Dump from the storefront bench.", "© 2026"]],
   ["components/callout", "Callout", "A short note set apart from the text around it.", "centered",
     ["Good to know", "A callout sets a short note apart"]],
+  // The view the layouts' queries show related pages in (page.related), and its card.
+  ["views/compact", "Compact", "A list of pages as titles and dates, each a compact card.", "centered",
+    ["A harbour of cable cars", "2026-11-01", "Plain on purpose"]],
+  ["components/compact-card", "Compact card", "One page in the compact view, its title as a link and its date.", "centered",
+    ["A harbour of cable cars", "2026-11-01"]],
 ];
 /** The components the guides page places with values (pd- tags): a slider and its slides. */
 const PLACED = ["components/slide", "components/slider"];
