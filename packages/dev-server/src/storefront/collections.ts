@@ -48,6 +48,16 @@ export async function dateOf(route: string, model: PageModel, dates: GitDates | 
   return { date: dated.shallow && mode === "build" ? null : dated.dates.created?.slice(0, 10) ?? null, problems: dated.problems, notes: dated.notes };
 }
 
+/** The entry of the page at `route`, with its date (dateOf); undefined for a route that is no page. */
+export async function entryOf(route: string, model: PageModel, o: { dates?: GitDates | undefined; mode: DatesMode })
+  : Promise<{ entry?: Entry; problems: string[]; notes: string[] }> {
+  const fields = model.entries.get(route);
+  if (!fields) return { problems: [], notes: [] };
+  const dated = await dateOf(route, model, o.dates, o.mode);
+  const title = model.pages.find(p => p.route === route)?.title ?? route;
+  return { entry: { route, title, ...fields, date: dated.date }, problems: dated.problems, notes: dated.notes };
+}
+
 /** The entries of the folder at `folder` (a route: "/articles/"), sorted as its index.md says. */
 export async function entriesOf(folder: string, model: PageModel, o: { dates?: GitDates | undefined; mode: DatesMode }): Promise<Listed> {
   const listing = model.folders.get(folder);

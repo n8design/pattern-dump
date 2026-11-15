@@ -38,7 +38,7 @@ import { checkPageBasics } from "./page-basics.js";
 import { redirectsOf } from "./redirects.js";
 import { dateOf, entriesOf, resolveCollections, type Entry } from "./collections.js";
 import { cardOf, checkEntries, readCard } from "./cards.js";
-import { checkViewSampleData, resolveView } from "./views.js";
+import { checkViewSampleData, DEFAULT_VIEW_KEY, resolveView } from "./views.js";
 import type { Category } from "./categories.js";
 
 /** Said once (the same text from every page) when JSON-LD leaves git's date out for a shallow clone. */
@@ -291,6 +291,13 @@ const markCurrent = (nav: StorefrontNavItem[], route: string): unknown[] => nav.
   ...(item.children ? { children: item.children.map(c => ({ ...c, ...(c.route === route ? { current: true } : {}) })) } : {}),
 }));
 
+/** A layout's default view for its listing: x-pd-view on page.listing, when it names one. */
+const defaultView = (schema: { properties?: Record<string, unknown> } | undefined): string | undefined => {
+  const listing = (schema?.properties?.["page"] as { properties?: Record<string, Record<string, unknown>> } | undefined)?.properties?.["listing"];
+  const v = listing?.[DEFAULT_VIEW_KEY];
+  return typeof v === "string" ? v : undefined;
+};
+
 export async function assemblePage(route: string, model: PageModel, a: PageAssembly): Promise<AssembledPage> {
   let siteWide: string[] = [];
   const fail = (problems: string[]): AssembledPage => ({ status: 500, html: errorDocument(route, problems, a.live, siteWide), problems, notes: [] });
@@ -446,6 +453,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const resolved = await resolveView({
       view: checked.build.view, line: page.frontmatter.lines["view"], path: page.path,
       layout: checked.layoutId.slice("layouts/".length), shows: declares("listing"), discoveryMap: a.discoveryMap,
+      fallback: defaultView(layoutSchema),
     });
     problems.push(...resolved.problems);
     if (resolved.view) {

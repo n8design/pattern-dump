@@ -84,7 +84,24 @@ describe("listing views", () => {
 
   it("fails a listing whose layout shows a view, when its index.md names none", async () => {
     const p = await assemble("/articles/", pagesWith(""));
-    expect(p.problems).toEqual([`articles/index.md: layout "listing" shows a listing (page.listing), so name its view: view: <name> (the views are "grid", "list")`]);
+    expect(p.problems).toEqual([`articles/index.md: layout "listing" shows a listing (page.listing), so name its view: view: <name> (the views are "grid", "list"), or give the layout a default ("x-pd-view" on page.listing)`]);
+  });
+
+  it("takes the layout's default view (x-pd-view on page.listing) when the index.md names none, and the index.md's view wins", async () => {
+    const skin = { ...SKIN, "layouts/listing/listing.schema.json": json({ properties: { title: { type: "string" }, page: { type: "object", properties: { listing: { "x-pd-view": "list" } } } } }) };
+    const byDefault = await assemble("/articles/", pagesWith(""), skin);
+    expect(byDefault.problems).toEqual([]);
+    expect(byDefault.html).toContain(`<ul class="view-list">`);
+    expect(byDefault.placed).toContain("views/list");
+    const own = await assemble("/articles/", pagesWith("view: grid\n", { "articles/two.md": md("Two", "date: 2026-10-01\nimage: /assets/images/two.jpg\n") }), skin);
+    expect(own.problems).toEqual([]);
+    expect(own.html).toContain(`<ul class="view-grid">`);
+  });
+
+  it("checks the layout's default view like a named one, at the layout", async () => {
+    const skin = { ...SKIN, "layouts/listing/listing.schema.json": json({ properties: { title: { type: "string" }, page: { type: "object", properties: { listing: { "x-pd-view": "gird" } } } } }) };
+    const p = await assemble("/articles/", pagesWith(""), skin);
+    expect(p.problems).toEqual([`layouts/listing (x-pd-view on page.listing): view "gird" is not a view: did you mean "grid"? (the views are "grid", "list")`]);
   });
 
   it("says so when the skin has no views at all", async () => {
