@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Grid card",
+  "description": "One page of a listing, as the grid and featured views show it: its image, its title as a link and its date. Every page needs an image.",
+  "type": "object",
+  "required": [
+    "route",
+    "title",
+    "image"
+  ],
+  "properties": {
+    "route": {
+      "type": "string",
+      "description": "The page's address"
+    },
+    "title": {
+      "type": "string",
+      "description": "The page's title, as the card's link"
+    },
+    "image": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The page's image, a raster image in the assets: shown above the title, as decoration (the title says what the page is)",
+      "x-pd-image": {
+        "widths": [
+          320,
+          640
+        ],
+        "sizes": "(min-width: 44rem) 20rem, calc(100vw - 2rem)"
+      }
+    },
+    "date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The page's date, YYYY-MM-DD"
+    }
+  }
+}

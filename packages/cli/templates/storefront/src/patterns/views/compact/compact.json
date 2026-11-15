@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "route": "/articles/second/",
+      "title": "A second article",
+      "date": "2026-11-14"
+    },
+    {
+      "route": "/articles/first/",
+      "title": "A first article",
+      "date": "2026-11-01"
+    }
+  ]
+}

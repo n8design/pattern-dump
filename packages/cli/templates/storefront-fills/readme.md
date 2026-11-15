@@ -28,10 +28,14 @@ returns by itself. How `pd-` tags work:
 | `src/patterns/partials/base/` | the frame around every page: header, navigation, footer |
 | `src/patterns/partials/head/` | what the skin adds to every page's `<head>` (the icon) |
 | `src/patterns/components/note/` | the component the home page shows |
+| `src/patterns/views/` | the ways a listing can be shown: `list`, `grid`, `featured`, `compact` |
+| `src/patterns/components/*-card/` | the card each view shows a page as; its schema says which fields a page needs |
 | `pattern-dump.config.ts` | `storefront`: the website's name and footer (`site`), and where it is published |
 
-`pages/articles/` is a collection: its `index.md` (layout `listing`, `sort: date`) lists every page in the folder,
-newest first, by its `date`. Copy `hello.md` to write another; `draft: true` keeps one out of the build.
+`pages/articles/` is a collection: its `index.md` (layout `listing`, `view: list`, `sort: date`) lists every page
+in the folder, newest first, by its `date`. Copy `hello.md` to write another; `draft: true` keeps one out of the
+build. Each page is checked against the view's card: switch to `view: grid` and the listing names every article
+without an `image:`. `childLayout: <layout>` on a folder's `index.md` gives its pages a layout of their own.
 
 A page that doesn't exist shows a built-in 404 page; write `pages/404.md` to change it. A page that moved
 can forward from its old address (`redirectFrom: [/old/]`), and `index: false` keeps a page out of search

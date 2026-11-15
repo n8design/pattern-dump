@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Grid",
+  "description": "A listing as a grid of cards, each with the page's image.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "type": "array",
+      "x-pd-card": "components/grid-card",
+      "description": "The pages of the listing, in its order (the folder's sort)"
+    }
+  }
+}

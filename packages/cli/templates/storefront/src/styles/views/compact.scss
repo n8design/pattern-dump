@@ -1,0 +1,4 @@
+@use "../base/tokens";
+
+.view-compact { margin: tokens.$space-md 0 0; padding: 0; list-style: none; }
+.view-compact > li { margin-block-end: tokens.$space-xs; }

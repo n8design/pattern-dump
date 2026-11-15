@@ -1,0 +1,5 @@
+@use "../base/tokens";
+
+.grid-card img { display: block; inline-size: 100%; block-size: auto; border-radius: tokens.$radius; }
+.grid-card-title { margin: tokens.$space-sm 0 0; font-size: 1.125rem; }
+.grid-card-date { margin: tokens.$space-xs 0 0; color: var(--color-text-muted, #4b5563); }

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Featured",
+  "description": "A listing with its first page large and the rest as a grid below.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "type": "array",
+      "x-pd-card": "components/grid-card",
+      "description": "The pages of the listing, in its order (the folder's sort)"
+    }
+  }
+}

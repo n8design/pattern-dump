@@ -56,7 +56,7 @@ const RENAMES: Record<string, string> = { _gitignore: ".gitignore" };
  * The storefront's skin: written as one unit or not at all. Mixed with a skin already in the project (its own
  * `layouts/page` beside the starter's `partials/base`, say), pages would render with parts of two skins.
  */
-const SKIN_PREFIXES = ["src/patterns/layouts/", "src/patterns/partials/", "src/styles/layouts/", "src/styles/partials/"];
+const SKIN_PREFIXES = ["src/patterns/layouts/", "src/patterns/partials/", "src/patterns/views/", "src/styles/layouts/", "src/styles/partials/", "src/styles/views/"];
 const SKIN_FILES = ["assets/icon.svg"];
 const isSkin = (path: string): boolean => SKIN_PREFIXES.some(p => path.startsWith(p)) || SKIN_FILES.includes(path);
 
@@ -95,7 +95,7 @@ export function planInit(
   const skinTaken = skin.map(f => renamed(f.path)).find(p => existing.exists(p));
   if (skinTaken) {
     skipped.push({ path: skinTaken, reason: `already exists: the storefront skin (${skin.length} files in src/patterns/layouts, `
-      + `src/patterns/partials and their styles) was left out as a whole, so it isn't mixed with the skin already here` });
+      + `src/patterns/partials, src/patterns/views and their styles) was left out as a whole, so it isn't mixed with the skin already here` });
   }
   const files = [...templates.base, ...(answers.examples ? templates.examples : []),
     ...storefront.filter(f => !skinTaken || !skin.includes(f))];
