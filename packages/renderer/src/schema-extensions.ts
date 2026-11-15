@@ -5,7 +5,7 @@
 //   x-pd-content       at a schema's top: the property a tag's content fills; it must be a declared string.
 //   contentMediaType   only "text/markdown", only on a string: rendered as markdown, HTML escaped.
 //
-// And three that are not about placement, so they don't switch on the template check below:
+// And five that are not about placement, so they don't switch on the template check below:
 //
 //   x-pd-card            on a list property (a layout's `page.children`, a view's `entries`): the card each page of
 //                        the listing is shown as. It names a component with a schema; the storefront checks every page
@@ -13,6 +13,11 @@
 //   x-pd-image           on a string property: the image slot that field fills, `{ widths, sizes }`, which
 //                        `{{pd-image field alt=…}}` writes as an <img> with its variants (image-slots.ts). Every
 //                        `{{pd-image}}` call in the template is checked against it.
+//   x-pd-query           on a sub-key of a layout's `page` (`page.related`): a list of pages the storefront fills from
+//                        a query, `{ pages, collections, categories, tags, match, sort, order, limit, view }`
+//                        (query.ts in the dev-server checks the values against the site).
+//   x-pd-view            on a layout's `page.listing`: the view its listing is shown in when the folder's index.md
+//                        names none.
 //   x-pd-example-height  at a schema's top: the height, in whole CSS pixels, a live example of the component
 //                        starts at on a storefront page, before its preview reports its own. It must err
 //                        short: the frame can grow to its content but never shrink below this. One value
@@ -41,9 +46,12 @@ export interface SchemaExtensionContext {
 }
 
 type Prop = Record<string, unknown>;
-const KNOWN_PROPERTY_KEYS = new Set(["x-pd-card", "x-pd-component", "x-pd-image"]);
+const KNOWN_PROPERTY_KEYS = new Set(["x-pd-card", "x-pd-component", "x-pd-image", "x-pd-query", "x-pd-view"]);
 const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-prose-images"]);
-const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images";
+const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images, x-pd-query, x-pd-view";
+/** The options of a query (x-pd-query), in the order the docs list them. Their values are checked by the storefront,
+ *  against the site's pages, folders and categories (query.ts in the dev-server). */
+export const QUERY_OPTIONS = ["pages", "collections", "categories", "tags", "match", "sort", "order", "limit", "view"] as const;
 const isObject = (v: unknown): v is Prop => typeof v === "object" && v !== null && !Array.isArray(v);
 const typesOf = (p: Prop): unknown[] => p["type"] === undefined ? [] : Array.isArray(p["type"]) ? p["type"] : [p["type"]];
 
@@ -110,6 +118,26 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
       else if (typeof card !== "string") problems.push({ path: `${path}/x-pd-card`, message: `x-pd-card must name a component` });
       else if (!ctx.componentExists(card)) problems.push({ path: `${path}/x-pd-card`, message: `x-pd-card names "${card}", which is not a component` });
       else if (!ctx.hasSchema(card)) problems.push({ path: `${path}/x-pd-card`, message: `x-pd-card names "${card}", which has no schema, so a listing's pages can't be checked against it` });
+    }
+    // A query (a layout's page.<name>) and a default view (a layout's page.listing): not placements either. Only what
+    // needs no site is checked here: the options' names, and that a view is one.
+    const isView = (v: unknown) => typeof v === "string" && /^[^/~]+$/.test(v) && ctx.componentExists(`views/${v}`);
+    const query = prop["x-pd-query"];
+    if (query !== undefined) {
+      const at = `${path}/x-pd-query`;
+      const options = QUERY_OPTIONS.join(", ");
+      if (!isObject(query)) problems.push({ path: at, message: `x-pd-query must be an object of options (${options})` });
+      else {
+        for (const key of Object.keys(query)) {
+          if (!(QUERY_OPTIONS as readonly string[]).includes(key)) problems.push({ path: at, message: `"${key}" is not an option of a query (${options})` });
+        }
+        if (query["view"] !== undefined && !isView(query["view"])) problems.push({ path: at, message: `view ${JSON.stringify(query["view"])} is not a view (a component in views/)` });
+      }
+    }
+    const view = prop["x-pd-view"];
+    if (view !== undefined) {
+      if (typeof view !== "string") problems.push({ path: `${path}/x-pd-view`, message: `x-pd-view must name a view` });
+      else if (!isView(view)) problems.push({ path: `${path}/x-pd-view`, message: `view "${view}" is not a view (a component in views/)` });
     }
     const image = prop["x-pd-image"];
     if (image !== undefined) {
