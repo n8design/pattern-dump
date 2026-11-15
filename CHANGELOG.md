@@ -19,9 +19,25 @@
   clock), with every page under a folder whose `index.md` is dated so. A site with such a page builds without it
   now. `pd dev` shows it, and the report names it: `scheduled: 1 held back (articles/launch.md until 2026-12-01)`.
 - `updated` and `categories` are now keys the build owns: a layout's schema that declares either must rename it.
+- `childLayout` and `view` are keys the build owns too, so the same holds for them.
 
 ### Added
 
+- `childLayout:` on a folder's `index.md`: the layout of the pages under it that name none. The nearest folder that
+  sets one wins, and a page's own `layout:` wins over it. A `childLayout` that names no layout fails the `index.md`
+  and each page that takes it, and every problem about a page's layout names where the layout came from. The
+  workbench lists a layout's pages in its Relationships tab, each with where its layout came from, and `/api/pages`
+  gives `layoutFrom`.
+- A listing's card: `x-pd-card` names the component each page of a listing is shown as (on a layout's
+  `page.children`, or a view's `entries`). Every page in the listing is checked against the card's schema: a field
+  the card requires that a page doesn't have fails the listing, naming the page. A card declares only fields a
+  listing's page has, and its sample data may set only those.
+- Listing views: `view: grid` on a folder's `index.md` shows its listing through `views/grid`, a component in the
+  skin's style guide (Pattern Dump has none of its own). The layout writes `{{{page.listing}}}`; the view gets the
+  pages as `entries`, and names its card, so each view's required fields are checked on their own. A view that
+  doesn't exist, a listing that names none and a view on a page with no listing are problems.
+- The website starter (`pd init --storefront`) ships four plain views with their cards: `list`, `grid`, `featured`
+  and `compact`. Its articles listing uses `view: list`.
 - `updated:` on a storefront page, its last real change: `page.updated`, JSON-LD `dateModified`,
   `article:modified_time` on an article, and the sitemap's `lastmod`. Checked: a real date, not before `date`.
 - Categories, independent of folders: `storefront.categories` declares them (key, label, optional description, and
