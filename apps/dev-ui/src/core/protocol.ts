@@ -11,6 +11,6 @@ import { PD_PROTOCOL_VERSION } from "@pattern-dump/contracts";
 export function protocolMismatch(serverProtocol: unknown, shellProtocol: number = PD_PROTOCOL_VERSION): string | null {
   if (serverProtocol === shellProtocol) return null;
   const server = typeof serverProtocol === "number" ? `v${serverProtocol}` : "an unknown version";
-  return `Protocol mismatch — the server speaks ${server}, this shell expects v${shellProtocol}. ` +
+  return `Protocol mismatch: the server speaks ${server}, this shell expects v${shellProtocol}. ` +
     "Rebuild and restart the dev server, then reload.";
 }

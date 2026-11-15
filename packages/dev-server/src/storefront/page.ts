@@ -107,6 +107,20 @@ export function fitterScript(): string {
     + `})();</script>`;
 }
 
+/** The copy buttons' script, on a page that has a code block (code-blocks.ts writes each button hidden): it shows a
+ *  button only where the browser can write to the clipboard, and copies the block's code (its data-raw), saying
+ *  "Copied" for a moment. Without scripting, or without a clipboard, there is no button: no focus stop that does
+ *  nothing. The block itself stays focusable. */
+export function copyScript(): string {
+  return `<script>(function(){if(!(navigator.clipboard&&navigator.clipboard.writeText))return;`
+    + `var sel=".shiki-container>button.copy-btn";`
+    + `document.querySelectorAll(sel).forEach(function(b){b.hidden=false;});`
+    + `document.addEventListener("click",function(e){var b=e.target instanceof Element&&e.target.closest(sel);if(!b)return;`
+    + `var done=function(t){b.textContent=t;setTimeout(function(){b.textContent="Copy";},1500);};`
+    + `navigator.clipboard.writeText(b.parentElement.getAttribute("data-raw")||"").then(function(){done("Copied");},function(){done("Not copied");});});`
+    + `})();</script>`;
+}
+
 /**
  * `pd dev` only: reload when this page or the nav changes, or a component or stylesheet does; list a
  * build problem (a reload that failed, a restart that is needed) in a notice on the page, which the next
@@ -595,5 +609,5 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     // One main landmark and one <h1> (page-basics.ts): errors in pd build, warnings here.
     notes.push(...checkPageBasics(html).map(p => `warning: ${page!.path}: ${p}`));
   }
-  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}`, a.live, a.lang, a.basePath ?? "/"), problems: [], notes };
+  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${html.includes(`class="copy-btn"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/"), problems: [], notes };
 }

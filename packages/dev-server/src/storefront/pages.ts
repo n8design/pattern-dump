@@ -194,7 +194,7 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
   }
   if (!files.has("/")) problems.push("there is no home page: the pages folder needs an index.md at its top, the page at /");
   for (const folder of [...folders].sort()) {
-    if (!files.has(folder)) problems.push(`the folder ${folder.slice(1)} holds pages but has no index.md — it needs one, as the folder's own page`);
+    if (!files.has(folder)) problems.push(`the folder ${folder.slice(1)} holds pages but has no index.md: it needs one, as the folder's own page`);
   }
 
   /** The direct children of a folder route: its pages (not its index) and its subfolders. */

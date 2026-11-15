@@ -66,9 +66,9 @@ describe("checkPlaced", () => {
       entry("meta", keys([entry("note", text("n", 5))], 5)),
     ], 1), "<pd-molecules-slider>", ctx);
     expect(r.problems.map(p => `${p.at.line}: ${p.message}`)).toEqual([
-      `1: <pd-molecules-slider>: "lable" is not declared by molecules/slider — did you mean "label"?`,
+      `1: <pd-molecules-slider>: "lable" is not declared by molecules/slider: did you mean "label"?`,
       `1: <pd-molecules-slider>.per-view must be a whole number (got "two")`,
-      `3: <pd-molecules-slider>.<pd-atoms-slide>[1]: "captoin" is not declared by atoms/slide — did you mean "caption"?`,
+      `3: <pd-molecules-slider>.<pd-atoms-slide>[1]: "captoin" is not declared by atoms/slide: did you mean "caption"?`,
       `3: <pd-molecules-slider>.<pd-atoms-slide>[1]: "alt" is required by atoms/slide`,
       `5: <pd-molecules-slider>.meta: "owner" is required by <pd-molecules-slider>.meta`,
       `1: <pd-molecules-slider>: "label" is required by molecules/slider`,
@@ -95,7 +95,7 @@ describe("checkPlaced", () => {
     expect((await loop(text("yes"))).problems.map(p => p.message)).toEqual([`<pd-molecules-slider>.loop must be true or false (got "yes")`]);
     // Bare is only for a boolean.
     expect((await checkPlaced("molecules/slider", keys([entry("label", bare()), entry("slides", list([slide()]))]), "<pd-molecules-slider>", ctx)).problems
-      .map(p => p.message)).toEqual([`<pd-molecules-slider>.label needs a value — only a boolean can be written without one`]);
+      .map(p => p.message)).toEqual([`<pd-molecules-slider>.label needs a value: only a boolean can be written without one`]);
   });
 
   it("refuses a component without a schema, and a value set twice", async () => {

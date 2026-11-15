@@ -18,9 +18,10 @@
 // the tag's indent. Attribute values are plain text, never HTML; how content becomes HTML is the checker's
 // (block markdown, with HTML escaped, only for a `text/markdown` property).
 
-import MarkdownIt from "markdown-it";
+import type MarkdownIt from "markdown-it";
 import type StateBlock from "markdown-it/lib/rules_block/state_block.mjs";
 import { suggest } from "@pattern-dump/config";
+import { createMarkdown } from "./code-blocks.js";
 import type { ObjectSchema, Placed, PlacedEntry, PlacedProblem, Pos } from "./storefront/declared-values.js";
 
 /** One `pd-` tag as written: its name, attributes, child tags and content text, each with a position. */
@@ -131,7 +132,7 @@ export function usePlacedTags(md: MarkdownIt): MarkdownIt {
 
 /** Every claimed block of a markdown body, in order (for a caller that needs no rendering). */
 export function readPlacedBlocks(body: string, lineOffset = 0): PlacedBlock[] {
-  const md = usePlacedTags(new MarkdownIt({ html: false, linkify: false }));
+  const md = usePlacedTags(createMarkdown({ html: false, linkify: false }));
   return md.parse(body, { pdLineOffset: lineOffset }).filter(t => t.type === "pd_component").map(t => t.meta as PlacedBlock);
 }
 
@@ -163,7 +164,7 @@ export async function toPlaced(
   const id = resolver.idOf(handle);
   if (!id) {
     const near = suggest(handle, resolver.handles());
-    problems.push({ at: tag.at, message: `<${tag.name}>: there is no component "${handle}"${near ? ` — did you mean <pd-${near}>?` : ""}` });
+    problems.push({ at: tag.at, message: `<${tag.name}>: there is no component "${handle}"${near ? `: did you mean <pd-${near}>?` : ""}` });
     return {};
   }
   const schema = await resolver.schemaOf(id);
@@ -184,7 +185,7 @@ export async function toPlaced(
     const slot = slots.find(s => s.component === c.id);
     if (!slot) {
       const takes = slots.map(s => `<pd-${resolver.handleOf(s.component)}>`);
-      problems.push({ at: child.at, message: `<${child.name}> cannot be placed inside <${tag.name}> — ${takes.length ? `it takes ${takes.join(", ")}` : "it takes no child components"}` });
+      problems.push({ at: child.at, message: `<${child.name}> cannot be placed inside <${tag.name}>: ${takes.length ? `it takes ${takes.join(", ")}` : "it takes no child components"}` });
       continue;
     }
     if (!slot.list) {

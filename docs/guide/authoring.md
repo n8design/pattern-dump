@@ -147,9 +147,12 @@ line or on the first line inside it:
 | ` ```src-data atoms/button~secondary ` | Its data; for a variant, merged with the base |
 | ` ```src-html atoms/button ` | Its rendered HTML |
 
-Any other language is syntax-highlighted. Every code block is focusable (`tabindex="0"`), in the docs and on
-storefront pages alike, so a block that scrolls sideways can be scrolled from the keyboard; style it with
-`overflow-x: auto` rather than wrapping its lines.
+Any other language is syntax-highlighted. Every code block is written the same way wherever its markdown is (a
+component's docs, a storefront page, the content of a component placed on a page), a fence and an indented block
+alike: highlighted, with a copy button, and focusable (`tabindex="0"`), so a block that scrolls sideways can be
+scrolled from the keyboard. Style it with `overflow-x: auto` rather than wrapping its lines. On a storefront page the
+copy button is shown by a small script of the page's own, and only where the browser can copy: with scripting off
+there is no button.
 
 Link to another component with a `pattern:` link, which becomes an in-app link: `[the button](pattern:atoms/button)`
 or `[secondary](pattern:atoms/button~secondary)`. A link to a component that doesn't exist is marked as
@@ -203,7 +206,7 @@ its page off, or `overviews: false` in the config to turn them all off.
   and as tall as the content. The page itself is not changed to get there, so a component that fills
   its container (a full-width input, a progress bar) shows at full width, as it would on a page. A
   component whose height comes from the viewport (`height: 100vh`, a percentage chain) cannot be
-  fitted — its height would follow the frame's — so the frame keeps its last steady height and the
+  fitted (its height would follow the frame's), so the frame keeps its last steady height and the
   content scrolls inside it; the Console says when that happens.
 - **`full`**: the component fills the Stage, for pages and layouts.
 

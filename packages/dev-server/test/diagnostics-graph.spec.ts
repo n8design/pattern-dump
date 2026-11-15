@@ -154,7 +154,7 @@ describe("pd audit — report formats (--format md|text|json)", () => {
     expect(head).toMatchInlineSnapshot(`
       "# Diagnostics audit
 
-      **2 machine-detectable static defects across 1 of 2 components — 50% clean of static machine-detectable defects.**
+      **2 machine-detectable static defects across 1 of 2 components, 50% clean of static machine-detectable defects.**
 
       Render outcomes: 1 ok, 1 blank, 0 error.
 
@@ -169,7 +169,7 @@ describe("pd audit — report formats (--format md|text|json)", () => {
 
       ### atoms/button  _(render: ok)_
       - \`axe:label\` **[SUBJECT-DEBT]** no label
-      - \`html-validate:element-permitted-content\` **[SUBJECT-DEBT]** bad nesting — \`button > div\`
+      - \`html-validate:element-permitted-content\` **[SUBJECT-DEBT]** bad nesting · \`button > div\`
 
       ### atoms/field  _(render: blank)_
       - (no defects; render outcome noted above)
@@ -203,15 +203,15 @@ describe("pd audit — report formats (--format md|text|json)", () => {
   it("text: same information, Markdown stripped; headline and scope included", () => {
     const txt = formatAudit(FIXTURE, "text");
     // headline verbatim (plain, no ** emphasis)
-    expect(txt).toContain("2 machine-detectable static defects across 1 of 2 components — 50% clean of static machine-detectable defects.");
+    expect(txt).toContain("2 machine-detectable static defects across 1 of 2 components, 50% clean of static machine-detectable defects.");
     // markdown stripped: no table pipes, no backticked rule ids
     expect(txt).not.toContain("| rule |");
     expect(txt).not.toMatch(/`[a-z-]+:[a-z-]+`/);
     // rule rollup + per-component content present in plain form (sort tiebreak: axe before html-validate)
-    expect(txt).toContain("axe:label — components 1, occurrences 1 [SUBJECT-DEBT]");
+    expect(txt).toContain("axe:label · components 1, occurrences 1 [SUBJECT-DEBT]");
     expect(txt).toContain("atoms/button (render: ok)");
     expect(txt).toContain("axe:label [SUBJECT-DEBT] no label");
-    expect(txt).toContain("html-validate:element-permitted-content [SUBJECT-DEBT] bad nesting — button > div");
+    expect(txt).toContain("html-validate:element-permitted-content [SUBJECT-DEBT] bad nesting · button > div");
     expect(txt).toContain("atoms/field (render: blank)");
     // The scope in plain form, so a text reader gets the caveat too — without Markdown syntax.
     expect(txt).toContain("\nScope\n");
@@ -224,7 +224,7 @@ describe("pd audit — report formats (--format md|text|json)", () => {
     const json = formatAudit(FIXTURE, "json");
     const parsed = JSON.parse(json); // must parse — no human meta mixed into the report string
     // the caveat rides alongside the number: a CI consumer never reads a bare count
-    expect(parsed.headline).toBe("2 machine-detectable static defects across 1 of 2 components — 50% clean of static machine-detectable defects.");
+    expect(parsed.headline).toBe("2 machine-detectable static defects across 1 of 2 components, 50% clean of static machine-detectable defects.");
     expect(parsed.scope).toEqual(AUDIT_SCOPE);
     expect(parsed.scope.note).toBe(SCOPE_NOTE);
     // numbers as data, not strings — the smell the refactor fixed

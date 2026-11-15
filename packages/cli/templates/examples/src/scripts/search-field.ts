@@ -1,6 +1,6 @@
 // Behaviour for molecules/search-field, loaded by `requireScript: [search-field]` in its .md.
 //
-// Runs as a module after the markup, in every preview that shows a search field — including pages
+// Runs as a module after the markup, in every preview that shows a search field, including pages
 // that include one. Submitting would otherwise navigate the preview away; instead the query is
 // announced in the field's status line.
 

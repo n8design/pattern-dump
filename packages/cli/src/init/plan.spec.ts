@@ -103,7 +103,7 @@ describe("planInit — the storefront", () => {
     const paths = p.writes.map(w => w.path);
     for (const s of SKIN) expect(paths, s).not.toContain(s);
     expect(paths).toEqual(expect.arrayContaining(REST));
-    expect(p.skipped).toEqual([{ path: "src/patterns/partials/base/base.hbs", reason: "already exists — the storefront skin (5 files in src/patterns/layouts, "
+    expect(p.skipped).toEqual([{ path: "src/patterns/partials/base/base.hbs", reason: "already exists: the storefront skin (5 files in src/patterns/layouts, "
       + "src/patterns/partials and their styles) was left out as a whole, so it isn't mixed with the skin already here" }]);
   });
 
@@ -117,7 +117,7 @@ describe("planInit — the storefront", () => {
     const p = plan({ storefront: true }, existing(["pages/index.md"]));
     expect(p.writes.map(w => w.path)).toEqual(expect.arrayContaining([...SKIN, ...REST.slice(1)]));
     expect(p.writes.map(w => w.path)).not.toContain("pages/index.md");
-    expect(p.skipped).toEqual([{ path: "pages/index.md", reason: "already exists — left untouched" }]);
+    expect(p.skipped).toEqual([{ path: "pages/index.md", reason: "already exists, left untouched" }]);
   });
 
   it("adds pd:build beside a project's own build script", () => {
@@ -171,7 +171,7 @@ describe("planInit — an existing folder", () => {
     expect(JSON.parse(p.packageJson.content).scripts).toEqual({
       dev: "vite", "pd:dev": "pd dev", audit: "pd audit", typecheck: "tsc --noEmit", "build:scripts": "tsc",
     });
-    expect(p.packageJson.notes).toEqual(['script "dev" already exists — added "pd:dev" instead']);
+    expect(p.packageJson.notes).toEqual(['script "dev" already exists: added "pd:dev" instead']);
   });
 
   it("leaves an existing PD dependency at its version", () => {

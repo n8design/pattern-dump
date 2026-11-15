@@ -81,7 +81,7 @@ export function checkNavigations(
     if (!names.listed.includes(name)) {
       const near = suggest(name, names.listed);
       problems.push(names.listed.length
-        ? `${AT}.${name} is not a navigation ${owner} lists (it lists ${names.listed.map(n => `"${n}"`).join(", ")})${near ? ` — did you mean "${near}"?` : ""}`
+        ? `${AT}.${name} is not a navigation ${owner} lists (it lists ${names.listed.map(n => `"${n}"`).join(", ")})${near ? `: did you mean "${near}"?` : ""}`
         : `${AT}.${name} is set, but ${owner} lists no navigations, so no layout can show it`);
       continue;
     }
@@ -106,7 +106,7 @@ function checkEntry(entry: unknown, at: string, pagePaths: ReadonlySet<string>):
   for (const key of Object.keys(entry)) {
     if (KEYS.includes(key)) continue;
     const near = suggest(key, KEYS);
-    problems.push(`${at}: "${key}" is not a key of a navigation entry${near ? ` — did you mean "${near}"?` : ""}`);
+    problems.push(`${at}: "${key}" is not a key of a navigation entry${near ? `: did you mean "${near}"?` : ""}`);
   }
   const forms = (["page", "href", "children"] as const).filter(k => Object.hasOwn(entry, k));
   if (forms.length !== 1) {
@@ -123,7 +123,7 @@ function checkEntry(entry: unknown, at: string, pagePaths: ReadonlySet<string>):
     if (typeof page !== "string") problems.push(`${at}.page must be the path of a page in the pages folder, such as "about.md" (got ${show(page)})`);
     else if (!pagePaths.has(page)) {
       const near = suggest(page, [...pagePaths]);
-      problems.push(`${at}: "${page}" is not a page in the pages folder${near ? ` — did you mean "${near}"?` : ""}`);
+      problems.push(`${at}: "${page}" is not a page in the pages folder${near ? `: did you mean "${near}"?` : ""}`);
     }
   } else {
     if (label === undefined) problems.push(`${at} needs a "label"`);

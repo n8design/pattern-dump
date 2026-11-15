@@ -24,3 +24,9 @@ example looks.
 
 Every layout fills the main region of the base partial, which has the id `main`. This heading would
 have the same anchor, so it gets `main-1`.
+
+To start the bench's own server:
+
+```bash
+npm run dev --workspace storefront-bench
+```

@@ -105,27 +105,27 @@ export async function buildStaticSite(
     return rel === "" || (!rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-zA-Z]:/.test(rel));
   };
   const project = resolve(root);
-  if (inside(project, outDir)) throw new Error(`pd build: --out ${outDir} would contain the project itself — choose a folder inside or beside it, like ./dist`);
+  if (inside(project, outDir)) throw new Error(`pd build: --out ${outDir} would contain the project itself: choose a folder inside or beside it, like ./dist`);
   for (const source of [cfg.patternsDir, cfg.stylesDir, ...cfg.themeDirs, ...cfg.assetRoots]) {
     if (inside(outDir, source) || inside(source, outDir)) {
-      throw new Error(`pd build: --out ${outDir} overlaps ${source}, which Pattern Dump reads — choose another folder`);
+      throw new Error(`pd build: --out ${outDir} overlaps ${source}, which Pattern Dump reads: choose another folder`);
     }
   }
   // The storefront's own output root: the same rules, and apart from the workbench's.
   const storefront = cfg.storefront;
   if (storefront) {
     const sfOut = storefront.outDir;
-    if (inside(project, sfOut)) throw new Error(`pd build: storefront.outDir ${sfOut} would contain the project itself — choose a folder inside or beside it`);
+    if (inside(project, sfOut)) throw new Error(`pd build: storefront.outDir ${sfOut} would contain the project itself: choose a folder inside or beside it`);
     for (const source of [cfg.patternsDir, cfg.stylesDir, storefront.pagesDir, ...cfg.themeDirs, ...cfg.assetRoots]) {
       if (inside(sfOut, source) || inside(source, sfOut)) {
-        throw new Error(`pd build: storefront.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads — choose another folder`);
+        throw new Error(`pd build: storefront.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads: choose another folder`);
       }
     }
     if (inside(sfOut, outDir) || inside(outDir, sfOut)) {
-      throw new Error(`pd build: storefront.outDir ${sfOut} and --out ${outDir} overlap — the storefront and the workbench each need a folder of their own`);
+      throw new Error(`pd build: storefront.outDir ${sfOut} and --out ${outDir} overlap: the storefront and the workbench each need a folder of their own`);
     }
     if (!storefront.workbenchUrl) {
-      throw new Error("pd build: storefront.workbenchUrl is required to build the storefront — its pages link into the workbench at that address");
+      throw new Error("pd build: storefront.workbenchUrl is required to build the storefront: its pages link into the workbench at that address");
     }
     // A workbench published on the storefront's own host is linked at its path, so it must be built for that
     // path: the base path this build uses (--base, else build.basePath, else /).

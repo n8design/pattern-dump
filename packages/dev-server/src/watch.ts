@@ -142,8 +142,8 @@ export class WatchStartError extends Error {
 export function describeWatchError(e: unknown): string {
   const err = e as NodeJS.ErrnoException;
   const what = `file watching failed${err?.path ? ` on ${err.path}` : ""}: ${err?.message ?? String(e)}`;
-  if (err?.code === "ENOSPC") return `${what} — the system's limit on watched files is reached (on Linux, raise fs.inotify.max_user_watches)`;
-  if (err?.code === "EMFILE") return `${what} — too many open files (raise the open-file limit, ulimit -n)`;
+  if (err?.code === "ENOSPC") return `${what}: the system's limit on watched files is reached (on Linux, raise fs.inotify.max_user_watches)`;
+  if (err?.code === "EMFILE") return `${what}: too many open files (raise the open-file limit, ulimit -n)`;
   return what;
 }
 
@@ -749,7 +749,7 @@ async function patchStyles(filePath: string): Promise<boolean> {
     hmr.push({
       type: "error",
       scope: "build",
-      message: `SCSS ${basename(file)} — ${message.split("\n")[0]}`,
+      message: `SCSS ${basename(file)}: ${message.split("\n")[0]}`,
     });
   }
   const discovery = await currentDiscovery(state, patternRoots);
@@ -831,7 +831,7 @@ async function restyleAll(
   // A file that failed to compile is skipped by buildAllStyleData, which with one entry bundle would
   // empty every component's CSS. Keep the last good CSS on screen; the error is already on the Console.
   if (hadCompileErrors) {
-    console.warn(`[dev-server] CSS not updated — compile errors (recompiled: ${names})`);
+    console.warn(`[dev-server] CSS not updated: compile errors (recompiled: ${names})`);
     return false;
   }
   // A request's full build in flight started before this change: it is never installed over this one.

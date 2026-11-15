@@ -33,7 +33,7 @@ export function describeBindError(
     : `pd dev --port ${ports.http + 100}   (live reload then uses ${ports.http + 101})`;
   return new PortInUseError(port,
     `Port ${port} is already in use, so ${what} cannot start. ` +
-    `Another \`pd dev\` is probably still running — stop it, or start this one on other ports:\n` +
+    `Another \`pd dev\` is probably still running: stop it, or start this one on other ports:\n` +
     `  ${advice}`,
   );
 }

@@ -144,7 +144,7 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
     const md = "---\ntitle: T\nlayout: <img src=x onerror=alert(1)>\n---\n";
     const page = await build("/", await pagesOf({ "index.md": md }));
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`index.md:3: layout "<img src=x onerror=alert(1)>" is not a layout — the layouts are "article", "doc", "home", "listing", "page"`]);
+    expect(page.problems).toEqual([`index.md:3: layout "<img src=x onerror=alert(1)>" is not a layout: the layouts are "article", "doc", "home", "listing", "page"`]);
     expect(page.html).not.toContain("<img src=x");
     expect(page.html).toContain(`<li>index.md:3: layout &quot;&lt;img src=x onerror=alert(1)&gt;&quot; is not a layout`.replace(/&quot;/g, `"`));
   });

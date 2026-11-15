@@ -105,9 +105,9 @@ describe("a tag tree as located values", () => {
 
   it("names an unknown component, a child that does not belong, and content a tag does not take", async () => {
     expect((await placed(`<pd-molecules-slidr label="x"></pd-molecules-slidr>\n`)).problems)
-      .toEqual([`5:1 <pd-molecules-slidr>: there is no component "molecules-slidr" — did you mean <pd-molecules-slider>?`]);
+      .toEqual([`5:1 <pd-molecules-slidr>: there is no component "molecules-slidr": did you mean <pd-molecules-slider>?`]);
     expect((await placed(`<pd-molecules-slider label="x">\n  <pd-atoms-note>hi</pd-atoms-note>\n</pd-molecules-slider>\n`)).problems)
-      .toEqual([`6:3 <pd-atoms-note> cannot be placed inside <pd-molecules-slider> — it takes <pd-atoms-slide>`]);
+      .toEqual([`6:3 <pd-atoms-note> cannot be placed inside <pd-molecules-slider>: it takes <pd-atoms-slide>`]);
     expect((await placed(`<pd-molecules-slider label="x">stray words</pd-molecules-slider>\n`)).problems)
       .toEqual([`5:32 <pd-molecules-slider> takes no content text, found "stray words"`]);
   });

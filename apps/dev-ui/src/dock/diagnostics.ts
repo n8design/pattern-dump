@@ -53,7 +53,7 @@ export function renderDiagnostics(diagnostics: Diagnostic[]): void {
     }
     const ruleSpan = document.createElement("span");
     ruleSpan.className = "pd-a11y-rule";
-    ruleSpan.textContent = ` — ${d.ruleId}`;
+    ruleSpan.textContent = ` · ${d.ruleId}`;
     li.appendChild(ruleSpan);
     if (d.target) {
       const targetSpan = document.createElement("span");

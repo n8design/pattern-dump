@@ -36,15 +36,15 @@ const ADDED: Record<string, string> = {
 };
 const CASES: Record<string, [body: string, problem: string]> = {
   "case-1": [`<pd-molecules-slidr label="x"></pd-molecules-slidr>\n`,
-    `case-1.md:5:1: <pd-molecules-slidr>: there is no component "molecules-slidr" — did you mean <pd-molecules-slider>?`],
+    `case-1.md:5:1: <pd-molecules-slidr>: there is no component "molecules-slidr": did you mean <pd-molecules-slider>?`],
   "case-2": [`<pd-molecules-slider label="x" per-veiw="2">\n  <pd-atoms-slide image="a.jpg" alt="a"></pd-atoms-slide>\n</pd-molecules-slider>\n`,
-    `case-2.md:5:32: <pd-molecules-slider>: "per-veiw" is not declared by molecules/slider — did you mean "per-view"?`],
+    `case-2.md:5:32: <pd-molecules-slider>: "per-veiw" is not declared by molecules/slider: did you mean "per-view"?`],
   "case-3": [`<pd-molecules-slider label="x" per-view="two">\n  <pd-atoms-slide image="a.jpg" alt="a"></pd-atoms-slide>\n</pd-molecules-slider>\n`,
     `case-3.md:5:32: <pd-molecules-slider>.per-view must be a whole number (got "two")`],
   "case-4": [`<pd-molecules-slider label="x">\n  <pd-atoms-slide image="a.jpg">Caption</pd-atoms-slide>\n</pd-molecules-slider>\n`,
     `case-4.md:6:3: <pd-molecules-slider>.<pd-atoms-slide>[1]: "alt" is required by atoms/slide`],
   "case-5": [`<pd-molecules-slider label="x">\n  <pd-atoms-slide image="a.jpg" alt="a"></pd-atoms-slide>\n  <pd-molecules-slider label="inner"></pd-molecules-slider>\n</pd-molecules-slider>\n`,
-    `case-5.md:7:3: <pd-molecules-slider> cannot be placed inside <pd-molecules-slider> — it takes <pd-atoms-slide>`],
+    `case-5.md:7:3: <pd-molecules-slider> cannot be placed inside <pd-molecules-slider>: it takes <pd-atoms-slide>`],
   "case-6": [`<pd-atoms-badge label="New"></pd-atoms-badge>\n`,
     `case-6.md:5:1: atoms/badge cannot be placed: its schema (src/patterns/atoms/badge/badge.schema.json, #/properties/id): `
       + `"id" is the name of a registered helper, so {{id}} would call the helper, not read this field`],

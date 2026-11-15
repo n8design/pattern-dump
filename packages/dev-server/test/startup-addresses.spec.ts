@@ -43,7 +43,7 @@ describe("pd dev's startup addresses", () => {
       `[dev-server] Website:   http://docs.localhost:${port}/`,
       `[dev-server] Workbench: http://pd.localhost:${port}/`,
     ]);
-    expect(lines.at(-1)).toMatch(/^\[dev-server\] Ready in \d+ms — \d+ components$/);
+    expect(lines.at(-1)).toMatch(/^\[dev-server\] Ready in \d+ms, \d+ components$/);
   }, 60_000);
 
   it("without a storefront: one workbench line, on localhost", async () => {

@@ -47,13 +47,13 @@ export function updateReadout(): void {
     : "Component preview";
   try {
     const cw = dom.iframe.contentWindow;
-    if (!cw) { dom.vpReadout.textContent = "— × —"; return; }
+    if (!cw) { dom.vpReadout.textContent = "(no size)"; return; }
     const w = cw.innerWidth;
     const h = cw.innerHeight;
     dom.vpReadout.textContent = `${w} × ${h}`;
     dom.vpReadout.setAttribute("aria-label", `Viewport ${w} by ${h} pixels`);
   } catch {
-    dom.vpReadout.textContent = "— × —";
+    dom.vpReadout.textContent = "(no size)";
   }
   syncMarks();
 }

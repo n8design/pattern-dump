@@ -5,7 +5,7 @@
 // so the preview is themed either way. Anything that DISPLAYS the theme must use activeThemeName();
 // anything that SENDS it to the server keeps passing the raw stored value, so "" keeps meaning
 // "follow the default" rather than pinning a name. Getting that backwards is exactly how the picker
-// came to report "— no theme —" over a document that was plainly themed.
+// came to report "(no theme)" over a document that was plainly themed.
 //
 // The radio inputs are sr-only; the chip <label> is the real affordance.
 //
@@ -69,7 +69,7 @@ export function populateThemePicker(fetchedThemes: ThemeSummary[], onThemeApplie
   // The EFFECTIVE theme, not the stored one. store.local.theme is "" until the user picks
   // explicitly, and "" means "follow the project default" — the server then falls back to its
   // configured defaultTheme, so the preview is themed regardless. Reporting the raw stored value
-  // made the picker read "— no theme —" over a document that was plainly themed.
+  // made the picker read "(no theme)" over a document that was plainly themed.
   //
   // Deliberately NOT seeding store.local.theme with the default: keeping it "" is what lets a later
   // change to the project's configured default carry through to anyone who never chose a theme. The
@@ -88,7 +88,7 @@ export function populateThemePicker(fetchedThemes: ThemeSummary[], onThemeApplie
   dom.themePickerSwatch.innerHTML = "";
   dom.themePickerSwatch.appendChild(buildSwatchStrip(activeTheme?.tokens, slotsOf(activeTheme)));
   // Still reachable — and then genuinely true — when the project configures no themes at all.
-  dom.themePickerCurrentName.textContent = currentTheme || "— no theme —";
+  dom.themePickerCurrentName.textContent = currentTheme || "(no theme)";
   dom.themePickerReadout.textContent = currentTheme || "";
 
   dom.themePickerList.innerHTML = "";

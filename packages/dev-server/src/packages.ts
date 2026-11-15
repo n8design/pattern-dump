@@ -96,7 +96,7 @@ export function loadPatternPackages(references: PackageReference[] | undefined, 
     const via = findPackageDir(name, from);
     if (!via) {
       if (!direct) return; // an uninstalled peer is npm's concern, not a PD startup error
-      throw new Error(`pattern package "${name}" is not installed — run: npm install --save-dev ${name}`);
+      throw new Error(`pattern package "${name}" is not installed. Run: npm install --save-dev ${name}`);
     }
     const dir = realpathSync(via);
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as PackageJson;

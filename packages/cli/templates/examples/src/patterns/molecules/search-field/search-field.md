@@ -14,7 +14,7 @@ Composes two components:
 Both edges appear in the Inspector's **Relationships** tab.
 
 **Behaviour** comes from `src/scripts/search-field.ts`, loaded by `requireScript: [search-field]` in
-this file's frontmatter. Every preview that shows a search field loads it — the example page too.
+this file's frontmatter. Every preview that shows a search field loads it, the example page too.
 Submit the form: the query appears in the status line instead of the preview navigating away.
 
 ```pattern molecules/search-field

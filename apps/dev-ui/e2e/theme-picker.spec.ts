@@ -16,7 +16,7 @@
 //      but not clickable, so the user-facing affordance is the chip <label>. Playwright's .check()
 //      cannot act on them; clicking the label is both the honest path and the working one.
 //   2. store.local.theme defaults to "" (store.ts:161), so on a FRESH load no radio is checked and
-//      the summary reads "— no theme —" -- even though test-bench's config declares default: light.
+//      the summary reads "(no theme)" -- even though test-bench's config declares default: light.
 //      The picker reflects shell state, not the project's default theme.
 
 import { test, expect } from "@playwright/test";
@@ -43,7 +43,7 @@ test.describe("Nav Rail — theme picker", () => {
 
     // The preview is ALWAYS themed: with no ?theme= the server falls back to its configured default
     // (routes.ts:303-311), so the body carries data-theme="light". The picker used to read
-    // "— no theme —" with nothing checked, describing shell state while claiming to describe the
+    // "(no theme)" with nothing checked, describing shell state while claiming to describe the
     // document. It now reports what the user is looking at.
     await expect(page.locator(".theme-picker-current-name")).toHaveText("light");
     await expect(page.locator(`${radios}:checked`)).toHaveValue("light");

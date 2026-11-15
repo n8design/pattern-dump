@@ -48,14 +48,14 @@ test.describe("static build — built without the audit (--no-audit)", () => {
 });
 
 test.describe("static build — the browser tab", () => {
-  test("names the brand in every shell page, and the component in front on a component route", async ({ page, request }) => {
+  test("names the brand in every shell page, and the component or folder in front on its route", async ({ page, request }) => {
     expect(await (await request.get("atoms/button")).text()).toContain("<title>Test bench</title>");
     await page.goto("atoms/button");
     await page.waitForSelector("#preview-frame[srcdoc]");
     await expect(page).toHaveTitle("Button · Test bench");
     await page.goto("atoms");
     await expect(page.locator("#category-overview")).toBeVisible();
-    await expect(page).toHaveTitle("Test bench");
+    await expect(page).toHaveTitle("Atoms · Test bench");
   });
 });
 

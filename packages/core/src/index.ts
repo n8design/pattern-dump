@@ -165,8 +165,8 @@ export async function runExport(root: string, configPath?: string, outDir?: stri
   const { files: includerFiles, rewrites } = await writeThreadedIncluders(plan.threaded, patternsDir, sink);
 
   console.log(`[pd export] patterns: ${patternsDir}`);
-  console.log(`[pd export] sink: ${sink}${outDir ? "" : " (default — pass --out <dir> for a durable target)"}`);
-  console.log(`[pd export] ${plan.collapse.length} family(ies) collapse (leaf, shape (a)); ${plan.threaded.length} threaded (include-consumed shape (a) — slice 2); ${plan.deferred.length} deferred (§7 hazard, not shape (a) — slice 3 / shape-(c) track); ${plan.skipped.length} skipped (leaf but not lossless shape (a)).`);
+  console.log(`[pd export] sink: ${sink}${outDir ? "" : " (default: pass --out <dir> for a durable target)"}`);
+  console.log(`[pd export] ${plan.collapse.length} family(ies) collapse (leaf, shape (a)); ${plan.threaded.length} threaded (include-consumed shape (a), slice 2); ${plan.deferred.length} deferred (§7 hazard, not shape (a): slice 3 / shape-(c) track); ${plan.skipped.length} skipped (leaf but not lossless shape (a)).`);
   console.log(`[pd export] wrote ${files.length} collapsed file(s) + ${includerFiles.length} rewritten includer(s) (${rewrites} include site(s) threaded):`);
   for (const f of files) console.log(`    ${f}`);
   for (const f of includerFiles) console.log(`    ${f}  (includer, rewritten)`);
@@ -204,7 +204,7 @@ export async function runExport(root: string, configPath?: string, outDir?: stri
     console.log(`\n[pd export] REWRITE MAP (${rewriteMap.size} flat handle(s) → collapsed base + threaded modifier):`);
     for (const [oldHandle, { baseHandle, modifier }] of [...rewriteMap].sort((a, b) => a[0].localeCompare(b[0]))) {
       const sites = [...(sitesByHandle.get(oldHandle) ?? [])].sort();
-      const sitesNote = sites.length ? `  used-by: [${sites.join(", ")}]` : "  (no include site — free member)";
+      const sitesNote = sites.length ? `  used-by: [${sites.join(", ")}]` : "  (no include site: free member)";
       console.log(`    {{> ${oldHandle}}}  →  {{> ${baseHandle} modifier="${modifier}"}}${sitesNote}`);
     }
   }

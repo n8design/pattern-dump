@@ -48,7 +48,7 @@ export async function buildVariantsGallery(): Promise<void> {
     fig.className = "preview gallery-item";
 
     const isDefault = v.variantParam === undefined;
-    const labelText = isDefault ? session.current.title : `${session.current.title} — ${v.name}`;
+    const labelText = isDefault ? session.current.title : `${session.current.title} · ${v.name}`;
     const labelHref = isDefault
       ? `/${session.current.id}${currentVpParam()}`
       : `/${session.current.id}${currentVpParam()}#${encodeURIComponent(v.name)}`;

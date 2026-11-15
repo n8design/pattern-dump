@@ -74,7 +74,7 @@ export function planInit(
 ): PlanResult {
   const existingConfig = CONFIG_FILES.find(f => existing.exists(f));
   if (existingConfig) {
-    return { ok: false, reason: `${existingConfig} already exists — this folder is already a Pattern Dump project` };
+    return { ok: false, reason: `${existingConfig} already exists: this folder is already a Pattern Dump project` };
   }
 
   // A placeholder stands on a line of its own; without a storefront the line goes.
@@ -94,7 +94,7 @@ export function planInit(
   const skin = storefront.filter(f => isSkin(renamed(f.path)));
   const skinTaken = skin.map(f => renamed(f.path)).find(p => existing.exists(p));
   if (skinTaken) {
-    skipped.push({ path: skinTaken, reason: `already exists — the storefront skin (${skin.length} files in src/patterns/layouts, `
+    skipped.push({ path: skinTaken, reason: `already exists: the storefront skin (${skin.length} files in src/patterns/layouts, `
       + `src/patterns/partials and their styles) was left out as a whole, so it isn't mixed with the skin already here` });
   }
   const files = [...templates.base, ...(answers.examples ? templates.examples : []),
@@ -102,7 +102,7 @@ export function planInit(
   for (const file of files) {
     const path = renamed(file.path);
     if (existing.exists(path)) {
-      skipped.push({ path, reason: "already exists — left untouched" });
+      skipped.push({ path, reason: "already exists, left untouched" });
       continue;
     }
     writes.push({ path, content: substitute(file.content) });
@@ -145,7 +145,7 @@ function mergePackageJson(
       // Never replace the project's own script; add ours beside it.
       const alt = `pd:${name}`;
       if (scripts[alt] === undefined) scripts[alt] = command;
-      notes.push(`script "${name}" already exists — added "${alt}" instead`);
+      notes.push(`script "${name}" already exists: added "${alt}" instead`);
     }
   }
   pkg.scripts = scripts;
@@ -153,9 +153,9 @@ function mergePackageJson(
   const deps = pkg.dependencies as Record<string, string> | undefined;
   const devDeps = { ...(pkg.devDependencies as Record<string, string> | undefined) };
   if (deps?.[packageName] !== undefined) {
-    notes.push(`${packageName} is already a dependency — left as is`);
+    notes.push(`${packageName} is already a dependency, left as is`);
   } else if (devDeps[packageName] !== undefined && devDeps[packageName] !== answers.dependency) {
-    notes.push(`${packageName} is already a devDependency (${devDeps[packageName]}) — left as is`);
+    notes.push(`${packageName} is already a devDependency (${devDeps[packageName]}), left as is`);
   } else {
     devDeps[packageName] = answers.dependency;
   }
@@ -164,7 +164,7 @@ function mergePackageJson(
   if (existingTs === undefined) {
     devDeps.typescript = TYPESCRIPT_RANGE;
   } else if (existingTs !== TYPESCRIPT_RANGE) {
-    notes.push(`typescript is already a dependency (${existingTs}) — left as is; the starter scripts expect ${TYPESCRIPT_RANGE}`);
+    notes.push(`typescript is already a dependency (${existingTs}), left as is; the starter scripts expect ${TYPESCRIPT_RANGE}`);
   }
   pkg.devDependencies = devDeps;
 

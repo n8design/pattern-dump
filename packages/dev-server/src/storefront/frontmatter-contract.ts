@@ -128,8 +128,8 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   if (!entry || Array.isArray(rawLayout)) {
     if (!Array.isArray(rawLayout)) {
       at("layout", known.length
-        ? `layout "${layout}" is not a layout — the layouts are ${known.map(n => `"${n}"`).join(", ")}`
-        : `layout "${layout}" is not a layout — the project has no layouts (components in a layouts/ folder of its patterns)`);
+        ? `layout "${layout}" is not a layout: the layouts are ${known.map(n => `"${n}"`).join(", ")}`
+        : `layout "${layout}" is not a layout: the project has no layouts (components in a layouts/ folder of its patterns)`);
     }
     return { layoutId, values: {}, build: checkBuildKeys(values, page.path, at), problems };
   }
@@ -161,7 +161,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     if (!prop) {
       if (!hasSchema) { at(key, `"${key}" is not declared by layout "${layout}", which has no schema`); continue; }
       const near = suggest(key, [...Object.keys(declared), ...RESERVED_KEYS]);
-      at(key, `"${key}" is not declared by layout "${layout}"${near ? ` — did you mean "${near}"?` : ""}`);
+      at(key, `"${key}" is not declared by layout "${layout}"${near ? `: did you mean "${near}"?` : ""}`);
       continue;
     }
     const r = checkDeclared(prop, value, "frontmatter");

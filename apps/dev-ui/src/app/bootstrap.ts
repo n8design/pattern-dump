@@ -213,7 +213,7 @@ export async function init(): Promise<void> {
     const built = new Date(runtime.builtAt).toLocaleString();
     dom.railStatus.dataset.state = "static";
     dom.railStatusLabel.textContent = `Static build · ${built}`;
-    renderConsole(`Static build of ${runtime.builtAt} (pattern-dump ${runtime.pdVersion}) — read-only snapshot, no live reload.`);
+    renderConsole(`Static build of ${runtime.builtAt} (pattern-dump ${runtime.pdVersion}): a read-only snapshot, no live reload.`);
   } else {
     connectHmr();
   }

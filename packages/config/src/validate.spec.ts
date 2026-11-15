@@ -54,11 +54,11 @@ describe("configProblems", () => {
   it("names a missing required key, and the typo that probably meant it", () => {
     const { outDir, ...rest } = valid;
     expect(configProblems({ ...rest, outdir: outDir }))
-      .toEqual([`missing required "outDir" (found "outdir" — did you mean "outDir"?)`]);
+      .toEqual([`missing required "outDir" (found "outdir": did you mean "outDir"?)`]);
     expect(configProblems({ ...rest })).toEqual([`missing required "outDir"`]);
     // styles is optional, so a typo of it is an unknown key.
     const { styles, ...noStyles } = valid;
-    expect(configProblems({ ...noStyles, style: styles })).toEqual([`unknown key "style" — did you mean "styles"?`]);
+    expect(configProblems({ ...noStyles, style: styles })).toEqual([`unknown key "style": did you mean "styles"?`]);
   });
 
   it("sourceDir, patternsDir and styles are optional: a site whose patterns all come from packages names none", () => {
@@ -81,9 +81,9 @@ describe("configProblems", () => {
       `unknown key "dataDirectory"`,
       `unknown key "colour"`,
     ]);
-    expect(configProblems({ ...valid, overview: true })).toEqual([`unknown key "overview" — did you mean "overviews"?`]);
+    expect(configProblems({ ...valid, overview: true })).toEqual([`unknown key "overview": did you mean "overviews"?`]);
     expect(configProblems({ ...valid, styles: { ...valid.styles, entries: "x" } }))
-      .toEqual([`unknown key "styles.entries" — did you mean "styles.entry"?`]);
+      .toEqual([`unknown key "styles.entries": did you mean "styles.entry"?`]);
   });
 
   it("reports wrong value types by path", () => {
@@ -106,9 +106,9 @@ describe("configProblems", () => {
 
   it("rejects the strategies that are not implemented, instead of ignoring them", () => {
     expect(configProblems({ ...valid, styles: { ...valid.styles, strategy: "co-located" } }))
-      .toEqual([`"styles.strategy": "co-located" is not supported yet — use "parallel", or leave it out`]);
+      .toEqual([`"styles.strategy": "co-located" is not supported yet: use "parallel", or leave it out`]);
     expect(configProblems({ ...valid, assets: { strategy: "component-relative" } }))
-      .toEqual([`"assets.strategy": "component-relative" is not supported yet — use "central", or leave it out`]);
+      .toEqual([`"assets.strategy": "component-relative" is not supported yet: use "central", or leave it out`]);
     expect(configProblems({ ...valid, styles: { ...valid.styles, strategy: "flat" } }))
       .toEqual([`"styles.strategy" must be "parallel"`]);
   });
@@ -127,7 +127,7 @@ describe("configProblems — storefront", () => {
   it("names a missing required key, and the typo that probably meant it", () => {
     expect(storefront({ outDir: "./www" })).toEqual([`missing required "storefront.pagesDir"`]);
     expect(storefront({ pageDir: "./pages", outDir: "./www" }))
-      .toEqual([`missing required "storefront.pagesDir" (found "storefront.pageDir" — did you mean "storefront.pagesDir"?)`]);
+      .toEqual([`missing required "storefront.pagesDir" (found "storefront.pageDir": did you mean "storefront.pagesDir"?)`]);
   });
 
   it("has no layouts key: layouts are the fixed layouts/ folder of the patterns", () => {
@@ -216,9 +216,9 @@ describe("configProblems — storefront", () => {
   // storefront.pagesDir, patternsDir ("./src/patterns" in the fixture) and storefront.outDir must be
   // pairwise disjoint: for each pair, the same folder or either one inside the other is a problem.
   const same = (a: string, va: string, b: string, vb: string) =>
-    `"${a}" ("${va}") and "${b}" ("${vb}") are the same folder — each needs a folder of its own`;
+    `"${a}" ("${va}") and "${b}" ("${vb}") are the same folder: each needs a folder of its own`;
   const nested = (a: string, va: string, b: string, vb: string) =>
-    `"${a}" ("${va}") is inside "${b}" ("${vb}") — each needs a folder of its own, outside the other`;
+    `"${a}" ("${va}") is inside "${b}" ("${vb}"): each needs a folder of its own, outside the other`;
   const P = "storefront.pagesDir", T = "patternsDir", O = "storefront.outDir", PATTERNS = "./src/patterns";
 
   const cases: Array<[label: string, pagesDir: string, outDir: string, problem: string]> = [

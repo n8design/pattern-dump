@@ -117,13 +117,13 @@ function checkObject(value: Record<string, unknown>, shape: Shape, required: rea
     if (value[key] !== undefined) continue;
     const near = unknown.find(u => suggest(u, [key]) === key);
     problems.push(near
-      ? `missing required "${at}${key}" (found "${at}${near}" — did you mean "${at}${key}"?)`
+      ? `missing required "${at}${key}" (found "${at}${near}": did you mean "${at}${key}"?)`
       : `missing required "${at}${key}"`);
   }
   for (const key of unknown) {
     const near = suggest(key, known);
     if (near && required.includes(near) && value[near] === undefined) continue; // reported above
-    problems.push(`unknown key "${at}${key}"${near ? ` — did you mean "${at}${near}"?` : ""}`);
+    problems.push(`unknown key "${at}${key}"${near ? `: did you mean "${at}${near}"?` : ""}`);
   }
   for (const key of known) {
     if (value[key] !== undefined) checkValue(value[key], shape[key], `${at}${key}`, problems);
@@ -226,7 +226,7 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
   }
   if ("values" in rule) {
     if (typeof value === "string" && rule.unsupported?.includes(value)) {
-      problems.push(`"${at}": "${value}" is not supported yet — use ${rule.values.map(v => `"${v}"`).join(" or ")}, or leave it out`);
+      problems.push(`"${at}": "${value}" is not supported yet: use ${rule.values.map(v => `"${v}"`).join(" or ")}, or leave it out`);
     } else if (typeof value !== "string" || !rule.values.includes(value)) {
       fail(rule.values.map(v => `"${v}"`).join(" or "));
     }
@@ -267,9 +267,9 @@ function checkRelations(raw: Record<string, unknown>, problems: string[]): void 
       if (typeof va !== "string" || typeof vb !== "string") continue;
       const pa = resolve(root, va), pb = resolve(root, vb);
       const label = (name: string, value: string) => `"${name}" ("${value}")`;
-      if (pa === pb) problems.push(`${label(a, va)} and ${label(b, vb)} are the same folder — each needs a folder of its own`);
-      else if (inside(pa, pb)) problems.push(`${label(a, va)} is inside ${label(b, vb)} — each needs a folder of its own, outside the other`);
-      else if (inside(pb, pa)) problems.push(`${label(b, vb)} is inside ${label(a, va)} — each needs a folder of its own, outside the other`);
+      if (pa === pb) problems.push(`${label(a, va)} and ${label(b, vb)} are the same folder: each needs a folder of its own`);
+      else if (inside(pa, pb)) problems.push(`${label(a, va)} is inside ${label(b, vb)}: each needs a folder of its own, outside the other`);
+      else if (inside(pb, pa)) problems.push(`${label(b, vb)} is inside ${label(a, va)}: each needs a folder of its own, outside the other`);
     }
   }
 }

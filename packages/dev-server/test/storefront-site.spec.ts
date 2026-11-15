@@ -111,7 +111,7 @@ describe("checkSite — values partials/base declares", () => {
     expect(vp(await checkSite({ titel: "Docs", colour: "red" }, maps.full))).toEqual({
       values: {},
       problems: [
-        `storefront.site.titel is not declared by partials/base — did you mean "title"?`,
+        `storefront.site.titel is not declared by partials/base: did you mean "title"?`,
         "storefront.site.colour is not declared by partials/base",
         "storefront.site.title is required by partials/base",
       ],
@@ -128,7 +128,7 @@ describe("checkSite — inside objects and lists", () => {
 
   it("refuses a nested key it does not declare, suggesting the one probably meant", async () => {
     expect(await check({ home: { pgae: "/", label: "Home" } }))
-      .toEqual([`storefront.site.home.pgae is not declared by partials/base — did you mean "page"?`]);
+      .toEqual([`storefront.site.home.pgae is not declared by partials/base: did you mean "page"?`]);
   });
 
   it("requires a nested key the schema requires", async () => {
@@ -151,7 +151,7 @@ describe("checkSite — inside objects and lists", () => {
         "storefront.site.home.page must be text (got 5)",
         "storefront.site.home.label is required by partials/base",
         "storefront.site.links[0].label must be text (got 2)",
-        `storefront.site.links[1].lable is not declared by partials/base — did you mean "label"?`,
+        `storefront.site.links[1].lable is not declared by partials/base: did you mean "label"?`,
         "storefront.site.meta.note must be text (got 1)",
         "storefront.site.titel is not declared by partials/base",
       ],

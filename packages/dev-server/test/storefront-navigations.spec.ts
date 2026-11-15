@@ -29,7 +29,7 @@ describe("checkNavigations — the entries, at any depth", () => {
     expect(check({ footer: [{ page: 5 }, { page: "nope.md" }, { page: "guides/stup.md" }] })).toEqual([
       `storefront.site.navigations.footer[0].page must be the path of a page in the pages folder, such as "about.md" (got 5)`,
       `storefront.site.navigations.footer[1]: "nope.md" is not a page in the pages folder`,
-      `storefront.site.navigations.footer[2]: "guides/stup.md" is not a page in the pages folder — did you mean "guides/setup.md"?`,
+      `storefront.site.navigations.footer[2]: "guides/stup.md" is not a page in the pages folder: did you mean "guides/setup.md"?`,
     ]);
   });
 
@@ -47,7 +47,7 @@ describe("checkNavigations — the entries, at any depth", () => {
       `storefront.site.navigations.footer[0] needs "page", "href" or "children": an entry is one of { page }, { href, label } or { label, children }`,
       `storefront.site.navigations.footer[1] has "page" and "href": an entry is one of { page }, { href, label } or { label, children }`,
       `storefront.site.navigations.footer[2] needs a "label"`,
-      `storefront.site.navigations.footer[3]: "lable" is not a key of a navigation entry — did you mean "label"?`,
+      `storefront.site.navigations.footer[3]: "lable" is not a key of a navigation entry: did you mean "label"?`,
       `storefront.site.navigations.footer[4] must be an entry, one of { page }, { href, label } or { label, children } (got "about.md")`,
     ]);
   });
@@ -67,7 +67,7 @@ describe("checkNavigations — the entries, at any depth", () => {
 describe("checkNavigations — what the skin lists", () => {
   it("refuses a navigation the skin does not list, suggesting the one meant", () => {
     expect(check({ footer: [], foter: [] })).toEqual([
-      `storefront.site.navigations.foter is not a navigation partials/base lists (it lists "footer", "sidebar") — did you mean "footer"?`,
+      `storefront.site.navigations.foter is not a navigation partials/base lists (it lists "footer", "sidebar"): did you mean "footer"?`,
     ]);
     expect(checkNavigations({ footer: [] }, undefined, OWNER, PAGES).problems).toEqual([
       `storefront.site.navigations.footer is set, but partials/base lists no navigations, so no layout can show it`,

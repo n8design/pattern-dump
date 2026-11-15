@@ -88,11 +88,12 @@ export function getShikiCSS(): string {
 
 /**
  * Wrap a highlighted block in a container that carries the raw source text.
- * The shell reads data-raw for the copy button — it never touches the highlighted markup.
+ * The shell reads data-raw for the copy button; it never touches the highlighted markup. `hidden`: the button is
+ * written hidden, for a page whose own script shows it (a storefront page), so it is never there without one.
  */
-export function wrapWithCopyButton(highlightedHtml: string, rawCode: string): string {
+export function wrapWithCopyButton(highlightedHtml: string, rawCode: string, o: { hidden?: boolean } = {}): string {
   const escaped = rawCode.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-  return `<div class="shiki-container" data-raw="${escaped}"><button class="copy-btn" type="button" aria-label="Copy source">Copy</button>${highlightedHtml}</div>`;
+  return `<div class="shiki-container" data-raw="${escaped}"><button class="copy-btn" type="button" aria-label="Copy source"${o.hidden ? " hidden" : ""}>Copy</button>${highlightedHtml}</div>`;
 }
 
 // ---- Internal ----
