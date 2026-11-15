@@ -8,8 +8,8 @@ describe("the browser tab's title", () => {
   });
 
   it("puts the component in front on a component route, and is the brand alone elsewhere", () => {
-    expect(documentTitle("Acme DS", "Button")).toBe("Button — Acme DS");
-    expect(documentTitle(brandTitle(undefined), "Button")).toBe("Button — Pattern Dump");
+    expect(documentTitle("Acme DS", "Button")).toBe("Button · Acme DS");
+    expect(documentTitle(brandTitle(undefined), "Button")).toBe("Button · Pattern Dump");
     expect(documentTitle("Acme DS")).toBe("Acme DS");
   });
 });

@@ -5,9 +5,9 @@ import { openChapters } from "./helpers.js";
 // route, document title, heading, the header label that is the page itself, the one that is its section.
 const PAGES: Array<[route: string, title: string, heading: string, page: string | null, section: string | null]> = [
   ["/", "Storefront bench", "Storefront bench", "Storefront bench ©2026", null],
-  ["/about/", "About — Storefront bench", "About", "(02) About", null],
-  ["/guides/", "Guides — Storefront bench", "Guides", "(01) Guides", null],
-  ["/guides/setup/", "Setup — Storefront bench", "Setup", null, "(01) Guides"],
+  ["/about/", "About · Storefront bench", "About", "(02) About", null],
+  ["/guides/", "Guides · Storefront bench", "Guides", "(01) Guides", null],
+  ["/guides/setup/", "Setup · Storefront bench", "Setup", null, "(01) Guides"],
 ];
 
 test.describe("storefront pages", () => {

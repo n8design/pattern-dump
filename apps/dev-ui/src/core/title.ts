@@ -7,7 +7,7 @@ export function brandTitle(title: string | undefined): string {
   return title ?? "Pattern Dump";
 }
 
-/** "<component> — <brand>" on a component route, else the brand. */
+/** "<component> · <brand>" on a component route, else the brand. */
 export function documentTitle(brand: string, component?: string): string {
-  return component ? `${component} — ${brand}` : brand;
+  return component ? `${component} · ${brand}` : brand;
 }

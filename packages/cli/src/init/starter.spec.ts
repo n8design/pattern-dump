@@ -183,7 +183,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     try {
       const home = await onHost(server.port, "live.localhost", "/");
       expect(home.status).toBe(200);
-      expect(home.body).toContain("<title>Home — Starter Check</title>");
+      expect(home.body).toContain("<title>Home · Starter Check</title>");
       expect(home.body).toContain(`<aside class="note note-tip" role="note">`);
       expect(home.body).toContain(`<iframe src="/preview/components/note"`);
       expect(home.body).toContain(`<a rel="next" href="/about/">Next: About</a>`);

@@ -91,7 +91,7 @@ describe("assemblePage — the bench's pages", () => {
   it("renders an article with its lede, and marks it current in the nav", async () => {
     const page = await build("/guides/setup/", join(bench, "pages"));
     expect(page.status).toBe(200);
-    expect(page.html).toContain(`<title>Setup — Storefront bench</title>`);
+    expect(page.html).toContain(`<title>Setup · Storefront bench</title>`);
     expect(page.html).toContain(`<p class="article-lede">Three folders make a site — the pages, the layouts that dress them, and the components they show.</p>`);
     expect(page.html).toContain(`<a href="/guides/setup/" aria-current="page">Setup</a>`);
     expect(page.html).not.toContain(`<a href="/" aria-current="page">`);
