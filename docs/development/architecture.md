@@ -86,7 +86,7 @@ second writer:
 
 | Package | Responsibility | Depends on |
 |---|---|---|
-| `contracts` | The seams: TypeScript types plus a few pure helpers (URL builders, the audit rollup, `staticPathFor`, the preview height fitter). Defines `render()`, the dev-server ↔ dev-ui data API and the HMR protocol, versioned by `PD_PROTOCOL_VERSION`. | — |
+| `contracts` | The seams: TypeScript types plus a few pure helpers (URL builders, the audit rollup, `staticPathFor`, the preview height fitter). Defines `render()`, the dev-server ↔ dev-ui data API and the HMR protocol, versioned by `PD_PROTOCOL_VERSION`. | (none) |
 | `config` | Loads `pattern-dump.config.ts` / `.json` (TypeScript wins). Shared config types. | contracts |
 | `build` | esbuild (TypeScript), Sass + Autoprefixer, Chokidar watching, incremental builds, the SCSS dependency graph, and image encoding: responsive WebP variants by sharp (pinned to one exact release, so the same source gives the same bytes everywhere), cached on disk by their key. | contracts |
 | `hotreloader` | `ws`-based hot-reload server and browser client. | contracts |

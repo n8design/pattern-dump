@@ -1,4 +1,4 @@
-# Static build — `pd build`
+# Static build: `pd build`
 
 `pd build` writes the Pattern Dump workbench as **plain files** that any static host can serve: GitHub
 Pages, Netlify, a CDN, nginx, an internal file share behind a web server. Node is needed only to build;
@@ -32,7 +32,7 @@ Everything the live workbench (`pd dev`) shows, frozen at build time:
 | Themes | Previews are built with the **default theme**; every other theme still switches in the browser |
 | Inspector | Docs, Relationships, **Audit** (labelled "Snapshot from …"; can be [left out](#leaving-the-audit-out)) |
 | Console | Source (Handlebars, data, schema), rendered HTML, Diagnostics (including the rendered a11y check, which runs in the browser) |
-| Links | Deep links and page reloads work on every host — each route has its own `index.html` |
+| Links | Deep links and page reloads work on every host: each route has its own `index.html` |
 
 What is **not** there, because there is no server:
 
@@ -52,8 +52,8 @@ The command line wins.
 | `--out <dir>` | `build.outDir` | `outDir`, then `dist` | Output folder, relative to the project root. **Emptied before each build.** |
 | `--base <path>` | `build.basePath` | `/` | Where the site will be hosted: `/` at a domain root, or a subpath such as `/docs/htwoo/` |
 | `--no-audit` / `--audit` | `build.audit` | `true` | Include the corpus audit |
-| `--root <path>` | — | current folder | Build another project |
-| `--config <path>` | — | `pattern-dump.config.ts` in the root | Use a config file outside the root |
+| `--root <path>` | (none) | current folder | Build another project |
+| `--config <path>` | (none) | `pattern-dump.config.ts` in the root | Use a config file outside the root |
 
 ```ts
 // pattern-dump.config.ts
@@ -72,7 +72,7 @@ npx pd build --base /docs/htwoo/
 ```
 
 Every link, stylesheet, script and data file inside the build then points under `/docs/htwoo/`. A
-build made for one base path does not work under another — rebuild when the address changes.
+build made for one base path does not work under another. Rebuild when the address changes.
 
 A project with a storefront whose workbench is on the storefront's own host (`storefront.workbenchUrl` a
 path such as `/workbench/`, [storefront.md](storefront.md#building)) must build the workbench for that
@@ -114,7 +114,7 @@ npx pd build --base /my-design-system/
 ```
 
 The build includes an empty `.nojekyll` file. Keep it: without it GitHub Pages runs Jekyll, which drops
-every folder starting with `_` — including `_pd/`, where the workbench itself lives.
+every folder starting with `_`, including `_pd/`, where the workbench itself lives.
 
 ### Netlify, Vercel, Cloudflare Pages
 
@@ -152,7 +152,7 @@ node apps/dev-ui/e2e/static-server.mjs --dir dist --base /docs/htwoo/ --port 808
 
 ```
 dist/
-  index.html                          shell pages — one per route
+  index.html                          shell pages, one per route
   atoms/index.html                    a folder gallery
   atoms/button/index.html             a component
   atoms/button/variants/index.html    the variants gallery
@@ -176,7 +176,7 @@ When the build finishes it prints a summary:
 [pd build]   not built: 500 /source/atoms/loading/shimmer-theming-support/rendered: Render error: …
 ```
 
-**"not built"** lines list components that fail to render — they are findings about the design
+**"not built"** lines list components that fail to render. They are findings about the design
 system, not build errors. The build still succeeds, and the static site shows those components the
 same way `pd dev` does. Fix the template and rebuild.
 
@@ -215,7 +215,7 @@ suffix, `main-1`, and the note says so; `pd dev` prints the same line.
 
 ## How it works
 
-`pd build` starts the dev server internally — without live reload or a file watcher — requests every
+`pd build` starts the dev server internally (without live reload or a file watcher), requests every
 route the workbench uses, and saves each response as a file. Two adjustments are made, and only these:
 
 - **Base path.** Root-relative Pattern Dump URLs inside HTML, CSS and JSON gain the base path.
@@ -236,10 +236,10 @@ How a live URL maps to a file (for example `/api/component/atoms/button?variant=
 | Symptom | Cause and fix |
 |---|---|
 | Blank page, errors about `fetch` or CORS | The build was opened from disk. Serve the folder over HTTP. |
-| Page loads without styling; `_pd/…` returns 404 | Built for a different base path than it is served from — rebuild with `--base` matching the address. On GitHub Pages, check that `.nojekyll` was published. |
+| Page loads without styling; `_pd/…` returns 404 | Built for a different base path than it is served from: rebuild with `--base` matching the address. On GitHub Pages, check that `.nojekyll` was published. |
 | A preview shows a second workbench inside it | The host rewrites missing files to `index.html` (a "single-page app" setting), so a component that failed to render gets the workbench page as its preview. Turn the rewrite off; every route already has its own page. |
 | The site shows old content | Rebuild. The site is a snapshot; nothing updates on its own. |
 | `pd build: --out … overlaps …` | The output folder would overwrite folders Pattern Dump reads. Choose a separate folder such as `dist`. |
 | `pd build: storefront.workbenchUrl is /workbench/, so the workbench must be built for /workbench/` | The workbench is linked at that path on the storefront's host. Set `build.basePath` (or `--base`) to the same path. |
-| `[pd] Error: unknown command "build"` | The installed Pattern Dump predates `pd build` — update the `pattern-dump` dependency. |
+| `[pd] Error: unknown command "build"` | The installed Pattern Dump predates `pd build`: update the `pattern-dump` dependency. |
 | Build is slow on a large design system | Most time goes into per-component checks. `--no-audit` skips the corpus audit; the rest scales with the number of components and variants (about 55 s for hTWOo's 259 components). |

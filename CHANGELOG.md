@@ -234,13 +234,13 @@ Fixes found while moving a second PatternLab styleguide (n8d) to Pattern Dump.
 
 - A numbered `templates` or `pages` folder now gets the `full` preview layout its category promises.
   The category was matched with its ordering prefix still attached, so a PatternLab tree
-  (`04-templates`, `05-pages`) could never hit the documented default — only a per-folder
+  (`04-templates`, `05-pages`) could never hit the documented default. Only a per-folder
   `preview: full` could. Folder *labels* still keep the number: `2-col` is a name and `04-templates`
   a prefix, and nothing in the string tells them apart, so a numbered folder sets `title:` for a
   clean label.
 - A `requireScript` or `globalScripts` id with no matching `<scriptsDir>/<id>.ts` is reported instead
-  of failing inside the preview. `pd dev` names every unresolvable id at startup — with the component
-  for a `requireScript` — and the script's URL answers 404 saying which file it expected and where,
+  of failing inside the preview. `pd dev` names every unresolvable id at startup (with the component
+  for a `requireScript`), and the script's URL answers 404 saying which file it expected and where,
   rather than embedding a raw `ENOENT`. Scripts are TypeScript, so a `.js` file of the same name does
   not satisfy an id; that is the common case this hid.
 
@@ -284,8 +284,8 @@ These can change how an existing project loads or renders:
 ### Fixed
 
 - A `centered` preview whose height comes from the viewport (`height: 200vh` in the base layer, a
-  percentage chain) no longer grows without bound. Content-fitting such a height is circular — the
-  frame's height feeds the content's — and the frame used to double every tick to the browser's
+  percentage chain) no longer grows without bound. Content-fitting such a height is circular (the
+  frame's height feeds the content's), and the frame used to double every tick to the browser's
   layout ceiling, showing a size like `785 × 33554428`. The run of growth is now detected, the frame
   keeps its last steady height and the content scrolls inside it, and the Console says why.
 - SCSS edits reach the preview live when `styles.entry` is set, and edits to base-layer styles

@@ -14,7 +14,7 @@ __PD_STOREFRONT_README__
 
 | Path | What lives there |
 |---|---|
-| `pattern-dump.config.ts` | where everything is — every path resolves against this folder |
+| `pattern-dump.config.ts` | where everything is: every path resolves against this folder |
 | `src/patterns/<category>/<name>/` | one component: `<name>.hbs`, `.json` data, `.md` docs, `.schema.json` |
 | `src/patterns/<category>/<name>/<name>~<variant>.json` | a variant that overrides data |
 | `src/patterns/<category>/<name>/<name>~<variant>.hbs` | a variant with its own markup |
@@ -55,7 +55,7 @@ Siblings sort by rank first, then by the parent's list, then alphabetically.
 ## Behaviour scripts
 
 A script is a TypeScript module in `src/scripts/`. A component loads it by naming it in its `.md`
-frontmatter, and every preview that shows the component — directly or included in another — loads it:
+frontmatter, and every preview that shows the component (directly or included in another) loads it:
 
 ```md
 ---

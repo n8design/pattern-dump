@@ -355,7 +355,7 @@ helper: such a schema field is an error, which is why the heading's field is `an
 
 **Dates.** They are read from git once, the first time a layout that declares them is rendered; a site
 whose layouts show no dates never runs git. A page with uncommitted changes has its last commit's dates
-(a note in `pd build`). A page git does not know — not committed yet, ignored, or outside any repository —
+(a note in `pd build`). A page git does not know (not committed yet, ignored, or outside any repository)
 has `null` for both, with a note. In `pd dev` the dates are as of the first page that asked for them: a new
 commit is seen on restart. Two limits:
 

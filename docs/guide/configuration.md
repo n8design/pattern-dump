@@ -11,7 +11,7 @@ wrong type stops `pd` with a list of every problem, and a likely typo gets a sug
 
 ```
 [pd] Error: pattern-dump.config.json: invalid config
-  - missing required "outDir" (found "outdir" — did you mean "outDir"?)
+  - missing required "outDir" (found "outdir": did you mean "outDir"?)
 ```
 
 ```ts
@@ -177,14 +177,14 @@ in [storefront.md](storefront.md).
 | `storefront.pagesDir` | string | required | Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/` |
 | `storefront.outDir` | string | required | Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench snapshot |
 | `storefront.host` | string | `live.localhost` | The host name `pd dev` serves the storefront on. A bare name, with no scheme, port or path |
-| `storefront.workbenchUrl` | string | — | Where the built workbench will be hosted: an absolute http(s) URL with no query or fragment, such as `https://workbench.example.com/`, or a path such as `/workbench/` for a workbench on the storefront's own host (see [storefront.md](storefront.md#building)). A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
-| `storefront.head` | string | — | A Handlebars file of the site's, such as `./head.hbs`, rendered with `site` into every page's head after the skin's `partials/head` ([storefront.md](storefront.md#skins)) |
-| `storefront.url` | string | — | The site's address, such as `https://example.com/`: an absolute http(s) URL with no query or fragment (loaded with one trailing slash). It may have a path, such as `https://example.github.io/project/`: the site is then published under it, in `pd dev` too ([storefront.md](storefront.md#publishing-under-a-path)). With it, pages get canonical URLs, Open Graph and JSON-LD, and `pd build` writes `sitemap.xml`; without it, those are left out ([storefront.md](storefront.md#search-engines-and-link-previews)) |
+| `storefront.workbenchUrl` | string | (none) | Where the built workbench will be hosted: an absolute http(s) URL with no query or fragment, such as `https://workbench.example.com/`, or a path such as `/workbench/` for a workbench on the storefront's own host (see [storefront.md](storefront.md#building)). A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
+| `storefront.head` | string | (none) | A Handlebars file of the site's, such as `./head.hbs`, rendered with `site` into every page's head after the skin's `partials/head` ([storefront.md](storefront.md#skins)) |
+| `storefront.url` | string | (none) | The site's address, such as `https://example.com/`: an absolute http(s) URL with no query or fragment (loaded with one trailing slash). It may have a path, such as `https://example.github.io/project/`: the site is then published under it, in `pd dev` too ([storefront.md](storefront.md#publishing-under-a-path)). With it, pages get canonical URLs, Open Graph and JSON-LD, and `pd build` writes `sitemap.xml`; without it, those are left out ([storefront.md](storefront.md#search-engines-and-link-previews)) |
 | `storefront.lang` | string | `en` | The language of every page, for `<html lang>`: a language tag such as `de-AT` |
 | `storefront.index` | boolean | `true` | `false` keeps the whole site out of search engines, for a staging site: every page `noindex`, `robots.txt` disallows everything, no sitemap |
-| `storefront.image` | string | — | The link-preview image of every page that names none: a PNG, JPEG, GIF or WebP file in the assets, such as `/assets/images/share.png` |
-| `storefront.images` | object | — | The site's own `quality` and `effort` for its images, over `images` (above) |
-| `storefront.site` | object | — | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
+| `storefront.image` | string | (none) | The link-preview image of every page that names none: a PNG, JPEG, GIF or WebP file in the assets, such as `/assets/images/share.png` |
+| `storefront.images` | object | (none) | The site's own `quality` and `effort` for its images, over `images` (above) |
+| `storefront.site` | object | (none) | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
 
 ## When changes take effect
 
