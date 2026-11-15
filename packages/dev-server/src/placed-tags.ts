@@ -164,7 +164,7 @@ export async function toPlaced(
   const id = resolver.idOf(handle);
   if (!id) {
     const near = suggest(handle, resolver.handles());
-    problems.push({ at: tag.at, message: `<${tag.name}>: there is no component "${handle}"${near ? ` — did you mean <pd-${near}>?` : ""}` });
+    problems.push({ at: tag.at, message: `<${tag.name}>: there is no component "${handle}"${near ? `: did you mean <pd-${near}>?` : ""}` });
     return {};
   }
   const schema = await resolver.schemaOf(id);
@@ -185,7 +185,7 @@ export async function toPlaced(
     const slot = slots.find(s => s.component === c.id);
     if (!slot) {
       const takes = slots.map(s => `<pd-${resolver.handleOf(s.component)}>`);
-      problems.push({ at: child.at, message: `<${child.name}> cannot be placed inside <${tag.name}> — ${takes.length ? `it takes ${takes.join(", ")}` : "it takes no child components"}` });
+      problems.push({ at: child.at, message: `<${child.name}> cannot be placed inside <${tag.name}>: ${takes.length ? `it takes ${takes.join(", ")}` : "it takes no child components"}` });
       continue;
     }
     if (!slot.list) {

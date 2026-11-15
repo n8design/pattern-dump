@@ -354,22 +354,22 @@ export function renderFlatteningReport(
   const head = [
     "# Flattened templates (structural)",
     "",
-    "> **Scope:** this detects **structural flattening** — clusters of components that are " +
+    "> **Scope:** this detects **structural flattening**: clusters of components that are " +
       "near-duplicate copies of one template, flattened along a class-token. It is a separate corpus " +
       "lens: **not** the diagnostics graph, **not** a11y, **not** HTML validation.",
     ">",
-    "> Every finding is `[SUBJECT-DEBT]` — the subject flattened its own templates; PD reports the " +
+    "> Every finding is `[SUBJECT-DEBT]`: the subject flattened its own templates; PD reports the " +
       "sprawl and grows no model to absorb it. One derived graph (composition) sharpens another " +
       "(flattening): a wrapper that *includes* a base is excluded as legitimate composition, not a copy.",
     ">",
-    "> **Boundary:** this catches **class-token** flattening — copies with identical structure that " +
+    "> **Boundary:** this catches **class-token** flattening: copies with identical structure that " +
       "differ only in class values. A copy whose **markup** also drifted is not distinguishable from a " +
       "genuinely-distinct sibling family by structural similarity alone; those need review, not a lower " +
       "threshold. Absence of a cluster is not proof of no duplication.",
     ">",
     "> **Reading the count:** a component being *in a cluster* is not the same as a distinct flattening " +
       "problem. With exact root-match, one logical family whose emphasis is baked into the root class " +
-      "(`hoo-button` vs `hoo-button-primary`) is reported as **separate clusters** — so the cluster count " +
+      "(`hoo-button` vs `hoo-button-primary`) is reported as **separate clusters**, so the cluster count " +
       "and the in-cluster percentage **over-count** distinct problems (the emphasis under-reporting). " +
       "Read the number as \"templates touched by flattening,\" never \"N distinct defects.\"",
     "",
@@ -390,7 +390,7 @@ export function renderFlatteningReport(
 
   const body = clusters.flatMap((c) => {
     const lines = [
-      `## \`${c.root}\` — ${c.members.length} copies  \`[SUBJECT-DEBT]\``,
+      `## \`${c.root}\` · ${c.members.length} copies  \`[SUBJECT-DEBT]\``,
       "",
       "**Members:**",
       ...c.members.map((m) => `- \`${m}\``),

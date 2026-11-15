@@ -355,7 +355,7 @@ export async function startDevServer(
   }
   const startupDiscovery = await cachedDiscovery(state);
   const componentCount = startupDiscovery ? [...startupDiscovery.discoveryMap.keys()].filter(id => !id.includes("~")).length : 0;
-  console.log(`[dev-server] Ready in ${Math.round(performance.now() - startTime)}ms — ${componentCount} components`);
+  console.log(`[dev-server] Ready in ${Math.round(performance.now() - startTime)}ms, ${componentCount} components`);
 
   // ---- File watcher ----
 

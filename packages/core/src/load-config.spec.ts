@@ -24,14 +24,14 @@ describe("loadConfig", () => {
       JSON.stringify({ sourceDir: "s", patternsDir: "p", outDir: "o", style: { dir: "d" } }));
     await expect(loadConfig(root)).rejects.toMatchObject({
       name: "ConfigError",
-      message: `pattern-dump.config.json: invalid config\n  - unknown key "style" — did you mean "styles"?`,
+      message: `pattern-dump.config.json: invalid config\n  - unknown key "style": did you mean "styles"?`,
     });
   });
 
   it("rejects a .ts config the same way", async () => {
     const root = await project("ts", "pattern-dump.config.ts",
       `export default { sourceDir: "s", patternsDir: "p", outDir: "o", styles: { dir: "d" }, overview: false };`);
-    await expect(loadConfig(root)).rejects.toThrow(`unknown key "overview" — did you mean "overviews"?`);
+    await expect(loadConfig(root)).rejects.toThrow(`unknown key "overview": did you mean "overviews"?`);
   });
 
   it("loads many .ts configs at once, each its own: none fails, none gets another's values", async () => {

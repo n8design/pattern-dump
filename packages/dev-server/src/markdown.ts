@@ -326,7 +326,7 @@ async function _resolveFence(
       const fullId = variant ? `${compId}~${variant}` : compId;
       if (!discoveryMap.has(fullId)) {
         embed.problems.push(`pattern ${spec}: there is no such component`);
-        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — no such component]</p>`);
+        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} · no such component]</p>`);
         return;
       }
       // The height the frame starts at, before its preview reports its own: the base component's declared
@@ -338,13 +338,13 @@ async function _resolveFence(
       const shown = embed.placed?.deps.shown ?? basename;
       if (read.error !== undefined) {
         embed.problems.push(`pattern ${spec}: its schema (${shown(schemaPath!)}) cannot be read: ${read.error}`);
-        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — its schema cannot be read]</p>`);
+        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} · its schema cannot be read]</p>`);
         return;
       }
       const declared = readExampleHeight(read.schema);
       if (declared.problem) {
         embed.problems.push(`pattern ${spec}: its schema (${shown(schemaPath!)}, #/x-pd-example-height): ${declared.problem}`);
-        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — invalid x-pd-example-height]</p>`);
+        out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} · invalid x-pd-example-height]</p>`);
         return;
       }
       const height = declared.height === undefined ? "" : ` height="${declared.height}"`;
@@ -364,7 +364,7 @@ async function _resolveFence(
       out.set(idx, `<div class="doc-example">${html}</div>`);
     } catch (e) {
       if (!_isRendererNotFound(e)) console.warn(`[dev-server] Pattern block render error [${spec}]:`, e);
-      out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} — render error]</p>`);
+      out.set(idx, `<p class="doc-error">[pattern: ${escapeHtml(spec)} · render error]</p>`);
     }
     return;
   }
@@ -375,7 +375,7 @@ async function _resolveFence(
     const { compId } = _parsePatternSpec(spec);  // variant ignored — all variants share the base template
     const entry = discoveryMap.get(compId);
     if (!entry?.hbsPath) {
-      out.set(idx, `<p class="doc-error">[src-template: ${escapeHtml(spec)} — no template file]</p>`);
+      out.set(idx, `<p class="doc-error">[src-template: ${escapeHtml(spec)} · no template file]</p>`);
       return;
     }
     try {
@@ -383,7 +383,7 @@ async function _resolveFence(
       out.set(idx, codeBlock(src, "handlebars", { storefront: embed.embed === "frame" }));
     } catch (e) {
       console.warn(`[dev-server] src-template read error [${spec}]:`, e);
-      out.set(idx, `<p class="doc-error">[src-template: ${escapeHtml(spec)} — read error]</p>`);
+      out.set(idx, `<p class="doc-error">[src-template: ${escapeHtml(spec)} · read error]</p>`);
     }
     return;
   }
@@ -398,7 +398,7 @@ async function _resolveFence(
         // Resolved context: base defaults merged with variant layer — the same context renderComponent renders from.
         const variantEntry = discoveryMap.get(lookupId);
         if (!variantEntry) {
-          out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} — unknown variant]</p>`);
+          out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} · unknown variant]</p>`);
           return;
         }
         const baseJsonPath    = discoveryMap.get(compId)?.jsonPath;
@@ -412,7 +412,7 @@ async function _resolveFence(
         // Base component: no parent to merge from — show its own data file as-is.
         const jsonPath = discoveryMap.get(compId)?.jsonPath;
         if (!jsonPath) {
-          out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} — no data file]</p>`);
+          out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} · no data file]</p>`);
           return;
         }
         const src = await readFile(jsonPath, "utf-8");
@@ -420,7 +420,7 @@ async function _resolveFence(
       }
     } catch (e) {
       console.warn(`[dev-server] src-data read error [${spec}]:`, e);
-      out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} — read error]</p>`);
+      out.set(idx, `<p class="doc-error">[src-data: ${escapeHtml(spec)} · read error]</p>`);
     }
     return;
   }
@@ -434,7 +434,7 @@ async function _resolveFence(
       out.set(idx, codeBlock(html, "html", { storefront: embed.embed === "frame" }));
     } catch (e) {
       if (!_isRendererNotFound(e)) console.warn(`[dev-server] src-html render error [${spec}]:`, e);
-      out.set(idx, `<p class="doc-error">[src-html: ${escapeHtml(spec)} — render error]</p>`);
+      out.set(idx, `<p class="doc-error">[src-html: ${escapeHtml(spec)} · render error]</p>`);
     }
     return;
   }

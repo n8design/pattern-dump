@@ -42,7 +42,7 @@ function scopeText(scope: AuditScope): string[] {
 /** Markdown renderer. The part above the scope is guarded by a same-graph→same-md regression test. */
 function renderAuditMarkdown(r: AuditRollup): string {
   const lines: string[] = [];
-  lines.push(`# Diagnostics audit${r.subjectSha ? ` — ${r.subjectSha}` : ""}`);
+  lines.push(`# Diagnostics audit${r.subjectSha ? ` · ${r.subjectSha}` : ""}`);
   lines.push("");
   lines.push(`**${r.headline}**`);
   lines.push("");
@@ -62,7 +62,7 @@ function renderAuditMarkdown(r: AuditRollup): string {
     lines.push(`### ${c.id}  _(render: ${c.render})_`);
     if (c.occurrences.length === 0) lines.push("- (no defects; render outcome noted above)");
     for (const o of c.occurrences) {
-      lines.push(`- \`${o.engine}:${o.ruleId}\` **[${o.tag}]** ${o.message}${o.domPath ? ` — \`${o.domPath}\`` : ""}`);
+      lines.push(`- \`${o.engine}:${o.ruleId}\` **[${o.tag}]** ${o.message}${o.domPath ? ` · \`${o.domPath}\`` : ""}`);
     }
     lines.push("");
   }
@@ -74,7 +74,7 @@ function renderAuditMarkdown(r: AuditRollup): string {
 /** Plain-text renderer — the same information, Markdown stripped; the headline and scope included. */
 function renderAuditText(r: AuditRollup): string {
   const lines: string[] = [];
-  lines.push(`Diagnostics audit${r.subjectSha ? ` — ${r.subjectSha}` : ""}`);
+  lines.push(`Diagnostics audit${r.subjectSha ? ` · ${r.subjectSha}` : ""}`);
   lines.push("");
   lines.push(r.headline);
   lines.push("");
@@ -83,7 +83,7 @@ function renderAuditText(r: AuditRollup): string {
   lines.push("Rules by blast radius (components affected; occurrences secondary):");
   if (r.rulesByBlast.length === 0) lines.push("  (none)");
   for (const rule of r.rulesByBlast) {
-    lines.push(`  ${rule.engine}:${rule.ruleId} — components ${rule.components}, occurrences ${rule.occurrences} [${rule.tags.join(", ")}]`);
+    lines.push(`  ${rule.engine}:${rule.ruleId} · components ${rule.components}, occurrences ${rule.occurrences} [${rule.tags.join(", ")}]`);
   }
   lines.push("");
   lines.push("Per component:");
@@ -92,7 +92,7 @@ function renderAuditText(r: AuditRollup): string {
     lines.push(`  ${c.id} (render: ${c.render})`);
     if (c.occurrences.length === 0) lines.push("    (no defects; render outcome noted above)");
     for (const o of c.occurrences) {
-      lines.push(`    ${o.engine}:${o.ruleId} [${o.tag}] ${o.message}${o.domPath ? ` — ${o.domPath}` : ""}`);
+      lines.push(`    ${o.engine}:${o.ruleId} [${o.tag}] ${o.message}${o.domPath ? ` · ${o.domPath}` : ""}`);
     }
   }
   lines.push("");

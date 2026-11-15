@@ -139,7 +139,7 @@ describe("runInit", () => {
     expect(JSON.parse(await readFile(join(root, "package.json"), "utf8")).scripts).toEqual({
       dev: "vite", "pd:dev": "pd dev", audit: "pd audit", typecheck: "tsc --noEmit", "build:scripts": "tsc",
     });
-    expect(logs).toContain("  · README.md: already exists — left untouched");
+    expect(logs).toContain("  · README.md: already exists, left untouched");
     expect(logs.at(-1)).toContain("npm run pd:dev");
   });
 

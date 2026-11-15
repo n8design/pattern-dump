@@ -62,12 +62,12 @@ function scan(md: string): FrontmatterReading {
   if (blockEnd === null) {
     // No block, which is valid — unless it is one written with bare-CR line endings, which leave the
     // whole file on one line and so never read as a block.
-    if (/^---\r(?!\n)/.test(text)) err(1, "lines end in a bare CR — use LF or CRLF line endings");
+    if (/^---\r(?!\n)/.test(text)) err(1, "lines end in a bare CR: use LF or CRLF line endings");
     return { values: {}, errors, lines: {} };
   }
   const end = blockEnd;
   if (end < 0) {
-    err(1, "the frontmatter block opened here is never closed — end it with a line holding only ---");
+    err(1, "the frontmatter block opened here is never closed: end it with a line holding only ---");
     return { values: {}, errors, lines: {} };
   }
 
@@ -81,7 +81,7 @@ function scan(md: string): FrontmatterReading {
     // A bare CR is the one problem reported for its line: whatever else the CR makes of the line, it is
     // read as the lenient reading reads it, and not reported a second time.
     const bareCr = line.includes("\r");
-    if (bareCr) err(n, "line ends in a bare CR — use LF or CRLF line endings");
+    if (bareCr) err(n, "line ends in a bare CR: use LF or CRLF line endings");
     const lineErr = (message: string): void => { if (!bareCr) err(n, message); };
 
     const item = line.match(/^\s*-\s+(.*)$/);
@@ -93,8 +93,8 @@ function scan(md: string): FrontmatterReading {
     const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
     if (!kv) {
       if (line.trim() !== "") {
-        if (item) lineErr("list item with no key above it — a list follows a line `key:`");
-        else if (/^\s+[A-Za-z_][\w-]*:/.test(line)) lineErr("nested value — only top-level keys are supported, written at the start of the line");
+        if (item) lineErr("list item with no key above it: a list follows a line `key:`");
+        else if (/^\s+[A-Za-z_][\w-]*:/.test(line)) lineErr("nested value: only top-level keys are supported, written at the start of the line");
         else lineErr(`cannot read this line: ${line.trim()}`);
       }
       listKey = null;

@@ -108,7 +108,7 @@ function jsonKeys(schema: PropertySchema, value: Record<string, unknown>, path: 
     const prop = Object.hasOwn(declared, key) ? declared[key] : undefined;
     if (!prop) {
       const near = suggest(key, Object.keys(declared));
-      problems.push(`${path}.${key} is not declared by ${owner}${near ? ` — did you mean "${near}"?` : ""}`);
+      problems.push(`${path}.${key} is not declared by ${owner}${near ? `: did you mean "${near}"?` : ""}`);
       continue;
     }
     const before = problems.length;
@@ -210,7 +210,7 @@ async function placedKeys(
     const prop = Object.hasOwn(declared, e.key) ? declared[e.key] : undefined;
     if (!prop) {
       const near = suggest(e.label, Object.keys(declared).map(k => ctx.label(k)));
-      problems.push({ at: e.at, message: `${where}: "${e.label}" is not declared by ${owner}${near ? ` — did you mean "${near}"?` : ""}` });
+      problems.push({ at: e.at, message: `${where}: "${e.label}" is not declared by ${owner}${near ? `: did you mean "${near}"?` : ""}` });
       continue;
     }
     const v = await placedValue(prop, e.value, `${where}.${e.label}`, ctx, problems);
@@ -247,7 +247,7 @@ async function placedValue(prop: PropertySchema, node: Placed, where: string, ct
   if (node.kind === "bare") {
     // Written without a value: a boolean, true. Anything else needs one.
     if (types.includes("boolean")) return true;
-    problems.push({ at: node.at, message: `${where} needs a value — only a boolean can be written without one` });
+    problems.push({ at: node.at, message: `${where} needs a value: only a boolean can be written without one` });
     return undefined;
   }
   // Text: as frontmatter coerces it ("2" to 2; "true" and "false" to booleans, nothing else).

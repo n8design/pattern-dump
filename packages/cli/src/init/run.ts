@@ -71,7 +71,7 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
     try {
       packageJson = JSON.parse(await readFile(pkgPath, "utf8")) as Record<string, unknown>;
     } catch (e) {
-      io.log(`✗ ${pkgPath} is not valid JSON — fix it and run pd init again (${e instanceof Error ? e.message : e})`);
+      io.log(`✗ ${pkgPath} is not valid JSON: fix it and run pd init again (${e instanceof Error ? e.message : e})`);
       return 1;
     }
   }
@@ -98,7 +98,7 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   await applyPlan(target, plan);
   const where = relative(io.cwd, target) || ".";
   io.log(`✓ ${plan.writes.length} files written to ${where}`);
-  io.log(`✓ package.json ${plan.packageJson.created ? "created" : "updated"} — ${PD_PACKAGE_NAME} ${answers.dependency}`);
+  io.log(`✓ package.json ${plan.packageJson.created ? "created" : "updated"} (${PD_PACKAGE_NAME} ${answers.dependency})`);
   for (const note of plan.packageJson.notes) io.log(`  · ${note}`);
   for (const s of plan.skipped) io.log(`  · ${s.path}: ${s.reason}`);
   if (storefront && dependency.startsWith("file:")) {
@@ -109,7 +109,7 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
 
   if (git) {
     const code = await io.run("git", ["init", "-q"], target);
-    io.log(code === 0 ? "✓ git repository initialised" : "✗ git init failed — is git installed? (the project is set up regardless)");
+    io.log(code === 0 ? "✓ git repository initialised" : "✗ git init failed: is git installed? (the project is set up regardless)");
   }
 
   if (install) {

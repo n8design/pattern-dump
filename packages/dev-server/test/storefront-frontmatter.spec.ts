@@ -97,7 +97,7 @@ describe("checkPageFrontmatter — the layout", () => {
   const known = `the layouts are "bare", "broken", "claims", "listing", "page", "typed"`;
   for (const [label, value] of [["an unknown name", "nope"], ["a partial", "base"], ["a variant", "page~x"], ["a path", "../partials/base"]] as const) {
     it(`refuses ${label}, naming the layouts there are`, async () => {
-      expect((await check(`---\ntitle: T\nlayout: ${value}\n---\n`)).problems).toEqual([P(3, `layout "${value}" is not a layout — ${known}`)]);
+      expect((await check(`---\ntitle: T\nlayout: ${value}\n---\n`)).problems).toEqual([P(3, `layout "${value}" is not a layout: ${known}`)]);
     });
   }
 
@@ -107,7 +107,7 @@ describe("checkPageFrontmatter — the layout", () => {
 
   it("says so when the project has no layouts at all", async () => {
     expect((await check("---\ntitle: T\n---\n", new Map())).problems).toEqual([
-      P(undefined, `layout "page" is not a layout — the project has no layouts (components in a layouts/ folder of its patterns)`),
+      P(undefined, `layout "page" is not a layout: the project has no layouts (components in a layouts/ folder of its patterns)`),
     ]);
   });
 
@@ -125,10 +125,10 @@ describe("checkPageFrontmatter — keys", () => {
 
   it("refuses a key the layout does not declare, suggesting the one it probably meant", async () => {
     expect((await check("---\ntitel: Setup\n---\n")).problems).toEqual([
-      P(2, `"titel" is not declared by layout "page" — did you mean "title"?`),
+      P(2, `"titel" is not declared by layout "page": did you mean "title"?`),
       P(undefined, `"title" is required by layout "page"`),
     ]);
-    expect((await check("---\ntitle: T\nlayuot: page\n---\n")).problems).toEqual([P(3, `"layuot" is not declared by layout "page" — did you mean "layout"?`)]);
+    expect((await check("---\ntitle: T\nlayuot: page\n---\n")).problems).toEqual([P(3, `"layuot" is not declared by layout "page": did you mean "layout"?`)]);
     expect((await check("---\ntitle: T\ncolour: red\n---\n")).problems).toEqual([P(3, `"colour" is not declared by layout "page"`)]);
   });
 
@@ -285,7 +285,7 @@ describe("checkPageFrontmatter — the listing keys: date, tags, draft, sort", (
 describe("checkPageFrontmatter — the frontmatter's own grammar", () => {
   it("reports grammar errors first, with their lines, then the key checks", async () => {
     expect((await check("---\ntitle: T\n  nested: x\ntitle: U\nwho: me\n---\n")).problems).toEqual([
-      P(3, "nested value — only top-level keys are supported, written at the start of the line"),
+      P(3, "nested value: only top-level keys are supported, written at the start of the line"),
       P(4, `duplicate key "title"`),
       P(5, `"who" is not declared by layout "page"`),
     ]);
@@ -293,7 +293,7 @@ describe("checkPageFrontmatter — the frontmatter's own grammar", () => {
 
   it("reports an unclosed block", async () => {
     expect((await check("---\ntitle: T\n")).problems).toEqual([
-      P(1, "the frontmatter block opened here is never closed — end it with a line holding only ---"),
+      P(1, "the frontmatter block opened here is never closed: end it with a line holding only ---"),
       P(undefined, `"title" is required by layout "page"`),
     ]);
   });

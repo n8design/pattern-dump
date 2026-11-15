@@ -164,13 +164,13 @@ describe("docs rendering — characterisation", () => {
 
     it("emits the documented error strings for unresolvable specs", () => {
       expect(specimen).toContain(
-        '<p class="doc-error">[src-template: atoms/no-such-component — no template file]</p>',
+        '<p class="doc-error">[src-template: atoms/no-such-component · no template file]</p>',
       );
       expect(specimen).toContain(
-        '<p class="doc-error">[src-data: atoms/button~no-such-variant — unknown variant]</p>',
+        '<p class="doc-error">[src-data: atoms/button~no-such-variant · unknown variant]</p>',
       );
       expect(specimen).toContain(
-        '<p class="doc-error">[src-html: atoms/no-such-component — render error]</p>',
+        '<p class="doc-error">[src-html: atoms/no-such-component · render error]</p>',
       );
     });
   });

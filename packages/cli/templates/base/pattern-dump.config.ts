@@ -26,7 +26,7 @@ export default defineConfig({
   scriptsDir: "./src/scripts",
   // globalScripts: ["<id>"],
 
-  // Pattern packages used alongside this project's own patterns — install them, then name them here.
+  // Pattern packages used alongside this project's own patterns: install them, then name them here.
   // Each package describes its patterns, styles and themes in its package.json ("patternDump").
   // packages: ["@n8d/htwoo-patterns"],
 

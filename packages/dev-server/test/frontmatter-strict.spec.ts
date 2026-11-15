@@ -50,13 +50,13 @@ describe("readFrontmatterStrict — the line of each key", () => {
 describe("readFrontmatterStrict — every problem, with its line", () => {
   const cases: Array<[label: string, md: string, errors: Array<{ line: number; message: string }>]> = [
     ["an unclosed block", "---\ntitle: Setup\n# Body\n",
-      [{ line: 1, message: "the frontmatter block opened here is never closed — end it with a line holding only ---" }]],
+      [{ line: 1, message: "the frontmatter block opened here is never closed: end it with a line holding only ---" }]],
     ["a line it cannot read", "---\ntitle: Setup\n  : : broken [\n---\n",
       [{ line: 3, message: "cannot read this line: : : broken [" }]],
     ["a nested value", "---\nnested:\n  child: x\n---\n",
-      [{ line: 3, message: "nested value — only top-level keys are supported, written at the start of the line" }]],
+      [{ line: 3, message: "nested value: only top-level keys are supported, written at the start of the line" }]],
     ["a list item with no key above it", "---\ntitle: A\n\n- stray\n---\n",
-      [{ line: 4, message: "list item with no key above it — a list follows a line `key:`" }]],
+      [{ line: 4, message: "list item with no key above it: a list follows a line `key:`" }]],
     ["a duplicate key", "---\ntitle: A\norder: 1\ntitle: B\n---\n",
       [{ line: 4, message: "duplicate key \"title\"" }]],
     ["an unterminated quote in a value", "---\ntitle: \"Setup\n---\n",
@@ -68,7 +68,7 @@ describe("readFrontmatterStrict — every problem, with its line", () => {
     ["an inline list never closed", "---\ntags: [a, b\n---\n",
       [{ line: 2, message: "\"tags\": the list opened with [ is never closed with ]" }]],
     ["several problems, in line order", "---\ntitle: A\n  child: x\nwhat is this\ntitle: B\n---\n", [
-      { line: 3, message: "nested value — only top-level keys are supported, written at the start of the line" },
+      { line: 3, message: "nested value: only top-level keys are supported, written at the start of the line" },
       { line: 4, message: "cannot read this line: what is this" },
       { line: 5, message: "duplicate key \"title\"" },
     ]],
@@ -85,23 +85,23 @@ describe("readFrontmatterStrict — every problem, with its line", () => {
   it("reports bare-CR line endings, which the lenient reading takes for no block at all", () => {
     expect(readFrontmatter("---\rtitle: Setup\r---\r")).toEqual({});
     expect(readFrontmatterStrict("---\rtitle: Setup\r---\r")).toEqual({
-      values: {}, errors: [{ line: 1, message: "lines end in a bare CR — use LF or CRLF line endings" }], lines: {},
+      values: {}, errors: [{ line: 1, message: "lines end in a bare CR: use LF or CRLF line endings" }], lines: {},
     });
     // The same with a byte-order mark in front.
     expect(readFrontmatterStrict(BOM + "---\rtitle: Setup\r---\r").errors).toEqual([
-      { line: 1, message: "lines end in a bare CR — use LF or CRLF line endings" },
+      { line: 1, message: "lines end in a bare CR: use LF or CRLF line endings" },
     ]);
     // A stray CR inside an otherwise LF block: reported once, for its line, whatever else the CR does to
     // the line — which is read exactly as the lenient reading reads it.
     expect(readFrontmatterStrict("---\ntitle: A\rB\n---\n")).toEqual({
       values: readFrontmatter("---\ntitle: A\rB\n---\n"),
-      errors: [{ line: 2, message: "line ends in a bare CR — use LF or CRLF line endings" }],
+      errors: [{ line: 2, message: "line ends in a bare CR: use LF or CRLF line endings" }],
       lines: {},
     });
     expect(readFrontmatter("---\ntitle:\rB\n---\n")).toEqual({ title: "B" });
     expect(readFrontmatterStrict("---\ntitle:\rB\n---\n")).toEqual({
       values: { title: "B" },
-      errors: [{ line: 2, message: "line ends in a bare CR — use LF or CRLF line endings" }],
+      errors: [{ line: 2, message: "line ends in a bare CR: use LF or CRLF line endings" }],
       lines: { title: 2 },
     });
   });

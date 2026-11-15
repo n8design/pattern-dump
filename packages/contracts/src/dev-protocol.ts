@@ -325,7 +325,7 @@ export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: s
 
   return {
     ...(opts.subjectSha ? { subjectSha: opts.subjectSha } : {}),
-    headline: `${graph.occurrences.length} machine-detectable static defects across ${affected.size} of ${total} components — ${cleanPct}% clean of static machine-detectable defects.`,
+    headline: `${graph.occurrences.length} machine-detectable static defects across ${affected.size} of ${total} components, ${cleanPct}% clean of static machine-detectable defects.`,
     totals: { components: total, affected: affected.size, cleanPct, defects: graph.occurrences.length },
     renderOutcomes: { ok: outcomes["ok"] ?? 0, blank: outcomes["blank"] ?? 0, error: outcomes["error"] ?? 0 },
     rulesByBlast,

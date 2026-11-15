@@ -107,7 +107,7 @@ export function checkCollections(
     if (!folders.has(name) && !leftOut.includes(`${name}/index.md`)) {
       const near = suggest(name, [...folders]);
       const text = `${owner} lists site.${COLLECTIONS_KEY}.${name}, but the pages folder has no folder "${name}" with an index.md`;
-      const hint = near ? ` — did you mean "${near}"?` : folders.size ? ` (its folders: ${[...folders].map(f => `"${f}"`).join(", ")})` : "";
+      const hint = near ? `: did you mean "${near}"?` : folders.size ? ` (its folders: ${[...folders].map(f => `"${f}"`).join(", ")})` : "";
       if (required.includes(name)) problems.push(`${text}, and ${owner} requires it${hint}`);
       else notes.push(`${text}, so it is an empty list${hint}`);
     }

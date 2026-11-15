@@ -249,9 +249,9 @@ describe("checkCollections: the names partials/base lists under site.collections
 
   it("a name with no such folder is an empty list and a note suggesting the nearest; a required one is refused", () => {
     expect(checkCollections({ properties: { article: {} } }, owner, folders, [], undefined)).toEqual({ listed: ["article"], problems: [], notes: [
-      `partials/base lists site.collections.article, but the pages folder has no folder "article" with an index.md, so it is an empty list — did you mean "articles"?`] });
+      `partials/base lists site.collections.article, but the pages folder has no folder "article" with an index.md, so it is an empty list: did you mean "articles"?`] });
     expect(checkCollections({ properties: { article: {} }, required: ["article"] }, owner, folders, [], undefined).problems).toEqual([
-      `partials/base lists site.collections.article, but the pages folder has no folder "article" with an index.md, and partials/base requires it — did you mean "articles"?`]);
+      `partials/base lists site.collections.article, but the pages folder has no folder "article" with an index.md, and partials/base requires it: did you mean "articles"?`]);
   });
 
   it("takes a folder a build leaves out as a draft: an empty list, with nothing to say", () => {

@@ -51,7 +51,7 @@ export function connectHmr(): void {
   ws.addEventListener("close", () => {
     dom.railStatus.dataset.state = "disconnected";
     dom.railStatusLabel.textContent = "disconnected"; // announces once via role="status"
-    renderConsole("HMR disconnected — retrying…");
+    renderConsole("HMR disconnected, retrying…");
     setTimeout(() => connectHmr(), 1000);
   });
 
@@ -98,14 +98,14 @@ export function connectHmr(): void {
             return loadDocument(`tile:${vp ?? ""}`, `${componentId}~${vp ?? ""}`, previewUrl(componentId, vp, store.local.theme || undefined), doc => {
               f.srcdoc = doc;
               console.log("%c[pd] srcdoc reloaded", "color:#7ed321;font-weight:bold",
-                `— ${componentId} (${vp ?? "default"})`);
+                `· ${componentId} (${vp ?? "default"})`);
             }, () => f.isConnected && session.current?.id === componentId);
           }));
         } else {
           const variant = session.currentVariant;
           await loadDocument("preview", `${componentId}~${variant ?? ""}`, previewUrl(componentId, variant ?? undefined, store.local.theme || undefined), doc => {
             dom.iframe.srcdoc = doc;
-            console.log("%c[pd] srcdoc reloaded", "color:#7ed321;font-weight:bold", `— ${componentId}`);
+            console.log("%c[pd] srcdoc reloaded", "color:#7ed321;font-weight:bold", `· ${componentId}`);
           }, () => session.current?.id === componentId && session.currentVariant === variant);
         }
         // Re-render the active view.
@@ -206,7 +206,7 @@ export function connectHmr(): void {
       // none. A broken .scss therefore produced nothing in the UI at all — it reached only the
       // dev-server's terminal. For a workbench whose whole job is surfacing defects, silently
       // swallowing its own build errors is the worst possible failure mode.
-      renderConsole(`${msg.scope === "build" ? "Build" : "Render"} error — ${msg.message}`, "error");
+      renderConsole(`${msg.scope === "build" ? "Build" : "Render"} error: ${msg.message}`, "error");
 
       const errId = msg.componentId;
       if (errId && errId === session.current?.id) {
@@ -283,7 +283,7 @@ export function connectHmr(): void {
       // A quarantined component is excluded from the tree, so without this line the author sees a
       // component silently vanish. Name both paths — renaming or moving one of them resolves it.
       renderConsole(
-        `Handle collision — "${msg.handle}" is held by ${msg.incumbentPath}; ${msg.quarantinedPath} is quarantined until one is renamed`,
+        `Handle collision: "${msg.handle}" is held by ${msg.incumbentPath}; ${msg.quarantinedPath} is quarantined until one is renamed`,
         "error",
       );
     } else if (msg.type === "page-changed") {

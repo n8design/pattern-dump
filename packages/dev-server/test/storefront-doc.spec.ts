@@ -57,8 +57,8 @@ describe("renderDoc frame mode — pattern fences", () => {
     const problems: string[] = [];
     const html = await renderDoc("```pattern components/nope\n```\n\n```pattern components/callout~nope\n```\n", renderComponent, map, frame(problems));
     expect(html).toBe(
-      `<p class="doc-error">[pattern: components/nope — no such component]</p>`
-      + `<p class="doc-error">[pattern: components/callout~nope — no such component]</p>`,
+      `<p class="doc-error">[pattern: components/nope · no such component]</p>`
+      + `<p class="doc-error">[pattern: components/callout~nope · no such component]</p>`,
     );
     expect(problems).toEqual([
       "pattern components/nope: there is no such component",
@@ -147,7 +147,7 @@ describe("renderDoc frame mode — a live example's declared height (x-pd-exampl
   it("marks an invalid declared height in the page and reports it, so the page fails to build", async () => {
     const problems: string[] = [];
     const html = await renderDoc("```pattern components/bad\n```\n", renderComponent, declared, frame(problems));
-    expect(html).toBe(`<p class="doc-error">[pattern: components/bad — invalid x-pd-example-height]</p>`);
+    expect(html).toBe(`<p class="doc-error">[pattern: components/bad · invalid x-pd-example-height]</p>`);
     expect(problems).toEqual([
       `pattern components/bad: its schema (bad.schema.json, #/x-pd-example-height): x-pd-example-height must be a whole number of pixels `
       + `above 0 (got 0): the live example's height at the widest column, no taller than its shortest variant`,
@@ -157,7 +157,7 @@ describe("renderDoc frame mode — a live example's declared height (x-pd-exampl
   it("marks a schema that cannot be read and reports it: the page can't tell what it declares", async () => {
     const problems: string[] = [];
     const html = await renderDoc("```pattern components/broken\n```\n", renderComponent, declared, frame(problems));
-    expect(html).toBe(`<p class="doc-error">[pattern: components/broken — its schema cannot be read]</p>`);
+    expect(html).toBe(`<p class="doc-error">[pattern: components/broken · its schema cannot be read]</p>`);
     expect(problems).toEqual([expect.stringMatching(/^pattern components\/broken: its schema \(broken\.schema\.json\) cannot be read: \S/)]);
   });
 });

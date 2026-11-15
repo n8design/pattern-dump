@@ -173,7 +173,7 @@ export const USAGE = `Usage: pd <command> [options]
   init [dir]   Set up a new Pattern Dump project (default: the current folder)
     --name <name>      Package name (default: the folder name)
     --brand <title>    Title shown in the Nav Rail (default: the name)
-    --no-examples      Structure, config and themes only — no starter components
+    --no-examples      Structure, config and themes only, no starter components
     --storefront       Also a website: pages, a skin, and a GitHub Pages workflow (default: no)
     --no-install       Skip npm install
     --git / --no-git   Run git init (default: yes, unless already inside a repository)
@@ -191,7 +191,7 @@ export const USAGE = `Usage: pd <command> [options]
     --config <path>    Use a config file outside the root
     --format <fmt>     Report format: md (default) | text | json (json → stdout only)
 
-  build    Write a static snapshot of the workbench — plain files for any static host
+  build    Write a static snapshot of the workbench: plain files for any static host
     --root <path>      Build a specific project root
     --config <path>    Use a config file outside the root
     --out <dir>        Output folder, relative to the root (default: build.outDir, outDir, or dist)

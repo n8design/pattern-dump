@@ -197,7 +197,7 @@ describe("readPages — what the nav shows", () => {
 describe("readPages — problems (each one fatal to the caller)", () => {
   it("a folder of pages with no index.md", async () => {
     const model = await readPages(await pages({ "index.md": page("Home"), "guides/setup.md": page("Setup") }));
-    expect(model.problems).toEqual(["the folder guides/ holds pages but has no index.md — it needs one, as the folder's own page"]);
+    expect(model.problems).toEqual(["the folder guides/ holds pages but has no index.md: it needs one, as the folder's own page"]);
     expect(model.nav.map(n => n.route)).toEqual(["/"]);
   });
 

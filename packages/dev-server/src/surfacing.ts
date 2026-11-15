@@ -41,7 +41,7 @@ export async function surfaceCollisions(
   hotreloader.retain(messages);
   for (const [i, col] of collisions.entries()) {
     hotreloader.push(messages[i]);
-    console.warn(`[dev-server] HANDLE_COLLISION: "${col.handle}" — incumbent: ${col.incumbentPath} — quarantined: ${col.quarantinedPath}`);
+    console.warn(`[dev-server] HANDLE_COLLISION: "${col.handle}" · incumbent: ${col.incumbentPath} · quarantined: ${col.quarantinedPath}`);
   }
   if (collisions.length > 0) console.warn(`[dev-server] collisions listed in ${join(pdScratchDir(cwd), "CONFLICTS.generated.md")}`);
   const md = collisions.length === 0
@@ -105,7 +105,7 @@ export async function surfaceFlattening(
 
   if (clusters.length) {
     const members = clusters.reduce((n, c) => n + c.members.length, 0);
-    console.warn(`[dev-server] FLATTENED: ${clusters.length} cluster(s) across ${members} components — see ${join(pdScratchDir(cwd), "FLATTENED.generated.md")}`);
+    console.warn(`[dev-server] FLATTENED: ${clusters.length} cluster(s) across ${members} components: see ${join(pdScratchDir(cwd), "FLATTENED.generated.md")}`);
   }
 
   // Never write into the (possibly read-only) project root — emit to the PD-owned scratch dir. A
@@ -160,7 +160,7 @@ export async function surfaceDocumentBase(roots: readonly StyleRoot[], outsideLi
   const files = [...outsideList].sort((a, b) => b[1] - a[1]);
   const rules = files.reduce((n, [, count]) => n + count, 0);
   const examples = files.slice(0, 3).map(([path]) => relative(cwd, path)).join(", ");
-  console.log(`[dev-server] base layer: ${rules} rule(s) from ${files.length} file(s) that no component owns and documentBase does not list, e.g. ${examples} — all listed in ${report}`);
+  console.log(`[dev-server] base layer: ${rules} rule(s) from ${files.length} file(s) that no component owns and documentBase does not list, e.g. ${examples} (all listed in ${report})`);
 }
 
 /** Warn about asset roots that an earlier root with the same folder name hides (see
