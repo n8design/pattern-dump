@@ -12,9 +12,15 @@
 // The mapping from changed files to specs is `planBurnIn` below, and its cases are in burn-in.test.mjs.
 // The split into groups is `groupJobs`, by the measured seconds in burn-in-times.json
 // (refresh with `node scripts/ci/burn-in-times.mjs <burn-in log>`).
+//
+// Known flakes are listed in quarantine.json (file, test name as "describe > title", BACKLOG entry). A run
+// whose only failures are quarantined tests is reported as a known flake and does not fail the burn-in;
+// the repetitions go on. Any other failure fails it. Nothing is skipped: a quarantined test still runs, and
+// passes when it passes. Only vitest specs can be quarantined (its JSON report names each failed test).
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, join, posix } from "node:path";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, posix, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -137,10 +143,56 @@ function git(...args) {
   return r.stdout.split("\n").filter(Boolean);
 }
 
+/**
+ * The quarantine list, checked: every entry names a file, a test and a BACKLOG entry, and a vitest spec.
+ * @returns {{ file: string, test: string, backlog: string }[]}
+ */
+export function readQuarantine(path = join(repo, "scripts/ci/quarantine.json")) {
+  const list = JSON.parse(readFileSync(path, "utf8"));
+  if (!Array.isArray(list)) throw new Error(`${path}: expected a list`);
+  for (const q of list) {
+    if (typeof q?.file !== "string" || typeof q.test !== "string" || typeof q.backlog !== "string" || !q.backlog) {
+      throw new Error(`${path}: every entry needs "file", "test" and "backlog": ${JSON.stringify(q)}`);
+    }
+    if (runnerOf(q.file)?.runner !== "vitest") throw new Error(`${path}: only vitest specs can be quarantined: ${q.file}`);
+  }
+  return list;
+}
+
+/**
+ * Sorts the failures of one vitest run (its JSON report) into known flakes and real failures.
+ * A file that failed without a failed test (it did not load, or an error outside a test) is a real failure,
+ * and so is a failed run with no report to read.
+ * @param {any} report vitest's JSON report, or null when there is none
+ * @param {{ file: string, test: string, backlog: string }[]} quarantine
+ * @param {string} root the repository's root, to make the report's absolute paths repo-relative
+ * @returns {{ known: { file: string, test: string, backlog: string }[], real: string[] }}
+ */
+export function classifyFailures(report, quarantine, root = repo) {
+  if (!report || !Array.isArray(report.testResults)) return { known: [], real: ["no test report to read"] };
+  const known = [];
+  const real = [];
+  for (const file of report.testResults) {
+    const path = relative(root, file.name).split("\\").join("/");
+    const failed = (file.assertionResults ?? []).filter(a => a.status === "failed");
+    if (file.status === "failed" && failed.length === 0) real.push(`${path}: ${(file.message || "failed outside a test").split("\n")[0]}`);
+    for (const a of failed) {
+      const test = [...(a.ancestorTitles ?? []), a.title].join(" > ");
+      const q = quarantine.find(e => e.file === path && e.test === test);
+      if (q) known.push(q); else real.push(`${path} > ${test}`);
+    }
+  }
+  if (report.success === false && known.length === 0 && real.length === 0) real.push("the run failed, and its report names no failure");
+  return { known, real };
+}
+
 /** The command for one repetition (vitest) or for all of them (Playwright repeats within one run). */
-export function commandFor(job, runs) {
+export function commandFor(job, runs, reportFile) {
   if (job.runner === "node") return { cmd: "node", args: ["--test", ...job.files], times: runs };
-  if (job.runner === "vitest") return { cmd: "npx", args: ["vitest", "run", "--retry=0", ...job.files], times: runs };
+  if (job.runner === "vitest") {
+    const report = reportFile ? ["--reporter=default", "--reporter=json", `--outputFile.json=${reportFile}`] : [];
+    return { cmd: "npx", args: ["vitest", "run", "--retry=0", ...report, ...job.files], times: runs };
+  }
   return {
     cmd: "npx",
     args: ["playwright", "test", "--config", "e2e/playwright.config.ts", "--retries=0", "--workers=1", `--repeat-each=${runs}`, ...job.files],
@@ -180,20 +232,67 @@ async function repeat(jobs, runs, load) {
     hog = spawn("stress-ng", ["--cpu", "1", "--timeout", "3600s"], { stdio: "ignore" });
     hog.on("error", err => { console.error(`burn-in: --load needs stress-ng: ${err.message}`); process.exit(2); });
   }
+  const quarantine = readQuarantine();
+  const tmp = mkdtempSync(join(tmpdir(), "burn-in-"));
+  const reportFile = join(tmp, "report.json");
   let failed = 0;
+  /** @type {{ job: string, run: number, file: string, test: string, backlog: string }[]} */
+  const flakes = [];
+  /** @type {{ job: string, run: number, what: string[] }[]} */
+  const failures = [];
   try {
     for (const job of jobs) {
-      const { cmd, args, times } = commandFor(job, runs);
+      const { cmd, args, times } = commandFor(job, runs, job.runner === "vitest" ? reportFile : undefined);
       for (let i = 1; i <= times; i++) {
         console.log(`\n=== burn-in ${job.runner} ${job.cwd} ${times > 1 ? `run ${i}/${times}` : `x${runs}`} ===`);
+        rmSync(reportFile, { force: true });
         const code = await run(cmd, args, join(repo, job.cwd));
-        if (code !== 0) { failed++; console.error(`burn-in: FAILED in ${job.cwd}${times > 1 ? ` on run ${i}` : ""}`); break; }
+        if (code === 0) continue;
+        if (job.runner === "vitest") {
+          let report = null;
+          try { report = JSON.parse(readFileSync(reportFile, "utf8")); } catch { /* no report: a real failure */ }
+          const { known, real } = classifyFailures(report, quarantine);
+          for (const q of known) {
+            flakes.push({ job: job.cwd, run: i, ...q });
+            console.log(`burn-in: known flake in ${job.cwd} on run ${i}, see BACKLOG "${q.backlog}": ${q.file} > ${q.test}`);
+          }
+          if (real.length === 0) continue;
+          failures.push({ job: job.cwd, run: i, what: real });
+        } else {
+          failures.push({ job: job.cwd, run: i, what: [`exit code ${code}`] });
+        }
+        failed++;
+        console.error(`burn-in: FAILED in ${job.cwd}${times > 1 ? ` on run ${i}` : ""}`);
+        break;
       }
     }
   } finally {
     hog?.kill();
+    rmSync(tmp, { recursive: true, force: true });
   }
+  writeSummary(summaryOf(jobs, runs, flakes, failures));
   return failed === 0 ? 0 : 1;
+}
+
+/** The burn-in's result as markdown, for the job summary. */
+export function summaryOf(jobs, runs, flakes, failures) {
+  const lines = [`### Burn-in: ${jobs.map(j => j.cwd).join(", ")} (${runs} runs)`, ""];
+  if (failures.length === 0) lines.push(flakes.length ? "Passed, with known flakes (they do not fail the run)." : "Passed.");
+  else lines.push("**Failed.**");
+  for (const f of failures) {
+    lines.push("", `**Failure** in ${f.job}, run ${f.run}:`);
+    for (const w of f.what) lines.push(`- ${w}`);
+  }
+  if (flakes.length) {
+    lines.push("", "**Known flake, see BACKLOG** (quarantined in scripts/ci/quarantine.json):");
+    for (const k of flakes) lines.push(`- ${k.job}, run ${k.run}: ${k.file} > ${k.test} (BACKLOG: ${k.backlog})`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+function writeSummary(text) {
+  console.log(`\n${text}`);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, text);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

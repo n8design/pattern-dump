@@ -165,8 +165,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
-      # One failing group fails the pull request; the others need not finish.
-      fail-fast: true
+      # Every group runs to the end and reports, whatever another group does: one failing group still
+      # fails the pull request, but no longer cancels the others' repetitions. Known flakes are listed in
+      # scripts/ci/quarantine.json and reported in the job summary without failing it.
+      fail-fast: false
       matrix:
         group: ${{ fromJSON(needs.burn-in-plan.outputs.groups) }}
 

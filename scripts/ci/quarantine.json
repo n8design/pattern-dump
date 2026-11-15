@@ -1,0 +1,7 @@
+[
+  {
+    "file": "packages/dev-server/test/watcher-new-folder.spec.ts",
+    "test": "a folder that leaves and comes back > removed and made again at the same path: the folder and its files are handled again",
+    "backlog": "watcher-new-folder: one event too many when a folder is removed and made again (recorded 2026-11-15)"
+  }
+]
