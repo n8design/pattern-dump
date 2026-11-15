@@ -22,6 +22,8 @@ const TRAILS: Record<string, string[]> = {
 };
 /** A page's own date (frontmatter date), which its JSON-LD gives as datePublished. */
 const PUBLISHED: Record<string, string> = { "/articles/harbour/": "2026-11-01", "/articles/plain/": "2026-10-02" };
+/** The articles: the pages with their own date (not the home page, not a listing), and their tags. */
+const ARTICLE_TAGS: Record<string, string[]> = { "/articles/harbour/": ["images", "layout"], "/articles/plain/": ["design"] };
 
 for (const [route, title, [image, width, height]] of PAGES) {
   test(`${route}: canonical, Open Graph and the card, at the site's address`, async ({ page, request }, info) => {
@@ -32,12 +34,16 @@ for (const [route, title, [image, width, height]] of PAGES) {
       meta: Object.fromEntries([...document.querySelectorAll("meta[property], meta[name]")]
         .map(m => [m.getAttribute("property") ?? m.getAttribute("name"), m.getAttribute("content")])),
       lang: document.documentElement.lang,
+      tags: [...document.querySelectorAll(`meta[property="article:tag"]`)].map(m => m.getAttribute("content")),
     }));
     const url = new URL(route.slice(1), site).href;
     expect(head.canonical).toBe(url);
     expect(head.meta["og:url"]).toBe(url);
     expect(head.meta["og:title"]).toBe(title);
-    expect(head.meta["og:type"]).toBe("website");
+    const article = ARTICLE_TAGS[route];
+    expect(head.meta["og:type"]).toBe(article ? "article" : "website");
+    expect(head.meta["article:published_time"]).toBe(article ? PUBLISHED[route] : undefined);
+    expect(head.tags).toEqual(article ?? []);
     expect(head.meta["og:site_name"]).toBe("Storefront bench");
     expect([head.meta["og:image:width"], head.meta["og:image:height"]]).toEqual([width, height]);
     expect(head.meta["twitter:card"]).toBe("summary_large_image");
@@ -56,7 +62,11 @@ for (const [route, title, [image, width, height]] of PAGES) {
     expect(scripts).toHaveLength(1);
     type Node = Record<string, unknown> & { breadcrumb?: { itemListElement: Array<{ name: string; item: string }> } };
     const graph = (JSON.parse(scripts[0]!) as { "@graph": Node[] })["@graph"];
-    expect(graph.map(n => n["@type"])).toEqual(["WebSite", "WebPage"]);
+    expect(graph.map(n => n["@type"])).toEqual(article ? ["WebSite", "WebPage", "Article"] : ["WebSite", "WebPage"]);
+    if (article) {
+      expect(graph[2]).toMatchObject({ headline: title, mainEntityOfPage: { "@id": url }, datePublished: PUBLISHED[route],
+        dateModified: graph[1]!["dateModified"], ...(article.length ? { keywords: article } : {}) });
+    }
     expect(graph[0]).toMatchObject({ url: site, name: "Storefront bench" });
     expect(graph[1]).toMatchObject({ url, name: title });
     // Every bench page is committed, so git dates it (the checkout has its full history, in CI too).
