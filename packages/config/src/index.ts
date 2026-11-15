@@ -4,7 +4,6 @@ import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/c
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
 export { ConfigError, configProblems, sameHostWorkbenchPath, storefrontBasePath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
 export { withOwnManifest } from "./own-manifest.js";
-import { withSourceDefaults } from "./validate.js";
 
 export interface AssetsConfig {
   /** Where assets live. Only 'central' (the default: one assets dir, served at /assets/) is supported
@@ -250,12 +249,17 @@ export type StorefrontNavEntry =
 
 /**
  * What a project writes: the config, where `sourceDir`, `patternsDir` and `styles` may be left out (a site whose
- * patterns and styles all come from pattern packages has none of its own). `defineConfig` and `validateConfig` fill
- * them in (`withSourceDefaults`), so everything that reads a config gets all three.
+ * patterns and styles all come from pattern packages has none of its own). `validateConfig` fills them in
+ * (`withSourceDefaults`), so everything that reads a loaded config gets all three.
  */
 export type PatternDumpConfigInput = Omit<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">
   & Partial<Pick<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">>;
 
-export function defineConfig(config: PatternDumpConfigInput): PatternDumpConfig {
-  return withSourceDefaults(config);
+/**
+ * Type checking for a config file; the object is returned unchanged. It fills in no defaults: what the config leaves
+ * out is left out, so a folder the project's own package.json names (withOwnManifest) is not taken for one the config
+ * names too. `validateConfig` fills the defaults, after the manifest's folders are in.
+ */
+export function defineConfig(config: PatternDumpConfigInput): PatternDumpConfigInput {
+  return config;
 }

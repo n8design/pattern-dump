@@ -591,6 +591,12 @@ or with a path, such as `https://example.github.io/project/`, for a site publish
 - one JSON-LD graph: the `WebSite`, the `WebPage` with its date (`datePublished`: its `date`, else its first
   commit) and its last change from git (`dateModified`), and a `BreadcrumbList` from Home down to the page
 
+`og:type` is `website`, except on an article: a page whose frontmatter gives it a `date`, other than the home
+page and a listing (a folder's `index.md` with pages under it). An article gets `og:type` `article`, with
+`article:published_time` (its `date`) and one `article:tag` per tag, and its JSON-LD graph adds an `Article`
+(headline, dates, `keywords` from its tags) as the page's main entity. The date git gives a page does not make
+it an article: every committed page has one.
+
 and `pd build` writes `sitemap.xml`. Without it, those are left out and `pd build` says so once. In `pd dev`
 the same tags carry the address the browser is on. Every page has `<html lang>` from `storefront.lang`
 (default `en`).

@@ -11,7 +11,7 @@
 
 import { readFile } from "node:fs/promises";
 import type { ServerResponse } from "node:http";
-import { PD_ROUTE_PREFIX, PD_ROUTES, type ShellRuntime } from "@pattern-dump/contracts";
+import { PD_ROUTE_PREFIX, PD_ROUTES, type ShellBrandConfig, type ShellRuntime } from "@pattern-dump/contracts";
 
 /** Content-Type for a file extension; unknown extensions fall back to a download-safe default. */
 export function mimeType(ext: string): string {
@@ -88,19 +88,26 @@ export function servesShell(pathname: string, accept: string | undefined): boole
   return !/\.[a-z0-9]+$/i.test(last) || (accept ?? "").includes("text/html");
 }
 
+/** The workbench's name, as the rail's wordmark shows it: `shell.brand.title`, else "Pattern Dump". The browser tab
+ *  starts with it; the shell puts the component in front on a component route (dev-ui core/title.ts). */
+export function workbenchTitle(brand: ShellBrandConfig | undefined): string {
+  return brand?.title ?? "Pattern Dump";
+}
+
 /**
  * The SPA shell document. Served for unmatched workbench routes (see `servesShell`) so client-side
  * routing owns the URL space.
  * `window.__pd` (ShellRuntime) is the only value the shell needs inline — how it was served: live,
- * with the live-reload port, or from a static build. Everything else it fetches.
+ * with the live-reload port, or from a static build. Everything else it fetches. Its title is the
+ * workbench's name (`brand`, the config's shell.brand), the same in `pd dev` and in a static build.
  */
-export function buildShellHtml(runtime: ShellRuntime): string {
+export function buildShellHtml(runtime: ShellRuntime, brand?: ShellBrandConfig): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pattern Dump Dev</title>
+<title>${escapeHtml(workbenchTitle(brand))}</title>
 <link rel="stylesheet" href="${PD_ROUTES.mainCss}">
 <link rel="stylesheet" href="${PD_ROUTES.shikiCss}">
 </head>

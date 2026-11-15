@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadConfig } from "./index.js";
 import { save } from "../../../test-support/save.js";
 
@@ -64,6 +65,22 @@ describe("loadConfig", () => {
       message: `pattern-dump.config.ts: the config and the project's own package manifest disagree
   - "patternsDir" is "./src/patterns" in pattern-dump.config.ts, `
         + `but "patternDump.patterns" is "patterns" in package.json: name it in one of them, or give both the same value` });
+  });
+
+  it("a config written with defineConfig names only what it writes: the folders it leaves out come from package.json", async () => {
+    // As a project's config file is written: defineConfig imported from the package. Its defaults are not folders
+    // the config names, so they never clash with the manifest's.
+    // The package's entry as its exports name it ("import": "./dist/index.js").
+    const pkg = JSON.stringify(fileURLToPath(new URL("../../config/dist/index.js", import.meta.url)));
+    const root = await project("own-manifest-define", "pattern-dump.config.ts",
+      `import { defineConfig } from ${pkg};\nexport default defineConfig({ outDir: "./dist" });\n`);
+    await save(join(root, "package.json"), JSON.stringify({ name: "@acme/ds", patternDump: { patterns: "patterns", styles: { dir: "styles" } } }));
+    const config = await loadConfig(root);
+    expect([config.sourceDir, config.patternsDir, config.styles.dir]).toEqual(["./src", "patterns", "styles"]);
+    const clash = await project("own-manifest-define-clash", "pattern-dump.config.ts",
+      `import { defineConfig } from ${pkg};\nexport default defineConfig({ outDir: "./dist", patternsDir: "./src/patterns" });\n`);
+    await save(join(clash, "package.json"), JSON.stringify({ name: "@acme/ds", patternDump: { patterns: "patterns" } }));
+    await expect(loadConfig(clash)).rejects.toThrow(`"patternsDir" is "./src/patterns" in pattern-dump.config.ts, but "patternDump.patterns" is "patterns" in package.json`);
   });
 
   it("leaves a config alone whose package.json has no patternDump field", async () => {

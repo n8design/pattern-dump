@@ -121,8 +121,9 @@ function createDocMarkdown(placing: boolean): MarkdownIt {
 const _md = createDocMarkdown(false);
 const _mdPlaced = createDocMarkdown(true);
 
+/** Focusable, as every code block is (renderer highlight.ts): a block that scrolls sideways is reached by keyboard. */
 function _mdPlainPre(code: string): string {
-  return `<pre><code>${escapeHtml(code)}</code></pre>`;
+  return `<pre tabindex="0"><code>${escapeHtml(code)}</code></pre>`;
 }
 
 

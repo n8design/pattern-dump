@@ -12,4 +12,6 @@ export default defineConfig({
   dataDir: "./src/_data",
   // A pattern package used alongside test-bench's own patterns (the E2E fixture for "Hide packages").
   packages: ["pd-fixture-ui"],
+  // The workbench's name: the rail's wordmark and the browser tab's title (the E2E fixture for both).
+  shell: { brand: { title: "Test bench" } },
 });

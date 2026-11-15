@@ -217,6 +217,34 @@ describe("assemblePage — the head", () => {
     expect(draft.notes).toEqual([SHALLOW_SEO_NOTE, NO_ARTICLES]);
   });
 
+  it("og:type article for a dated page, with its date and tags; website for an undated page, the home page and a listing", async () => {
+    const dir = await pagesOf({
+      "index.md": "---\ntitle: Home\ndate: 2026-11-01\n---\n\nHi.\n",
+      "about.md": "---\ntitle: About\n---\n\nUs.\n",
+      "articles/index.md": "---\ntitle: Articles\ndate: 2026-11-02\n---\n\nAll of them.\n",
+      "articles/why.md": "---\ntitle: Why\ndate: 2026-11-03\ntags: [design, css]\n---\n\nBecause.\n",
+    });
+    const model = await readPages(dir);
+    const { dates } = dated();
+    const at = async (route: string) => (await assemblePage(route, model, assembly({ siteUrl: URL_, dates }))).html;
+    const why = await at("/articles/why/");
+    expect(headOf(why)).toContain(`<meta property="og:type" content="article">`);
+    expect(headOf(why)).toContain(`<meta property="og:url" content="https://example.test/articles/why/">\n`
+      + `<meta property="article:published_time" content="2026-11-03">\n`
+      + `<meta property="article:tag" content="design">\n<meta property="article:tag" content="css">`);
+    expect(graphOf(why).map(n => n["@type"])).toEqual(["WebSite", "WebPage", "Article"]);
+    expect(graphOf(why)[2]).toEqual({ "@type": "Article", "@id": "https://example.test/articles/why/#article", headline: "Why",
+      mainEntityOfPage: { "@id": "https://example.test/articles/why/" }, isPartOf: { "@id": "https://example.test/#website" },
+      datePublished: "2026-11-03", dateModified: "2026-02-10T10:00:00+01:00", keywords: ["design", "css"] });
+    // The date git gives every committed page does not make it an article; nor does a date on the home page or a listing.
+    for (const route of ["/about/", "/", "/articles/"]) {
+      const html = await at(route);
+      expect(headOf(html), route).toContain(`<meta property="og:type" content="website">`);
+      expect(headOf(html), route).not.toContain("article:");
+      expect(graphOf(html).map(n => n["@type"]), route).toEqual(["WebSite", "WebPage"]);
+    }
+  });
+
   it("the site's language on <html>, en unless set", async () => {
     const dir = await pages();
     expect((await assemblePage("/", await readPages(dir), assembly())).html).toContain(`<html lang="en">`);

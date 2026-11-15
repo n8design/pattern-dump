@@ -60,6 +60,8 @@ export interface Session {
   serverDefaultTheme: string;
   /** Rule ids whose verdict needs a rendered scan; from /_pd/rule-tiers.json. */
   needsRenderingRules: string[];
+  /** The workbench's name for the browser tab: shell.brand.title, else "Pattern Dump" (core/title.ts). */
+  brandTitle: string;
 
   // ---- Selection ----
   current: ComponentDetail | null;
@@ -93,6 +95,7 @@ export const session: Session = {
   themeSwitch: "attribute",
   serverDefaultTheme: "",
   needsRenderingRules: [],
+  brandTitle: "Pattern Dump",
   current: null,
   currentVariant: null,
   stageMode: "single",

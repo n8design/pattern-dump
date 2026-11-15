@@ -175,6 +175,19 @@ ${live ? liveScript(live.wsPort, live.generation) : ""}
 </html>`;
 }
 
+/** A page that is an article: its own date and its tags. */
+export interface PageArticle { published: string; tags: string[] }
+
+/**
+ * Whether the page at `route` is an article, for og:type and JSON-LD: a page whose frontmatter gives it a `date`, other
+ * than the home page and a listing (a folder's index.md with pages under it). The date git gives a page is not one:
+ * every committed page has it, so it says nothing about what the page is.
+ */
+export function articleOf(route: string, model: PageModel, ownDate: string | undefined): PageArticle | undefined {
+  if (ownDate === undefined || route === "/" || (model.folders.get(route)?.children.length ?? 0) > 0) return undefined;
+  return { published: ownDate, tags: model.entries.get(route)?.tags ?? [] };
+}
+
 /**
  * A page's search and link-preview tags, after its title and description. Without the site's address only
  * what needs none: robots. With it: canonical, Open Graph (og:image with its size when the page has an
@@ -183,6 +196,8 @@ ${live ? liveScript(live.wsPort, live.generation) : ""}
 export function seoTags(p: {
   route: string; title: string; description: string | undefined; siteTitle: string | undefined;
   siteUrl: string | undefined; image: PageImage | undefined; index: boolean;
+  /** The page is an article (articleOf): og:type article, with its date and one article:tag per tag. */
+  article?: PageArticle | undefined;
 }): string[] {
   const tags: string[] = [];
   if (!p.index) tags.push(`<meta name="robots" content="noindex">`);
@@ -191,12 +206,16 @@ export function seoTags(p: {
   const url = abs(p.route);
   tags.push(
     `<link rel="canonical" href="${escapeAttr(url)}">`,
-    `<meta property="og:type" content="website">`,
+    `<meta property="og:type" content="${p.article ? "article" : "website"}">`,
     ...(p.siteTitle ? [`<meta property="og:site_name" content="${escapeAttr(p.siteTitle)}">`] : []),
     `<meta property="og:title" content="${escapeAttr(p.title)}">`,
     ...(p.description ? [`<meta property="og:description" content="${escapeAttr(p.description)}">`] : []),
     `<meta property="og:url" content="${escapeAttr(url)}">`,
   );
+  if (p.article) {
+    tags.push(`<meta property="article:published_time" content="${escapeAttr(p.article.published)}">`,
+      ...p.article.tags.map(t => `<meta property="article:tag" content="${escapeAttr(t)}">`));
+  }
   if (p.image) {
     tags.push(
       `<meta property="og:image" content="${escapeAttr(abs(p.image.path))}">`,
@@ -506,6 +525,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const title = typeof checked.values["title"] === "string" ? checked.values["title"] : isNotFound ? "Page not found" : route;
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
+  const article = isNotFound ? undefined : articleOf(route, model, checked.build.date);
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} — ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
@@ -513,10 +533,10 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     ...seoTags({
       route, title, description, siteTitle, siteUrl: isNotFound ? undefined : a.siteUrl,
       image: imageCheck?.ok ? imageCheck.image : undefined,
-      index: !isNotFound && a.siteIndex !== false && checked.build.index !== false,
+      index: !isNotFound && a.siteIndex !== false && checked.build.index !== false, article,
     }),
     ...(a.siteUrl !== undefined && !isNotFound
-      ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published })]
+      ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published, article })]
       : []),
     ...(headExtra ? [headExtra] : []),
     ...(siteHead ? [siteHead] : []),

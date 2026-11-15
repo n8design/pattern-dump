@@ -1,6 +1,7 @@
 // A storefront page's structured data: one JSON-LD graph, derived from what the site already has — the
 // site (WebSite), the page (WebPage, with its date and its last change from git) and where it sits (a BreadcrumbList from
-// the folders, ending at the page). Richer types (Article, FAQ, …) are not core's; a plugin adds a node to
+// the folders, ending at the page). A page that is an article (page.ts articleOf, the same pages og:type calls one)
+// adds an Article node, the page's main entity. Richer types (FAQ, …) are not core's; a plugin adds a node to
 // the same @graph.
 
 import type { PageLink } from "./derived.js";
@@ -18,6 +19,8 @@ export interface JsonLdPage {
   modified: string | null;
   /** The page's date: its own (frontmatter `date`, YYYY-MM-DD), else git's first commit of it (ISO 8601), or null. */
   published?: string | null;
+  /** The page is an article: its own date and its tags (page.ts articleOf). */
+  article?: { published: string; tags: string[] } | undefined;
 }
 
 /** The page's JSON-LD as a <script> element. Every "<" in it is written <, so no value can end the
@@ -26,7 +29,7 @@ export function jsonLdScript(p: JsonLdPage): string {
   const abs = (route: string) => new URL(route.replace(/^\//, ""), p.siteUrl).href;
   const site = `${p.siteUrl}#website`;
   const trail = [...p.breadcrumbs, { route: p.route, title: p.title }];
-  const graph = [
+  const graph: Record<string, unknown>[] = [
     { "@type": "WebSite", "@id": site, url: p.siteUrl, ...(p.siteTitle ? { name: p.siteTitle } : {}) },
     {
       "@type": "WebPage", "@id": abs(p.route), url: abs(p.route), name: p.title,
@@ -42,6 +45,16 @@ export function jsonLdScript(p: JsonLdPage): string {
       } : {}),
     },
   ];
+  if (p.article) {
+    graph.push({
+      "@type": "Article", "@id": `${abs(p.route)}#article`, headline: p.title,
+      ...(p.description ? { description: p.description } : {}),
+      mainEntityOfPage: { "@id": abs(p.route) }, isPartOf: { "@id": site },
+      datePublished: p.article.published,
+      ...(p.modified ? { dateModified: p.modified } : {}),
+      ...(p.article.tags.length ? { keywords: p.article.tags } : {}),
+    });
+  }
   const json = JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c");
   return `<script type="application/ld+json">${json}</script>`;
 }
