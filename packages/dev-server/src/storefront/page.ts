@@ -61,7 +61,7 @@ export interface PageAssembly {
   workbenchUrl: string;
   /** Set in `pd dev`: the live-reload socket's port, and the generation the page's request took. */
   live?: { wsPort: number; generation: string };
-  /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created and page.modified are null. */
+  /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created is null. */
   dates?: GitDates;
   /** Checks a link-preview image path against the project's assets (page-image.ts). */
   image(path: string): Promise<PageImageCheck>;
