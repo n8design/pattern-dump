@@ -41,4 +41,29 @@ test.describe("the skin in the workbench", () => {
       expect((await page.frameLocator("#preview-frame").locator("body").innerText()).trim()).not.toBe("");
     });
   }
+
+  // Which pages a layout renders, and how each got it, so nobody has to guess (childLayout on a folder's index.md).
+  test("lists a layout's pages in its Relationships, each with where its layout came from", async ({ page }) => {
+    await page.goto(`${WORKBENCH}/layouts/article`);
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await page.click("button[data-tab='relationships']");
+    const pages = page.locator(".rel-panel .rel-group-heading", { hasText: /^Pages$/ });
+    await expect(pages).toBeVisible();
+    await expect(pages.locator("xpath=following-sibling::ul[1]").locator(".rel-item")).toHaveText([
+      "articles/harbour.md (childLayout of articles/index.md)",
+    ]);
+    await page.goto(`${WORKBENCH}/layouts/doc`);
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await page.click("button[data-tab='relationships']");
+    await expect(page.locator(".rel-panel .rel-group-heading", { hasText: /^Pages$/ }).locator("xpath=following-sibling::ul[1]").locator(".rel-item"))
+      .toHaveText(["about.md (its own layout)", "articles/plain.md (its own layout)", "guides/setup.md (its own layout)"]);
+  });
+
+  test("shows no Pages group on a component that is not a layout", async ({ page }) => {
+    await page.goto(`${WORKBENCH}/components/card`);
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await page.click("button[data-tab='relationships']");
+    await expect(page.locator(".rel-panel .rel-group-heading", { hasText: /^Used by$/ })).toBeVisible();
+    await expect(page.locator(".rel-panel .rel-group-heading", { hasText: /^Pages$/ })).toHaveCount(0);
+  });
 });

@@ -145,6 +145,12 @@ export async function renderPanel(): Promise<void> {
     // Top-level composition groups.
     appendComponentGroup("Uses",    relAvail.uses,   section);
     appendComponentGroup("Used by", relAvail.usedBy, section);
+    // A layout of a project with a website: the pages that render with it, and where each got its layout.
+    if (relAvail.pages) {
+      appendPlainGroup("Pages", relAvail.pages.map(p => `${p.path} (${
+        p.source === "own" ? "its own layout" : p.source === "default" ? "the default layout" : `childLayout of ${p.from ?? "its folder"}`
+      })`), section);
+    }
 
     // Style umbrella: groups Style uses + Style modules under a shared heading.
     const styleUmbrella = document.createElement("div");
