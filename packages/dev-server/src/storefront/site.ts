@@ -15,6 +15,7 @@ import type { StorefrontNavEntry } from "@pattern-dump/config";
 import { checkJsonKeys, readSchema, type PropertySchema } from "./declared-values.js";
 import { checkNavigations, NAVIGATIONS_KEY } from "./navigations.js";
 import { checkCollections, COLLECTIONS_KEY } from "./collections.js";
+import { CATEGORIES_KEY, checkSiteCategories } from "./categories.js";
 
 /** The component whose schema declares `site`. */
 export const SITE_SCHEMA_OWNER = "partials/base";
@@ -29,12 +30,15 @@ export interface CheckedSite {
   listed: string[];
   /** The collection names partials/base lists (collections.ts): folders' paths, filled per page. */
   collections: string[];
+  /** partials/base lists site.categories (categories.ts): every declared category, filled for every page. */
+  categories: boolean;
   problems: string[];
   /** Said once for the site: a listed collection with no folder (an empty list). */
   notes?: string[];
 }
 
-const none = (problems: string[] = [], collections: string[] = []): CheckedSite => ({ values: {}, navigations: {}, listed: [], collections, problems });
+const none = (problems: string[] = [], collections: string[] = [], categories = false): CheckedSite =>
+  ({ values: {}, navigations: {}, listed: [], collections, categories, problems });
 
 /** `pagePaths`: every page's path in the pages folder ("guides/setup.md"), which a navigation's `page` names.
  *  `folders`: every folder's path ("articles"), which a collection's name is; `leftOut`: the drafts a build leaves out. */
@@ -62,14 +66,15 @@ export async function checkSite(
   const navs = checkNavigations(site?.[NAVIGATIONS_KEY], navDeclared, SITE_SCHEMA_OWNER, pagePaths);
   const cols = checkCollections(declared.properties?.[COLLECTIONS_KEY] as Record<string, unknown> | undefined, SITE_SCHEMA_OWNER,
     pages.folders, pages.leftOut, site);
+  const cats = checkSiteCategories(declared.properties?.[CATEGORIES_KEY], SITE_SCHEMA_OWNER, site);
   if (site === undefined) {
     if (schema.required?.includes("site")) problems.push(`storefront.site is required by ${SITE_SCHEMA_OWNER}`);
-    problems.push(...navs.problems, ...cols.problems);
-    return { ...none(problems, cols.listed), listed: navs.listed, notes: cols.notes };
+    problems.push(...navs.problems, ...cols.problems, ...cats.problems);
+    return { ...none(problems, cols.listed, cats.listed), listed: navs.listed, notes: cols.notes };
   }
 
   // The rest of site, at every depth, against the skin's schema; navigations and collections are checked above.
-  const own = (k: string) => k !== NAVIGATIONS_KEY && k !== COLLECTIONS_KEY;
+  const own = (k: string) => k !== NAVIGATIONS_KEY && k !== COLLECTIONS_KEY && k !== CATEGORIES_KEY;
   const rest = Object.fromEntries(Object.entries(site).filter(([k]) => own(k)));
   const restDeclared: PropertySchema = {
     ...declared,
@@ -77,10 +82,11 @@ export async function checkSite(
     ...(declared.required ? { required: declared.required.filter(own) } : {}),
   };
   const checked = checkJsonKeys(restDeclared, rest, "storefront.site", SITE_SCHEMA_OWNER);
-  problems.push(...checked.problems, ...navs.problems, ...cols.problems);
+  problems.push(...checked.problems, ...navs.problems, ...cols.problems, ...cats.problems);
   if (declared.required?.includes(NAVIGATIONS_KEY) && !Object.hasOwn(site, NAVIGATIONS_KEY)) {
     problems.push(`storefront.site.${NAVIGATIONS_KEY} is required by ${SITE_SCHEMA_OWNER}`);
   }
-  if (problems.length) return { ...none(problems, cols.listed), listed: navs.listed, notes: cols.notes };
-  return { values: checked.value as Record<string, unknown>, navigations: navs.navigations, listed: navs.listed, collections: cols.listed, problems, notes: cols.notes };
+  if (problems.length) return { ...none(problems, cols.listed, cats.listed), listed: navs.listed, notes: cols.notes };
+  return { values: checked.value as Record<string, unknown>, navigations: navs.navigations, listed: navs.listed, collections: cols.listed,
+    categories: cats.listed, problems, notes: cols.notes };
 }

@@ -216,6 +216,8 @@ export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
 const pagesDir = cfg.storefront?.pagesDir ?? null;
 // Where a same-host workbench is published, which no page may claim (readPages reports it).
 const workbenchPath = sameHostWorkbenchPath(cfg.storefront ?? undefined);
+// A page's categories are resolved against the config's (a change to them restarts the server).
+const categories = cfg.storefront?.categories;
 // What every page shows of the others (handlePages): read before the watcher starts, then after each event
 // in the pages folder.
 let pagesPrint = await pagesFingerprint();
@@ -1024,11 +1026,11 @@ async function handleConfig(filePath: string): Promise<boolean> {
 const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p);
 
 /** What every page shows of the others: the nav, each page's route, title and layout, what a listing shows of it
- *  (its description or first paragraph, date, image, tags, draft) and each folder's listing. Null without a
+ *  (its description or first paragraph, date, image, tags, categories, draft) and each folder's listing. Null without a
  *  storefront. Compared, never parsed. */
 async function pagesFingerprint(): Promise<string | null> {
   if (!pagesDir) return null;
-  const model = await readPages(pagesDir, { workbenchPath });
+  const model = await readPages(pagesDir, { workbenchPath, categories });
   return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems, entries: [...model.entries], folders: [...model.folders] });
 }
 

@@ -15,6 +15,7 @@
 import { suggest } from "@pattern-dump/config";
 import type { DatesMode, GitDates } from "./git-dates.js";
 import type { PageModel } from "./pages.js";
+import type { Category } from "./categories.js";
 
 /** One page in a listing. */
 export interface Entry {
@@ -24,6 +25,7 @@ export interface Entry {
   date: string | null;
   image: string | null;
   tags: string[];
+  categories: Category[];
   draft: boolean;
 }
 

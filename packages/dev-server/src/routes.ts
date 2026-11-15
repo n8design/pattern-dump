@@ -626,7 +626,9 @@ async function routeRequest(
       const discovery = await currentDiscovery(state, patternRoots);
       const discoveryMap = discovery.discoveryMap;
       // pd dev shows drafts; pd build leaves them out, as if their files weren't there.
-      const model = await readPages(cfg.storefront.pagesDir, { workbenchPath: sameHostWorkbenchPath(cfg.storefront), drafts: ctx.live ? "show" : "leave-out" });
+      const model = await readPages(cfg.storefront.pagesDir, {
+        workbenchPath: sameHostWorkbenchPath(cfg.storefront), drafts: ctx.live ? "show" : "leave-out", categories: cfg.storefront.categories,
+      });
       if (pathname === PD_ROUTES.pages) {
         if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
         json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);

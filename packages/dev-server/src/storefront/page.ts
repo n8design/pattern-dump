@@ -37,6 +37,7 @@ import { checkLinks } from "./links.js";
 import { checkPageBasics } from "./page-basics.js";
 import { redirectsOf } from "./redirects.js";
 import { dateOf, entriesOf, resolveCollections, type Entry } from "./collections.js";
+import type { Category } from "./categories.js";
 
 /** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
 export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
@@ -323,7 +324,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
 
   const problems: string[] = [];
-  const checked = await checkPageFrontmatter(page, a.discoveryMap);
+  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories);
   problems.push(...checked.problems.map(p => `${p.file}${p.line !== undefined ? `:${p.line}` : ""}: ${p.message}`));
   if (isNotFound && checked.build.redirectFrom) {
     const line = page.frontmatter.lines["redirectFrom"];
@@ -420,7 +421,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     else { modified = dated.dates.modified; published ??= dated.dates.created; }
   }
   // A listing's entries, and the page's own date and tags (collections.ts), for a layout that shows them.
-  const listing: { children?: Entry[]; date?: string | null; tags?: string[] } = {};
+  const listing: { children?: Entry[]; date?: string | null; tags?: string[]; categories?: Category[] } = {};
   if (declares("children")) {
     const listed = isNotFound ? { entries: [], problems: [], notes: [] } : await entriesOf(route, model, { dates: a.dates, mode });
     listing.children = listed.entries;
@@ -434,6 +435,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     notes.push(...dated.notes);
   }
   if (declares("tags")) listing.tags = model.entries.get(route)?.tags ?? [];
+  if (declares("categories")) listing.categories = (checked.build.categories ?? []).map(k => model.categories.byKey.get(k)!);
   // The collections the skin lists (site.collections), on every page.
   const collections = site.collections.length ? await resolveCollections(site.collections, model, { dates: a.dates, mode }) : undefined;
   if (collections) { problems.push(...collections.problems); notes.push(...collections.notes); }
@@ -449,6 +451,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     problems.push(...headSample);
   }
   if (problems.length) return fail(problems);
+  notes.push(...checked.notes);
   // pd dev shows drafts; each is said once, whichever page is open.
   if (a.live) notes.push(...model.drafts.map(d => `${d} is a draft: pd build leaves it out`));
 
@@ -457,6 +460,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     ...withDeclaredAbsentAsNull(site.values, siteDeclared),
     ...(site.listed.length ? { navigations: resolveNavigations(site.navigations, site.listed, model, route) } : {}),
     ...(collections ? { collections: collections.collections } : {}),
+    ...(site.categories ? { categories: model.categories.list } : {}),
   };
   const dataFor = (body: string, headings: PageHeading[]) => ({
     ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),

@@ -29,7 +29,9 @@ import { PD_ROUTES, type StorefrontNavItem, type StorefrontPage, type Storefront
 import { frontmatterBody, readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
 import { redirectProblems, redirectsOf, workbenchPlace } from "./redirects.js";
-import { readDate, readDraft, readSort, readTags, type SortBy } from "./listing-keys.js";
+import { readCategories, readDate, readDraft, readSort, readTags, type SortBy } from "./listing-keys.js";
+import { categoryIndex, type Category, type CategoryIndex } from "./categories.js";
+import type { StorefrontCategory } from "@pattern-dump/config";
 import { teaserOf } from "./teaser.js";
 
 /** The layout a page uses when its frontmatter names none. */
@@ -56,6 +58,8 @@ export interface PageEntryFields {
   /** Its image, a path in the assets, or null. */
   image: string | null;
   tags: string[];
+  /** Its categories, resolved (an old key as the category it is now). */
+  categories: Category[];
   draft: boolean;
 }
 
@@ -80,6 +84,8 @@ export interface PageModel extends StorefrontPagesResponse {
   /** 404.md at the top of the pages folder, at the route /404.html: not a page of the site, so in neither
    *  `pages`, `files` nor the nav. Absent when the site has none (a built-in one is used). */
   notFound?: PageFile;
+  /** The declared categories (storefront.categories), which pages' `categories:` are checked against. */
+  categories: CategoryIndex;
   /** Problems with the folder as a whole, one line each. Empty when it is a sound site. */
   problems: string[];
 }
@@ -127,12 +133,16 @@ const scalar = (v: string | string[] | undefined): string | undefined => typeof 
  * `drafts`: "show" (pd dev, the default) keeps drafts as pages; "leave-out" (pd build) drops every page whose
  * frontmatter says `draft: true`, and every page under a folder whose index.md does, as if their files weren't there.
  */
-export async function readPages(pagesDir: string, opts: { workbenchPath?: string | undefined; drafts?: "show" | "leave-out" } = {}): Promise<PageModel> {
+/** `categories`: storefront.categories from the config. */
+export async function readPages(pagesDir: string, opts: {
+  workbenchPath?: string | undefined; drafts?: "show" | "leave-out"; categories?: Readonly<Record<string, StorefrontCategory>> | undefined;
+} = {}): Promise<PageModel> {
   const problems: string[] = [];
+  const categories = categoryIndex(opts.categories);
   const files = new Map<string, PageFile>();
   let notFound: PageFile | undefined;
   if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
-    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], problems: [`the pages folder ${pagesDir} does not exist`] };
+    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], categories, problems: [`the pages folder ${pagesDir} does not exist`] };
   }
   const bodies = new Map<string, string>();
   for (const path of (await markdownFiles(pagesDir, pagesDir, problems)).sort()) {
@@ -269,6 +279,7 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
       date: ok(v["date"], readDate) ?? null,
       image: image !== undefined && /^\/assets\/[^?#]+[^/?#]$/.test(image) ? image : null,
       tags: ok(v["tags"], readTags) ?? [],
+      categories: (ok(v["categories"], x => readCategories(x, categories))?.keys ?? []).map(k => categories.byKey.get(k)!),
       draft: ok(v["draft"], readDraft) ?? false,
     });
   }
@@ -281,5 +292,5 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
       children: ordered(folder).map(c => c.route).filter(r => files.has(r)),
     });
   }
-  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, problems, ...(notFound ? { notFound } : {}) };
+  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, categories, problems, ...(notFound ? { notFound } : {}) };
 }

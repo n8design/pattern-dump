@@ -82,7 +82,7 @@ describe("layoutNames", () => {
 describe("checkPageFrontmatter — a valid page", () => {
   it("uses the page layout when none is named, and passes the declared values on, without layout or order", async () => {
     expect(await check("---\ntitle: Setup\ndescription: How\norder: 2\n---\n")).toEqual({
-      layoutId: "layouts/page", values: { title: "Setup", description: "How" }, build: {}, problems: [],
+      layoutId: "layouts/page", values: { title: "Setup", description: "How" }, build: {}, problems: [], notes: [],
     });
   });
 
@@ -149,7 +149,7 @@ describe("checkPageFrontmatter — keys", () => {
 
   it("declares nothing for a layout with no schema", async () => {
     expect((await check("---\nlayout: bare\ntitle: T\n---\n")).problems).toEqual([P(3, `"title" is not declared by layout "bare", which has no schema`)]);
-    expect(await check("---\nlayout: bare\norder: 3\n---\n")).toEqual({ layoutId: "layouts/bare", values: {}, build: {}, problems: [] });
+    expect(await check("---\nlayout: bare\norder: 3\n---\n")).toEqual({ layoutId: "layouts/bare", values: {}, build: {}, problems: [], notes: [] });
   });
 });
 
@@ -161,6 +161,7 @@ describe("checkPageFrontmatter — declared types", () => {
       values: { title: "T", count: 2.5, n: -4, pinned: true, labels: ["a", "b"], scores: [1, 2.5], tone: "info", either: 7, free: "anything" },
       build: {},
       problems: [],
+      notes: [],
     });
   });
 
