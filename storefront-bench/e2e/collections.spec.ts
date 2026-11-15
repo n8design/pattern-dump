@@ -1,6 +1,6 @@
 // Collections on the rendered page, in pd dev and on the built root: the articles folder's index.md lists its pages
 // newest first as cards (page.children), the one without a description by its first paragraph, unshortened in the
-// markup and clamped to three lines by the card's CSS; the home page shows the two newest (site.collections). In pd
+// markup and clamped to three lines by the card's CSS; the home page shows the two newest (a query, query.spec.ts). In pd
 // dev a draft, and a page dated after today, written while the site is open is listed, marked, and removing it takes
 // it away.
 import { rm } from "node:fs/promises";
@@ -36,12 +36,6 @@ test("a page with no description: the first paragraph, whole in the markup, thre
   });
   expect(box.scroll).toBeGreaterThan(box.height);
   expect(Math.round(box.height / box.line)).toBe(3);
-});
-
-test("the home page lists the newest articles from site.collections", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.locator(".home-latest h2")).toHaveText("Latest articles");
-  await expect(page.locator(".home-latest a")).toHaveText(["A harbour of cable cars", "Plain on purpose"]);
 });
 
 test.describe("a draft", () => {

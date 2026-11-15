@@ -1,0 +1,15 @@
+{
+  "title": "An article",
+  "description": "Its one-sentence description.",
+  "body": "<p>The article's markdown, rendered.</p>",
+  "site": { "title": __PD_BRAND_JSON__, "footer": "Made with Pattern Dump." },
+  "nav": [{ "route": "/", "title": "Home" }, { "route": "/articles/", "title": "Articles", "current": true }],
+  "page": {
+    "date": "2026-11-14",
+    "tags": ["notes"],
+    "related": {
+      "entries": [{ "route": "/articles/second/", "title": "A second article", "date": "2026-11-15" }],
+      "listing": "<ul class=\"view-compact\" role=\"list\"><li><p class=\"compact-card\"><a href=\"/articles/second/\">A second article</a> <time class=\"compact-card-date\" datetime=\"2026-11-15\">2026-11-15</time></p></li></ul>"
+    }
+  }
+}

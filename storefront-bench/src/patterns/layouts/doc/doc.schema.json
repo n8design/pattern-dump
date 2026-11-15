@@ -4,7 +4,11 @@
   "description": "The frontmatter a page using layout: doc may set, besides layout and order. It also shows what the storefront derives for the page.",
   "type": "object",
   "x-pd-prose-images": {
-    "widths": [480, 960, 1920],
+    "widths": [
+      480,
+      960,
+      1920
+    ],
     "sizes": "(min-width: 62rem) 60rem, calc(100vw - 2rem)"
   },
   "required": [
@@ -141,6 +145,13 @@
                 ]
               }
             }
+          }
+        },
+        "related": {
+          "description": "Pages from every folder, newest first, through the compact view; each page sets its own options under related:",
+          "x-pd-query": {
+            "sort": "date",
+            "view": "compact"
           }
         }
       }

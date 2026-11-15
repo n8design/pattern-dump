@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Home",
+  "description": "The layout of the home page: its text, then the latest articles.",
+  "type": "object",
+  "x-pd-prose-images": { "widths": [480, 672, 1344], "sizes": "(min-width: 44rem) 42rem, calc(100vw - 2rem)" },
+  "required": ["title"],
+  "properties": {
+    "title": { "type": "string", "description": "The home page's heading, and its title in the navigation" },
+    "description": { "type": "string", "description": "One sentence under the heading, and the site's description for search results" },
+    "page": {
+      "type": "object",
+      "description": "What the storefront works out for the page",
+      "properties": {
+        "next": { "description": "The page after this one in the navigation" },
+        "latest": {
+          "description": "The three newest articles, in the list view. The home page changes options under latest: (limit: 5, indented), or turns them off with latest: false",
+          "x-pd-query": { "collections": ["articles"], "sort": "date", "limit": 3, "view": "list" }
+        }
+      }
+    }
+  }
+}

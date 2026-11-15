@@ -5,5 +5,11 @@
     {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
   </header>
   <div class="article-body">{{{body}}}</div>
+  {{#if page.related.listing}}
+  <section class="related" aria-labelledby="related-title">
+    <h2 id="related-title">Related</h2>
+    {{{page.related.listing}}}
+  </section>
+  {{/if}}
 </article>
 {{/partials-base}}

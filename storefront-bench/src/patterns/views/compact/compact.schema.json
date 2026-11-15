@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Compact view",
+  "description": "A list of pages as titles and dates, for related pages.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "type": "array",
+      "x-pd-card": "components/compact-card",
+      "description": "The pages, in the order the query gives"
+    }
+  }
+}

@@ -131,10 +131,13 @@ export function checkPageDeclaration(schema: unknown, layoutId: string, filled: 
   const props = isObject(schema) && isObject(schema["properties"]) ? schema["properties"] : {};
   const page = Object.hasOwn(props, "page") ? props["page"] : undefined;
   if (page === undefined) return { declared: undefined, problems: [] };
-  const declared = isObject(page) && isObject(page["properties"]) ? Object.keys(page["properties"]) : [];
+  const subs = isObject(page) && isObject(page["properties"]) ? page["properties"] : {};
+  const declared = Object.keys(subs);
+  // A query (query.ts) is a sub-key the layout names itself: x-pd-query on it.
+  const isQuery = (key: string) => { const sub = subs[key]; return isObject(sub) && Object.hasOwn(sub, "x-pd-query") && !Object.hasOwn(RETIRED, key); };
   const fills = filled.length ? `it fills ${filled.map(k => `page.${k}`).join(", ")}` : "it fills none yet";
   const problems = declared
-    .filter(key => !filled.includes(key))
+    .filter(key => !filled.includes(key) && !isQuery(key))
     .map(key => Object.hasOwn(RETIRED, key) ? `${layoutId} declares "page.${key}", which Pattern Dump no longer fills: ${RETIRED[key]}`
       : `${layoutId} declares "page.${key}", which Pattern Dump does not fill (${fills})`);
   return { declared, problems };

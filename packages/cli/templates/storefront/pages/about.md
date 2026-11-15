@@ -7,7 +7,9 @@ order: 1
 The pages are in `pages/`. What they look like is the skin, written as ordinary components so the
 workbench shows each part of it:
 
-- `src/patterns/layouts/page`: the layout every page renders with
+- `src/patterns/layouts/page`: the layout every page renders with, unless it names another
+- `src/patterns/layouts/home` and `src/patterns/layouts/article`: the home page's, with the latest articles, and an
+  article's, with its related articles
 - `src/patterns/partials/base`: the frame around it, with the header, navigation and footer
 - `src/patterns/partials/head`: what the skin adds to every page's `<head>`
 - `src/patterns/components/note`: a component the pages show

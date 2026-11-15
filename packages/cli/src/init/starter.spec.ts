@@ -175,7 +175,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
       [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"],
-        ["layouts/listing", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
+        ["layouts/article", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
         ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
   }, 120_000);
 
@@ -189,17 +189,24 @@ describe("the starter project with a website (--storefront, no examples)", () =>
       expect(home.body).toContain(`<aside class="note note-tip" role="note">`);
       expect(home.body).toContain(`<iframe src="/preview/components/note"`);
       expect(home.body).toContain(`<a rel="next" href="/about/">Next: About</a>`);
+      // The latest articles: a query of the home layout (articles, newest first, three), in the list view.
+      expect(home.body).toMatch(/<h2 id="home-latest-title">Latest articles<\/h2>\s*<ul class="view-list" role="list">\s*<li>\s*<article class="listing-card">\s*<h2 class="listing-card-title"><a href="\/articles\/related\/">Related articles<\/a><\/h2>/);
+      expect([...home.body.matchAll(/<h2 class="listing-card-title"><a href="([^"]+)"/g)].map(m => m[1])).toEqual(["/articles/related/", "/articles/hello/"]);
       expect((await onHost(server.port, "live.localhost", "/about/")).status).toBe(200);
       // The articles collection: its listing names the example article with its date, and the article shows its tags.
       const articles = await onHost(server.port, "live.localhost", "/articles/");
       expect(articles.status).toBe(200);
       // Shown through the list view its index.md names: one listing card per page, and the view's and card's styles.
-      expect(articles.body).toMatch(/<ul class="view-list" role="list">\s*<li>\s*<article class="listing-card">\s*<h2 class="listing-card-title"><a href="\/articles\/hello\/">Hello, articles<\/a><\/h2>\s*<p class="listing-card-date"><time datetime="2026-11-14">/);
+      expect(articles.body).toMatch(/<ul class="view-list" role="list">\s*<li>\s*<article class="listing-card">\s*<h2 class="listing-card-title"><a href="\/articles\/related\/">Related articles<\/a><\/h2>\s*<p class="listing-card-date"><time datetime="2026-11-15">/);
+      expect(articles.body).toContain(`<a href="/articles/hello/">Hello, articles</a></h2>\n  <p class="listing-card-date"><time datetime="2026-11-14">`);
       expect(articles.body).toContain(`href="${componentCssUrl("views/list").replace(/\.css$/, "")}`);
       expect(articles.body).toContain(`href="${componentCssUrl("components/listing-card").replace(/\.css$/, "")}`);
       const hello = await onHost(server.port, "live.localhost", "/articles/hello/");
       expect(hello.status).toBe(200);
       expect(hello.body).toContain(`<ul class="page-tags" aria-label="Tags"><li>getting-started</li><li>notes</li></ul>`);
+      // Its related articles: the article layout's query (the same folder, by relevance, three), in the compact view.
+      expect(hello.body).toMatch(/<h2 id="article-related-title">Related articles<\/h2>\s*<ul class="view-compact" role="list">\s*<li><p class="compact-card"><a href="\/articles\/related\/">Related articles<\/a> <time class="compact-card-date" datetime="2026-11-15">/);
+      expect(hello.body).toContain(`href="${componentCssUrl("views/compact").replace(/\.css$/, "")}`);
       const missing = await onHost(server.port, "live.localhost", "/no-such-page/");
       expect(missing.status).toBe(404);
       expect(missing.body).toContain("Page not found");
@@ -215,7 +222,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const config = await loadConfig(siteDir);
     const server = await startDevServer(config, siteDir, { port: 0, wsPort: 0 });
     try {
-      for (const id of ["views/list", "views/grid", "views/featured", "views/compact", "components/listing-card", "components/grid-card", "components/feature-card", "components/compact-card"]) {
+      for (const id of ["layouts/article", "layouts/home", "views/list", "views/grid", "views/featured", "views/compact", "components/listing-card", "components/grid-card", "components/feature-card", "components/compact-card"]) {
         const d = await (await fetch(`http://127.0.0.1:${server.port}/api/component/${id}`)).json() as ComponentDetailResponse;
         expect(d.diagnostics, id).toEqual([]);
         expect(d.doc, id).toBeTruthy();
@@ -231,10 +238,11 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const config = await loadConfig(siteDir);
     const server = await startDevServer(config, siteDir, { port: 0, wsPort: 0 });
     try {
-      await save(index, before.replace("view: list", "view: grid"));
+      await save(index, before.replace("layout: listing\n", "layout: listing\nview: grid\n"));
       const page = await onHost(server.port, "live.localhost", "/articles/");
       expect(page.status).toBe(500);
       expect(page.body).toContain(`articles/index.md: articles/hello.md has no image, which the card of view "grid" (components/grid-card) requires`);
+      expect(page.body).toContain(`articles/index.md: articles/related.md has no image, which the card of view "grid" (components/grid-card) requires`);
     } finally {
       await save(index, before);
       await server.close();

@@ -206,16 +206,14 @@ describe("assemblePage — the head", () => {
   });
 
   it("a shallow clone: no datePublished from git, no problem, one note whatever the page; other date notes are not the JSON-LD's", async () => {
-    const NO_ARTICLES = `partials/base lists site.collections.articles, but the pages folder has no folder "articles" with an index.md, so it is an empty list`;
     const dir = await pages();
     const shallow = dated({ shallow: true, notes: ["index.md: a date note"], problems: ["index.md: the repository is a shallow clone"] });
     const home = await assemblePage("/", await readPages(dir), assembly({ siteUrl: URL_, dates: shallow.dates }));
     expect(home.problems).toEqual([]);
-    // The bench skin lists site.collections.articles, which this site has no folder for: the other note.
-    expect(home.notes).toEqual([SHALLOW_SEO_NOTE, NO_ARTICLES]);
+    expect(home.notes).toEqual([SHALLOW_SEO_NOTE]);
     expect(graphOf(home.html)[1]).not.toHaveProperty("datePublished");
     const draft = await assemblePage("/draft/", await readPages(dir), assembly({ siteUrl: URL_, dates: shallow.dates }));
-    expect(draft.notes).toEqual([SHALLOW_SEO_NOTE, NO_ARTICLES]);
+    expect(draft.notes).toEqual([SHALLOW_SEO_NOTE]);
   });
 
   it("og:type article for a dated page, with its date and tags; website for an undated page, the home page and a listing", async () => {

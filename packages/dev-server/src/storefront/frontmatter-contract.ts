@@ -23,6 +23,7 @@ import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
 import type { FrontmatterValue } from "../frontmatter.js";
 import { readCategories, readChildLayout, readDate, readDraft, readSort, readTags, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
 import { categoryIndex, type CategoryIndex } from "./categories.js";
+import { declaredQueries } from "./query.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
 export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view"] as const;
@@ -190,16 +191,18 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     }
   }
   const build = buildKeys();
+  // The keys that set the layout's queries (query.ts reads and checks them): the build's, like the reserved keys.
+  const forQueries = declaredQueries(read.schema).map(q => q.name);
 
   // ---- every key the page sets ----
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
-    if ((RESERVED_KEYS as readonly string[]).includes(key)) continue;
+    if ((RESERVED_KEYS as readonly string[]).includes(key) || forQueries.includes(key)) continue;
     if ((ASSEMBLY_KEYS as readonly string[]).includes(key)) { at(key, `"${key}" is filled by the storefront, not by a page`); continue; }
     const prop = Object.hasOwn(declared, key) ? declared[key] : undefined;
     if (!prop) {
       if (!hasSchema) { at(key, `"${key}" is not declared by ${named}, which has no schema`); continue; }
-      const near = suggest(key, [...Object.keys(declared), ...RESERVED_KEYS]);
+      const near = suggest(key, [...Object.keys(declared), ...RESERVED_KEYS, ...forQueries]);
       at(key, `"${key}" is not declared by ${named}${near ? `: did you mean "${near}"?` : ""}`);
       continue;
     }
@@ -208,10 +211,19 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     else at(key, `"${key}" ${r.message}`);
   }
 
+  // ---- keys with options under them: only a query of the layout takes them ----
+  for (const key of Object.keys(page.frontmatter.maps ?? {})) {
+    if (forQueries.includes(key)) continue;
+    const known = Object.hasOwn(declared, key) || (RESERVED_KEYS as readonly string[]).includes(key) || (ASSEMBLY_KEYS as readonly string[]).includes(key);
+    if (known) { at(key, `"${key}" has keys indented under it, which only a query of the layout takes: write its value on the line`); continue; }
+    const near = suggest(key, [...Object.keys(declared), ...RESERVED_KEYS, ...forQueries]);
+    at(key, `"${key}" is not declared by ${named}${near ? `: did you mean "${near}"?` : ""}`);
+  }
+
   // ---- what the layout requires ----
   for (const key of schema.required ?? []) {
     if ((ASSEMBLY_KEYS as readonly string[]).includes(key)) continue;
-    if (!(key in values)) problems.push({ file: page.path, message: `"${key}" is required by ${named}` });
+    if (!(key in values) && !(key in (page.frontmatter.maps ?? {}))) problems.push({ file: page.path, message: `"${key}" is required by ${named}` });
   }
 
   return { layoutId, values: out, build, problems, notes };

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Article",
+  "description": "The layout of an article: a page in a collection, with its date, its tags and related articles.",
+  "type": "object",
+  "x-pd-prose-images": { "widths": [480, 672, 1344], "sizes": "(min-width: 44rem) 42rem, calc(100vw - 2rem)" },
+  "required": ["title"],
+  "properties": {
+    "title": { "type": "string", "description": "The article's heading, its title in listings and in search results" },
+    "description": { "type": "string", "description": "One sentence under the heading, its teaser in listings, and its description for search results" },
+    "page": {
+      "type": "object",
+      "description": "What the storefront works out for the page",
+      "properties": {
+        "date": { "description": "The article's date, from its frontmatter" },
+        "tags": { "description": "The article's tags, from its frontmatter" },
+        "related": {
+          "description": "Up to three articles of the same folder, the ones sharing most tags and categories first, in the compact view. An article changes options under related: (limit: 5, indented), or turns them off with related: false",
+          "x-pd-query": { "collections": "same", "sort": "relevance", "limit": 3, "view": "compact" }
+        }
+      }
+    }
+  }
+}

@@ -15,9 +15,9 @@ describe("readFrontmatter (lenient)", () => {
     expect(readFrontmatter("---\norder: 2\n---\n")).toEqual({ order: "2" });
   });
 
-  it("drops a line it cannot read, and turns a nested map into an empty list", () => {
+  it("drops a line it cannot read, and leaves a key with a map under it out of the plain values", () => {
     expect(readFrontmatter("---\ntitle: Setup\n  : : broken [\nnested:\n  child: x\n---\n"))
-      .toEqual({ title: "Setup", nested: [] });
+      .toEqual({ title: "Setup" });
   });
 
   it("ignores a block that is never closed", () => {

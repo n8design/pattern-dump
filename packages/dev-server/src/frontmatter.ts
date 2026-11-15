@@ -4,7 +4,8 @@
 // The older per-key reads in this package regex-match `^key:` against the WHOLE file, so a body line
 // that happens to start with `title:` is read as metadata, and no list can be expressed at all. This
 // reader looks only inside the leading block and understands the two list spellings authors
-// actually write. It is deliberately not YAML: scalars stay strings, no nesting, no anchors.
+// actually write, and one level of keys under a key (`related:` with `  limit: 5` indented under it). It
+// is deliberately not YAML: scalars stay strings, no deeper nesting, no anchors.
 //
 // One scanner, two readings:
 //   - readFrontmatter (lenient): the values, nothing else. A line it cannot read is dropped without a
@@ -17,6 +18,8 @@
 // mark is not part of the first line, and lines split on `\r?\n`. Line numbers count from 1, the
 // opening `---` being line 1, the same with or without the mark or CR.
 
+/** A map under a key, one level deep: `related:` with `  limit: 5` and `  tags: [css]` indented under it. */
+export type FrontmatterMap = { [key: string]: string | string[] };
 export type FrontmatterValue = string | string[];
 
 export interface FrontmatterError {
@@ -27,8 +30,11 @@ export interface FrontmatterError {
 
 export interface FrontmatterReading {
   values: Record<string, FrontmatterValue>;
+  /** The keys with a map under them, never also in `values` (which every plain reading takes). */
+  maps: Record<string, FrontmatterMap>;
   errors: FrontmatterError[];
-  /** The 1-based line each key is set on; for a duplicate key, the line whose value counts (the last). */
+  /** The 1-based line each key is set on; for a duplicate key, the line whose value counts (the last). A key in a
+   *  map is named with its parent: "related.limit". */
   lines: Record<string, number>;
 }
 
@@ -63,17 +69,34 @@ function scan(md: string): FrontmatterReading {
     // No block, which is valid — unless it is one written with bare-CR line endings, which leave the
     // whole file on one line and so never read as a block.
     if (/^---\r(?!\n)/.test(text)) err(1, "lines end in a bare CR: use LF or CRLF line endings");
-    return { values: {}, errors, lines: {} };
+    return { values: {}, maps: {}, errors, lines: {} };
   }
   const end = blockEnd;
   if (end < 0) {
     err(1, "the frontmatter block opened here is never closed: end it with a line holding only ---");
-    return { values: {}, errors, lines: {} };
+    return { values: {}, maps: {}, errors, lines: {} };
   }
 
   const out: Record<string, FrontmatterValue> = {};
+  const maps: Record<string, FrontmatterMap> = {};
   const keyLines: Record<string, number> = {};
-  let listKey: string | null = null;
+  /** The key whose block (`key:` with nothing after it) the next lines fill: a list (`- a`) or a map (`  sub: v`). */
+  let openKey: string | null = null;
+  /** In a map: its indentation, and the sub-key whose own block list (`    - a`) the next lines fill. */
+  let mapIndent = 0;
+  let subListKey: string | null = null;
+
+  /** A value written after `key:` on one line: an inline list, or a scalar. `label`: how messages name the key. */
+  const inline = (value: string, label: string, lineErr: (m: string) => void): string | string[] => {
+    if (value.startsWith("[") && value.endsWith("]")) {
+      const items = value.slice(1, -1).split(",");
+      for (const it of items) if (unterminatedQuote(it)) lineErr(`list item ${it.trim()} has an opening quote with no closing one`);
+      return items.map(unquote).filter(Boolean);
+    }
+    if (value.startsWith("[")) lineErr(`"${label}": the list opened with [ is never closed with ]`);
+    else if (unterminatedQuote(value)) lineErr(`"${label}": the value has an opening quote with no closing one`);
+    return unquote(value);
+  };
 
   for (let i = 1; i < end; i++) {
     const line = lines[i];
@@ -83,44 +106,62 @@ function scan(md: string): FrontmatterReading {
     const bareCr = line.includes("\r");
     if (bareCr) err(n, "line ends in a bare CR: use LF or CRLF line endings");
     const lineErr = (message: string): void => { if (!bareCr) err(n, message); };
+    const isMap = openKey !== null && Object.hasOwn(maps, openKey);
 
     const item = line.match(/^\s*-\s+(.*)$/);
-    if (item && listKey) {
+    if (item && openKey !== null) {
       if (unterminatedQuote(item[1])) lineErr(`list item ${item[1].trim()} has an opening quote with no closing one`);
-      (out[listKey] as string[]).push(unquote(item[1]));
+      if (isMap) {
+        if (subListKey === null) lineErr(`list item with no key above it in "${openKey}": a list follows a line \`  key:\``);
+        else (maps[openKey][subListKey] as string[]).push(unquote(item[1]));
+      } else (out[openKey] as string[]).push(unquote(item[1]));
+      continue;
+    }
+    // A key indented under `key:`: the block is a map, one level deep, of plain values and lists.
+    const sub = line.match(/^(\s+)([A-Za-z_][\w-]*):\s*(.*)$/);
+    if (sub && openKey !== null && (isMap || (out[openKey] as string[]).length === 0)) {
+      const indent = sub[1].length;
+      if (!isMap) { delete out[openKey]; maps[openKey] = {}; mapIndent = indent; }
+      const map = maps[openKey];
+      if (indent !== mapIndent) {
+        lineErr(`nested value: one level of keys under "${openKey}", each indented the same as the first`);
+        continue;
+      }
+      const [, , name, raw] = sub;
+      if (name in map) lineErr(`duplicate key "${openKey}.${name}"`);
+      keyLines[`${openKey}.${name}`] = n;
+      const value = raw.trim();
+      if (value === "") { map[name] = []; subListKey = name; }
+      else { map[name] = inline(value, `${openKey}.${name}`, lineErr); subListKey = null; }
       continue;
     }
     const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
     if (!kv) {
       if (line.trim() !== "") {
         if (item) lineErr("list item with no key above it: a list follows a line `key:`");
-        else if (/^\s+[A-Za-z_][\w-]*:/.test(line)) lineErr("nested value: only top-level keys are supported, written at the start of the line");
+        else if (/^\s+[A-Za-z_][\w-]*:/.test(line)) lineErr("nested value with no key above it: nested keys follow a line `key:`, indented under it");
         else lineErr(`cannot read this line: ${line.trim()}`);
       }
-      listKey = null;
+      openKey = null;
+      subListKey = null;
       continue;
     }
     const [, key, raw] = kv;
-    if (key in out) lineErr(`duplicate key "${key}"`);
+    if (key in out || key in maps) lineErr(`duplicate key "${key}"`);
+    delete maps[key];
     keyLines[key] = n;
     const value = raw.trim();
+    subListKey = null;
     if (value === "") {
-      // `key:` with nothing after it opens a block list (`- a` lines follow).
+      // `key:` with nothing after it opens a block: a list (`- a` lines follow) or a map (`  sub: v` lines).
       out[key] = [];
-      listKey = key;
-    } else if (value.startsWith("[") && value.endsWith("]")) {
-      const items = value.slice(1, -1).split(",");
-      for (const it of items) if (unterminatedQuote(it)) lineErr(`list item ${it.trim()} has an opening quote with no closing one`);
-      out[key] = items.map(unquote).filter(Boolean);
-      listKey = null;
+      openKey = key;
     } else {
-      if (value.startsWith("[")) lineErr(`"${key}": the list opened with [ is never closed with ]`);
-      else if (unterminatedQuote(value)) lineErr(`"${key}": the value has an opening quote with no closing one`);
-      out[key] = unquote(value);
-      listKey = null;
+      out[key] = inline(value, key, lineErr);
+      openKey = null;
     }
   }
-  return { values: out, errors, lines: keyLines };
+  return { values: out, maps, errors, lines: keyLines };
 }
 
 /** Parse the leading `---` block. Returns an empty object when the file has none. Lenient: a line it

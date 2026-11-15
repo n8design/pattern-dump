@@ -287,7 +287,7 @@ describe("checkPageFrontmatter — the listing keys: date, tags, draft, sort", (
 describe("checkPageFrontmatter — the frontmatter's own grammar", () => {
   it("reports grammar errors first, with their lines, then the key checks", async () => {
     expect((await check("---\ntitle: T\n  nested: x\ntitle: U\nwho: me\n---\n")).problems).toEqual([
-      P(3, "nested value: only top-level keys are supported, written at the start of the line"),
+      P(3, "nested value with no key above it: nested keys follow a line `key:`, indented under it"),
       P(4, `duplicate key "title"`),
       P(5, `"who" is not declared by layout "page"`),
     ]);

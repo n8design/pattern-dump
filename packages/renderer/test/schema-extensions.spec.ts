@@ -57,8 +57,8 @@ describe("the placement schema extensions", () => {
 
   it("an unknown x-pd- key is an error, at the top and in a property", () => {
     expect(check({ "x-pd-contnet": "caption", properties: { caption: { type: "string", "x-pd-componnet": "atoms/slide" } } })).toEqual([
-      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
-      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images, x-pd-query, x-pd-view)`,
+      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images, x-pd-query, x-pd-view)`,
     ]);
   });
 
@@ -74,7 +74,7 @@ describe("the placement schema extensions", () => {
     }
     // In a property it is not a known key.
     expect(check({ properties: { a: { type: "string", "x-pd-example-height": 10 } } })).toEqual([
-      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images, x-pd-query, x-pd-view)`,
     ]);
   });
 
@@ -98,7 +98,7 @@ describe("the placement schema extensions", () => {
     }
     // In a property it is not a known key.
     expect(check({ properties: { body: { type: "string", "x-pd-prose-images": slot } } })).toEqual([
-      `#/properties/body/x-pd-prose-images: "x-pd-prose-images" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+      `#/properties/body/x-pd-prose-images: "x-pd-prose-images" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images, x-pd-query, x-pd-view)`,
     ]);
   });
 
@@ -122,6 +122,31 @@ describe("the placement schema extensions", () => {
       `#/properties/c/x-pd-card: x-pd-card must name a component`,
       `#/properties/d/x-pd-card: x-pd-card is only for a list: the pages of a listing, each shown as the card`,
     ]);
+  });
+
+  it("x-pd-query: on a sub-key of a layout's page, an object of known options; its view is a view", () => {
+    const views = { componentExists: (id: string) => ["views/compact", "atoms/slide"].includes(id), hasSchema: () => true };
+    const run = (schema: unknown) => checkSchemaExtensions(schema, undefined, views).map(p => `${p.path}: ${p.message}`);
+    expect(run({ properties: { page: { properties: {
+      related: { "x-pd-query": { collections: "same", sort: "relevance", limit: 3, view: "compact" } },
+      listing: { "x-pd-view": "compact" },
+    } } } })).toEqual([]);
+    expect(run({ properties: { page: { properties: {
+      a: { "x-pd-query": "same" },
+      b: { "x-pd-query": { limt: 3, view: "grid" } },
+      listing: { "x-pd-view": "gird" },
+      c: { "x-pd-view": 3 },
+    } } } })).toEqual([
+      `#/properties/page/properties/a/x-pd-query: x-pd-query must be an object of options (pages, collections, categories, tags, match, sort, order, limit, view)`,
+      `#/properties/page/properties/b/x-pd-query: "limt" is not an option of a query (pages, collections, categories, tags, match, sort, order, limit, view)`,
+      `#/properties/page/properties/b/x-pd-query: view "grid" is not a view (a component in views/)`,
+      `#/properties/page/properties/listing/x-pd-view: view "gird" is not a view (a component in views/)`,
+      `#/properties/page/properties/c/x-pd-view: x-pd-view must name a view`,
+    ]);
+  });
+
+  it("x-pd-query doesn't make a layout placeable: its template is not checked", () => {
+    expect(check({ properties: { body: { type: "string" }, page: { properties: { related: { "x-pd-query": { limit: 3 } } } } } }, `<main>{{{body}}}{{{page.related.listing}}}</main>`)).toEqual([]);
   });
 
   it("x-pd-card doesn't make a layout placeable: its template is not checked", () => {

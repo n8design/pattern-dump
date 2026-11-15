@@ -19,7 +19,10 @@ import { basename } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "../composition.js";
 import { ASSEMBLY_KEYS } from "./frontmatter-contract.js";
-import { ENTRY, outsideShape, PAGE_SHAPE } from "./derived.js";
+import { ENTRY, outsideShape, PAGE_SHAPE, type Shape } from "./derived.js";
+
+/** What a layout gets for a query: its pages, and the same through its view. */
+const QUERY_SHAPE: Shape = { fields: { entries: { items: ENTRY }, listing: "value" } };
 import { SITE_SCHEMA_OWNER } from "./site.js";
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -51,6 +54,8 @@ export async function checkSampleData(
   /** The cards in the tree (x-pd-card): each renders with a page of a listing as its context, so its sample data may
    *  set only that page's fields (ENTRY), not the layout's keys. */
   cards: readonly string[] = [],
+  /** The layout's queries (query.ts), by name: sub-keys of `page` whose shape is { entries, listing }. */
+  queries: readonly string[] = [],
 ): Promise<string[]> {
   const problems: string[] = [];
   const allowed = new Set<string>([...layoutDeclared, ...ASSEMBLY_KEYS].filter(k => k !== "page" || pageDeclared !== undefined));
@@ -76,7 +81,8 @@ export async function checkSampleData(
       }
       if (key === "page" && isPlainObject(value)) {
         for (const [sub, v] of Object.entries(value)) {
-          const outside = Object.hasOwn(shapeFields, sub)
+          const outside = queries.includes(sub) ? outsideShape(v, QUERY_SHAPE, `page.${sub}`)
+            : Object.hasOwn(shapeFields, sub)
             ? (pageDeclared ?? []).includes(sub) ? outsideShape(v, PAGE_SHAPE.fields[sub as keyof typeof PAGE_SHAPE.fields], `page.${sub}`) : undefined
             : [`page.${sub}`];
           if (outside === undefined) {

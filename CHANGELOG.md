@@ -21,6 +21,11 @@
 - `updated` and `categories` are now keys the build owns: a layout's schema that declares either must rename it.
 - `childLayout` and `view` are keys the build owns too, so the same holds for them.
 
+### Deprecated
+
+- `site.collections`. It keeps working, and a skin whose `partials/base` lists it gets one warning per build, naming
+  the query to declare instead (`x-pd-query` on a sub-key of `page`). It goes in a later release.
+
 ### Added
 
 - `childLayout:` on a folder's `index.md`: the layout of the pages under it that name none. The nearest folder that
@@ -37,7 +42,7 @@
   pages as `entries`, and names its card, so each view's required fields are checked on their own. A view that
   doesn't exist, a listing that names none and a view on a page with no listing are problems.
 - The website starter (`pd init --storefront`) ships four plain views with their cards: `list`, `grid`, `featured`
-  and `compact`. Its articles listing uses `view: list`.
+  and `compact`.
 - `updated:` on a storefront page, its last real change: `page.updated`, JSON-LD `dateModified`,
   `article:modified_time` on an article, and the sitemap's `lastmod`. Checked: a real date, not before `date`.
 - Categories, independent of folders: `storefront.categories` declares them (key, label, optional description, and
@@ -45,6 +50,20 @@
   a "did you mean"; an old key builds as the new category, with a warning naming the page. Layouts get
   `page.categories`, listing entries carry them, and `site.categories` lists every one when `partials/base` lists it.
 - Listing entries carry `updated`, `categories` and `scheduled` (true in `pd dev` for a page dated after today).
+- Queries: one way to list pages anywhere but a folder's own listing, such as related pages and a home page's latest
+  articles. A layout declares one as a sub-key of `page` with `x-pd-query` and its defaults: hand-picked `pages`
+  first, then the pages of `collections` (or `same`, the page's own folder) matching `categories` and `tags`
+  (`match`: any or all), by `sort` (relevance, date or title) and `order`, to `limit`, through a `view`. The layout
+  gets `{ entries, listing }`. A page changes options in a block under the query's name, with the same option names (`related:` with
+  `limit: 5` indented under it), or turns the
+  query off with `<name>: false`. The current page, drafts and scheduled pages never appear, and a page never comes
+  twice. Every value is checked, at the page's line or in the layout, with a "did you mean" where it fits.
+- A page's frontmatter takes one level of keys indented under a key, for a query's options. Under any other key, and
+  any deeper, it is a problem with its line, as before.
+- A layout's default view for its listing: `x-pd-view` on `page.listing`. An `index.md`'s `view:` wins.
+- The website starter has an article layout, which its articles take from their folder, listing three related
+  articles in the compact view, and a home layout listing the three newest articles in the list view. Its listing
+  layout shows the list view by default, so `articles/index.md` names no view.
 - Shell code is highlighted: `bash`, `sh`, `shell` and `zsh`, and `console` or `shell-session` for a prompt with its
   output. `text` stays plain.
 

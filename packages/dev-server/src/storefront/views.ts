@@ -31,36 +31,53 @@ export function viewNames(discoveryMap: DiscoveryMap): string[] {
 export interface ResolvedView { id: string; card: Card }
 
 /**
- * The view a listing page names (`view`, at `line`), for a layout that shows a listing or not (`shows`). Every
- * problem, each with the page's file. Nothing to do for a page that names none and shows none.
+ * The view `name`, named at `at` ("articles/index.md:4", or a layout), read for a listing: its component and its card,
+ * or every problem with it.
  */
-export async function resolveView(o: {
-  view: string | undefined; line: number | undefined; path: string; layout: string; shows: boolean; discoveryMap: DiscoveryMap;
-}): Promise<{ view?: ResolvedView; problems: string[] }> {
-  const at = `${o.path}${o.line !== undefined ? `:${o.line}` : ""}`;
-  const names = viewNames(o.discoveryMap);
+export async function viewOf(name: string, at: string, discoveryMap: DiscoveryMap): Promise<{ view?: ResolvedView; problems: string[] }> {
+  const names = viewNames(discoveryMap);
   const list = names.length ? `the views are ${names.map(n => `"${n}"`).join(", ")}` : undefined;
-  if (o.view === undefined) {
-    if (!o.shows) return { problems: [] };
-    return { problems: [`${o.path}: layout "${o.layout}" shows a listing (page.listing), so name its view: view: <name> `
-      + `(${list ?? "the skin has no views yet: components in a views/ folder of its patterns"})`] };
+  const id = `views/${name}`;
+  if (!VIEW_ID.test(id) || !discoveryMap.has(id)) {
+    if (!list) return { problems: [`${at}: view "${name}" is not a view: the skin has no views (components in a views/ folder of its patterns)`] };
+    const near = suggest(name, names);
+    return { problems: [`${at}: view "${name}" is not a view: ${near ? `did you mean "${near}"? (${list})` : list}`] };
   }
-  if (!o.shows) return { problems: [`${at}: view names how a listing is shown, but layout "${o.layout}" shows none (it doesn't declare page.listing)`] };
-  const id = `views/${o.view}`;
-  if (!VIEW_ID.test(id) || !o.discoveryMap.has(id)) {
-    if (!list) return { problems: [`${at}: view "${o.view}" is not a view: the skin has no views (components in a views/ folder of its patterns)`] };
-    const near = suggest(o.view, names);
-    return { problems: [`${at}: view "${o.view}" is not a view: ${near ? `did you mean "${near}"? (${list})` : list}`] };
-  }
-  const read = await readSchema(o.discoveryMap.get(id)?.schemaPath);
+  const read = await readSchema(discoveryMap.get(id)?.schemaPath);
   if (read.error !== undefined) return { problems: [`${id}: its schema cannot be read: ${read.error}`] };
   const cardId = cardOf(read.schema?.properties?.[VIEW_KEY]);
   if (cardId === undefined) {
     return { problems: [`${id}: its schema declares no "${VIEW_KEY}" list with "x-pd-card": a view names the card it shows each page as, `
       + `so each page can be checked against it`] };
   }
-  const card = await readCard(cardId, id, `the card of view "${o.view}"`, o.discoveryMap);
+  const card = await readCard(cardId, id, `the card of view "${name}"`, discoveryMap);
   return card.card ? { view: { id, card: card.card }, problems: card.problems } : { problems: card.problems };
+}
+
+/** The key on a layout's page.listing that names the view its listings are shown in when the index.md names none. */
+export const DEFAULT_VIEW_KEY = "x-pd-view";
+
+/**
+ * The view a listing page names (`view`, at `line`), else its layout's default (`fallback`, x-pd-view on page.listing),
+ * for a layout that shows a listing or not (`shows`). Every problem, each with the page's file, or the layout's id for
+ * its default. Nothing to do for a page that names none and shows none.
+ */
+export async function resolveView(o: {
+  view: string | undefined; line: number | undefined; path: string; layout: string; shows: boolean; discoveryMap: DiscoveryMap;
+  fallback?: string | undefined;
+}): Promise<{ view?: ResolvedView; problems: string[] }> {
+  const at = `${o.path}${o.line !== undefined ? `:${o.line}` : ""}`;
+  const names = viewNames(o.discoveryMap);
+  const list = names.length ? `the views are ${names.map(n => `"${n}"`).join(", ")}` : undefined;
+  if (o.view === undefined) {
+    if (!o.shows) return { problems: [] };
+    if (o.fallback !== undefined) return viewOf(o.fallback, `layouts/${o.layout} (${DEFAULT_VIEW_KEY} on page.listing)`, o.discoveryMap);
+    return { problems: [`${o.path}: layout "${o.layout}" shows a listing (page.listing), so name its view: view: <name> `
+      + `(${list ?? "the skin has no views yet: components in a views/ folder of its patterns"}), or give the layout a default `
+      + `("${DEFAULT_VIEW_KEY}" on page.listing)`] };
+  }
+  if (!o.shows) return { problems: [`${at}: view names how a listing is shown, but layout "${o.layout}" shows none (it doesn't declare page.listing)`] };
+  return viewOf(o.view, at, o.discoveryMap);
 }
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);

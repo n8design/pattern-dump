@@ -7,7 +7,7 @@
 //     from @pattern-dump/discovery — never the old walk. No path reconstruction anywhere.
 export { initHighlighter, highlight, getShikiCSS, wrapWithCopyButton } from "./highlight";
 export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
-export { checkSchemaExtensions, readExampleHeight, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
+export { checkSchemaExtensions, QUERY_OPTIONS, readExampleHeight, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
 export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
 export { helperShadows, type HelperShadow } from "./helper-shadow";
 import { helperShadows } from "./helper-shadow";

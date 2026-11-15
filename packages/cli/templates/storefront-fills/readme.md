@@ -25,6 +25,7 @@ returns by itself. How `pd-` tags work:
 |---|---|
 | `pages/` | the pages, in markdown (`pages/` is the website; `src/patterns/pages/`, if you have it, holds page-sized components) |
 | `src/patterns/layouts/page/` | the layout every page renders with; its schema is what a page's frontmatter may set |
+| `src/patterns/layouts/home/`, `layouts/article/` | the home page's layout, with the latest articles, and an article's, with its related articles |
 | `src/patterns/partials/base/` | the frame around every page: header, navigation, footer |
 | `src/patterns/partials/head/` | what the skin adds to every page's `<head>` (the icon) |
 | `src/patterns/components/note/` | the component the home page shows |
@@ -32,10 +33,13 @@ returns by itself. How `pd-` tags work:
 | `src/patterns/components/*-card/` | the card each view shows a page as; its schema says which fields a page needs |
 | `pattern-dump.config.ts` | `storefront`: the website's name and footer (`site`), and where it is published |
 
-`pages/articles/` is a collection: its `index.md` (layout `listing`, `view: list`, `sort: date`) lists every page
-in the folder, newest first, by its `date`. Copy `hello.md` to write another; `draft: true` keeps one out of the
+`pages/articles/` is a collection: its `index.md` (layout `listing`, `sort: date`) lists every page in the folder,
+newest first, by its `date`, in the listing layout's default view (`list`). Copy `hello.md` to write another; `draft: true` keeps one out of the
 build. Each page is checked against the view's card: switch to `view: grid` and the listing names every article
-without an `image:`. `childLayout: <layout>` on a folder's `index.md` gives its pages a layout of their own.
+without an `image:`. `childLayout: article` on its `index.md` gives its pages the article layout, which lists each article's related
+articles; the home page lists the latest ones. Both are queries, declared in the layout's schema (`x-pd-query`)
+and changed per page under the query's name (`related:`, with `limit: 5` indented under it), or turned off with
+`related: false`.
 
 A page that doesn't exist shows a built-in 404 page; write `pages/404.md` to change it. A page that moved
 can forward from its old address (`redirectFrom: [/old/]`), and `index: false` keeps a page out of search

@@ -227,10 +227,12 @@ page fails when:
 - it sets a key the layout does not declare (with a suggestion for a likely typo)
 - a value does not have its declared type. Values are text, read as numbers or booleans only where the
   schema declares `number`, `integer` or `boolean`
-- the frontmatter cannot be read: a line that is not `key: value` or a list item, a nested value, a
-  duplicate key, an unclosed block or quote
+- the frontmatter cannot be read: a line that is not `key: value` or a list item, a value nested deeper
+  than one level, a duplicate key, an unclosed block or quote
+- keys indented under a key that is not one of the layout's [queries](#queries)
 
-Frontmatter is a small fixed grammar, not full YAML: one level of `key: value` pairs and lists.
+Frontmatter is a small fixed grammar, not full YAML: `key: value` pairs and lists, and, for a query's options only,
+one level of keys indented under a key.
 
 ### A folder's default layout
 
@@ -499,7 +501,9 @@ With `sort: date`, a page with no date at all (no `date` and no commit, such as 
 `pd build` and a note in `pd dev`, where it is listed last. From a shallow clone, a date git would give is
 refused by `pd build`, as for `page.created`.
 
-**On any page.** `partials/base`'s schema lists the collections the skin shows under
+**On any page (deprecated).** Use a [query](#queries) instead: it lists pages on any page, with a limit and a
+view. `site.collections` keeps working for now, and a skin that lists it gets one warning per build.
+`partials/base`'s schema lists the collections the skin shows under
 `site.properties.collections.properties`, by the folder's path (`articles`, or `blog/news` for a nested folder,
 read as `site.collections.[blog/news]`), each with a description at most, as it lists navigations. Every page
 gets `site.collections.<name>`: the folder's entries, sorted as above. A listed name the site has no folder for is
@@ -542,8 +546,10 @@ them like any component.
 
   So views are separate components with cards of their own, not variants of one card: a grid's card can require an
   image while a list's doesn't.
+- **A default view.** The layout can name the view its listings take when the `index.md` names none, with
+  `x-pd-view` on `page.listing`: `"listing": { "x-pd-view": "list" }`. The `index.md`'s `view:` wins.
 - **Checked:** a view that doesn't exist fails the page with the views there are (and a "did you mean"); a listing
-  page whose layout shows `page.listing` must name its view; a `view:` on a page whose layout shows no listing, or on
+  page whose layout shows `page.listing` must name its view, unless the layout names a default; a `view:` on a page whose layout shows no listing, or on
   a page that is not a folder's `index.md`, is a problem; a view whose schema names no card is a problem.
 - **Sample data:** a view's may set only `entries`, each an entry; its card's only an entry's fields.
 - **Styles and scripts** of the view and its card load on the page as those of a placed component do.
@@ -551,6 +557,72 @@ them like any component.
 The starter (`pd init --storefront`) ships four plain views, each with its card in `components/`: `list` (title,
 date, teaser and tags), `grid` (cards with an image; every page needs one), `featured` (the first page large, the
 rest as the grid: with `sort: date`, the newest first) and `compact` (title and date only).
+
+### Queries
+
+Every list of pages that isn't a folder's own listing is a query: related pages under an article, the latest
+articles on the home page. A layout declares it as a sub-key of `page`, with `x-pd-query` and its defaults:
+
+```json
+"page": { "properties": {
+  "related": { "x-pd-query": { "collections": "same", "sort": "relevance", "limit": 3, "view": "compact" } }
+} }
+```
+
+The layout gets `page.related` as `{ entries, listing }`: the pages, each an entry (the table above), and the same
+rendered through the query's view, as HTML. `listing` is `null` without a view, or when no page matched, so
+`{{#if page.related.listing}}` leaves out an empty section:
+
+```hbs
+{{#if page.related.listing}}<section><h2>Related articles</h2>{{{page.related.listing}}}</section>{{/if}}
+```
+
+A layout that writes its own markup loops over `page.related.entries`, and can name a card for them with
+`x-pd-card` on the query's `entries` (`"properties": { "entries": { "x-pd-card": "components/card" } }`), so each
+page is checked against it. A query's name is letters and digits, starting with a lowercase letter, and is none of
+the sub-keys Pattern Dump fills.
+
+| Option | Value | Default |
+|---|---|---|
+| `pages` | Pages picked by hand, by their path in the pages folder (`articles/a.md`): listed first, in this order | none |
+| `collections` | Folders' paths (`articles`, `blog/news`), or `same` for the page's own folder | every folder |
+| `categories` | Declared categories (an old key works, with a warning) | none |
+| `tags` | Tags | none |
+| `match` | `any`: a page needs one of the listed tags, and one of the categories; `all`: every one | `any` |
+| `sort` | `relevance` (the number of tags and categories a page shares with the current one, then the date), `date` or `title` | `date` |
+| `order` | `asc` or `desc`; not with `relevance`, which always lists the most relevant first | newest first; A to Z |
+| `limit` | How many pages in all, picked ones included: a whole number from 1 | no limit |
+| `view` | A view (`views/<name>`), as for a listing | none |
+
+With both `tags` and `categories`, a page must match both. A page with no date sorts last. Always: the current page
+is left out, a page never comes twice (a picked page isn't repeated), and drafts and scheduled pages never appear,
+in `pd dev` either.
+
+**A page changes options** in its frontmatter, in a block under the query's name, with the same option names:
+
+```yaml
+related:
+  pages: [articles/tokens-explained.md]
+  tags: [css]
+  limit: 5
+  sort: date
+```
+
+Each option given replaces that one of the layout's; the rest stay. `related: false` turns the query off for that
+page, and `related: true` keeps the layout's as it is. The key is the build's: the layout never gets it. It is the
+one place a page's frontmatter nests: one level of keys under a key, each a value or a list.
+
+**Every value is checked**, at the page's line or in the layout's schema: an option there isn't, a picked page that
+doesn't exist (with a "did you mean"), a folder that isn't one, a category that isn't declared, a tag no page has, an
+unknown `sort`, `match` or `order`, `order` with `relevance`, a `limit` that isn't a whole number from 1, more picked
+pages than the limit, a page picked twice, and a view that isn't one; every page is checked against the view's card.
+A picked draft or scheduled page fails `pd build`; in `pd dev` it is a warning, and left out.
+
+In `pd dev`, an edit to what a query reads of a page (its date, tags, categories, title or draft) reloads every open
+page, as for a listing.
+
+The starter (`pd init --storefront`) shows both: the article layout's `related` (three, from the same folder, by
+relevance, in the compact view) and the home layout's `latest` (the three newest articles, in the list view).
 
 ### Categories
 
