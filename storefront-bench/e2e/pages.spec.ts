@@ -3,12 +3,12 @@ import { expect, test } from "./fixtures.js";
 
 const PAGES: Array<[route: string, title: string, heading: string, current: string]> = [
   ["/", "Storefront bench", "Storefront bench", "Storefront bench"],
-  ["/about/", "About — Storefront bench", "About", "About"],
-  ["/guides/", "Guides — Storefront bench", "Guides", "Guides"],
-  ["/guides/setup/", "Setup — Storefront bench", "Setup", "Setup"],
-  ["/articles/", "Articles — Storefront bench", "Articles", "Articles"],
-  ["/articles/harbour/", "A harbour of cable cars — Storefront bench", "A harbour of cable cars", "A harbour of cable cars"],
-  ["/articles/plain/", "Plain on purpose — Storefront bench", "Plain on purpose", "Plain on purpose"],
+  ["/about/", "About · Storefront bench", "About", "About"],
+  ["/guides/", "Guides · Storefront bench", "Guides", "Guides"],
+  ["/guides/setup/", "Setup · Storefront bench", "Setup", "Setup"],
+  ["/articles/", "Articles · Storefront bench", "Articles", "Articles"],
+  ["/articles/harbour/", "A harbour of cable cars · Storefront bench", "A harbour of cable cars", "A harbour of cable cars"],
+  ["/articles/plain/", "Plain on purpose · Storefront bench", "Plain on purpose", "Plain on purpose"],
 ];
 
 test.describe("storefront pages", () => {

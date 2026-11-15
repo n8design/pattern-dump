@@ -66,7 +66,7 @@ describe("storefront pages on the storefront host", () => {
   beforeAll(async () => { ({ port } = await serve(bench, config)); }, 120_000);
 
   it("serves every page at its route, /about as /about/, and the page list", async () => {
-    for (const [path, title] of [["/", "Storefront bench"], ["/about/", "About — Storefront bench"], ["/about", "About — Storefront bench"], ["/guides/setup/", "Setup — Storefront bench"]]) {
+    for (const [path, title] of [["/", "Storefront bench"], ["/about/", "About · Storefront bench"], ["/about", "About · Storefront bench"], ["/guides/setup/", "Setup · Storefront bench"]]) {
       const r = await get(port, "live.localhost", path);
       expect(r.status, path).toBe(200);
       expect(r.body, path).toContain(`<title>${title}</title>`);

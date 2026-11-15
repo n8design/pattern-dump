@@ -52,7 +52,7 @@ test.describe("static build — the browser tab", () => {
     expect(await (await request.get("atoms/button")).text()).toContain("<title>Test bench</title>");
     await page.goto("atoms/button");
     await page.waitForSelector("#preview-frame[srcdoc]");
-    await expect(page).toHaveTitle("Button — Test bench");
+    await expect(page).toHaveTitle("Button · Test bench");
     await page.goto("atoms");
     await expect(page.locator("#category-overview")).toBeVisible();
     await expect(page).toHaveTitle("Test bench");

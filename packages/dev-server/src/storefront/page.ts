@@ -252,7 +252,7 @@ const BUILT_IN_NOT_FOUND_DOCUMENT = `<main>\n<h1>Page not found</h1>\n<p>There i
  *  data-pd-site, so a build that crawls every page lists it once. */
 export function errorDocument(route: string, problems: string[], live: PageAssembly["live"], siteWide: readonly string[] = []): string {
   const items = problems.map(p => `<li${siteWide.includes(p) ? " data-pd-site" : ""}>${escapeHtml(p)}</li>`).join("\n");
-  return document(`<title>Problems — ${escapeHtml(route)}</title>`,
+  return document(`<title>Problems · ${escapeHtml(route)}</title>`,
     `<main>\n<h1>The page ${escapeHtml(route)} cannot be built</h1>\n<ul class="pd-problems">\n${items}\n</ul>\n</main>`, live);
 }
 
@@ -527,7 +527,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
   const article = isNotFound ? undefined : articleOf(route, model, checked.build.date);
   const head = [
-    `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} — ${siteTitle}` : title)}</title>`,
+    `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} · ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
     // The 404 page is served at every address that has none: no address of its own, never indexed.
     ...seoTags({
