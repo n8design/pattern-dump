@@ -88,10 +88,10 @@ describe("readPages: what a listing shows of each page", () => {
       "articles/bad.md": page("Bad", "date: 2026-02-30\ntags: [Nope]\nimage: one.png\ndraft: maybe\n"),
     });
     const model = await readPages(root);
-    expect(model.entries.get("/articles/one/")).toEqual({ description: "Its own", date: "2026-11-02", updated: null, image: "/assets/images/one.png", tags: ["css", "html"], categories: [], draft: true });
-    expect(model.entries.get("/articles/two/")).toEqual({ description: "The first words.", date: null, updated: null, image: null, tags: [], categories: [], draft: false });
+    expect(model.entries.get("/articles/one/")).toEqual({ description: "Its own", date: "2026-11-02", updated: null, image: "/assets/images/one.png", tags: ["css", "html"], categories: [], draft: true, scheduled: false });
+    expect(model.entries.get("/articles/two/")).toEqual({ description: "The first words.", date: null, updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false });
     // A value that fails its check is left out; the page's own check reports it.
-    expect(model.entries.get("/articles/bad/")).toEqual({ description: "Body of Bad.", date: null, updated: null, image: null, tags: [], categories: [], draft: false });
+    expect(model.entries.get("/articles/bad/")).toEqual({ description: "Body of Bad.", date: null, updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false });
     expect(model.folders.get("/articles/")).toEqual({ sort: "date", children: ["/articles/bad/", "/articles/one/", "/articles/two/"] });
   });
 
@@ -127,7 +127,7 @@ describe("entriesOf", () => {
     expect(r.problems).toEqual([]);
     expect(r.entries.map(e => [e.route, e.date])).toEqual([
       ["/articles/b/", "2026-11-02"], ["/articles/d/", "2026-10-15"], ["/articles/a/", "2026-10-01"], ["/articles/c/", "2026-10-01"]]);
-    expect(r.entries[0]).toEqual({ route: "/articles/b/", title: "B", description: "Body of B.", date: "2026-11-02", updated: null, image: null, tags: [], categories: [], draft: false });
+    expect(r.entries[0]).toEqual({ route: "/articles/b/", title: "B", description: "Body of B.", date: "2026-11-02", updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false });
   });
 
   it("keeps the folder's order without sort: date", async () => {
@@ -195,8 +195,8 @@ describe("assemblePage: page.children, page.date, page.tags, and datePublished",
     const { page: p, data } = await assemble("/articles/", site, ["children"]);
     expect(p.problems).toEqual([]);
     expect(data).toEqual({ children: [
-      { route: "/articles/new/", title: "New", description: "Newest", date: "2026-11-02", updated: null, image: null, tags: [], categories: [], draft: false },
-      { route: "/articles/old/", title: "Old", description: "The old one.", date: "2026-01-05", updated: null, image: null, tags: ["css"], categories: [], draft: false },
+      { route: "/articles/new/", title: "New", description: "Newest", date: "2026-11-02", updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false },
+      { route: "/articles/old/", title: "Old", description: "The old one.", date: "2026-01-05", updated: null, image: null, tags: ["css"], categories: [], draft: false, scheduled: false },
     ] });
     expect(p.html).toContain("<li>New: Newest</li><li>Old: The old one.</li>");
   });
@@ -229,6 +229,14 @@ describe("assemblePage: page.children, page.date, page.tags, and datePublished",
     expect((data?.["children"] as Array<{ route: string; draft: boolean }>).map(e => [e.route, e.draft])).toEqual([
       ["/articles/wip/", true], ["/articles/new/", false], ["/articles/old/", false]]);
     expect(p.notes).toContain("articles/wip.md is a draft: pd build leaves it out");
+  });
+
+  it("pd dev lists a scheduled page with scheduled: true, and says once until when pd build leaves it out", async () => {
+    const files = { ...site, "articles/later.md": page("Later", "date: 2999-01-01\n") };
+    const { page: p, data } = await assemble("/articles/", files, ["children"], { live: { wsPort: 1, generation: "" } });
+    expect((data?.["children"] as Array<{ route: string; scheduled: boolean }>).map(e => [e.route, e.scheduled])).toEqual([
+      ["/articles/later/", true], ["/articles/new/", false], ["/articles/old/", false]]);
+    expect(p.notes.filter(n => n.includes("scheduled"))).toEqual(["articles/later.md is scheduled for 2999-01-01: pd build leaves it out until then"]);
   });
 
   it("a listing with a page that has no date stops pd build, and the page names why", async () => {

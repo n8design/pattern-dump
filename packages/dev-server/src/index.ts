@@ -131,6 +131,10 @@ export interface DevServerOptions {
    *  `generatedAt`. Default: real time. `pd build` passes a fixed one when asked for a reproducible
    *  snapshot. */
   now?: () => Date;
+  /** `pd build` only: the day a storefront page's `date` is compared with (YYYY-MM-DD, UTC), fixed once for the whole
+   *  build so a build that runs past midnight holds back the same pages throughout. Without it, each request takes the
+   *  clock's day. */
+  today?: string;
   /** `pd build` only: where storefront pages link into the workbench — the built workbench's address
    *  (storefront.workbenchUrl). Without it, pages link to this process's own workbench on pd.localhost. */
   storefrontWorkbenchUrl?: string;
@@ -328,7 +332,7 @@ export async function startDevServer(
   let settleWatcher: (() => Promise<void>) | null = null;
   const testHooks = live && process.env["PD_TEST_HOOKS"] === "1";
   const routeCtx: RouteContext = {
-    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, ...(dates ? { dates } : {}),
+    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
     images: async () => { await images.ready(generationNow()); return images.lookup; },
     ...(testHooks ? { settle: () => settleWatcher ? settleWatcher() : Promise.reject(new Error("settle: the watcher is not running yet")) } : {}),
     ...(live ? { generation: () => hotreloader.generation() } : {}),

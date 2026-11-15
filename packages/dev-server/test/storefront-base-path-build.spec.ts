@@ -14,7 +14,8 @@ import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
-const NOW = new Date("2026-01-02T03:04:05.000Z");
+// A fixed clock, after every date the bench's pages carry: the build's day decides which pages are scheduled.
+const NOW = new Date("2027-01-02T03:04:05.000Z");
 let tmp = "";
 
 beforeAll(async () => { tmp = await mkdtemp(join(tmpdir(), "pd-sf-base-")); });

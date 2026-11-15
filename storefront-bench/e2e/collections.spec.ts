@@ -1,7 +1,8 @@
 // Collections on the rendered page, in pd dev and on the built root: the articles folder's index.md lists its pages
 // newest first as cards (page.children), the one without a description by its first paragraph, unshortened in the
 // markup and clamped to three lines by the card's CSS; the home page shows the two newest (site.collections). In pd
-// dev a draft written while the site is open is listed, marked, and removing it takes it away.
+// dev a draft, and a page dated after today, written while the site is open is listed, marked, and removing it takes
+// it away.
 import { rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures.js";
@@ -55,6 +56,23 @@ test.describe("a draft", () => {
     await expect(page.locator(".card-title a")).toHaveText(["Written ahead", "A harbour of cable cars", "Plain on purpose"], { timeout: 10_000 });
     await expect(page.locator(".card").first().locator(".card-draft")).toHaveText("Draft");
     await rm(draft);
+    await expect(page.locator(".card-title a")).toHaveText(["A harbour of cable cars", "Plain on purpose"], { timeout: 10_000 });
+  });
+});
+
+test.describe("a scheduled page", () => {
+  const later = fileURLToPath(new URL("../pages/articles/zz-later.md", import.meta.url));
+  test.afterEach(async () => { await rm(later, { force: true }); });
+
+  test("pd dev lists a page dated after today, marked, as soon as it is written, and takes it away when it goes", async ({ page }, info) => {
+    test.skip(!isDev(info), "scheduled pages are shown by pd dev only; storefront-scheduled.spec.ts checks that a build holds them back");
+    await page.goto("/articles/");
+    await expect(page.locator(".card-title a")).toHaveCount(2);
+    await save(later, "---\nlayout: article\ntitle: Far ahead\ndescription: Not yet published.\ndate: 2999-01-01\n---\n\nLater.\n");
+    await expect(page.locator(".card-title a")).toHaveText(["Far ahead", "A harbour of cable cars", "Plain on purpose"], { timeout: 10_000 });
+    await expect(page.locator(".card").first().locator(".card-scheduled")).toHaveText("Scheduled");
+    await expect(page.locator(".card-draft")).toHaveCount(0);
+    await rm(later);
     await expect(page.locator(".card-title a")).toHaveText(["A harbour of cable cars", "Plain on purpose"], { timeout: 10_000 });
   });
 });

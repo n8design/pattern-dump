@@ -455,8 +455,11 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
   if (problems.length) return fail(problems);
   notes.push(...checked.notes);
-  // pd dev shows drafts; each is said once, whichever page is open.
-  if (a.live) notes.push(...model.drafts.map(d => `${d} is a draft: pd build leaves it out`));
+  // pd dev shows drafts and scheduled pages; each is said once, whichever page is open.
+  if (a.live) {
+    notes.push(...model.drafts.map(d => `${d} is a draft: pd build leaves it out`));
+    notes.push(...model.scheduled.map(s => `${s.path} is scheduled for ${s.until}: pd build leaves it out until then`));
+  }
 
   // What the layout gets: its declared values, null where the page sets none, then what the storefront fills.
   const siteData = {

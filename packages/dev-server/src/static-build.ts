@@ -25,7 +25,7 @@ import { imageCacheDir } from "./image-route.js";
 import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 import { createSnapshotWriter } from "./snapshot-writer.js";
-import { readPages } from "./storefront/pages.js";
+import { readPages, todayOf, type ScheduledPage } from "./storefront/pages.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
@@ -83,6 +83,9 @@ export interface StaticBuildReport {
   /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
    *  their path in the pages folder. Absent when there are none. */
   drafts?: string[];
+  /** The storefront's pages held back until a later day (a page dated after the build's day, and each page under a
+   *  scheduled folder's index.md), each with the first day it is built. Absent when there are none. */
+  scheduled?: ScheduledPage[];
   ms: number;
 }
 
@@ -141,10 +144,12 @@ export async function buildStaticSite(
 
   const fixed = opts.now;
   const now = fixed ? (): Date => new Date(fixed.getTime()) : (): Date => new Date();
+  // The build's day, once: every page is held back or built against the same one, even past midnight.
+  const today = todayOf(now());
   // A storefront page's notes, once each however often the page is fetched: the report's notes.
   const storefrontNotes = new Set<string>();
   const server = await startDevServer(config, root, {
-    port: 0, live: false, now, ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
+    port: 0, live: false, now, today, ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
     onStorefrontNote: note => { storefrontNotes.add(note); },
   });
   log("… server ready");
@@ -406,8 +411,9 @@ export async function buildStaticSite(
       if (linkSummary) report.links = linkSummary;
       if (a11ySummary) report.accessibility = a11ySummary;
       if (imageSummary) report.images = imageSummary;
-      const drafts = (await readPages(storefront.pagesDir, { drafts: "leave-out" })).drafts;
+      const { drafts, scheduled } = await readPages(storefront.pagesDir, { drafts: "leave-out", scheduled: "leave-out", today });
       if (drafts.length) report.drafts = drafts;
+      if (scheduled.length) report.scheduled = scheduled;
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
 

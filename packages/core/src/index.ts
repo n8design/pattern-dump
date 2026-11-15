@@ -68,6 +68,9 @@ export async function runBuild(
   if (report.drafts) {
     console.log(`[pd build] drafts: ${report.drafts.length} left out (${report.drafts.join(", ")})`);
   }
+  if (report.scheduled) {
+    console.log(`[pd build] scheduled: ${report.scheduled.length} held back (${report.scheduled.map(s => `${s.path} until ${s.until}`).join(", ")})`);
+  }
   for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
   for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
 }

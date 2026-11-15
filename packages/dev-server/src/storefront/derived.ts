@@ -48,7 +48,7 @@ export const CATEGORY: Shape = { fields: { key: "value", label: "value", descrip
 export const ENTRY: Shape = {
   fields: {
     route: "value", title: "value", description: "value", date: "value", updated: "value", image: "value", tags: "value",
-    categories: { items: CATEGORY }, draft: "value",
+    categories: { items: CATEGORY }, draft: "value", scheduled: "value",
   },
 };
 

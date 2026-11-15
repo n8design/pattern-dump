@@ -28,6 +28,8 @@ export interface Entry {
   tags: string[];
   categories: Category[];
   draft: boolean;
+  /** Its date is after today: pd dev only, since pd build leaves it out. */
+  scheduled: boolean;
 }
 
 export interface Listed {
