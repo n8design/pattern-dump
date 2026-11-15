@@ -25,11 +25,11 @@
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { PD_ROUTES, type StorefrontNavItem, type StorefrontPage, type StorefrontPagesResponse } from "@pattern-dump/contracts";
+import { PD_ROUTES, type LayoutPageUse, type StorefrontNavItem, type StorefrontPage, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { frontmatterBody, readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
 import { redirectProblems, redirectsOf, workbenchPlace } from "./redirects.js";
-import { readCategories, readDate, readDraft, readSort, readTags, readUpdated, type SortBy } from "./listing-keys.js";
+import { readCategories, readChildLayout, readDate, readDraft, readSort, readTags, readUpdated, type SortBy } from "./listing-keys.js";
 import { categoryIndex, type Category, type CategoryIndex } from "./categories.js";
 import type { StorefrontCategory } from "@pattern-dump/config";
 import { teaserOf } from "./teaser.js";
@@ -47,7 +47,13 @@ export interface PageFile {
   /** The file, relative to pagesDir, with forward slashes ("guides/setup.md"). */
   path: string;
   frontmatter: FrontmatterReading;
+  /** The layout the page takes when it names none: the `childLayout` of the nearest folder above it that sets one
+   *  (`from`: that folder's index.md). Absent when no folder above it does. */
+  inherited?: InheritedLayout;
 }
+
+/** A default layout from a folder: the name its index.md's `childLayout` gives, and that index.md's path. */
+export interface InheritedLayout { layout: string; from: string }
 
 /** What a listing shows of a page, from its file alone (collections.ts adds the date from git). */
 export interface PageEntryFields {
@@ -102,6 +108,15 @@ export interface PageModel extends StorefrontPagesResponse {
   categories: CategoryIndex;
   /** Problems with the folder as a whole, one line each. Empty when it is a sound site. */
   problems: string[];
+}
+
+/** The pages that render with the layout `name`, by path, each with where it got it (the workbench's Relationships). */
+export function layoutPages(model: PageModel, name: string): LayoutPageUse[] {
+  return model.pages.filter(p => p.layout === name).map(p => {
+    const f = model.files.get(p.route)!;
+    const source = p.layoutFrom !== undefined ? "folder" : f.frontmatter.values["layout"] !== undefined ? "own" : "default";
+    return { route: p.route, path: f.path, source, ...(p.layoutFrom !== undefined ? { from: p.layoutFrom } : {}) } satisfies LayoutPageUse;
+  }).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 }
 
 /** "guides/setup.md" -> "/guides/setup/", "index.md" -> "/", "guides/index.md" -> "/guides/". */
@@ -221,12 +236,34 @@ export async function readPages(pagesDir: string, opts: {
   }
   scheduled.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 
+  // Default layouts: each page that names no layout takes the childLayout of the nearest folder above it that sets
+  // one. A folder's index.md is a page of its parent folder, so its own childLayout is for the pages under it.
+  const childLayoutOf = (folder: string): string | undefined => {
+    const index = files.get(folder);
+    const v = index?.frontmatter.values["childLayout"];
+    if (!index || v === undefined) return undefined;
+    const r = readChildLayout(v, index.path);
+    return r.ok ? r.value : undefined;
+  };
+  for (const f of files.values()) {
+    const segments = f.route.split("/").filter(Boolean);
+    // The folders above the page, nearest first: for /a/b/c/ (a page, or the index.md of folder c) they are /a/b/, /a/, /.
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const folder = i === 0 ? "/" : `/${segments.slice(0, i).join("/")}/`;
+      const layout = childLayoutOf(folder);
+      if (layout !== undefined) { f.inherited = { layout, from: files.get(folder)!.path }; break; }
+    }
+  }
+
   const pageOf = (f: PageFile): StorefrontPage => {
     const redirectFrom = redirectsOf(f);
+    const own = f.frontmatter.values["layout"];
+    const inherited = own === undefined ? f.inherited : undefined;
     return {
       route: f.route,
       title: scalar(f.frontmatter.values["title"]) ?? f.route,
-      layout: scalar(f.frontmatter.values["layout"]) ?? DEFAULT_LAYOUT,
+      layout: scalar(own) ?? inherited?.layout ?? DEFAULT_LAYOUT,
+      ...(inherited ? { layoutFrom: inherited.from } : {}),
       ...(redirectFrom.length ? { redirectFrom } : {}),
     };
   };

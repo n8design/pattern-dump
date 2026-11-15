@@ -54,7 +54,7 @@ import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
-import { readPages, todayOf } from "./storefront/pages.js";
+import { layoutPages, readPages, todayOf } from "./storefront/pages.js";
 import { assetFile } from "./asset-file.js";
 import { decodePath } from "./contained-file.js";
 import { isOwnHost, ownHosts } from "./own-hosts.js";
@@ -72,6 +72,15 @@ export const TEST_SETTLE_ROUTE = "/_pd/__test/settle";
 
 /** The storefront notes a server has printed (pd dev), so each is printed once. */
 const printedNotes = new WeakMap<RouteContext, Set<string>>();
+
+/** The website's pages as this server serves them: pd dev shows drafts and scheduled pages; pd build leaves them out,
+ *  as if their files weren't there. */
+function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>): ReturnType<typeof readPages> {
+  return readPages(sf.pagesDir, {
+    workbenchPath: sameHostWorkbenchPath(sf), drafts: ctx.live ? "show" : "leave-out", scheduled: ctx.live ? "show" : "leave-out",
+    today: ctx.today ?? todayOf(ctx.now()), categories: sf.categories,
+  });
+}
 
 export interface RouteContext {
   readonly cfg: ResolvedConfig;
@@ -465,6 +474,10 @@ async function routeRequest(
         // Phase 2: render + static checks — the single per-component check unit (also driven by
         // the corpus sweep). Quarantined → 200 + HANDLE_COLLISION (no render); render failure →
         // 200 + RENDER_ERROR, not 404.
+        // A layout of a project with a website: the pages that render with it, and where each got it.
+        if (cfg.storefront && /^layouts\/[^/~]+$/.test(componentId)) {
+          detail.relationships.pages = layoutPages(await readStorefrontPages(ctx, cfg.storefront), componentId.slice("layouts/".length));
+        }
         const quarantineEntry = discovery.quarantineMap.get(componentId);
         const { previewHtml, diagnostics } = await checkComponent(componentId, variant, render, quarantineEntry);
 
@@ -627,11 +640,7 @@ async function routeRequest(
     if (cfg.storefront && host === cfg.storefront.host) {
       const discovery = await currentDiscovery(state, patternRoots);
       const discoveryMap = discovery.discoveryMap;
-      // pd dev shows drafts and scheduled pages; pd build leaves them out, as if their files weren't there.
-      const model = await readPages(cfg.storefront.pagesDir, {
-        workbenchPath: sameHostWorkbenchPath(cfg.storefront), drafts: ctx.live ? "show" : "leave-out", scheduled: ctx.live ? "show" : "leave-out",
-        today: ctx.today ?? todayOf(ctx.now()), categories: cfg.storefront.categories,
-      });
+      const model = await readStorefrontPages(ctx, cfg.storefront);
       if (pathname === PD_ROUTES.pages) {
         if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
         json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);

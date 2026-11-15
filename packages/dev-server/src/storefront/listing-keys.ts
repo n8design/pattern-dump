@@ -9,6 +9,7 @@
 //   categories: [guides]      each declared in storefront.categories (or an old key of one), no duplicates
 //   draft: true               true or false
 //   sort: date                on a folder's index.md: its pages newest first ("order", the default: the nav's order)
+//   childLayout: article      on a folder's index.md: the layout of the pages under it that name none (the nearest wins)
 
 import { suggest } from "@pattern-dump/config";
 import type { FrontmatterValue } from "../frontmatter.js";
@@ -93,9 +94,21 @@ export function readDraft(v: FrontmatterValue): Read<boolean> {
 
 export type SortBy = "date" | "order";
 
+/** A folder's index.md (the root's included): the pages that sort, set a default layout and name a view. */
+export const isFolderIndex = (path: string): boolean => path === "index.md" || path.endsWith("/index.md");
+
+/** `childLayout: article` on a folder's index.md: the layout of its pages that name none (the name only; whether
+ *  it is a layout is checked against the patterns, in frontmatter-contract.ts). */
+export function readChildLayout(v: FrontmatterValue, path: string): Read<string> {
+  if (!isFolderIndex(path)) {
+    return { ok: false, message: `childLayout sets the layout of a folder's pages, so it belongs on the folder's index.md, not on a page` };
+  }
+  return typeof v === "string" ? { ok: true, value: v } : { ok: false, message: "childLayout must be one layout name, not a list" };
+}
+
 /** `path`: the page's path in the pages folder; only a folder's index.md (the root's included) sorts. */
 export function readSort(v: FrontmatterValue, path: string): Read<SortBy> {
-  if (path !== "index.md" && !path.endsWith("/index.md")) {
+  if (!isFolderIndex(path)) {
     return { ok: false, message: `sort orders a folder's pages, so it belongs on the folder's index.md, not on a page` };
   }
   return v === "date" || v === "order" ? { ok: true, value: v }
