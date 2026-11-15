@@ -10,14 +10,14 @@
 import MarkdownIt from "markdown-it";
 import { highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
-/** Where a code block is written. On a storefront page its copy button starts hidden, and the page's script
- *  (page.ts copyScript) shows it: without scripting there is no button, so no focus stop that does nothing. The
- *  workbench's shell has its own handler. */
+/** Where a code block is written. On a storefront page it has no copy button in its markup: the page's script
+ *  (page.ts copyScript) adds one where the browser can copy, so without scripting or a clipboard there is none, and
+ *  no skin's CSS can show one that does nothing. The workbench's shell has its own handler. */
 export interface CodeBlockPlace { storefront?: boolean }
 
 /** A code block: highlighted (or a plain, focusable <pre>), with the copy button carrying the raw code. */
 export function codeBlock(code: string, lang: string, place: CodeBlockPlace = {}): string {
-  return wrapWithCopyButton(highlight(code, lang), code, { hidden: place.storefront === true });
+  return wrapWithCopyButton(highlight(code, lang), code, { button: place.storefront !== true });
 }
 
 /** The language a fence names: its info string's first word ("bash" of "bash title=x"), or "". */

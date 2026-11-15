@@ -170,7 +170,7 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps): Promi
   const checked = await checkPlaced(id, values, `<${block.root.name}>`, {
     schemaOf: deps.schemaOf,
     label: kebab,
-    // Placed content is a storefront page's: its code blocks' copy buttons start hidden (code-blocks.ts).
+    // Placed content is a storefront page's: its code blocks get their copy buttons from the page's script (code-blocks.ts).
     markdown: text => contentMd.render(text, { pdCodeBlocks: { storefront: true } }),
   });
   problems.push(...checked.problems, ...await unsafeOutputs(id, block.root.at, deps), ...await sampleDataProblems(id, block.root.at, deps));
