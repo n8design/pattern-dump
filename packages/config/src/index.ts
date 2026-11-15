@@ -234,6 +234,21 @@ export interface StorefrontConfig {
    * checked by Pattern Dump; the skin's schema only lists the names it uses.
    */
   site?: Record<string, unknown> & { navigations?: Record<string, StorefrontNavEntry[]> };
+  /**
+   * The categories a page can be in (its `categories:`), by key: the only values a page may name, so a typo fails the
+   * build. Independent of the folders, so a page changes category without changing its URL. A key is lowercase
+   * letters, digits and hyphens. `aliases` are the category's old keys: a page that still names one builds, as the
+   * category, with a note naming the page so it can be updated.
+   */
+  categories?: Record<string, StorefrontCategory>;
+}
+
+/** A declared category (`storefront.categories.<key>`). */
+export interface StorefrontCategory {
+  label: string;
+  description?: string;
+  /** Old keys of this category, kept after a rename. */
+  aliases?: string[];
 }
 
 /**

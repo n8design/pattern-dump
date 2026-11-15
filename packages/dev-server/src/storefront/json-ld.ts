@@ -1,5 +1,5 @@
 // A storefront page's structured data: one JSON-LD graph, derived from what the site already has — the
-// site (WebSite), the page (WebPage, with its date and its last change from git) and where it sits (a BreadcrumbList from
+// site (WebSite), the page (WebPage, with its date and its authored last change) and where it sits (a BreadcrumbList from
 // the folders, ending at the page). A page that is an article (page.ts articleOf, the same pages og:type calls one)
 // adds an Article node, the page's main entity. Richer types (FAQ, …) are not core's; a plugin adds a node to
 // the same @graph.
@@ -15,7 +15,7 @@ export interface JsonLdPage {
   description: string | undefined;
   /** The folders above the page, Home first (derived.ts positionOf); the page itself is added last. */
   breadcrumbs: PageLink[];
-  /** The page's last change, ISO 8601, or null when git has no reliable date for it. */
+  /** The page's last real change: its own `updated` (YYYY-MM-DD), or null. Never git's last commit. */
   modified: string | null;
   /** The page's date: its own (frontmatter `date`, YYYY-MM-DD), else git's first commit of it (ISO 8601), or null. */
   published?: string | null;

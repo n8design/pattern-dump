@@ -10,7 +10,7 @@
 
 import { basename, join, resolve } from "node:path";
 import type { ImageEncoding } from "@pattern-dump/build";
-import { storefrontBasePath, type PatternDumpConfig } from "@pattern-dump/config";
+import { storefrontBasePath, type PatternDumpConfig, type StorefrontCategory } from "@pattern-dump/config";
 import { PD_HOSTS, type ThemeSwitch } from "@pattern-dump/contracts";
 import type { PatternRoot } from "@pattern-dump/discovery";
 import type { ResolvedPackage } from "./packages.js";
@@ -100,6 +100,8 @@ export interface ResolvedConfig {
     readonly head: string | undefined;
     /** storefront.head as the config writes it, for messages. */
     readonly headName: string | undefined;
+    /** storefront.categories: what a page's `categories:` may name. */
+    readonly categories: Readonly<Record<string, StorefrontCategory>> | undefined;
   } | null;
 
   readonly overviewsEnabled: boolean;
@@ -239,6 +241,7 @@ export function resolveServerConfig(
       images: { ...images, ...config.storefront.images },
       head: config.storefront.head !== undefined ? resolve(cwd, config.storefront.head) : undefined,
       headName: config.storefront.head,
+      categories: config.storefront.categories,
     } : null,
     images,
     overviewsEnabled:    config.overviews !== false,

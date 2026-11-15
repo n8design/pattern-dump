@@ -11,6 +11,7 @@
 
 import type { StorefrontNavItem, StorefrontPagesResponse } from "@pattern-dump/contracts";
 import type { Entry } from "./collections.js";
+import type { Category } from "./categories.js";
 
 /** A link to another page. */
 export interface PageLink { route: string; title: string }
@@ -24,22 +25,31 @@ export interface DerivedPage {
   breadcrumbs: PageLink[];
   prev: PageLink | null;
   next: PageLink | null;
+  /** The day git first saw the page. */
   created: string | null;
-  modified: string | null;
+  /** The page's own `updated`, its last real change; null without one. Never git's last commit. */
+  updated: string | null;
   /** A folder's index.md: its pages (collections.ts); [] on any other page. */
   children: Entry[];
   /** The page's date, YYYY-MM-DD: its own, else the day git first saw it. */
   date: string | null;
   tags: string[];
+  /** The page's categories (categories.ts), in its order; [] when it has none. */
+  categories: Category[];
 }
 
 /** A value with no keys of its own; an object with exactly these fields; a list of one shape. */
 export type Shape = "value" | { fields: Record<string, Shape> } | { items: Shape };
 
 const LINK: Shape = { fields: { route: "value", title: "value" } };
+/** A category (categories.ts). */
+export const CATEGORY: Shape = { fields: { key: "value", label: "value", description: "value" } };
 /** An entry of a listing (collections.ts). */
 export const ENTRY: Shape = {
-  fields: { route: "value", title: "value", description: "value", date: "value", image: "value", tags: "value", draft: "value" },
+  fields: {
+    route: "value", title: "value", description: "value", date: "value", updated: "value", image: "value", tags: "value",
+    categories: { items: CATEGORY }, draft: "value", scheduled: "value",
+  },
 };
 
 /** The shape of `page`, field by field. */
@@ -51,15 +61,21 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
     prev: LINK,
     next: LINK,
     created: "value",
-    modified: "value",
+    updated: "value",
     children: { items: ENTRY },
     date: "value",
     tags: "value",
+    categories: { items: CATEGORY },
   },
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified", "children", "date", "tags"];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories"];
+
+/** Sub-keys Pattern Dump filled once and no longer does, with what to declare instead. */
+export const RETIRED: Readonly<Record<string, string>> = {
+  modified: `git's last commit counts a typo fix as a change. Declare "page.updated" instead: the page's own updated: date, set for real changes`,
+};
 
 /** A page's place in the site. */
 export type Position = Pick<DerivedPage, "section" | "breadcrumbs" | "prev" | "next">;
@@ -116,7 +132,8 @@ export function checkPageDeclaration(schema: unknown, layoutId: string, filled: 
   const fills = filled.length ? `it fills ${filled.map(k => `page.${k}`).join(", ")}` : "it fills none yet";
   const problems = declared
     .filter(key => !filled.includes(key))
-    .map(key => `${layoutId} declares "page.${key}", which Pattern Dump does not fill (${fills})`);
+    .map(key => Object.hasOwn(RETIRED, key) ? `${layoutId} declares "page.${key}", which Pattern Dump no longer fills: ${RETIRED[key]}`
+      : `${layoutId} declares "page.${key}", which Pattern Dump does not fill (${fills})`);
   return { declared, problems };
 }
 

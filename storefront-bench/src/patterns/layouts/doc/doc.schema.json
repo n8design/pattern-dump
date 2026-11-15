@@ -115,12 +115,33 @@
           ],
           "description": "When the page was first committed (the author date, ISO 8601); null when git has no history for it"
         },
-        "modified": {
+        "updated": {
           "type": [
             "string",
             "null"
           ],
-          "description": "When the page was last committed, the same way; uncommitted changes are not counted"
+          "description": "The page's own updated date (YYYY-MM-DD), set by its author for a real change; null without one"
+        },
+        "categories": {
+          "type": "array",
+          "description": "The page's categories (storefront.categories), in its order",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
         }
       }
     }

@@ -1,8 +1,23 @@
 // The storefront's files for crawlers, at the root of its host: robots.txt, and sitemap.xml when the site has
 // an address (storefront.url). Both are text built from the page model on every request, never stored.
 
-/** A page in the sitemap: its absolute URL, and its last change when git has a reliable one. */
+import type { PageModel } from "./pages.js";
+
+/** A page in the sitemap: its absolute URL, and its last change when the page says. */
 export interface SitemapEntry { url: string; lastmod: string | null }
+
+/**
+ * The sitemap's pages, by route, each but a page with `index: false`: its lastmod is the page's own `updated`, else its
+ * own `date`, else left out. Git is never asked: its last commit counts a typo fix as a change.
+ */
+export function sitemapEntries(model: PageModel, siteUrl: string): SitemapEntry[] {
+  return [...model.pages].sort((a, b) => a.route.localeCompare(b.route)).flatMap(p => {
+    const file = model.files.get(p.route);
+    if (!file || file.frontmatter.values["index"] === "false") return [];
+    const e = model.entries.get(p.route);
+    return [{ url: new URL(p.route.slice(1), siteUrl).href, lastmod: e?.updated ?? e?.date ?? null }];
+  });
+}
 
 const escapeXml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");

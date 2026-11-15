@@ -54,12 +54,12 @@ import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
-import { readPages } from "./storefront/pages.js";
+import { readPages, todayOf } from "./storefront/pages.js";
 import { assetFile } from "./asset-file.js";
 import { decodePath } from "./contained-file.js";
 import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
-import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
+import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import { pageStylesheets } from "./storefront/page-head.js";
@@ -87,6 +87,8 @@ export interface RouteContext {
   readonly boot: BootStamp;
   /** The clock for response time stamps (the audit's `generatedAt`). See DevServerOptions.now. */
   readonly now: () => Date;
+  /** The day scheduled pages are measured against (DevServerOptions.today); absent: the clock's, per request. */
+  readonly today?: string;
   /** false when headless (`pd build`): there is no live-reload socket, so pages carry no client for it. */
   readonly live: boolean;
   /** The current live-reload generation (PD_GENERATION_HEADER); absent when headless. */
@@ -625,8 +627,11 @@ async function routeRequest(
     if (cfg.storefront && host === cfg.storefront.host) {
       const discovery = await currentDiscovery(state, patternRoots);
       const discoveryMap = discovery.discoveryMap;
-      // pd dev shows drafts; pd build leaves them out, as if their files weren't there.
-      const model = await readPages(cfg.storefront.pagesDir, { workbenchPath: sameHostWorkbenchPath(cfg.storefront), drafts: ctx.live ? "show" : "leave-out" });
+      // pd dev shows drafts and scheduled pages; pd build leaves them out, as if their files weren't there.
+      const model = await readPages(cfg.storefront.pagesDir, {
+        workbenchPath: sameHostWorkbenchPath(cfg.storefront), drafts: ctx.live ? "show" : "leave-out", scheduled: ctx.live ? "show" : "leave-out",
+        today: ctx.today ?? todayOf(ctx.now()), categories: cfg.storefront.categories,
+      });
       if (pathname === PD_ROUTES.pages) {
         if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
         json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);
@@ -646,16 +651,8 @@ async function routeRequest(
       // The sitemap needs the site's address, and a site kept out of search engines has none.
       if (pathname === PD_ROUTES.sitemap && siteUrl !== undefined && cfg.storefront.index) {
         if (model.problems.length) { res.writeHead(500, { "Content-Type": "text/plain" }); res.end(model.problems.join("\n")); return; }
-        const entries: SitemapEntry[] = [];
-        for (const p of [...model.pages].sort((a, b) => a.route.localeCompare(b.route))) {
-          const file = model.files.get(p.route);
-          if (!file || file.frontmatter.values["index"] === "false") continue;
-          // A date only where git has a reliable one; a shallow clone's are left out (pages note it).
-          const dated = ctx.dates ? await ctx.dates.of(file.path, ctx.live ? "dev" : "build") : undefined;
-          entries.push({ url: new URL(p.route.slice(1), siteUrl).href, lastmod: dated && !dated.shallow ? dated.dates.modified : null });
-        }
         res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
-        res.end(sitemapXml(entries));
+        res.end(sitemapXml(sitemapEntries(model, siteUrl)));
         return;
       }
       // A page route is a folder path; /about is /about/, as a static host serves it.

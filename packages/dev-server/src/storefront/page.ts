@@ -37,10 +37,11 @@ import { checkLinks } from "./links.js";
 import { checkPageBasics } from "./page-basics.js";
 import { redirectsOf } from "./redirects.js";
 import { dateOf, entriesOf, resolveCollections, type Entry } from "./collections.js";
+import type { Category } from "./categories.js";
 
-/** Said once (the same text from every page) when JSON-LD and the sitemap leave dates out for a shallow clone. */
-export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages have no dateModified in their JSON-LD "
-  + "and no lastmod in the sitemap: build from the full history (in CI, check out with fetch-depth: 0)";
+/** Said once (the same text from every page) when JSON-LD leaves git's date out for a shallow clone. */
+export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages without a date of their own have no datePublished "
+  + "in their JSON-LD: build from the full history (in CI, check out with fetch-depth: 0)";
 
 export interface PageAssembly {
   discoveryMap: DiscoveryMap;
@@ -60,7 +61,7 @@ export interface PageAssembly {
   workbenchUrl: string;
   /** Set in `pd dev`: the live-reload socket's port, and the generation the page's request took. */
   live?: { wsPort: number; generation: string };
-  /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created and page.modified are null. */
+  /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created is null. */
   dates?: GitDates;
   /** Checks a link-preview image path against the project's assets (page-image.ts). */
   image(path: string): Promise<PageImageCheck>;
@@ -193,17 +194,17 @@ ${live ? liveScript(live.wsPort, live.generation) : ""}
 </html>`;
 }
 
-/** A page that is an article: its own date and its tags. */
-export interface PageArticle { published: string; tags: string[] }
+/** A page that is an article: its own date, its own updated (when it has one) and its tags. */
+export interface PageArticle { published: string; modified?: string; tags: string[] }
 
 /**
  * Whether the page at `route` is an article, for og:type and JSON-LD: a page whose frontmatter gives it a `date`, other
  * than the home page and a listing (a folder's index.md with pages under it). The date git gives a page is not one:
  * every committed page has it, so it says nothing about what the page is.
  */
-export function articleOf(route: string, model: PageModel, ownDate: string | undefined): PageArticle | undefined {
+export function articleOf(route: string, model: PageModel, ownDate: string | undefined, updated?: string): PageArticle | undefined {
   if (ownDate === undefined || route === "/" || (model.folders.get(route)?.children.length ?? 0) > 0) return undefined;
-  return { published: ownDate, tags: model.entries.get(route)?.tags ?? [] };
+  return { published: ownDate, ...(updated !== undefined ? { modified: updated } : {}), tags: model.entries.get(route)?.tags ?? [] };
 }
 
 /**
@@ -232,6 +233,7 @@ export function seoTags(p: {
   );
   if (p.article) {
     tags.push(`<meta property="article:published_time" content="${escapeAttr(p.article.published)}">`,
+      ...(p.article.modified !== undefined ? [`<meta property="article:modified_time" content="${escapeAttr(p.article.modified)}">`] : []),
       ...p.article.tags.map(t => `<meta property="article:tag" content="${escapeAttr(t)}">`));
   }
   if (p.image) {
@@ -323,7 +325,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
 
   const problems: string[] = [];
-  const checked = await checkPageFrontmatter(page, a.discoveryMap);
+  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories);
   problems.push(...checked.problems.map(p => `${p.file}${p.line !== undefined ? `:${p.line}` : ""}: ${p.message}`));
   if (isNotFound && checked.build.redirectFrom) {
     const line = page.frontmatter.lines["redirectFrom"];
@@ -402,25 +404,26 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   // runs for a site that needs neither. Only a layout that shows dates is stopped by an unreliable one (a
   // shallow clone in pd build) or noted about a missing one: the JSON-LD just leaves the date out.
   const notes: string[] = [];
-  let dates: Partial<PageDates> = {};
-  let modified: string | null = null;
+  let dates: Partial<Pick<PageDates, "created">> = {};
+  // dateModified: the page's own updated; git's last commit counts a typo fix as a change, so it is never used.
+  const modified: string | null = checked.build.updated ?? null;
   // datePublished: the page's own date, else the day git first saw it.
   let published: string | null = checked.build.date ?? null;
   const mode = a.live ? "dev" : "build";
   const declares = (k: string) => pageDeclaration.declared?.includes(k) ?? false;
-  const showsDates = declares("created") || declares("modified");
+  const showsDates = declares("created");
   if (a.dates && !isNotFound && (showsDates || a.siteUrl !== undefined)) {
     const dated = await a.dates.of(page.path, mode);
     if (showsDates) {
-      dates = dated.dates;
+      dates = { created: dated.dates.created };
       notes.push(...dated.notes);
       problems.push(...dated.problems);
     }
     if (dated.shallow) notes.push(SHALLOW_SEO_NOTE);
-    else { modified = dated.dates.modified; published ??= dated.dates.created; }
+    else published ??= dated.dates.created;
   }
   // A listing's entries, and the page's own date and tags (collections.ts), for a layout that shows them.
-  const listing: { children?: Entry[]; date?: string | null; tags?: string[] } = {};
+  const listing: { children?: Entry[]; date?: string | null; updated?: string | null; tags?: string[]; categories?: Category[] } = {};
   if (declares("children")) {
     const listed = isNotFound ? { entries: [], problems: [], notes: [] } : await entriesOf(route, model, { dates: a.dates, mode });
     listing.children = listed.entries;
@@ -433,7 +436,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     problems.push(...dated.problems);
     notes.push(...dated.notes);
   }
+  if (declares("updated")) listing.updated = checked.build.updated ?? null;
   if (declares("tags")) listing.tags = model.entries.get(route)?.tags ?? [];
+  if (declares("categories")) listing.categories = (checked.build.categories ?? []).map(k => model.categories.byKey.get(k)!);
   // The collections the skin lists (site.collections), on every page.
   const collections = site.collections.length ? await resolveCollections(site.collections, model, { dates: a.dates, mode }) : undefined;
   if (collections) { problems.push(...collections.problems); notes.push(...collections.notes); }
@@ -449,14 +454,19 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     problems.push(...headSample);
   }
   if (problems.length) return fail(problems);
-  // pd dev shows drafts; each is said once, whichever page is open.
-  if (a.live) notes.push(...model.drafts.map(d => `${d} is a draft: pd build leaves it out`));
+  notes.push(...checked.notes);
+  // pd dev shows drafts and scheduled pages; each is said once, whichever page is open.
+  if (a.live) {
+    notes.push(...model.drafts.map(d => `${d} is a draft: pd build leaves it out`));
+    notes.push(...model.scheduled.map(s => `${s.path} is scheduled for ${s.until}: pd build leaves it out until then`));
+  }
 
   // What the layout gets: its declared values, null where the page sets none, then what the storefront fills.
   const siteData = {
     ...withDeclaredAbsentAsNull(site.values, siteDeclared),
     ...(site.listed.length ? { navigations: resolveNavigations(site.navigations, site.listed, model, route) } : {}),
     ...(collections ? { collections: collections.collections } : {}),
+    ...(site.categories ? { categories: model.categories.list } : {}),
   };
   const dataFor = (body: string, headings: PageHeading[]) => ({
     ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),
@@ -543,7 +553,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const title = typeof checked.values["title"] === "string" ? checked.values["title"] : isNotFound ? "Page not found" : route;
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
-  const article = isNotFound ? undefined : articleOf(route, model, checked.build.date);
+  const article = isNotFound ? undefined : articleOf(route, model, checked.build.date, checked.build.updated);
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} · ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),

@@ -16,6 +16,7 @@ import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
 import { checkPageImage } from "../src/storefront/page-image.js";
 import { createImageService, type ImageService } from "../src/image-service.js";
 import { save } from "../../../test-support/save.js";
+import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 
 const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
 const patterns = join(bench, "src", "patterns");
@@ -66,7 +67,9 @@ async function pagesOf(files: Record<string, string>): Promise<string> {
   }
   return dir;
 }
-const build = async (route: string, dir: string, over: Partial<PageAssembly> = {}) => assemblePage(route, await readPages(dir), assembly(over));
+// The bench's categories (its config's storefront.categories): its pages name them.
+const build = async (route: string, dir: string, over: Partial<PageAssembly> = {}) =>
+  assemblePage(route, await readPages(dir, { categories: benchConfig.storefront?.categories }), assembly(over));
 
 describe("assemblePage — the bench's pages", () => {
   it("renders the home page through its layout, with the storefront's nav, site and examples", async () => {

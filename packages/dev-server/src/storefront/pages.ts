@@ -29,7 +29,9 @@ import { PD_ROUTES, type StorefrontNavItem, type StorefrontPage, type Storefront
 import { frontmatterBody, readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
 import { redirectProblems, redirectsOf, workbenchPlace } from "./redirects.js";
-import { readDate, readDraft, readSort, readTags, type SortBy } from "./listing-keys.js";
+import { readCategories, readDate, readDraft, readSort, readTags, readUpdated, type SortBy } from "./listing-keys.js";
+import { categoryIndex, type Category, type CategoryIndex } from "./categories.js";
+import type { StorefrontCategory } from "@pattern-dump/config";
 import { teaserOf } from "./teaser.js";
 
 /** The layout a page uses when its frontmatter names none. */
@@ -53,11 +55,23 @@ export interface PageEntryFields {
   description: string | null;
   /** Its frontmatter date, YYYY-MM-DD, or null. */
   date: string | null;
+  /** Its frontmatter updated, YYYY-MM-DD, or null. */
+  updated: string | null;
   /** Its image, a path in the assets, or null. */
   image: string | null;
   tags: string[];
+  /** Its categories, resolved (an old key as the category it is now). */
+  categories: Category[];
   draft: boolean;
+  /** Its own date is after today (pd dev only: pd build leaves it out). A draft is never scheduled. */
+  scheduled: boolean;
 }
+
+/** A page held back until a later day: its path in the pages folder, and the first day it is built (YYYY-MM-DD). */
+export interface ScheduledPage { path: string; until: string }
+
+/** The UTC date of `clock`, YYYY-MM-DD: the day a page's `date` is compared with, the same on every machine. */
+export const todayOf = (clock: Date): string => clock.toISOString().slice(0, 10);
 
 /** A folder's listing: its pages and subfolders (each by its index.md), in the folder's order, and how to sort them. */
 export interface FolderListing {
@@ -77,9 +91,15 @@ export interface PageModel extends StorefrontPagesResponse {
   /** Drafts, by their path in the pages folder: shown ones with `drafts: "show"`; with "leave-out", every page left
    *  out (a draft, and each page under a folder whose index.md is one). */
   drafts: string[];
+  /** Pages whose date is after today, by path: shown ones (their own date only) with `scheduled: "show"`; with
+   *  "leave-out", every page held back (a scheduled page, and each page under a folder whose index.md is one, until
+   *  the later of the dates). Drafts are never in it. */
+  scheduled: ScheduledPage[];
   /** 404.md at the top of the pages folder, at the route /404.html: not a page of the site, so in neither
    *  `pages`, `files` nor the nav. Absent when the site has none (a built-in one is used). */
   notFound?: PageFile;
+  /** The declared categories (storefront.categories), which pages' `categories:` are checked against. */
+  categories: CategoryIndex;
   /** Problems with the folder as a whole, one line each. Empty when it is a sound site. */
   problems: string[];
 }
@@ -127,12 +147,21 @@ const scalar = (v: string | string[] | undefined): string | undefined => typeof 
  * `drafts`: "show" (pd dev, the default) keeps drafts as pages; "leave-out" (pd build) drops every page whose
  * frontmatter says `draft: true`, and every page under a folder whose index.md does, as if their files weren't there.
  */
-export async function readPages(pagesDir: string, opts: { workbenchPath?: string | undefined; drafts?: "show" | "leave-out" } = {}): Promise<PageModel> {
+/**
+ * `scheduled`: "show" (pd dev, the default) keeps a page whose own `date` is after `today` (default: the clock's UTC
+ * date, todayOf); "leave-out" (pd build) drops it, and every page under a folder whose index.md is one, as drafts are.
+ * `categories`: storefront.categories from the config.
+ */
+export async function readPages(pagesDir: string, opts: {
+  workbenchPath?: string | undefined; drafts?: "show" | "leave-out"; scheduled?: "show" | "leave-out"; today?: string | undefined;
+  categories?: Readonly<Record<string, StorefrontCategory>> | undefined;
+} = {}): Promise<PageModel> {
   const problems: string[] = [];
+  const categories = categoryIndex(opts.categories);
   const files = new Map<string, PageFile>();
   let notFound: PageFile | undefined;
   if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
-    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], problems: [`the pages folder ${pagesDir} does not exist`] };
+    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], scheduled: [], categories, problems: [`the pages folder ${pagesDir} does not exist`] };
   }
   const bodies = new Map<string, string>();
   for (const path of (await markdownFiles(pagesDir, pagesDir, problems)).sort()) {
@@ -162,6 +191,35 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
     if (opts.drafts === "leave-out") { files.delete(route); bodies.delete(route); }
   }
   drafts.sort();
+
+  // Scheduled: a page whose own date is after today, held back (in leave-out) with every page under a scheduled
+  // folder's index.md, until the latest of those dates. What is left of the drafts is checked; a draft is only a draft.
+  const today = opts.today ?? todayOf(new Date());
+  const dateOf = (f: PageFile | undefined): string | undefined => {
+    const v = f?.frontmatter.values["date"];
+    if (v === undefined) return undefined;
+    const r = readDate(v);
+    return r.ok ? r.value : undefined;
+  };
+  const future = (f: PageFile | undefined): string | undefined => { const d = dateOf(f); return d !== undefined && d > today ? d : undefined; };
+  const scheduled: ScheduledPage[] = [];
+  const ownScheduled = new Set<string>();
+  for (const [route, f] of [...files]) {
+    if (isDraft(f)) continue;
+    const own = future(f);
+    if (own !== undefined) ownScheduled.add(route);
+    const segments = route.split("/").filter(Boolean);
+    const folders = opts.scheduled === "leave-out"
+      ? segments.slice(0, -1).map((_, i) => future(files.get(`/${segments.slice(0, i + 1).join("/")}/`))).filter((d): d is string => d !== undefined)
+      : [];
+    const until = [own, ...folders].filter((d): d is string => d !== undefined).sort().at(-1);
+    if (until === undefined) continue;
+    scheduled.push({ path: f.path, until });
+  }
+  if (opts.scheduled === "leave-out") {
+    for (const s of scheduled) { const route = routeFor(s.path); files.delete(route); bodies.delete(route); }
+  }
+  scheduled.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 
   const pageOf = (f: PageFile): StorefrontPage => {
     const redirectFrom = redirectsOf(f);
@@ -264,12 +322,16 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
     const v = f.frontmatter.values;
     const description = scalar(v["description"]);
     const image = scalar(v["image"]);
+    const date = ok(v["date"], x => readDate(x)) ?? null;
     entries.set(route, {
       description: description ?? teaserOf(frontmatterBody(bodies.get(route)!)),
-      date: ok(v["date"], readDate) ?? null,
+      date,
+      updated: ok(v["updated"], x => readUpdated(x, date ?? undefined)) ?? null,
       image: image !== undefined && /^\/assets\/[^?#]+[^/?#]$/.test(image) ? image : null,
       tags: ok(v["tags"], readTags) ?? [],
+      categories: (ok(v["categories"], x => readCategories(x, categories))?.keys ?? []).map(k => categories.byKey.get(k)!),
       draft: ok(v["draft"], readDraft) ?? false,
+      scheduled: ownScheduled.has(route),
     });
   }
   const listings = new Map<string, FolderListing>();
@@ -281,5 +343,5 @@ export async function readPages(pagesDir: string, opts: { workbenchPath?: string
       children: ordered(folder).map(c => c.route).filter(r => files.has(r)),
     });
   }
-  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, problems, ...(notFound ? { notFound } : {}) };
+  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, scheduled, categories, problems, ...(notFound ? { notFound } : {}) };
 }

@@ -7,9 +7,10 @@ import { transformerStyleToClass } from "@shikijs/transformers";
 import { mcmDark } from "./themes/mcm-dark.js";
 import { monokaiLight } from "./themes/monokai-light.js";
 
-// Fixed grammar set (bundle discipline).
+// Fixed grammar set (bundle discipline). Shell: `shellscript` for scripts and commands, `shellsession` for a prompt
+// with its output. `text` (and any other name) stays a plain block on purpose.
 const SUPPORTED_LANGS = [
-  "handlebars", "html", "json", "scss", "css", "typescript", "javascript", "markdown",
+  "handlebars", "html", "json", "scss", "css", "typescript", "javascript", "markdown", "shellscript", "shellsession",
 ] as const;
 type SupportedLang = typeof SUPPORTED_LANGS[number];
 
@@ -19,6 +20,12 @@ const LANG_ALIASES: Record<string, SupportedLang> = {
   ts:  "typescript",
   js:  "javascript",
   md:  "markdown",
+  bash: "shellscript",
+  sh: "shellscript",
+  shell: "shellscript",
+  zsh: "shellscript",
+  console: "shellsession",
+  "shell-session": "shellsession",
 };
 
 const LANG_SET = new Set<string>([...SUPPORTED_LANGS, ...Object.keys(LANG_ALIASES)]);
@@ -50,6 +57,8 @@ export async function initHighlighter(): Promise<void> {
     scss: `.a { color: #fff; font-size: 1rem; &:hover { background: var(--c); } }\n@mixin m($v: 0) { margin: $v; }\n@media (max-width: 768px) { .a { display: none; } }`,
     json: `{"k":"v","n":42,"b":true,"x":null,"a":[1,"two",false]}`,
     html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head><body class="c"><!-- note --><p data-x="1">hi</p></body></html>`,
+    shellscript: `#!/usr/bin/env bash\n# comment\nexport NAME="world" N=42\nif [ -n "$NAME" ]; then echo "hi \${NAME}" | tr a-z A-Z; fi\nnpm install --save-dev pattern-dump`,
+    shellsession: `$ npm run build\n> built in 2s\n$ echo "done"`,
   };
   for (const [lang, code] of Object.entries(WARMUP)) {
     _highlightRaw(code, lang);

@@ -204,15 +204,17 @@ lede: Three folders make a site.
 | `image` | Its link-preview image: a raster file in the assets (PNG, JPEG, GIF or WebP), such as `/assets/images/setup.png`. An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `storefront.image` |
 | `index` | `false` keeps the page out of search engines: `noindex`, and no sitemap entry |
 | `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. See [Redirects](#redirects) |
-| `date` | The page's date, a real calendar date written `YYYY-MM-DD`: what a listing sorts and shows, and its JSON-LD `datePublished`. Without it, the day git first saw the page. See [Collections](#collections) |
+| `date` | The page's date, a real calendar date written `YYYY-MM-DD`: what a listing sorts and shows, and its JSON-LD `datePublished`. Without it, the day git first saw the page. A date after today holds the page back from `pd build` until that day, see [Scheduled pages](#scheduled-pages). See [Collections](#collections) |
+| `updated` | The page's last real change, `YYYY-MM-DD`, set by its author: not before `date`. The only "last changed" date a reader or a search engine sees, see [Dates](#dates) |
 | `tags` | One tag or a list, each lowercase letters, digits and hyphens, none twice: `tags: [css, design-systems]` |
+| `categories` | One category or a list, each declared in `storefront.categories` (or an old key of one), none twice: `categories: [guides]`. See [Categories](#categories) |
 | `draft` | `true` shows the page in `pd dev` and leaves it out of `pd build`. See [Drafts](#drafts) |
 | `sort` | On a folder's `index.md` only: `date` lists the folder's pages newest first; `order`, the default, in the folder's order |
 | any other key | Must be declared by the layout's schema |
 
-`layout`, `order`, `image`, `index`, `redirectFrom`, `date`, `tags`, `draft` and `sort` belong to the build: they
-never reach the layout as keys of their own, and a layout's schema may not declare any of them (a layout shows a
-page's date and tags through `page.date` and `page.tags`).
+`layout`, `order`, `image`, `index`, `redirectFrom`, `date`, `updated`, `tags`, `categories`, `draft` and `sort`
+belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
+them (a layout shows them through `page.date`, `page.updated`, `page.tags` and `page.categories`).
 
 **The layout's schema is the frontmatter contract.** A layout is a component, and its
 `<name>.schema.json` lists the keys a page using it may set (`properties`) and must set (`required`). A
@@ -340,10 +342,12 @@ keys below, at any depth.
 | `section` | The top-level nav entry the page falls under, `{ route, title }`; a top-level page is its own section |
 | `breadcrumbs` | Home, then each folder above the page by its `index.md`, as `{ route, title }`; empty on the home page. They reach pages the one-level nav does not list |
 | `prev`, `next` | The pages before and after this one in the nav, read entry by entry with each folder's pages after it, across sections; `null` at either end and for a page the nav does not list |
-| `created`, `modified` | The page's first and last commit, from git: the author date, ISO 8601. A renamed page keeps the date it was first added |
+| `created` | The page's first commit, from git: the author date, ISO 8601. A renamed page keeps the date it was first added |
+| `updated` | The page's `updated`, `YYYY-MM-DD`, else `null`. Never git's last commit, see [Dates](#dates) |
 | `children` | On a folder's `index.md`: the folder's pages, an entry each, sorted as its `sort` says (see [Collections](#collections)); `[]` on any other page |
 | `date` | The page's `date`, else the day git first saw it (`YYYY-MM-DD`), else `null` |
 | `tags` | The page's `tags`, else `[]` |
+| `categories` | The page's categories, in its order, each `{ key, label, description }` (`description` `null` when the config gives none), else `[]` |
 
 ```hbs
 {{#each page.headings}}<a href="#{{anchor}}">{{text}}</a>{{/each}}
@@ -353,11 +357,25 @@ keys below, at any depth.
 A field named like a helper (`id`, `eq`, …) can never be read by its name, since `{{id}}` calls the
 helper: such a schema field is an error, which is why the heading's field is `anchor`.
 
-**Dates.** They are read from git once, the first time a layout that declares them is rendered; a site
-whose layouts show no dates never runs git. A page with uncommitted changes has its last commit's dates
-(a note in `pd build`). A page git does not know (not committed yet, ignored, or outside any repository)
-has `null` for both, with a note. In `pd dev` the dates are as of the first page that asked for them: a new
-commit is seen on restart. Two limits:
+#### Dates
+
+A page has three dates, and only the author sets the two a reader or a search engine sees as changes:
+
+- **`date`**, the publication date: `page.date`, a listing's date, `datePublished` and `article:published_time`.
+  Without it, the day git first saw the page.
+- **`updated`**, the last real change: `page.updated`, JSON-LD `dateModified`, `article:modified_time` and the
+  sitemap's `lastmod` (which falls back to `date`). Without it, there is no "last changed" date anywhere.
+- **`page.created`**, the page's first commit, from git.
+
+Git's last commit is not used for any of them: a typo fix or a reformat moves it, and readers and search engines
+would take that for new content. `page.modified`, which carried it, is no longer filled; a layout that declares it
+is told to declare `page.updated` instead.
+
+Git is read once, the first time a page needs its first commit (a layout that declares `page.created`, a page with
+no `date` in a listing or in its JSON-LD); a site that needs none never runs git. A page with uncommitted changes
+has its last commit's history (a note in `pd build`). A page git does not know (not committed yet, ignored, or
+outside any repository) has `null`, with a note. In `pd dev` the history is as of the first page that asked for
+it: a new commit is seen on restart. Two limits:
 
 - **A shallow clone** has only part of the history, so its dates would be wrong, not missing. `pd build`
   refuses to build a page whose layout shows dates from a shallow clone; in CI, check out the full history
@@ -412,9 +430,12 @@ has the same fixed shape:
 | `route`, `title` | The page's route and title |
 | `description` | The page's `description`; without one, the first paragraph of its body as plain text (links keep their text, markup and images are left out, a paragraph that is only an image or a placed component is skipped), or `null` |
 | `date` | The page's `date`, else the day git first saw it, else `null` |
+| `updated` | The page's `updated`, or `null` |
 | `image` | The page's `image`, a path in the assets, or `null` |
 | `tags` | The page's `tags`, or `[]` |
+| `categories` | The page's categories, each `{ key, label, description }`, or `[]` |
 | `draft` | `true` for a draft in `pd dev` |
+| `scheduled` | `true` in `pd dev` for a page dated after today |
 
 The description is never shortened: limit it in the skin's CSS, for example to three lines with
 `line-clamp: 3` (and `-webkit-line-clamp`, `display: -webkit-box` and `-webkit-box-orient: vertical` for the
@@ -445,8 +466,51 @@ set `site.collections`.
 {{#each site.collections.articles}}{{#if (lt @index 3)}}<a href="{{route}}">{{title}}</a>{{/if}}{{/each}}
 ```
 
-In `pd dev` an edit to what a listing shows of a page (its date, description, first paragraph, image, tags or
-draft) reloads every open page, as a title edit does.
+In `pd dev` an edit to what a listing shows of a page (its date, description, first paragraph, image, tags,
+categories or draft) reloads every open page, as a title edit does.
+
+### Categories
+
+Categories say what a page is about, apart from the folder it is in: a page changes category without moving, so
+its URL stays. The config declares them, by key:
+
+```ts
+storefront: {
+  categories: {
+    "design-systems": { label: "Design systems", description: "How they are built", aliases: ["ds"] },
+    guides: { label: "Guides" },
+  },
+},
+```
+
+- **A key** is lowercase letters, digits and hyphens, as a tag is. `label` is required, `description` is optional.
+- **A page names them** in `categories:`. A value the config does not declare stops the page, with a "did you mean"
+  where one is close, else the list of keys. A page that names one when the config declares none stops too.
+- **Renaming** keeps the old key as an alias of the new one (`aliases`). A page that still names the old key
+  builds, as the new category, with a warning that names the page and line so it can be updated. An alias that is
+  a key of its own, or that two categories claim, is a config problem.
+- **A layout** gets `page.categories` (in the page's order) and each listing entry carries them. `site.categories`
+  is every declared category in the config's order, `{ key, label, description }`, on every page, when
+  `partials/base`'s schema lists `categories` under `site.properties` (no shape of its own, a description at most).
+  The config can't set `site.categories`.
+
+### Scheduled pages
+
+A page whose `date` is after today stays out of `pd build`, as a draft does: no page, no entry in the nav, a
+listing or `site.collections`, no sitemap entry, none of its old routes, and a link to it from a published page is
+a broken link. It appears with the first build on or after its date. A folder whose `index.md` is scheduled holds
+its pages back with it, until the later of the dates. A draft is only a draft, whatever its date.
+
+**Today is the UTC date** of the build's clock, so a laptop and a CI runner agree: a page dated 2026-12-01 is built
+from 00:00 UTC on that day. The day is taken once per build. `pd dev` shows a scheduled page, listed with
+`scheduled: true` so the skin can mark it, and notes once until when `pd build` leaves it out. The build's report
+says what it held back:
+
+```
+[pd build] scheduled: 1 held back (articles/launch.md until 2026-12-01)
+```
+
+A static site is only as current as its last build: to publish on the day, build on the day (a scheduled CI run).
 
 ### Drafts
 
@@ -589,11 +653,13 @@ or with a path, such as `https://example.github.io/project/`, for a site publish
 - Open Graph (`og:type`, `og:site_name`, `og:title`, `og:description`, `og:image` with its width and height)
   and a Twitter card, large when the page has an image
 - one JSON-LD graph: the `WebSite`, the `WebPage` with its date (`datePublished`: its `date`, else its first
-  commit) and its last change from git (`dateModified`), and a `BreadcrumbList` from Home down to the page
+  commit) and its last real change (`dateModified`: its `updated`, else none), and a `BreadcrumbList` from Home
+  down to the page
 
 `og:type` is `website`, except on an article: a page whose frontmatter gives it a `date`, other than the home
 page and a listing (a folder's `index.md` with pages under it). An article gets `og:type` `article`, with
-`article:published_time` (its `date`) and one `article:tag` per tag, and its JSON-LD graph adds an `Article`
+`article:published_time` (its `date`), `article:modified_time` (its `updated`, when it has one) and one
+`article:tag` per tag, and its JSON-LD graph adds an `Article`
 (headline, dates, `keywords` from its tags) as the page's main entity. The date git gives a page does not make
 it an article: every committed page has one.
 
@@ -609,10 +675,9 @@ an image must be a PNG, JPEG, GIF or WebP file in the assets.
 everything and there is no sitemap.
 
 **`sitemap.xml`** lists every page in route order, except those with `index: false`, the 404 page and the
-redirect pages, each with a `lastmod` where git has a reliable date. A page with uncommitted changes has its
-last commit's date. From a shallow clone the dates would be the clone's boundary, so the sitemap and the
-JSON-LD leave them out and the build notes it once (in CI, check out with `fetch-depth: 0`). A layout that
-*shows* dates still fails the build there.
+redirect pages, each with a `lastmod` of its `updated`, else its `date`, else none. Git is not read for it. From a
+shallow clone, a `datePublished` git would give is left out of the JSON-LD and the build notes it once (in CI,
+check out with `fetch-depth: 0`). A layout that shows `page.created` still fails the build there.
 
 **`robots.txt`.** Both output roots get one. The storefront's keeps crawlers out of `/preview/` (the live
 examples: component demos, not pages) and names the sitemap. The workbench's keeps them out of its

@@ -22,6 +22,8 @@ const TRAILS: Record<string, string[]> = {
 };
 /** A page's own date (frontmatter date), which its JSON-LD gives as datePublished. */
 const PUBLISHED: Record<string, string> = { "/articles/harbour/": "2026-11-01", "/articles/plain/": "2026-10-02" };
+/** The pages with an updated date of their own: their dateModified and lastmod. */
+const UPDATED: Record<string, string> = { "/guides/setup/": "2026-11-15" };
 /** The articles: the pages with their own date (not the home page, not a listing), and their tags. */
 const ARTICLE_TAGS: Record<string, string[]> = { "/articles/harbour/": ["images", "layout"], "/articles/plain/": ["design"] };
 
@@ -65,12 +67,13 @@ for (const [route, title, [image, width, height]] of PAGES) {
     expect(graph.map(n => n["@type"])).toEqual(article ? ["WebSite", "WebPage", "Article"] : ["WebSite", "WebPage"]);
     if (article) {
       expect(graph[2]).toMatchObject({ headline: title, mainEntityOfPage: { "@id": url }, datePublished: PUBLISHED[route],
-        dateModified: graph[1]!["dateModified"], ...(article.length ? { keywords: article } : {}) });
+        ...(article.length ? { keywords: article } : {}) });
+      expect(graph[2]!["dateModified"]).toBe(graph[1]!["dateModified"]);
     }
     expect(graph[0]).toMatchObject({ url: site, name: "Storefront bench" });
     expect(graph[1]).toMatchObject({ url, name: title });
-    // Every bench page is committed, so git dates it (the checkout has its full history, in CI too).
-    expect(graph[1]!["dateModified"]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/);
+    // dateModified: the page's own updated, never git's last commit.
+    expect(graph[1]!["dateModified"]).toBe(UPDATED[route]);
     // datePublished: the page's own date where it has one, else the day git first saw it.
     if (PUBLISHED[route]) expect(graph[1]!["datePublished"]).toBe(PUBLISHED[route]);
     else expect(graph[1]!["datePublished"]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/);
@@ -80,7 +83,7 @@ for (const [route, title, [image, width, height]] of PAGES) {
   });
 }
 
-test("robots.txt keeps crawlers out of the previews and names the sitemap; the sitemap lists every page, dated", async ({ request }, info) => {
+test("robots.txt keeps crawlers out of the previews and names the sitemap; the sitemap lists every page, dated by the page", async ({ request }, info) => {
   const site = isDev(info) ? `${DEV}/` : SITE_URL;
   const robots = await request.get("/robots.txt");
   expect(robots.status()).toBe(200);
@@ -89,6 +92,9 @@ test("robots.txt keeps crawlers out of the previews and names the sitemap; the s
   expect(sitemap.status()).toBe(200);
   const entries = [...(await sitemap.text()).matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?<\/url>/g)];
   expect(entries.map(m => m[1])).toEqual(PAGES.map(([route]) => new URL(route.slice(1), site).href).sort());
-  // Every bench page is committed, so each has its last change (the checkout has its full history).
-  for (const m of entries) expect(m[2], m[1]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)$/);
+  // lastmod: the page's own updated, else its own date, else none; never git's last commit.
+  for (const m of entries) {
+    const route = new URL(m[1]!).pathname.slice(new URL(site).pathname.length - 1);
+    expect(m[2], m[1]).toBe(UPDATED[route] ?? PUBLISHED[route]);
+  }
 });

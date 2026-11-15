@@ -14,6 +14,11 @@
     {{#if page.section}}<p class="doc-section">{{page.section.title}}</p>{{/if}}
     <h1 class="doc-title">{{title}}</h1>
     {{#if lede}}<p class="article-lede">{{lede}}</p>{{/if}}
+    {{#if page.categories.length}}
+    <ul class="doc-categories" aria-label="Categories">
+      {{#each page.categories}}<li data-key="{{key}}">{{label}}</li>{{/each}}
+    </ul>
+    {{/if}}
   </header>
   {{#if page.headings.length}}
   <nav class="doc-toc" aria-label="On this page">
@@ -27,8 +32,8 @@
   <div class="doc-body">{{{body}}}</div>
   {{#if page.created}}
   <p class="doc-dates">
-    Created <time class="doc-created" datetime="{{page.created}}">{{page.created}}</time>{{#if page.modified}},
-    last changed <time class="doc-modified" datetime="{{page.modified}}">{{page.modified}}</time>{{/if}}
+    Created <time class="doc-created" datetime="{{page.created}}">{{page.created}}</time>{{#if page.updated}},
+    updated <time class="doc-updated" datetime="{{page.updated}}">{{page.updated}}</time>{{/if}}
   </p>
   {{/if}}
   <nav class="doc-pager" aria-label="Previous and next">

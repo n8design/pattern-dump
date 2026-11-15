@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **A storefront page's "last changed" date is the author's, never git's.** Git's last commit counts a typo fix or a
+  reformat as a change, so it is no longer used for anything a reader or a search engine sees. A page sets
+  `updated: YYYY-MM-DD` for a real change instead. What changes for an existing site:
+  - JSON-LD `dateModified` (on the `WebPage` and the `Article`) is the page's `updated`, and is left out without one.
+    Before, it was the page's last commit.
+  - The sitemap's `<lastmod>` is the page's `updated`, else its own `date`, else left out. Before, it was the last
+    commit. `pd build` no longer runs git for the sitemap.
+  - `page.modified` is no longer filled. A layout that declares it fails with a message to declare `page.updated`
+    instead. `page.created` (the first commit) is unchanged.
+  - From a shallow clone, the note `pd build` gives is about `datePublished` (a page without a `date` of its own),
+    since `dateModified` and `lastmod` no longer come from git.
+- **A page dated after today stays out of `pd build`** until that day (today is the UTC date of the build's
+  clock), with every page under a folder whose `index.md` is dated so. A site with such a page builds without it
+  now. `pd dev` shows it, and the report names it: `scheduled: 1 held back (articles/launch.md until 2026-12-01)`.
+- `updated` and `categories` are now keys the build owns: a layout's schema that declares either must rename it.
+
+### Added
+
+- `updated:` on a storefront page, its last real change: `page.updated`, JSON-LD `dateModified`,
+  `article:modified_time` on an article, and the sitemap's `lastmod`. Checked: a real date, not before `date`.
+- Categories, independent of folders: `storefront.categories` declares them (key, label, optional description, and
+  old keys as `aliases` after a rename), a page names them in `categories:`. An undeclared value fails the page with
+  a "did you mean"; an old key builds as the new category, with a warning naming the page. Layouts get
+  `page.categories`, listing entries carry them, and `site.categories` lists every one when `partials/base` lists it.
+- Listing entries carry `updated`, `categories` and `scheduled` (true in `pd dev` for a page dated after today).
+- Shell code is highlighted: `bash`, `sh`, `shell` and `zsh`, and `console` or `shell-session` for a prompt with its
+  output. `text` stays plain.
+
 ## 0.4.2
 
 ### Fixed

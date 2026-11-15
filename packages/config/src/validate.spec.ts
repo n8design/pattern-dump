@@ -207,6 +207,44 @@ describe("configProblems — storefront", () => {
     }
   });
 
+  it("takes categories: each key a URL segment, with a label, an optional description and old keys (aliases)", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    expect(storefront({ ...base, categories: {
+      guides: { label: "Guides" },
+      "design-systems": { label: "Design systems", description: "How they are built", aliases: ["ds", "systems"] },
+    } })).toEqual([]);
+    expect(storefront({ ...base, categories: {} })).toEqual([]);
+    expect(storefront({ ...base, categories: ["guides"] })).toEqual([
+      `"storefront.categories" must be an object of categories by key, such as { guides: { label: "Guides" } }`,
+    ]);
+    expect(storefront({ ...base, categories: {
+      Guides: { label: "Guides" },
+      news: {},
+      css: { label: 3, description: false, aliases: "style" },
+      tools: { label: "Tools", title: "Tools" },
+    } })).toEqual([
+      `"storefront.categories.Guides": a category's key is part of a URL, so it is lowercase letters, digits and hyphens only`,
+      `missing required "storefront.categories.news.label"`,
+      `"storefront.categories.css.label" must be a string`,
+      `"storefront.categories.css.description" must be a string`,
+      `"storefront.categories.css.aliases" must be a list of strings`,
+      `unknown key "storefront.categories.tools.title"`,
+    ]);
+  });
+
+  it("refuses an alias that is not a URL segment, is a category's own key, or is claimed by two categories", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    expect(storefront({ ...base, categories: {
+      guides: { label: "Guides", aliases: ["How To", "news"] },
+      news: { label: "News", aliases: ["updates"] },
+      blog: { label: "Blog", aliases: ["updates"] },
+    } })).toEqual([
+      `"storefront.categories.guides.aliases": "How To" is not a key: an old key is lowercase letters, digits and hyphens, as a key is`,
+      `"storefront.categories.guides.aliases": "news" is a category of its own, so it can't be an old key of "guides"`,
+      `"storefront.categories.blog.aliases": "updates" is an old key of "news" already: one old key leads to one category`,
+    ]);
+  });
+
   it("accepts a workbench URL with a subpath", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, workbenchUrl: "https://htwoo.io/workbench/" })).toEqual([]);

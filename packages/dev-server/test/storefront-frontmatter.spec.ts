@@ -12,6 +12,7 @@ import { readFrontmatterStrict } from "../src/frontmatter.js";
 import { readPages, type PageFile } from "../src/storefront/pages.js";
 import { checkPageFrontmatter, layoutNames } from "../src/storefront/frontmatter-contract.js";
 import { save } from "../../../test-support/save.js";
+import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 
 let tmp = "";
 let map: DiscoveryMap;
@@ -82,7 +83,7 @@ describe("layoutNames", () => {
 describe("checkPageFrontmatter — a valid page", () => {
   it("uses the page layout when none is named, and passes the declared values on, without layout or order", async () => {
     expect(await check("---\ntitle: Setup\ndescription: How\norder: 2\n---\n")).toEqual({
-      layoutId: "layouts/page", values: { title: "Setup", description: "How" }, build: {}, problems: [],
+      layoutId: "layouts/page", values: { title: "Setup", description: "How" }, build: {}, problems: [], notes: [],
     });
   });
 
@@ -149,7 +150,7 @@ describe("checkPageFrontmatter — keys", () => {
 
   it("declares nothing for a layout with no schema", async () => {
     expect((await check("---\nlayout: bare\ntitle: T\n---\n")).problems).toEqual([P(3, `"title" is not declared by layout "bare", which has no schema`)]);
-    expect(await check("---\nlayout: bare\norder: 3\n---\n")).toEqual({ layoutId: "layouts/bare", values: {}, build: {}, problems: [] });
+    expect(await check("---\nlayout: bare\norder: 3\n---\n")).toEqual({ layoutId: "layouts/bare", values: {}, build: {}, problems: [], notes: [] });
   });
 });
 
@@ -161,6 +162,7 @@ describe("checkPageFrontmatter — declared types", () => {
       values: { title: "T", count: 2.5, n: -4, pinned: true, labels: ["a", "b"], scores: [1, 2.5], tone: "info", either: 7, free: "anything" },
       build: {},
       problems: [],
+      notes: [],
     });
   });
 
@@ -303,8 +305,8 @@ describe("checkPageFrontmatter — the storefront bench", () => {
   it("finds nothing wrong with any of its pages", async () => {
     const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
     const benchMap = (await buildDiscoveryMap(join(bench, "src", "patterns"))).discoveryMap;
-    const model = await readPages(join(bench, "pages"));
-    const checked = await Promise.all([...model.files.values()].map(f => checkPageFrontmatter(f, benchMap)));
+    const model = await readPages(join(bench, "pages"), { categories: benchConfig.storefront?.categories });
+    const checked = await Promise.all([...model.files.values()].map(f => checkPageFrontmatter(f, benchMap, model.categories)));
     expect(checked.flatMap(c => c.problems)).toEqual([]);
     expect(checked.map(c => c.layoutId)).toEqual(["layouts/home", "layouts/page", "layouts/doc", "layouts/doc",
       "layouts/listing", "layouts/article", "layouts/doc"]);

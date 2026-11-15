@@ -29,8 +29,8 @@ describe("checkPageDeclaration", () => {
   });
 
   it("names what Pattern Dump fills today", () => {
-    const all = "page.headings, page.section, page.breadcrumbs, page.prev, page.next, page.created, page.modified, page.children, page.date, page.tags";
-    expect(FILLED).toEqual(["headings", "section", "breadcrumbs", "prev", "next", "created", "modified", "children", "date", "tags"]);
+    const all = "page.headings, page.section, page.breadcrumbs, page.prev, page.next, page.created, page.updated, page.children, page.date, page.tags, page.categories";
+    expect(FILLED).toEqual(["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories"]);
     expect(checkPageDeclaration({ properties: { page: { properties: { toc: {} } } } }, "layouts/doc").problems).toEqual([
       `layouts/doc declares "page.toc", which Pattern Dump does not fill (it fills ${all})`,
     ]);
@@ -121,7 +121,7 @@ describe("assemblePage — page", () => {
   it("a declared sub-key Pattern Dump does not fill fails the page, named", async () => {
     const { page } = await assemble({ properties: { title: { type: "string" }, page: { type: "object", properties: { toc: { type: "array" } } } } });
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`layouts/page declares "page.toc", which Pattern Dump does not fill (it fills page.headings, page.section, page.breadcrumbs, page.prev, page.next, page.created, page.modified, page.children, page.date, page.tags)`]);
+    expect(page.problems).toEqual([`layouts/page declares "page.toc", which Pattern Dump does not fill (it fills page.headings, page.section, page.breadcrumbs, page.prev, page.next, page.created, page.updated, page.children, page.date, page.tags, page.categories)`]);
   });
 
   it("a layout that declares page.headings gets every heading, with the anchor its id carries", async () => {
@@ -148,18 +148,19 @@ describe("assemblePage — page", () => {
   });
 
   describe("dates", () => {
-    const DATED = { properties: { title: { type: "string" }, page: { type: "object", properties: { created: { type: "string" }, modified: { type: "string" } } } } };
+    const DATED = { properties: { title: { type: "string" }, page: { type: "object", properties: { created: { type: "string" } } } } };
     const fake = (dated: DatedPage) => {
       const asked: string[] = [];
       const dates: GitDates = { of: async (path, mode) => { asked.push(`${path} ${mode}`); return dated; }, statusChanged: () => {} };
       return { dates, asked };
     };
 
-    it("a layout that declares them gets the page's dates, and their notes", async () => {
+    it("a layout that declares page.created gets git's first commit, and its notes; never git's last", async () => {
       const f = fake({ dates: { created: "2026-01-10T10:00:00+01:00", modified: "2026-02-10T10:00:00+01:00" }, notes: ["index.md: a note"], problems: [] });
       const { page, data } = await assemble(DATED, "title: Home", "Hello.", f.dates);
       expect(page.status).toBe(200);
-      expect(data!["page"]).toEqual({ created: "2026-01-10T10:00:00+01:00", modified: "2026-02-10T10:00:00+01:00" });
+      expect(data!["page"]).toEqual({ created: "2026-01-10T10:00:00+01:00" });
+      expect(page.html).not.toContain("2026-02-10T10:00:00+01:00");
       expect(page.notes).toEqual(["index.md: a note"]);
       expect(f.asked).toEqual(["index.md build"]);
     });

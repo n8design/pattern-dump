@@ -15,6 +15,7 @@
 import { suggest } from "@pattern-dump/config";
 import type { DatesMode, GitDates } from "./git-dates.js";
 import type { PageModel } from "./pages.js";
+import type { Category } from "./categories.js";
 
 /** One page in a listing. */
 export interface Entry {
@@ -22,9 +23,13 @@ export interface Entry {
   title: string;
   description: string | null;
   date: string | null;
+  updated: string | null;
   image: string | null;
   tags: string[];
+  categories: Category[];
   draft: boolean;
+  /** Its date is after today: pd dev only, since pd build leaves it out. */
+  scheduled: boolean;
 }
 
 export interface Listed {

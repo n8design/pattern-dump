@@ -159,7 +159,7 @@ describe("checkSampleData", () => {
     const site = ["title", "tagline", "href", "footer", "year", "navigations"];
     expect(await checkSampleData("layouts/page", discoveryMap, composition, ["title", "description"], site, undefined, ["footer"])).toEqual([]);
     expect(await checkSampleData("layouts/article", discoveryMap, composition, ["title", "description", "lede"], site, undefined, ["footer"])).toEqual([]);
-    expect(await checkSampleData("layouts/doc", discoveryMap, composition, ["title", "description", "lede", "page"], site, ["headings", "section", "breadcrumbs", "prev", "next", "created", "modified"], ["footer"])).toEqual([]);
+    expect(await checkSampleData("layouts/doc", discoveryMap, composition, ["title", "description", "lede", "page"], site, ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "categories"], ["footer"])).toEqual([]);
   });
 });
 

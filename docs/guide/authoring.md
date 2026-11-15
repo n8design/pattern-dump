@@ -147,9 +147,12 @@ line or on the first line inside it:
 | ` ```src-data atoms/button~secondary ` | Its data; for a variant, merged with the base |
 | ` ```src-html atoms/button ` | Its rendered HTML |
 
-Any other language is syntax-highlighted. Every code block is written the same way wherever its markdown is (a
+Any other fence is syntax-highlighted when its language is one of `handlebars` (`hbs`), `html`, `css`, `scss`,
+`json`, `javascript` (`js`), `typescript` (`ts`), `markdown` (`md`), shell code as `bash`, `sh`, `shell` or `zsh`,
+and a prompt with its output as `console` or `shell-session`. Any other language, `text` included, is a plain
+block. Every code block is written the same way wherever its markdown is (a
 component's docs, a storefront page, the content of a component placed on a page), a fence and an indented block
-alike: highlighted, with a copy button, and focusable (`tabindex="0"`), so a block that scrolls sideways can be
+alike: highlighted where its language is one of these, with a copy button, and focusable (`tabindex="0"`), so a block that scrolls sideways can be
 scrolled from the keyboard. Style it with `overflow-x: auto` rather than wrapping its lines. On a storefront page the
 copy button is added by a small script of the page's own, and only where the browser can copy: with scripting off,
 or without a clipboard, the page has no button at all, so a skin's CSS can't show one that does nothing. "Copied"
