@@ -11,7 +11,7 @@ type Rule =
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
   | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object" | "hbs-file"
-  | "quality" | "effort";
+  | "quality" | "effort" | "categories";
 type Shape = Readonly<Record<string, Rule>>;
 
 /** How responsive image variants are encoded: for the project, and overridden per site. */
@@ -63,6 +63,7 @@ const SHAPE: Shape = {
     keys: {
       pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", site: "plain-object",
       url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES, head: "hbs-file",
+      categories: "categories",
     },
     required: ["pagesDir", "outDir"],
   },
@@ -212,6 +213,10 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 6) fail("a whole number from 0 to 6 (WebP effort: 0 fastest, 6 smallest)");
     return;
   }
+  if (rule === "categories") {
+    checkCategories(value, at, problems);
+    return;
+  }
   if (rule === "plain-object") {
     // Its keys are checked where the patterns are known: against what the site's layouts declare.
     if (!isObject(value)) fail(`an object of the site's values, such as { title: "My site" }`);
@@ -234,6 +239,41 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
   }
   if (!isObject(value)) { fail("an object"); return; }
   checkObject(value, rule.keys, rule.required ?? [], `${at}.`, problems);
+}
+
+/** A category's key, and each old key of one: a URL segment (step 4 gives each category a page), as a tag is. */
+const SEGMENT = /^[a-z0-9-]+$/;
+const CATEGORY: Shape = { label: "string", description: "string", aliases: "strings" };
+
+/**
+ * storefront.categories: `{ <key>: { label, description?, aliases? } }`. An alias is a category's old key: pages that
+ * still name it build, resolved to the category (with a note). So an alias is never a key of its own, and one alias
+ * leads to one category.
+ */
+function checkCategories(value: unknown, at: string, problems: string[]): void {
+  if (!isObject(value)) {
+    problems.push(`"${at}" must be an object of categories by key, such as { guides: { label: "Guides" } }`);
+    return;
+  }
+  const claimed = new Map<string, string>();
+  for (const [key, category] of Object.entries(value)) {
+    if (!SEGMENT.test(key)) {
+      problems.push(`"${at}.${key}": a category's key is part of a URL, so it is lowercase letters, digits and hyphens only`);
+      continue;
+    }
+    if (!isObject(category)) { problems.push(`"${at}.${key}" must be an object, such as { label: "Guides" }`); continue; }
+    checkObject(category, CATEGORY, ["label"], `${at}.${key}.`, problems);
+    if (!isStrings(category.aliases)) continue;
+    for (const alias of category.aliases as string[]) {
+      if (!SEGMENT.test(alias)) {
+        problems.push(`"${at}.${key}.aliases": "${alias}" is not a key: an old key is lowercase letters, digits and hyphens, as a key is`);
+      } else if (Object.hasOwn(value, alias)) {
+        problems.push(`"${at}.${key}.aliases": "${alias}" is a category of its own, so it can't be an old key of "${key}"`);
+      } else if (claimed.has(alias)) {
+        problems.push(`"${at}.${key}.aliases": "${alias}" is an old key of "${claimed.get(alias)}" already: one old key leads to one category`);
+      } else claimed.set(alias, key);
+    }
+  }
 }
 
 /** A config that cannot be used, with a message written for the person editing it. The CLI prints
