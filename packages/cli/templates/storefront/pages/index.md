@@ -1,5 +1,6 @@
 ---
 title: Home
+layout: home
 description: A website written in markdown, next to the design system it shows.
 ---
 

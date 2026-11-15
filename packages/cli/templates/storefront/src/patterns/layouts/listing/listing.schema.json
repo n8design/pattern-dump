@@ -11,7 +11,7 @@
       "type": "object",
       "description": "What the storefront works out for the page",
       "properties": {
-        "listing": { "description": "The folder's pages, shown through the view its index.md names (view: list), newest first with sort: date" }
+        "listing": { "description": "The folder's pages, shown through the view its index.md names (view: grid), else the list view, newest first with sort: date", "x-pd-view": "list" }
       }
     }
   }
