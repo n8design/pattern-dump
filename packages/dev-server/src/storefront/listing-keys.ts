@@ -4,6 +4,7 @@
 // model (pages.ts) read the same value: the check reports what is wrong, the model takes only what is right.
 //
 //   date: 2026-11-02          a real calendar date, written YYYY-MM-DD
+//   updated: 2026-11-10       the same, set by the author for a real content change; never before `date`
 //   tags: [design, css]       each lowercase letters, digits and hyphens (a URL segment), no duplicates
 //   categories: [guides]      each declared in storefront.categories (or an old key of one), no duplicates
 //   draft: true               true or false
@@ -20,14 +21,24 @@ const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TAG = /^[a-z0-9-]+$/;
 const show = (v: FrontmatterValue): string => Array.isArray(v) ? `[${v.join(", ")}]` : `"${v}"`;
 
-export function readDate(v: FrontmatterValue): Read<string> {
+/** `key`: the key the value is under, for the message (`date`, `updated`). */
+export function readDate(v: FrontmatterValue, key = "date"): Read<string> {
   const m = typeof v === "string" ? DATE.exec(v) : null;
   if (m) {
     const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
     const t = new Date(Date.UTC(y, mo - 1, d));
     if (t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d) return { ok: true, value: v as string };
   }
-  return { ok: false, message: `date ${show(v)} is not a date: write it YYYY-MM-DD, such as "2026-11-14"` };
+  return { ok: false, message: `${key} ${show(v)} is not a date: write it YYYY-MM-DD, such as "2026-11-14"` };
+}
+
+/** `updated: YYYY-MM-DD`: a date, and not before the page's own `date` (`published`, when it has a valid one). */
+export function readUpdated(v: FrontmatterValue, published: string | undefined): Read<string> {
+  const r = readDate(v, "updated");
+  if (r.ok && published !== undefined && r.value < published) {
+    return { ok: false, message: `updated ${r.value} is before the page's date, ${published}: a page is updated after it is published` };
+  }
+  return r;
 }
 
 export function readTags(v: FrontmatterValue): Read<string[]> {

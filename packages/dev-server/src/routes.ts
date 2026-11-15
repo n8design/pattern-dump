@@ -59,7 +59,7 @@ import { assetFile } from "./asset-file.js";
 import { decodePath } from "./contained-file.js";
 import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
-import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt, type SitemapEntry } from "./storefront/site-files.js";
+import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import { pageStylesheets } from "./storefront/page-head.js";
@@ -648,16 +648,8 @@ async function routeRequest(
       // The sitemap needs the site's address, and a site kept out of search engines has none.
       if (pathname === PD_ROUTES.sitemap && siteUrl !== undefined && cfg.storefront.index) {
         if (model.problems.length) { res.writeHead(500, { "Content-Type": "text/plain" }); res.end(model.problems.join("\n")); return; }
-        const entries: SitemapEntry[] = [];
-        for (const p of [...model.pages].sort((a, b) => a.route.localeCompare(b.route))) {
-          const file = model.files.get(p.route);
-          if (!file || file.frontmatter.values["index"] === "false") continue;
-          // A date only where git has a reliable one; a shallow clone's are left out (pages note it).
-          const dated = ctx.dates ? await ctx.dates.of(file.path, ctx.live ? "dev" : "build") : undefined;
-          entries.push({ url: new URL(p.route.slice(1), siteUrl).href, lastmod: dated && !dated.shallow ? dated.dates.modified : null });
-        }
         res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
-        res.end(sitemapXml(entries));
+        res.end(sitemapXml(sitemapEntries(model, siteUrl)));
         return;
       }
       // A page route is a folder path; /about is /about/, as a static host serves it.

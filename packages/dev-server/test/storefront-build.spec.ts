@@ -191,11 +191,13 @@ describe("pd build — the storefront root", () => {
       .toBe("User-agent: *\nDisallow: /preview/\n\nSitemap: https://bench.example.test/sitemap.xml\n");
     const sitemap = files.get("sitemap.xml")!.bytes.toString("utf8");
     // The schema's rules (sitemaps.org 0.9): its namespace, a <loc> per URL, absolute and at most 2048
-    // characters. The copy is outside any repository, so no page has a date and none has a <lastmod>.
+    // characters. A <lastmod> is a page's own updated, else its own date (the two articles'); never git's.
     expect(sitemap.startsWith(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`)).toBe(true);
-    const locs = [...sitemap.matchAll(/<url><loc>([^<]+)<\/loc><\/url>/g)].map(m => m[1]!);
-    expect(locs).toEqual(["https://bench.example.test/", "https://bench.example.test/about/", "https://bench.example.test/articles/",
-      "https://bench.example.test/articles/harbour/", "https://bench.example.test/articles/plain/", "https://bench.example.test/guides/", "https://bench.example.test/guides/setup/"]);
+    const urls = [...sitemap.matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?<\/url>/g)].map(m => [m[1]!, m[2] ?? null]);
+    const locs = urls.map(u => u[0]!);
+    expect(urls).toEqual([["https://bench.example.test/", null], ["https://bench.example.test/about/", null], ["https://bench.example.test/articles/", null],
+      ["https://bench.example.test/articles/harbour/", "2026-11-01"], ["https://bench.example.test/articles/plain/", "2026-10-02"],
+      ["https://bench.example.test/guides/", null], ["https://bench.example.test/guides/setup/", "2026-11-15"]]);
     expect(sitemap.match(/<url>/g)).toHaveLength(locs.length);
     for (const loc of locs) expect(loc.length).toBeLessThanOrEqual(2048);
   });

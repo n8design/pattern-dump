@@ -189,11 +189,12 @@ describe("assemblePage — the head", () => {
   };
   const graphOf = (html: string) => ldOf(/<script type="application\/ld\+json">.*?<\/script>/s.exec(html)![0])["@graph"];
 
-  it("JSON-LD only with the site's address; its date from git", async () => {
+  it("JSON-LD only with the site's address; datePublished from git's first commit, no dateModified from its last", async () => {
     const dir = await pages();
     const { dates, calls } = dated();
     const page = await assemblePage("/", await readPages(dir), assembly({ siteUrl: URL_, dates }));
-    expect(graphOf(page.html)[1]).toMatchObject({ "@type": "WebPage", dateModified: "2026-02-10T10:00:00+01:00" });
+    expect(graphOf(page.html)[1]).toMatchObject({ "@type": "WebPage", datePublished: "2026-01-10T10:00:00+01:00" });
+    expect(graphOf(page.html)[1]).not.toHaveProperty("dateModified");
     expect(calls).toEqual(["index.md"]);
     expect((await assemblePage("/", await readPages(dir), assembly())).html).not.toContain("application/ld+json");
   });
@@ -204,7 +205,7 @@ describe("assemblePage — the head", () => {
     expect(calls).toEqual([]);
   });
 
-  it("a shallow clone: no dateModified, no problem, one note whatever the page; other date notes are not the JSON-LD's", async () => {
+  it("a shallow clone: no datePublished from git, no problem, one note whatever the page; other date notes are not the JSON-LD's", async () => {
     const NO_ARTICLES = `partials/base lists site.collections.articles, but the pages folder has no folder "articles" with an index.md, so it is an empty list`;
     const dir = await pages();
     const shallow = dated({ shallow: true, notes: ["index.md: a date note"], problems: ["index.md: the repository is a shallow clone"] });
@@ -212,7 +213,7 @@ describe("assemblePage — the head", () => {
     expect(home.problems).toEqual([]);
     // The bench skin lists site.collections.articles, which this site has no folder for: the other note.
     expect(home.notes).toEqual([SHALLOW_SEO_NOTE, NO_ARTICLES]);
-    expect(graphOf(home.html)[1]).not.toHaveProperty("dateModified");
+    expect(graphOf(home.html)[1]).not.toHaveProperty("datePublished");
     const draft = await assemblePage("/draft/", await readPages(dir), assembly({ siteUrl: URL_, dates: shallow.dates }));
     expect(draft.notes).toEqual([SHALLOW_SEO_NOTE, NO_ARTICLES]);
   });
@@ -235,7 +236,7 @@ describe("assemblePage — the head", () => {
     expect(graphOf(why).map(n => n["@type"])).toEqual(["WebSite", "WebPage", "Article"]);
     expect(graphOf(why)[2]).toEqual({ "@type": "Article", "@id": "https://example.test/articles/why/#article", headline: "Why",
       mainEntityOfPage: { "@id": "https://example.test/articles/why/" }, isPartOf: { "@id": "https://example.test/#website" },
-      datePublished: "2026-11-03", dateModified: "2026-02-10T10:00:00+01:00", keywords: ["design", "css"] });
+      datePublished: "2026-11-03", keywords: ["design", "css"] });
     // The date git gives every committed page does not make it an article; nor does a date on the home page or a listing.
     for (const route of ["/about/", "/", "/articles/"]) {
       const html = await at(route);

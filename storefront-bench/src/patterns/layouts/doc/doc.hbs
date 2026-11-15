@@ -27,8 +27,8 @@
   <div class="doc-body">{{{body}}}</div>
   {{#if page.created}}
   <p class="doc-dates">
-    Created <time class="doc-created" datetime="{{page.created}}">{{page.created}}</time>{{#if page.modified}},
-    last changed <time class="doc-modified" datetime="{{page.modified}}">{{page.modified}}</time>{{/if}}
+    Created <time class="doc-created" datetime="{{page.created}}">{{page.created}}</time>{{#if page.updated}},
+    updated <time class="doc-updated" datetime="{{page.updated}}">{{page.updated}}</time>{{/if}}
   </p>
   {{/if}}
   <nav class="doc-pager" aria-label="Previous and next">

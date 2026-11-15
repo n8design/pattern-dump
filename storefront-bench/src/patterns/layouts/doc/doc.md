@@ -15,4 +15,5 @@ description: A page with a table of contents, from what the storefront derives f
 | `page.section` | `{ route, title }` or null | the top-level nav entry the page falls under |
 | `page.breadcrumbs` | list of `{ route, title }` | Home, then each folder above the page |
 | `page.prev`, `page.next` | `{ route, title }` or null | the neighbouring pages in the nav, across sections |
-| `page.created`, `page.modified` | ISO 8601 date or null | the page's first and last commit, from git |
+| `page.created` | ISO 8601 date or null | the page's first commit, from git |
+| `page.updated` | `YYYY-MM-DD` or null | the page's own `updated:`, set for a real change (never git's last commit) |

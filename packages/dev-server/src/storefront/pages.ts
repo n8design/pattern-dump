@@ -29,7 +29,7 @@ import { PD_ROUTES, type StorefrontNavItem, type StorefrontPage, type Storefront
 import { frontmatterBody, readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
 import { redirectProblems, redirectsOf, workbenchPlace } from "./redirects.js";
-import { readCategories, readDate, readDraft, readSort, readTags, type SortBy } from "./listing-keys.js";
+import { readCategories, readDate, readDraft, readSort, readTags, readUpdated, type SortBy } from "./listing-keys.js";
 import { categoryIndex, type Category, type CategoryIndex } from "./categories.js";
 import type { StorefrontCategory } from "@pattern-dump/config";
 import { teaserOf } from "./teaser.js";
@@ -55,6 +55,8 @@ export interface PageEntryFields {
   description: string | null;
   /** Its frontmatter date, YYYY-MM-DD, or null. */
   date: string | null;
+  /** Its frontmatter updated, YYYY-MM-DD, or null. */
+  updated: string | null;
   /** Its image, a path in the assets, or null. */
   image: string | null;
   tags: string[];
@@ -274,9 +276,11 @@ export async function readPages(pagesDir: string, opts: {
     const v = f.frontmatter.values;
     const description = scalar(v["description"]);
     const image = scalar(v["image"]);
+    const date = ok(v["date"], x => readDate(x)) ?? null;
     entries.set(route, {
       description: description ?? teaserOf(frontmatterBody(bodies.get(route)!)),
-      date: ok(v["date"], readDate) ?? null,
+      date,
+      updated: ok(v["updated"], x => readUpdated(x, date ?? undefined)) ?? null,
       image: image !== undefined && /^\/assets\/[^?#]+[^/?#]$/.test(image) ? image : null,
       tags: ok(v["tags"], readTags) ?? [],
       categories: (ok(v["categories"], x => readCategories(x, categories))?.keys ?? []).map(k => categories.byKey.get(k)!),

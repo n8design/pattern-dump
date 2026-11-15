@@ -23,6 +23,7 @@ export interface Entry {
   title: string;
   description: string | null;
   date: string | null;
+  updated: string | null;
   image: string | null;
   tags: string[];
   categories: Category[];

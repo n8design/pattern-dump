@@ -1,4 +1,5 @@
-// A storefront page's dates, from git: `page.created` and `page.modified`.
+// A storefront page's dates, from git: `page.created` (and the fallback for a page's date), from its first commit.
+// The last commit (`modified`) is read too, but shown nowhere a reader or a search engine sees: a typo fix moves it.
 //
 // One pass over the pages folder's history, whatever the number of pages:
 //
@@ -153,7 +154,7 @@ export function datesOf(path: string, history: GitHistory, status: { untracked: 
   const notes: string[] = [], problems: string[] = [];
   const repo = history.repoPath(path);
   if (history.shallow) {
-    const why = "the repository is a shallow clone, so page.created and page.modified would be wrong (the history stops at the clone's depth)";
+    const why = "the repository is a shallow clone, so page.created would be wrong (the history stops at the clone's depth)";
     if (mode === "build") problems.push(`${path}: ${why}; build from the full history (in CI, check out with fetch-depth: 0)`);
     else notes.push(`${path}: ${why}`);
   }

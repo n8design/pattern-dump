@@ -1,11 +1,11 @@
 // A storefront page's frontmatter, checked against the layout it uses.
 //
-// Ten keys belong to the build, not to a layout: `layout` (which layout; `page` when absent), `order`
+// Eleven keys belong to the build, not to a layout: `layout` (which layout; `page` when absent), `order`
 // (where in the nav), the page's search and link-preview keys — `redirectFrom` (old routes that forward
 // here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
 // image, a raster file in the assets; checked against the files in page-image.ts) — and its listing keys
-// (listing-keys.ts): `date`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` on a
-// folder's index.md. A layout cannot declare any of the ten. Every other key must be declared by the chosen layout's schema — the
+// (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` on a
+// folder's index.md. A layout cannot declare any of the eleven. Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
 // declares. Nothing is inferred: a key the schema does not declare is an error, and a layout with no
 // schema declares nothing. Four more keys are filled by the storefront itself (`body`, the rendered
@@ -20,11 +20,11 @@ import { suggest } from "@pattern-dump/config";
 import { checkDeclared, readSchema, type PropertySchema } from "./declared-values.js";
 import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
 import type { FrontmatterValue } from "../frontmatter.js";
-import { readCategories, readDate, readDraft, readSort, readTags, type Read, type SortBy } from "./listing-keys.js";
+import { readCategories, readDate, readDraft, readSort, readTags, readUpdated, type Read, type SortBy } from "./listing-keys.js";
 import { categoryIndex, type CategoryIndex } from "./categories.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
-export const RESERVED_KEYS = ["layout", "order", "redirectFrom", "index", "image", "date", "tags", "categories", "draft", "sort"] as const;
+export const RESERVED_KEYS = ["layout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
 export const ASSEMBLY_KEYS = ["body", "nav", "site", "page"] as const;
 
@@ -46,6 +46,8 @@ export interface BuildKeys {
   image?: string;
   /** The page's date, YYYY-MM-DD. */
   date?: string;
+  /** The page's last real change, YYYY-MM-DD: set by its author, never before `date`. */
+  updated?: string;
   tags?: string[];
   /** Declared category keys, in the page's order (an old key resolved to its category). */
   categories?: string[];
@@ -81,13 +83,14 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
     if (typeof image === "string" && ASSET_PATH.test(image)) out.image = image;
     else at("image", `image must be a path to a file in the assets, such as "/assets/images/share.png"`);
   }
-  const take = <K extends "date" | "tags" | "draft" | "sort">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
+  const take = <K extends "date" | "updated" | "tags" | "draft" | "sort">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
     if (r === undefined) return;
     if (r.ok) out[key] = r.value;
     else at(key, r.message);
   };
   const v = (key: string) => values[key];
   take("date", v("date") === undefined ? undefined : readDate(v("date")!));
+  take("updated", v("updated") === undefined ? undefined : readUpdated(v("updated")!, out.date));
   take("tags", v("tags") === undefined ? undefined : readTags(v("tags")!));
   const cats = v("categories") === undefined ? undefined : readCategories(v("categories")!, categories);
   if (cats?.ok) {

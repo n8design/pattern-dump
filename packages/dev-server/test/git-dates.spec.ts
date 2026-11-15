@@ -146,7 +146,7 @@ describe("the pass, on a repository with history", () => {
       const h = await readHistory(clonePages, PATHS, git);
       return datesOf(path, h, await readStatus(h, git), mode);
     };
-    const why = "the repository is a shallow clone, so page.created and page.modified would be wrong (the history stops at the clone's depth)";
+    const why = "the repository is a shallow clone, so page.created would be wrong (the history stops at the clone's depth)";
 
     it("is a problem in pd build: the dates would be the boundary commit's, not missing", async () => {
       const page = await ofClone("setup.md", "build");
