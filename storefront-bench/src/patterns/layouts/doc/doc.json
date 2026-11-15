@@ -39,7 +39,14 @@
       "title": "Sample next page"
     },
     "created": "2026-01-10T10:00:00+01:00",
-    "updated": "2026-03-20"
+    "updated": "2026-03-20",
+    "categories": [
+      {
+        "key": "sample",
+        "label": "Sample category",
+        "description": null
+      }
+    ]
   },
   "site": {
     "title": "Storefront bench",

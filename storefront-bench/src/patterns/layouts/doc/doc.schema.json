@@ -121,6 +121,27 @@
             "null"
           ],
           "description": "The page's own updated date (YYYY-MM-DD), set by its author for a real change; null without one"
+        },
+        "categories": {
+          "type": "array",
+          "description": "The page's categories (storefront.categories), in its order",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
         }
       }
     }

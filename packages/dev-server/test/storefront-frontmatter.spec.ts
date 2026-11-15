@@ -12,6 +12,7 @@ import { readFrontmatterStrict } from "../src/frontmatter.js";
 import { readPages, type PageFile } from "../src/storefront/pages.js";
 import { checkPageFrontmatter, layoutNames } from "../src/storefront/frontmatter-contract.js";
 import { save } from "../../../test-support/save.js";
+import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 
 let tmp = "";
 let map: DiscoveryMap;
@@ -304,8 +305,8 @@ describe("checkPageFrontmatter — the storefront bench", () => {
   it("finds nothing wrong with any of its pages", async () => {
     const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
     const benchMap = (await buildDiscoveryMap(join(bench, "src", "patterns"))).discoveryMap;
-    const model = await readPages(join(bench, "pages"));
-    const checked = await Promise.all([...model.files.values()].map(f => checkPageFrontmatter(f, benchMap)));
+    const model = await readPages(join(bench, "pages"), { categories: benchConfig.storefront?.categories });
+    const checked = await Promise.all([...model.files.values()].map(f => checkPageFrontmatter(f, benchMap, model.categories)));
     expect(checked.flatMap(c => c.problems)).toEqual([]);
     expect(checked.map(c => c.layoutId)).toEqual(["layouts/home", "layouts/page", "layouts/doc", "layouts/doc",
       "layouts/listing", "layouts/article", "layouts/doc"]);

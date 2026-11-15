@@ -20,6 +20,11 @@ export default defineConfig({
     workbenchUrl: "https://workbench.example.test/",
     // The site's own address: canonical URLs, Open Graph, JSON-LD and the sitemap are built from it.
     url: "https://bench.example.test/",
+    // The categories a page can name (`categories:` in its frontmatter), independent of its folder.
+    categories: {
+      "design-systems": { label: "Design systems", description: "How a design system is built and kept", aliases: ["ds"] },
+      guides: { label: "Guides" },
+    },
     // The link-preview image of every page that names none of its own.
     image: "/assets/images/share.png",
     site: {
