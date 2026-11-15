@@ -7,10 +7,11 @@
 // of the body's text: an edit is a new key, so a changed first paragraph is never answered from the cache.
 
 import { createHash } from "node:crypto";
-import MarkdownIt from "markdown-it";
+import type MarkdownIt from "markdown-it";
+import { createMarkdown } from "../code-blocks.js";
 
 // html on, so a pd- tag is an html token to skip, not text.
-const md = new MarkdownIt({ html: true, linkify: false });
+const md = createMarkdown({ html: true, linkify: false });
 
 type Token = ReturnType<MarkdownIt["parse"]>[number];
 

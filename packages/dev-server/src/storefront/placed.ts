@@ -13,7 +13,7 @@
 
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
-import MarkdownIt from "markdown-it";
+import { createMarkdown } from "../code-blocks.js";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
 import { checkSchemaExtensions, isHelperNameProblem, unescapedOutputs } from "@pattern-dump/renderer";
 import type { CompositionRegistry } from "../composition.js";
@@ -22,7 +22,7 @@ import { checkPlaced, type ObjectSchema, type PlacedProblem, type PropertySchema
 import { includeTree } from "./sample-data.js";
 
 /** Content markdown: block markdown, HTML escaped (html: false), markdown-it's link check. */
-const contentMd = new MarkdownIt({ html: false, linkify: false });
+const contentMd = createMarkdown({ html: false, linkify: false });
 
 export interface PlacementDeps {
   discoveryMap: DiscoveryMap;
