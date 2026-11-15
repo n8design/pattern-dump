@@ -107,17 +107,21 @@ export function fitterScript(): string {
     + `})();</script>`;
 }
 
-/** The copy buttons' script, on a page that has a code block (code-blocks.ts writes each button hidden): it shows a
- *  button only where the browser can write to the clipboard, and copies the block's code (its data-raw), saying
- *  "Copied" for a moment. Without scripting, or without a clipboard, there is no button: no focus stop that does
- *  nothing. The block itself stays focusable. */
+/** The copy buttons' script, on a page that has a code block (code-blocks.ts writes it without a button). Only where the
+ *  browser can write to the clipboard, it puts a button in front of each block that copies the block's code (its
+ *  data-raw), says "Copied" on the button for a moment, and says it in a polite live region too, since the button's
+ *  name ("Copy source") doesn't change. Without scripting, or without a clipboard, the page has no button at all: no
+ *  focus stop that does nothing, and none a skin's CSS could show. The block itself stays focusable. */
 export function copyScript(): string {
   return `<script>(function(){if(!(navigator.clipboard&&navigator.clipboard.writeText))return;`
-    + `var sel=".shiki-container>button.copy-btn";`
-    + `document.querySelectorAll(sel).forEach(function(b){b.hidden=false;});`
-    + `document.addEventListener("click",function(e){var b=e.target instanceof Element&&e.target.closest(sel);if(!b)return;`
-    + `var done=function(t){b.textContent=t;setTimeout(function(){b.textContent="Copy";},1500);};`
-    + `navigator.clipboard.writeText(b.parentElement.getAttribute("data-raw")||"").then(function(){done("Copied");},function(){done("Not copied");});});`
+    + `var status=document.createElement("div");status.setAttribute("role","status");status.setAttribute("aria-live","polite");`
+    + `status.style.cssText="position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap";`
+    + `document.body.appendChild(status);`
+    + `document.querySelectorAll(".shiki-container[data-raw]").forEach(function(c){`
+    + `var b=document.createElement("button");b.type="button";b.className="copy-btn";b.setAttribute("aria-label","Copy source");b.textContent="Copy";`
+    + `b.addEventListener("click",function(){var say=function(t){b.textContent=t;status.textContent=t;setTimeout(function(){b.textContent="Copy";status.textContent="";},1500);};`
+    + `navigator.clipboard.writeText(c.getAttribute("data-raw")||"").then(function(){say("Copied");},function(){say("Not copied");});});`
+    + `c.insertBefore(b,c.firstChild);});`
     + `})();</script>`;
 }
 
@@ -609,5 +613,5 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     // One main landmark and one <h1> (page-basics.ts): errors in pd build, warnings here.
     notes.push(...checkPageBasics(html).map(p => `warning: ${page!.path}: ${p}`));
   }
-  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${html.includes(`class="copy-btn"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/"), problems: [], notes };
+  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/"), problems: [], notes };
 }

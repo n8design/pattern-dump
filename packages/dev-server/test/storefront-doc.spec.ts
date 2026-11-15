@@ -185,14 +185,14 @@ describe("renderDoc frame mode — the same safety rules", () => {
     expect(html).not.toContain(`href="javascript:`);
   });
 
-  it("renders the other fences as the workbench does, but for the copy button, which starts hidden (the page's script shows it)", async () => {
+  it("renders the other fences as the workbench does, but without the copy button, which the page's script adds", async () => {
     const md = "```src-template components/callout\n```\n\n```src-data components/callout~warning\n```\n\n```ts\nconst a = 1;\n```\n";
     const page = await renderDoc(md, renderComponent, map, frame());
-    const button = `<button class="copy-btn" type="button" aria-label="Copy source">`;
-    const hidden = `<button class="copy-btn" type="button" aria-label="Copy source" hidden>`;
-    expect(page.split(hidden)).toHaveLength(4);
-    expect(page).not.toContain(button);
-    expect(page.replaceAll(hidden, button)).toBe(await renderDoc(md, renderComponent, map));
+    const button = `<button class="copy-btn" type="button" aria-label="Copy source">Copy</button>`;
+    const workbench = await renderDoc(md, renderComponent, map);
+    expect(workbench.split(button)).toHaveLength(4);
+    expect(page).not.toContain("copy-btn");
+    expect(page).toBe(workbench.replaceAll(button, ""));
   });
 });
 
