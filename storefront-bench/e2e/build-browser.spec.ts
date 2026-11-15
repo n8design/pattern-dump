@@ -69,6 +69,41 @@ test("text that fails contrast stops the build, and nothing is written", async (
   expect(existsSync(join(root, ".out"))).toBe(false);
 });
 
+test("a code block wider than its column scrolls, takes keyboard focus, and passes at 390 px", async ({ browser }) => {
+  const line = `npm install ${Array.from({ length: 12 }, (_, i) => `@acme/package-number-${i}`).join(" ")}`;
+  const root = await project("code", {
+    "src/styles/layouts/page.scss": ".page pre {\n  overflow-x: auto;\n}\n",
+    "pages/index.md": `---\ntitle: Home\n---\n\nInstall it:\n\n\`\`\`bash\n${line}\n\`\`\`\n\nAnd plain:\n\n\`\`\`\n${line}\n\`\`\`\n`,
+  });
+  const report = await buildStaticSite(config, root, { outDir: join(root, ".out", "wb"), pdVersion: "0.0.0-test", browser: true, loadPlaywright });
+  expect(report.accessibility).toMatchObject({ browser: true, warnings: [] });
+  // The built page, served from its files, at the narrow viewport: each block scrolls sideways and is reached by Tab.
+  const site = join(root, ".out", "site");
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.route("http://site.test/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    const file = join(site, path.endsWith("/") ? `${path}index.html` : path);
+    await (existsSync(file) ? route.fulfill({ path: file }) : route.fulfill({ status: 404, body: "" }));
+  });
+  const page = await context.newPage();
+  await page.goto("http://site.test/");
+  const blocks = page.locator("main pre");
+  await expect(blocks).toHaveCount(2);
+  for (let i = 0; i < 2; i++) {
+    const box = await blocks.nth(i).evaluate(el => ({ overflow: getComputedStyle(el).overflowX, scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(box.overflow).toBe("auto");
+    expect(box.scroll).toBeGreaterThan(box.client);
+  }
+  // The Tab order, from the top: each block's copy button, then the block itself.
+  const reached: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("Tab");
+    reached.push(await page.evaluate(() => document.activeElement?.tagName ?? ""));
+  }
+  expect(reached).toEqual(["BUTTON", "PRE", "BUTTON", "PRE"]);
+  await context.close();
+});
+
 test("an image whose slot says it is narrower than it is shown is a warning, and the site builds", async () => {
   const root = await project("sizes", {
     "src/styles/layouts/page.scss": ".page img {\n  max-inline-size: 100%;\n  block-size: auto;\n}\n",

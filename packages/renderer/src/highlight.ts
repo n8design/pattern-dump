@@ -118,10 +118,12 @@ function _highlightRaw(code: string, lang: string): string {
   }
 }
 
+// tabindex="0", as Shiki writes on every block it highlights: a block wider than its column scrolls, and a scrolling
+// region must be reachable by keyboard (axe scrollable-region-focusable). axe asks for nothing more on a <pre>.
 function _plainPre(code: string): string {
   const esc = code
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
-  return `<pre class="shiki shiki-plain"><code>${esc}</code></pre>`;
+  return `<pre class="shiki shiki-plain" tabindex="0"><code>${esc}</code></pre>`;
 }

@@ -147,7 +147,9 @@ line or on the first line inside it:
 | ` ```src-data atoms/button~secondary ` | Its data; for a variant, merged with the base |
 | ` ```src-html atoms/button ` | Its rendered HTML |
 
-Any other language is syntax-highlighted.
+Any other language is syntax-highlighted. Every code block is focusable (`tabindex="0"`), in the docs and on
+storefront pages alike, so a block that scrolls sideways can be scrolled from the keyboard; style it with
+`overflow-x: auto` rather than wrapping its lines.
 
 Link to another component with a `pattern:` link, which becomes an in-app link: `[the button](pattern:atoms/button)`
 or `[secondary](pattern:atoms/button~secondary)`. A link to a component that doesn't exist is marked as
