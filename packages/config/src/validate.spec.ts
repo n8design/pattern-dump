@@ -65,11 +65,14 @@ describe("configProblems", () => {
     expect(configProblems({ outDir: "o" })).toEqual([]);
     const defaults = { sourceDir: "./src", patternsDir: "./src/patterns", styles: { strategy: "parallel", dir: "./src/styles" } };
     expect(validateConfig({ outDir: "o" }, "test")).toEqual({ outDir: "o", ...defaults });
-    expect(defineConfig({ outDir: "o" })).toEqual({ outDir: "o", ...defaults });
+    // defineConfig fills none of them: a default is not a folder the config names (withOwnManifest).
+    const written = { outDir: "o" };
+    expect(defineConfig(written)).toBe(written);
+    expect(defineConfig(written)).toEqual({ outDir: "o" });
     // The other two follow sourceDir.
-    expect(defineConfig({ outDir: "o", sourceDir: "./site" })).toMatchObject({ patternsDir: "./site/patterns", styles: { dir: "./site/styles" } });
+    expect(validateConfig({ outDir: "o", sourceDir: "./site" }, "test")).toMatchObject({ patternsDir: "./site/patterns", styles: { dir: "./site/styles" } });
     // What is given is kept, and still checked.
-    expect(defineConfig({ outDir: "o", patternsDir: "./p", styles: { dir: "./s" } })).toMatchObject({ sourceDir: "./src", patternsDir: "./p", styles: { dir: "./s" } });
+    expect(validateConfig({ outDir: "o", patternsDir: "./p", styles: { dir: "./s" } }, "test")).toMatchObject({ sourceDir: "./src", patternsDir: "./p", styles: { dir: "./s" } });
     expect(configProblems({ outDir: "o", patternsDir: 3 })).toEqual([`"patternsDir" must be a string`]);
   });
 
