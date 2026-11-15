@@ -37,6 +37,7 @@ import { checkLinks } from "./links.js";
 import { checkPageBasics } from "./page-basics.js";
 import { redirectsOf } from "./redirects.js";
 import { dateOf, entriesOf, resolveCollections, type Entry } from "./collections.js";
+import { cardOf, checkEntries, readCard } from "./cards.js";
 import type { Category } from "./categories.js";
 
 /** Said once (the same text from every page) when JSON-LD leaves git's date out for a shallow clone. */
@@ -424,11 +425,18 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
   // A listing's entries, and the page's own date and tags (collections.ts), for a layout that shows them.
   const listing: { children?: Entry[]; date?: string | null; updated?: string | null; tags?: string[]; categories?: Category[] } = {};
+  // The layout's card for them (x-pd-card on page.children): every page of the listing is checked against it.
+  const layoutCard = cardOf(layoutSchema?.properties?.["page"]?.properties?.["children"]);
   if (declares("children")) {
     const listed = isNotFound ? { entries: [], problems: [], notes: [] } : await entriesOf(route, model, { dates: a.dates, mode });
     listing.children = listed.entries;
     problems.push(...listed.problems);
     notes.push(...listed.notes);
+    if (layoutCard !== undefined) {
+      const read = await readCard(layoutCard, checked.layoutId, "the listing's card", a.discoveryMap);
+      problems.push(...read.problems);
+      if (read.card) problems.push(...checkEntries(listed.entries, read.card, page.path, model));
+    }
   }
   if (declares("date")) {
     const dated = isNotFound ? { date: null, problems: [], notes: [] } : await dateOf(route, model, a.dates, mode);
@@ -444,7 +452,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (collections) { problems.push(...collections.problems); notes.push(...collections.notes); }
   notes.push(...site.notes ?? []);
   if (a.discoveryMap.has(checked.layoutId)) {
-    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed, site.collections));
+    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed, site.collections,
+      layoutCard !== undefined && declares("children") ? [layoutCard] : []));
   }
   // The skin's head partial: the same for every page, so its problems are the whole site's.
   const hasHead = a.discoveryMap.has(HEAD_PARTIAL);

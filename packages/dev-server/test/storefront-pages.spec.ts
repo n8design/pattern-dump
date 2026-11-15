@@ -58,7 +58,7 @@ describe("readPages — the storefront bench", () => {
       { route: "/guides/setup/", title: "Setup", layout: "doc", redirectFrom: ["/setup/", "/start/"] },
       { route: "/about/", title: "About", layout: "doc" },
       { route: "/articles/", title: "Articles", layout: "listing" },
-      { route: "/articles/harbour/", title: "A harbour of cable cars", layout: "article" },
+      { route: "/articles/harbour/", title: "A harbour of cable cars", layout: "article", layoutFrom: "articles/index.md" },
       { route: "/articles/plain/", title: "Plain on purpose", layout: "doc" },
     ]);
     expect(model.nav).toEqual([

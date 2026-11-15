@@ -11,7 +11,7 @@
       "type": "object",
       "description": "What Pattern Dump derives for the page",
       "properties": {
-        "children": { "description": "The folder's pages, sorted as its index.md says" }
+        "children": { "description": "The folder's pages, sorted as its index.md says, each shown as the card", "x-pd-card": "components/card" }
       }
     }
   }
