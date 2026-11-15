@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { planBurnIn, runnerOf, commandFor, groupJobs, DEFAULT_SECONDS, MIN_GROUP_SECONDS } from "./burn-in.mjs";
+import { readFileSync } from "node:fs";
+import { planBurnIn, runnerOf, commandFor, groupJobs, classifyFailures, readQuarantine, summaryOf, DEFAULT_SECONDS, MIN_GROUP_SECONDS } from "./burn-in.mjs";
 import { timesFromLog } from "./burn-in-times.mjs";
 
 const ALL = [
@@ -167,4 +168,60 @@ test("timesFromLog: vitest test time plus a share of collect; Playwright summed 
     "packages/dev-server/test/b.spec.ts": 3, //  1 + 4 / 2
     "storefront-bench/e2e/p.spec.ts": 3.5, //   (2.4 + 0.6 + 3.0 + 1.0) / 2
   });
+});
+
+// The quarantine: known flakes reported, not failing the burn-in; every other failure still fails it.
+const Q = [{ file: "packages/dev-server/test/w.spec.ts", test: "a folder > made again", backlog: "w: one event too many" }];
+const fileResult = (name, assertions, status = assertions.some(a => a.status === "failed") ? "failed" : "passed", message = "") =>
+  ({ name: `/repo/${name}`, status, message, assertionResults: assertions });
+const a = (ancestorTitles, title, status) => ({ ancestorTitles, title, status });
+
+test("classifyFailures: a failed quarantined test is a known flake, not a failure", () => {
+  const report = { success: false, testResults: [fileResult("packages/dev-server/test/w.spec.ts",
+    [a(["a folder"], "made again", "failed"), a(["a folder"], "renamed", "passed")])] };
+  assert.deepEqual(classifyFailures(report, Q, "/repo"), { known: Q, real: [] });
+});
+
+test("classifyFailures: any other failed test is real, also beside a known flake", () => {
+  const report = { success: false, testResults: [fileResult("packages/dev-server/test/w.spec.ts",
+    [a(["a folder"], "made again", "failed"), a(["a folder"], "renamed", "failed")])] };
+  assert.deepEqual(classifyFailures(report, Q, "/repo"),
+    { known: Q, real: ["packages/dev-server/test/w.spec.ts > a folder > renamed"] });
+});
+
+test("classifyFailures: the same title in another file or describe is not quarantined", () => {
+  const report = { success: false, testResults: [
+    fileResult("packages/dev-server/test/other.spec.ts", [a(["a folder"], "made again", "failed")]),
+    fileResult("packages/dev-server/test/w.spec.ts", [a(["elsewhere"], "made again", "failed")]),
+  ] };
+  assert.equal(classifyFailures(report, Q, "/repo").real.length, 2);
+});
+
+test("classifyFailures: a file that failed outside a test, or no report, is real", () => {
+  const report = { success: false, testResults: [fileResult("packages/dev-server/test/w.spec.ts", [], "failed", "SyntaxError: x\nat y")] };
+  assert.deepEqual(classifyFailures(report, Q, "/repo").real, ["packages/dev-server/test/w.spec.ts: SyntaxError: x"]);
+  assert.deepEqual(classifyFailures(null, Q, "/repo").real, ["no test report to read"]);
+  assert.equal(classifyFailures({ success: false, testResults: [] }, Q, "/repo").real.length, 1);
+});
+
+test("the quarantine file is valid, and each entry names a test that exists in its spec", () => {
+  for (const q of readQuarantine()) {
+    const src = readFileSync(q.file, "utf8");
+    for (const title of q.test.split(" > ")) assert.ok(src.includes(JSON.stringify(title)), `${q.file}: no ${title}`);
+  }
+});
+
+test("commandFor: a vitest job with a report file writes vitest's JSON report there, and still prints", () => {
+  const v = commandFor({ runner: "vitest", cwd: "packages/x", files: ["test/a.spec.ts"] }, 20, "/tmp/r.json");
+  assert.ok(v.args.includes("--reporter=default") && v.args.includes("--reporter=json") && v.args.includes("--outputFile.json=/tmp/r.json"));
+});
+
+test("summaryOf: a known flake says so and names the BACKLOG entry; a failure says Failed", () => {
+  const jobs = [{ cwd: "packages/dev-server" }];
+  const flake = [{ job: "packages/dev-server", run: 7, ...Q[0] }];
+  const s = summaryOf(jobs, 20, flake, []);
+  assert.match(s, /Known flake, see BACKLOG/);
+  assert.match(s, /run 7: .*w\.spec\.ts > a folder > made again \(BACKLOG: w: one event too many\)/);
+  assert.doesNotMatch(s, /Failed/);
+  assert.match(summaryOf(jobs, 20, flake, [{ job: "packages/dev-server", run: 3, what: ["x > y"] }]), /\*\*Failed\.\*\*/);
 });
