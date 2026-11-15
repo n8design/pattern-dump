@@ -25,7 +25,7 @@ import { basename } from "node:path";
 import type MarkdownIt from "markdown-it";
 import type { DiscoveryMap, ImageLookup } from "@pattern-dump/contracts";
 import { imageTag, deepMerge, readExampleHeight, type ProseSlot } from "@pattern-dump/renderer";
-import { codeBlock, createMarkdown, fenceLanguage } from "./code-blocks.js";
+import { codeBlock, createMarkdown, fenceLanguage, placeOf } from "./code-blocks.js";
 import { escapeAttr, escapeHtml } from "./http-utils.js";
 import { usePlacedTags, type PlacedBlock } from "./placed-tags.js";
 import { placeBlock, type PlacementDeps } from "./storefront/placed.js";
@@ -101,7 +101,7 @@ function createDocMarkdown(placing: boolean): MarkdownIt {
   // never mutates shared state during render, safe for parallel builds.
   md.renderer.rules["fence"] = (tokens, idx, _opts, env) => {
     const map = (env as { resolvedFences?: Map<number, string> }).resolvedFences;
-    return map?.get(idx) ?? `${codeBlock(tokens[idx]?.content ?? "", fenceLanguage(tokens[idx]?.info ?? ""))}\n`;
+    return map?.get(idx) ?? `${codeBlock(tokens[idx]?.content ?? "", fenceLanguage(tokens[idx]?.info ?? ""), placeOf(env))}\n`;
   };
 
   // A storefront page's image, written with its variants (proseImages), else as markdown writes it.
@@ -230,7 +230,7 @@ export async function renderDoc(
     }
   }
 
-  return md.renderer.render(tokens, md.options, { resolvedFences, resolvedPlaced });
+  return md.renderer.render(tokens, md.options, { resolvedFences, resolvedPlaced, pdCodeBlocks: { storefront: embed.embed === "frame" } });
 }
 
 /** Checks a storefront page's images and resolves the markup of those from the assets (ProseImages). */
@@ -371,7 +371,7 @@ async function _resolveFence(
 
   if (lang === "src-template" || lang.startsWith("src-template ")) {
     const spec = lang.startsWith("src-template ") ? lang.slice("src-template ".length).trim() : code.split("\n")[0]?.trim() ?? "";
-    if (!spec) { out.set(idx, codeBlock("", "")); return; }
+    if (!spec) { out.set(idx, codeBlock("", "", { storefront: embed.embed === "frame" })); return; }
     const { compId } = _parsePatternSpec(spec);  // variant ignored — all variants share the base template
     const entry = discoveryMap.get(compId);
     if (!entry?.hbsPath) {
@@ -380,7 +380,7 @@ async function _resolveFence(
     }
     try {
       const src = await readFile(entry.hbsPath, "utf-8");
-      out.set(idx, codeBlock(src, "handlebars"));
+      out.set(idx, codeBlock(src, "handlebars", { storefront: embed.embed === "frame" }));
     } catch (e) {
       console.warn(`[dev-server] src-template read error [${spec}]:`, e);
       out.set(idx, `<p class="doc-error">[src-template: ${escapeHtml(spec)} — read error]</p>`);
@@ -390,7 +390,7 @@ async function _resolveFence(
 
   if (lang === "src-data" || lang.startsWith("src-data ")) {
     const spec = lang.startsWith("src-data ") ? lang.slice("src-data ".length).trim() : code.split("\n")[0]?.trim() ?? "";
-    if (!spec) { out.set(idx, codeBlock("", "")); return; }
+    if (!spec) { out.set(idx, codeBlock("", "", { storefront: embed.embed === "frame" })); return; }
     const { compId, variant } = _parsePatternSpec(spec);
     const lookupId = variant ? `${compId}~${variant}` : compId;
     try {
@@ -407,7 +407,7 @@ async function _resolveFence(
         const variantData: Record<string, unknown> = variantJsonPath ? JSON.parse(await readFile(variantJsonPath, "utf-8")) : {};
         const merged = deepMerge(structuredClone(baseData), variantData);
         const src = JSON.stringify(merged, null, 2);
-        out.set(idx, codeBlock(src, "json"));
+        out.set(idx, codeBlock(src, "json", { storefront: embed.embed === "frame" }));
       } else {
         // Base component: no parent to merge from — show its own data file as-is.
         const jsonPath = discoveryMap.get(compId)?.jsonPath;
@@ -416,7 +416,7 @@ async function _resolveFence(
           return;
         }
         const src = await readFile(jsonPath, "utf-8");
-        out.set(idx, codeBlock(src, "json"));
+        out.set(idx, codeBlock(src, "json", { storefront: embed.embed === "frame" }));
       }
     } catch (e) {
       console.warn(`[dev-server] src-data read error [${spec}]:`, e);
@@ -427,11 +427,11 @@ async function _resolveFence(
 
   if (lang === "src-html" || lang.startsWith("src-html ")) {
     const spec = lang.startsWith("src-html ") ? lang.slice("src-html ".length).trim() : code.split("\n")[0]?.trim() ?? "";
-    if (!spec) { out.set(idx, codeBlock("", "")); return; }
+    if (!spec) { out.set(idx, codeBlock("", "", { storefront: embed.embed === "frame" })); return; }
     const { compId, variant } = _parsePatternSpec(spec);
     try {
       const html = await renderComponent(compId, variant);
-      out.set(idx, codeBlock(html, "html"));
+      out.set(idx, codeBlock(html, "html", { storefront: embed.embed === "frame" }));
     } catch (e) {
       if (!_isRendererNotFound(e)) console.warn(`[dev-server] src-html render error [${spec}]:`, e);
       out.set(idx, `<p class="doc-error">[src-html: ${escapeHtml(spec)} — render error]</p>`);
@@ -439,5 +439,5 @@ async function _resolveFence(
     return;
   }
 
-  out.set(idx, codeBlock(code, lang));
+  out.set(idx, codeBlock(code, lang, { storefront: embed.embed === "frame" }));
 }

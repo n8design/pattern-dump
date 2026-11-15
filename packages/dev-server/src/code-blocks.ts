@@ -10,18 +10,26 @@
 import MarkdownIt from "markdown-it";
 import { highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
+/** Where a code block is written. On a storefront page its copy button starts hidden, and the page's script
+ *  (page.ts copyScript) shows it: without scripting there is no button, so no focus stop that does nothing. The
+ *  workbench's shell has its own handler. */
+export interface CodeBlockPlace { storefront?: boolean }
+
 /** A code block: highlighted (or a plain, focusable <pre>), with the copy button carrying the raw code. */
-export function codeBlock(code: string, lang: string): string {
-  return wrapWithCopyButton(highlight(code, lang), code);
+export function codeBlock(code: string, lang: string, place: CodeBlockPlace = {}): string {
+  return wrapWithCopyButton(highlight(code, lang), code, { hidden: place.storefront === true });
 }
 
 /** The language a fence names: its info string's first word ("bash" of "bash title=x"), or "". */
 export const fenceLanguage = (info: string): string => info.trim().split(/\s+/)[0] ?? "";
 
+/** Where a render's code blocks go: markdown-it's env, `{ pdCodeBlocks: { storefront: true } }`. */
+export const placeOf = (env: unknown): CodeBlockPlace => (env as { pdCodeBlocks?: CodeBlockPlace } | undefined)?.pdCodeBlocks ?? {};
+
 /** A markdown-it instance with the code-block rule installed. */
 export function createMarkdown(options: ConstructorParameters<typeof MarkdownIt>[0]): MarkdownIt {
   const md = new MarkdownIt(options);
-  md.renderer.rules["fence"] = (tokens, idx) => `${codeBlock(tokens[idx]!.content, fenceLanguage(tokens[idx]!.info))}\n`;
-  md.renderer.rules["code_block"] = (tokens, idx) => `${codeBlock(tokens[idx]!.content, "")}\n`;
+  md.renderer.rules["fence"] = (tokens, idx, _o, env) => `${codeBlock(tokens[idx]!.content, fenceLanguage(tokens[idx]!.info), placeOf(env))}\n`;
+  md.renderer.rules["code_block"] = (tokens, idx, _o, env) => `${codeBlock(tokens[idx]!.content, "", placeOf(env))}\n`;
   return md;
 }

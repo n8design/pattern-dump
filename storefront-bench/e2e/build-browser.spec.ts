@@ -80,13 +80,13 @@ test("a code block wider than its column scrolls, takes keyboard focus, and pass
   // The built page, served from its files, at the narrow viewport: each block scrolls sideways and is reached by Tab.
   const site = join(root, ".out", "site");
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await context.route("http://site.test/**", async route => {
+  await context.route("http://site.localhost/**", async route => {
     const path = new URL(route.request().url()).pathname;
     const file = join(site, path.endsWith("/") ? `${path}index.html` : path);
     await (existsSync(file) ? route.fulfill({ path: file }) : route.fulfill({ status: 404, body: "" }));
   });
   const page = await context.newPage();
-  await page.goto("http://site.test/");
+  await page.goto("http://site.localhost/");
   const blocks = page.locator("main pre");
   await expect(blocks).toHaveCount(3);
   for (let i = 0; i < 3; i++) {
@@ -94,7 +94,8 @@ test("a code block wider than its column scrolls, takes keyboard focus, and pass
     expect(box.overflow).toBe("auto");
     expect(box.scroll).toBeGreaterThan(box.client);
   }
-  // The Tab order, from the top: each block's copy button, then the block itself.
+  // The Tab order, from the top: each block's copy button (shown by the page's script, the origin being a secure
+  // context with a clipboard, as an https site is), then the block itself.
   const reached: string[] = [];
   for (let i = 0; i < 6; i++) {
     await page.keyboard.press("Tab");
@@ -119,13 +120,13 @@ test("a code block in a placed component's content scrolls, takes keyboard focus
   expect(report.accessibility).toMatchObject({ browser: true, warnings: [] });
   const site = join(root, ".out", "site");
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await context.route("http://site.test/**", async route => {
+  await context.route("http://site.localhost/**", async route => {
     const path = new URL(route.request().url()).pathname;
     const file = join(site, path.endsWith("/") ? `${path}index.html` : path);
     await (existsSync(file) ? route.fulfill({ path: file }) : route.fulfill({ status: 404, body: "" }));
   });
   const page = await context.newPage();
-  await page.goto("http://site.test/");
+  await page.goto("http://site.localhost/");
   const blocks = page.locator("aside.note pre");
   await expect(blocks).toHaveCount(2);
   for (let i = 0; i < 2; i++) {
