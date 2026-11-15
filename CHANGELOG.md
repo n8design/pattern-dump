@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.1
+
+### Fixed
+
+- A style guide whose config uses `defineConfig()` and takes its folders from its `package.json`'s `patternDump`
+  field loads again. `defineConfig` filled in default folders, which then disagreed with the manifest's ("the config
+  and the project's own package manifest disagree"); it now returns the config unchanged, and the defaults are filled
+  in after the manifest's folders.
+- A storefront page with a `date` in its frontmatter, other than the home page and a listing, gets `og:type`
+  `article`, with `article:published_time` and one `article:tag` per tag, and an `Article` in its JSON-LD. Every
+  other page keeps `og:type` `website`. The date git gives a page does not make it an article.
+- Every code block is focusable (`tabindex="0"`), including one in a language without highlighting such as `bash`,
+  in the workbench's docs and on storefront pages. A block that scrolls sideways no longer fails `pd build --browser`
+  (axe `scrollable-region-focusable`) at phone width.
+- The workbench's browser tab shows `shell.brand.title` ("Pattern Dump" without one, instead of "Pattern Dump Dev"
+  on every route), with the component in front on a component route ("Button · Acme DS"), in `pd dev` and in a
+  `pd build` snapshot.
+
+### Changed
+
+- A storefront page's <title> separates the page and the site with a middle dot
+  ("About · Site") instead of an em dash, as do the workbench tab and the problems page.
+
 ## 0.4.0
 
 ### Added
