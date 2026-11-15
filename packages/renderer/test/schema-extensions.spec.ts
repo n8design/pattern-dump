@@ -57,8 +57,8 @@ describe("the placement schema extensions", () => {
 
   it("an unknown x-pd- key is an error, at the top and in a property", () => {
     expect(check({ "x-pd-contnet": "caption", properties: { caption: { type: "string", "x-pd-componnet": "atoms/slide" } } })).toEqual([
-      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
-      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
     ]);
   });
 
@@ -74,7 +74,7 @@ describe("the placement schema extensions", () => {
     }
     // In a property it is not a known key.
     expect(check({ properties: { a: { type: "string", "x-pd-example-height": 10 } } })).toEqual([
-      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
     ]);
   });
 
@@ -98,12 +98,34 @@ describe("the placement schema extensions", () => {
     }
     // In a property it is not a known key.
     expect(check({ properties: { body: { type: "string", "x-pd-prose-images": slot } } })).toEqual([
-      `#/properties/body/x-pd-prose-images: "x-pd-prose-images" is not a schema extension Pattern Dump knows (x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
+      `#/properties/body/x-pd-prose-images: "x-pd-prose-images" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images)`,
     ]);
   });
 
   it("x-pd-prose-images doesn't make a layout placeable: its template is not checked", () => {
     expect(check({ "x-pd-prose-images": { widths: [480], sizes: "100vw" }, properties: { body: { type: "string" } } }, `<main>{{{body}}}</main>`)).toEqual([]);
+  });
+
+  it("x-pd-card: on a list (a layout's page.children, a view's entries), names a component that exists and has a schema", () => {
+    expect(check({ properties: {
+      entries: { type: "array", "x-pd-card": "atoms/slide" },
+      page: { type: "object", properties: { children: { "x-pd-card": "atoms/slide" } } },
+    } })).toEqual([]);
+    expect(check({ properties: {
+      a: { type: "array", "x-pd-card": "atoms/nope" },
+      b: { type: "array", "x-pd-card": "atoms/plain" },
+      c: { type: "array", "x-pd-card": 3 },
+      d: { type: "string", "x-pd-card": "atoms/slide" },
+    } })).toEqual([
+      `#/properties/a/x-pd-card: x-pd-card names "atoms/nope", which is not a component`,
+      `#/properties/b/x-pd-card: x-pd-card names "atoms/plain", which has no schema, so a listing's pages can't be checked against it`,
+      `#/properties/c/x-pd-card: x-pd-card must name a component`,
+      `#/properties/d/x-pd-card: x-pd-card is only for a list: the pages of a listing, each shown as the card`,
+    ]);
+  });
+
+  it("x-pd-card doesn't make a layout placeable: its template is not checked", () => {
+    expect(check({ properties: { body: { type: "string" }, page: { properties: { children: { "x-pd-card": "atoms/slide" } } } } }, `<main>{{{body}}}</main>`)).toEqual([]);
   });
 
   it("x-pd-example-height doesn't make a component placeable: its template is not checked", () => {
