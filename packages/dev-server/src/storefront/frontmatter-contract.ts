@@ -1,12 +1,12 @@
 // A storefront page's frontmatter, checked against the layout it uses.
 //
-// Twelve keys belong to the build, not to a layout: `layout` (which layout; when absent, the `childLayout` of the
+// Thirteen keys belong to the build, not to a layout: `layout` (which layout; when absent, the `childLayout` of the
 // nearest folder above the page whose index.md sets one, else `page`), `childLayout` (on a folder's index.md), `order`
 // (where in the nav), the page's search and link-preview keys — `redirectFrom` (old routes that forward
 // here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
 // image, a raster file in the assets; checked against the files in page-image.ts) — and its listing keys
-// (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` on a
-// folder's index.md. A layout cannot declare any of the twelve. Every other key must be declared by the chosen layout's schema — the
+// (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` and `view` on a
+// folder's index.md. A layout cannot declare any of the thirteen. Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
 // declares. Nothing is inferred: a key the schema does not declare is an error, and a layout with no
 // schema declares nothing. Four more keys are filled by the storefront itself (`body`, the rendered
@@ -21,11 +21,11 @@ import { suggest } from "@pattern-dump/config";
 import { checkDeclared, readSchema, type PropertySchema } from "./declared-values.js";
 import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
 import type { FrontmatterValue } from "../frontmatter.js";
-import { readCategories, readChildLayout, readDate, readDraft, readSort, readTags, readUpdated, type Read, type SortBy } from "./listing-keys.js";
+import { readCategories, readChildLayout, readDate, readDraft, readSort, readTags, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
 import { categoryIndex, type CategoryIndex } from "./categories.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
-export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort"] as const;
+export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
 export const ASSEMBLY_KEYS = ["body", "nav", "site", "page"] as const;
 
@@ -55,6 +55,8 @@ export interface BuildKeys {
   draft?: boolean;
   /** On a folder's index.md: how its pages are listed. */
   sort?: SortBy;
+  /** On a folder's index.md: the view its listing is shown in (views.ts checks that it is one). */
+  view?: string;
 }
 
 /** An old route: root-relative, slash-wrapped, plain segments only (no query, fragment, "." or ".."). */
@@ -84,7 +86,7 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
     if (typeof image === "string" && ASSET_PATH.test(image)) out.image = image;
     else at("image", `image must be a path to a file in the assets, such as "/assets/images/share.png"`);
   }
-  const take = <K extends "date" | "updated" | "tags" | "draft" | "sort">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
+  const take = <K extends "date" | "updated" | "tags" | "draft" | "sort" | "view">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
     if (r === undefined) return;
     if (r.ok) out[key] = r.value;
     else at(key, r.message);
@@ -100,6 +102,7 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
   } else if (cats) at("categories", cats.message);
   take("draft", v("draft") === undefined ? undefined : readDraft(v("draft")!));
   take("sort", v("sort") === undefined ? undefined : readSort(v("sort")!, path));
+  take("view", v("view") === undefined ? undefined : readView(v("view")!, path));
   return out;
 }
 

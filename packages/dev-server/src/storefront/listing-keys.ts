@@ -1,4 +1,5 @@
-// The keys a page sets for listings (collections): `date`, `tags`, `categories`, `draft`, and `sort` on a folder's index.md.
+// The keys a page sets for listings (collections): `date`, `tags`, `categories`, `draft`, and `sort`, `childLayout` and
+// `view` on a folder's index.md.
 // Reserved like `redirectFrom` and `image`: the build reads them, a layout never declares them. Each is read
 // from the frontmatter's text by one function here, so the page check (frontmatter-contract.ts) and the page
 // model (pages.ts) read the same value: the check reports what is wrong, the model takes only what is right.
@@ -10,6 +11,7 @@
 //   draft: true               true or false
 //   sort: date                on a folder's index.md: its pages newest first ("order", the default: the nav's order)
 //   childLayout: article      on a folder's index.md: the layout of the pages under it that name none (the nearest wins)
+//   view: grid                on a folder's index.md: how its listing is shown (a component in the skin's views/)
 
 import { suggest } from "@pattern-dump/config";
 import type { FrontmatterValue } from "../frontmatter.js";
@@ -104,6 +106,15 @@ export function readChildLayout(v: FrontmatterValue, path: string): Read<string>
     return { ok: false, message: `childLayout sets the layout of a folder's pages, so it belongs on the folder's index.md, not on a page` };
   }
   return typeof v === "string" ? { ok: true, value: v } : { ok: false, message: "childLayout must be one layout name, not a list" };
+}
+
+/** `view: grid` on a folder's index.md: how its listing is shown, a component in the skin's views/ folder (whether it
+ *  is one is checked against the patterns, in views.ts). */
+export function readView(v: FrontmatterValue, path: string): Read<string> {
+  if (!isFolderIndex(path)) {
+    return { ok: false, message: `view names how a folder's pages are listed, so it belongs on the folder's index.md, not on a page` };
+  }
+  return typeof v === "string" ? { ok: true, value: v } : { ok: false, message: "view must be one view name, not a list" };
 }
 
 /** `path`: the page's path in the pages folder; only a folder's index.md (the root's included) sorts. */
