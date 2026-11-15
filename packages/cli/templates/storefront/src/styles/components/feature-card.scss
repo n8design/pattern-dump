@@ -1,0 +1,6 @@
+@use "../base/tokens";
+
+.feature-card img { display: block; inline-size: 100%; block-size: auto; border-radius: tokens.$radius; }
+.feature-card-title { margin: tokens.$space-sm 0 0; font-size: 1.5rem; }
+.feature-card-date { margin: tokens.$space-xs 0 0; color: var(--color-text-muted, #4b5563); }
+.feature-card-teaser { margin: tokens.$space-xs 0 0; }

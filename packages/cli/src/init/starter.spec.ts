@@ -174,7 +174,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const { graph } = await runDiagnosticsAudit(config, siteDir);
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
-      [["components/compact-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"],
+      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"],
         ["layouts/listing", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
         ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
   }, 120_000);
@@ -215,7 +215,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const config = await loadConfig(siteDir);
     const server = await startDevServer(config, siteDir, { port: 0, wsPort: 0 });
     try {
-      for (const id of ["views/list", "views/grid", "views/featured", "views/compact", "components/listing-card", "components/grid-card", "components/compact-card"]) {
+      for (const id of ["views/list", "views/grid", "views/featured", "views/compact", "components/listing-card", "components/grid-card", "components/feature-card", "components/compact-card"]) {
         const d = await (await fetch(`http://127.0.0.1:${server.port}/api/component/${id}`)).json() as ComponentDetailResponse;
         expect(d.diagnostics, id).toEqual([]);
         expect(d.doc, id).toBeTruthy();
