@@ -176,7 +176,7 @@ export async function buildStaticSite(
   // A storefront page's notes, once each however often the page is fetched: the report's notes.
   const storefrontNotes = new Set<string>();
   const server = await startDevServer(config, root, {
-    port: 0, live: false, now, today, ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
+    port: 0, live: false, now, today, pagesOnce: true, ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
     onStorefrontNote: note => { storefrontNotes.add(note); },
     ...(pagefind ? { onSearchRecord: (r: SearchRecord) => { searchRecords.set(r.route, r); } } : {}),
   });

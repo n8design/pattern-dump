@@ -55,6 +55,7 @@ import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
 import { layoutPages, readPages, todayOf } from "./storefront/pages.js";
+import { createPagesCache, type PagesCache } from "./storefront/pages-cache.js";
 import { assetFile } from "./asset-file.js";
 import { decodePath } from "./contained-file.js";
 import { isOwnHost, ownHosts } from "./own-hosts.js";
@@ -74,15 +75,25 @@ export const TEST_SETTLE_ROUTE = "/_pd/__test/settle";
 /** The storefront notes a server has printed (pd dev), so each is printed once. */
 const printedNotes = new WeakMap<RouteContext, Set<string>>();
 
+/** Per server, the storefront's page model as last read (pages-cache.ts). */
+const pagesCaches = new WeakMap<RouteContext, PagesCache>();
+
 /** The website's pages as this server serves them: pd dev shows drafts and scheduled pages; pd build leaves them out,
  *  as if their files weren't there. */
 function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>, discoveryMap?: DiscoveryMap): ReturnType<typeof readPages> {
-  return readPages(sf.pagesDir, {
+  const today = ctx.today ?? todayOf(ctx.now());
+  // The skin's layouts: tag and category pages are generated through them (terms.ts).
+  const layouts = discoveryMap
+    ? [...discoveryMap.keys()].filter(id => /^layouts\/[^/~]+$/.test(id)).map(id => id.slice("layouts/".length)).sort()
+    : undefined;
+  // Not read again for every request (pages-cache.ts): once in pd build, and in pd dev until the folder changes.
+  let cache = pagesCaches.get(ctx);
+  if (!cache) { cache = createPagesCache(sf.pagesDir, ctx.pagesOnce === true); pagesCaches.set(ctx, cache); }
+  return cache.get(JSON.stringify([today, layouts ?? null]), () => readPages(sf.pagesDir, {
     workbenchPath: sameHostWorkbenchPath(sf), drafts: ctx.live ? "show" : "leave-out", scheduled: ctx.live ? "show" : "leave-out",
-    today: ctx.today ?? todayOf(ctx.now()), categories: sf.categories, tags: sf.tags, tagPages: sf.tagPages, categoryPages: sf.categoryPages,
-    // The skin's layouts: tag and category pages are generated through them (terms.ts).
-    ...(discoveryMap ? { layouts: new Set([...discoveryMap.keys()].filter(id => /^layouts\/[^/~]+$/.test(id)).map(id => id.slice("layouts/".length))) } : {}),
-  });
+    today, categories: sf.categories, tags: sf.tags, tagPages: sf.tagPages, categoryPages: sf.categoryPages,
+    ...(layouts ? { layouts: new Set(layouts) } : {}),
+  }));
 }
 
 export interface RouteContext {
@@ -103,6 +114,8 @@ export interface RouteContext {
   readonly today?: string;
   /** false when headless (`pd build`): there is no live-reload socket, so pages carry no client for it. */
   readonly live: boolean;
+  /** Set by `pd build`: the pages folder is read once for the whole build. See DevServerOptions. */
+  readonly pagesOnce?: boolean;
   /** The current live-reload generation (PD_GENERATION_HEADER); absent when headless. */
   readonly generation?: () => string;
   /** Set by `pd build`: storefront pages link into the workbench at this address. See DevServerOptions. */
