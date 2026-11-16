@@ -35,6 +35,7 @@ import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { checkClasses } from "./storefront/class-check.js";
 import { checkProperties } from "./storefront/property-check.js";
 import { withNoindex } from "./storefront/base-path.js";
+import { changedInputs, stampInputs } from "./input-stamps.js";
 import { buildSearchIndex, SEARCH_PATH, searchPagefind, type PagefindModule, type SearchRecord } from "./storefront/search.js";
 
 export interface StaticBuildOptions {
@@ -117,6 +118,40 @@ export async function buildStaticSite(
   root: string,
   opts: StaticBuildOptions,
 ): Promise<StaticBuildReport> {
+  const watch: InputWatch = {};
+  try {
+    return await buildOnce(config, root, opts, watch);
+  } catch (e) {
+    // A build that fails after an input changed may have failed because of the change (a page removed while
+    // the checks ran, say): the change is what to report, with what the build said.
+    if (!watch.changed || (e instanceof InputsChangedError)) throw e;
+    const changed = await watch.changed();
+    if (!changed.length) throw e;
+    throw new InputsChangedError(`the build stopped (it said: ${e instanceof Error ? e.message.split("\n")[0]!.replace(/:$/, "") : String(e)})`, changed, e);
+  }
+}
+
+/** What buildOnce has looked at: the inputs that differ from the build's start, once it has taken its stamps. */
+interface InputWatch { changed?: () => Promise<string[]> }
+
+/** The project changed while it was being built. */
+export class InputsChangedError extends Error {
+  override readonly name = "InputsChangedError";
+  constructor(written: string, changed: readonly string[], cause?: unknown) {
+    const shownMax = 20;
+    const list = changed.slice(0, shownMax).map(c => `  - ${c}`)
+      .concat(changed.length > shownMax ? [`  - and ${changed.length - shownMax} more`] : []);
+    super(`pd build: the project changed while it was being built, so ${written}. Run pd build again once the files `
+      + `are saved:\n${list.join("\n")}`, cause === undefined ? undefined : { cause });
+  }
+}
+
+async function buildOnce(
+  config: PatternDumpConfig,
+  root: string,
+  opts: StaticBuildOptions,
+  watch: InputWatch,
+): Promise<StaticBuildReport> {
   const started = performance.now();
   const logLine = opts.log ?? (() => {});
   const log = (line: string): void => logLine(`${line} (${((performance.now() - started) / 1000).toFixed(1)}s)`);
@@ -161,6 +196,22 @@ export async function buildStaticSite(
         + `(build.basePath or --base); it is being built for ${basePath}`);
     }
   }
+
+  // Every file the build reads, as it is now (input-stamps.ts). Compared before each write: a file saved while the
+  // build runs stops it, naming the file, instead of output that is part old, part new.
+  const inputs = [
+    ...cfg.patternRoots.map(r => r.dir), ...cfg.styleRoots.map(r => r.dir), ...cfg.dataDirs, ...cfg.helperPaths,
+    ...cfg.scriptsDirs, ...cfg.themeDirs, ...cfg.assetRoots,
+    ...(storefront ? [storefront.pagesDir, ...(storefront.head ? [storefront.head] : [])] : []),
+  ];
+  const outputs = [outDir, ...(storefront ? [storefront.outDir] : [])];
+  const startStamps = await stampInputs(inputs, outputs);
+  watch.changed = async () => changedInputs(startStamps, await stampInputs(inputs, outputs), project);
+  /** Stops the build when an input changed since it started; `written` says what is on disk by then. */
+  const assertUnchanged = async (written: string): Promise<void> => {
+    const changed = await watch.changed!();
+    if (changed.length) throw new InputsChangedError(written, changed);
+  };
 
   // --browser: the project's Playwright, loaded before anything is built, so a missing one stops the build at once.
   const playwright = opts.browser && storefront ? await (opts.loadPlaywright ?? loadProjectPlaywright)(project) : undefined;
@@ -333,6 +384,7 @@ export async function buildStaticSite(
     log(`… accessibility checked on ${pages.length} pages`);
   }
 
+  await assertUnchanged("nothing was written").catch(async (e: unknown) => { await server.close(); throw e; });
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
   const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], ms: 0 };
@@ -453,6 +505,8 @@ export async function buildStaticSite(
         + `its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
     }
 
+    await assertUnchanged(storefront ? `the workbench in ${outDir} may be part old, part new, and the storefront was not written` : `the workbench in ${outDir} may be part old, part new`);
+
     // ---- 7. The storefront, into its own root, through its own writer ----
     if (storefront && sfGet && sfCrawl) {
       const sfOut = storefront.outDir;
@@ -523,6 +577,8 @@ export async function buildStaticSite(
       if (scheduled.length) report.scheduled = scheduled;
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
+
+    if (storefront) await assertUnchanged(`the workbench in ${outDir} and the storefront in ${storefront.outDir} may be part old, part new`);
 
     // ---- 8. The image cache keeps what this build used: the variants written to either root ----
     const used = new Set<string>();
