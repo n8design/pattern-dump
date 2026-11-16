@@ -174,7 +174,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const { graph } = await runDiagnosticsAudit(config, siteDir);
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
-      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"],
+      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"], ["components/search", "ok"],
         ["layouts/article", "ok"], ["layouts/categories", "ok"], ["layouts/category", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"],
         ["layouts/tag", "ok"], ["layouts/tags", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
         ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
@@ -207,6 +207,12 @@ describe("the starter project with a website (--storefront, no examples)", () =>
       // Each tag by its label, linked to its tag page.
       expect(hello.body).toContain(`<ul class="page-tags" aria-label="Tags"><li><a href="/tags/getting-started/">getting-started</a></li><li><a href="/tags/notes/">notes</a></li></ul>`);
       // The tag and category pages, and their indexes, through the starter's plain layouts.
+      // The search page: the search component, its script, and a link to it in the navigation.
+      const search = await onHost(server.port, "live.localhost", "/search/");
+      expect(search.status).toBe(200);
+      expect(search.body).toMatch(/<search class="search" data-search>\s*<form class="search-form" method="get">\s*<label class="search-label" for="search-field">Search this site<\/label>/);
+      expect(search.body).toMatch(/<script type="module" src="\/_pd\/scripts\/site-search\.js[^"]*"><\/script>/);
+      expect(home.body).toContain(`<a href="/search/">Search</a>`);
       const notes = await onHost(server.port, "live.localhost", "/tags/notes/");
       expect(notes.status).toBe(200);
       expect(notes.body).toContain(`<h1 class="page-title">notes</h1>`);

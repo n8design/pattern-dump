@@ -17,6 +17,8 @@
     categories: {
       notes: { label: "Notes", description: "Short articles about this site" },
     },
+    // Search: pd build indexes every page with Pagefind once the project has it (npm install --save-dev pagefind);
+    // components/search is the search field. search: true makes a build without Pagefind stop, false turns it off.
     site: { title: __PD_BRAND_JSON__, footer: "Made with Pattern Dump." },
   },
   build: { basePath: "/workbench/" },

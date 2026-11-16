@@ -46,6 +46,14 @@ describe("pd dev's startup addresses", () => {
     expect(lines.at(-1)).toMatch(/^\[dev-server\] Ready in \d+ms, \d+ components$/);
   }, 60_000);
 
+  it("says that search works in pd build only: with Pagefind (the repository's), not with search: false", async () => {
+    const note = "[dev-server] Search: the index is built by pd build, so the site's search finds nothing in pd dev";
+    const on = await startupLines(benchConfig, storefrontBench, { port: 0, wsPort: 0 });
+    expect(on.lines).toContain(note);
+    const off = validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, search: false } }, "test");
+    expect((await startupLines(off, storefrontBench, { port: 0, wsPort: 0 })).lines).not.toContain(note);
+  }, 60_000);
+
   it("without a storefront: one workbench line, on localhost", async () => {
     const { lines, port } = await startupLines(plain, testBench, { port: 0, wsPort: 0 });
     expect(lines.filter(l => /\] (Website|Workbench):/.test(l))).toEqual([`[dev-server] Workbench: http://localhost:${port}/`]);

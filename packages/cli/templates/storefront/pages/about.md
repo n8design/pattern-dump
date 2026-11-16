@@ -13,5 +13,7 @@ workbench shows each part of it:
 - `src/patterns/partials/base`: the frame around it, with the header, navigation and footer
 - `src/patterns/partials/head`: what the skin adds to every page's `<head>`
 - `src/patterns/components/note`: a component the pages show
+- `src/patterns/components/search`: the site's search, on the search page; `pd build` writes its index once the
+  project has Pagefind (`npm install --save-dev pagefind`)
 
 The site's name and footer are `storefront.site` in `pattern-dump.config.ts`.

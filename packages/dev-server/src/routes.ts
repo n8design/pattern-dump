@@ -62,6 +62,7 @@ import { checkPageImage } from "./storefront/page-image.js";
 import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
+import type { SearchRecord } from "./storefront/search.js";
 import { pageStylesheets } from "./storefront/page-head.js";
 import type { RenderingHandle } from "./rendering.js";
 import type { SiteValuesHandle } from "./storefront/site-values.js";
@@ -108,6 +109,8 @@ export interface RouteContext {
   readonly storefrontWorkbenchUrl?: string;
   /** Set by `pd build`: where a storefront page's notes go. Without it they go to the terminal. */
   readonly onStorefrontNote?: (note: string) => void;
+  /** Set by `pd build`: where what a storefront page gives the search index goes. */
+  readonly onSearchRecord?: (record: SearchRecord) => void;
   /** The storefront pages' dates from git, when there is a storefront (git-dates.ts). */
   readonly dates?: GitDates;
   /** TEST ONLY: set when PD_TEST_HOOKS=1 on a live server; resolves once every change so far is handled. */
@@ -696,6 +699,7 @@ async function routeRequest(
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
       });
+      if (page.search && ctx.onSearchRecord) ctx.onSearchRecord(page.search);
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
       for (const note of page.notes) {
         if (ctx.onStorefrontNote) { ctx.onStorefrontNote(note); continue; }

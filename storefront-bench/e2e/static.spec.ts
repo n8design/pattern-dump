@@ -21,6 +21,18 @@ test.describe("the built storefront on a static host", () => {
     });
   }
 
+  // storefront.search is left out in the bench's config, so the repository's Pagefind turns it on.
+  test("serves the search index pd build wrote, and a search in it finds a page", async ({ page }) => {
+    const res = await page.request.get("/_pd/search/pagefind.js", { headers: NO_CACHE });
+    expect(res.status()).toBe(200);
+    await page.goto("/");
+    const found = await page.evaluate(async () => {
+      const pf = await import("/_pd/search/pagefind.js") as { search(t: string): Promise<{ results: Array<{ data(): Promise<{ url: string }> }> }> };
+      return Promise.all((await pf.search("photograph")).results.map(r => r.data().then(d => d.url)));
+    });
+    expect(found).toEqual(["/articles/harbour/"]);
+  });
+
   test("stamps each served file it references with the content hash of that file as written", async () => {
     const files = (await readdir(ROOT, { recursive: true, withFileTypes: true })).filter(e => e.isFile()).map(e => join(e.parentPath, e.name));
     const stamps: Array<{ in: string; path: string; v: string }> = [];

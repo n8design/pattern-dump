@@ -747,6 +747,40 @@ belong to the skin.
 
 ---
 
+### Search
+
+`pd build` indexes the site with [Pagefind](https://pagefind.app/) and writes the index into it, at `_pd/search/`.
+There is no server: search runs in the reader's browser, on GitHub Pages and under a path as well.
+
+```bash
+npm install --save-dev pagefind
+```
+
+- **Pagefind is the project's own**, as Playwright is for `--browser`; Pattern Dump does not depend on it.
+  `storefront.search` left out: the site is indexed when the project has Pagefind, and built without search, with no
+  message, when it has none. `true` asks for it: without Pagefind the build stops before anything is built, naming the
+  install. `false` turns it off.
+- **What is indexed is each page's own content:** its markdown and the components it places, with its title. The
+  layout's markup is not: header, footer, navigation, listings and related pages (other pages' titles and teasers)
+  and the copy buttons never match. The written pages are unchanged; they carry no Pagefind attributes.
+- **Left out:** the 404 page (it has no address of its own); tag and category pages and their indexes (their text is
+  other pages' labels and teasers, so each page would match twice; the filters do their job); redirect stubs; and a
+  page with `index: false`, which keeps it out of site search as well as search engines. `storefront.index: false`
+  does not: a site kept out of search engines still has its own search. Drafts and scheduled pages are never built.
+- **Filters:** `section`, the label of the page's collection (the folder that lists it, by its index page's title; a
+  page at the top has none), `tag` and `category`, by their labels. **Meta:** `title`, and `teaser` (the listing
+  teaser: the description, else the first paragraph).
+- **The search UI is the skin's:** a component that loads `<base path>_pd/search/pagefind.js` (the site's path is in
+  `<meta name="pd-base-path">`) and uses Pagefind's JavaScript API. Pagefind's own UIs are not written.
+- **`pd dev` has no index,** so a save stays as fast as it is: search works on the built site, and `pd dev` says so
+  when it starts.
+
+The starter (`pd init --storefront`) has a search page with a plain, accessible component, `components/search`: a
+`<search>` landmark with a labelled field and a button, a status line screen readers announce (such as
+`2 results for "grid".`), and the results as a list of links with their section and the passage that matched. It searches as you
+type, keeps the words in the address (`?q=`), and adds a section list once the index is loaded. Without JavaScript
+the form still submits and the page says that search needs JavaScript.
+
 ## Images
 
 Every raster image on a page (JPEG, PNG, GIF, WebP and the like) is served as WebP variants, a few widths of it,
@@ -1128,6 +1162,11 @@ the build stops at once and says what to install:
 npm install --save-dev playwright
 npx playwright install chromium
 ```
+
+- **Search:** with a search index, on the first page that has a search field (`input[type="search"]`), at each
+  viewport, a word of an indexed page's title is typed and sent. A page that shows no result within 5 seconds stops
+  the build; the page showing its results is checked with axe again. Once per viewport, since the search component is
+  the skin's, the same on every page.
 
 A page is fetched from the build itself, never from the network: images and fonts from other sites are not loaded.
 
