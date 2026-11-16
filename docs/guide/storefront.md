@@ -999,6 +999,15 @@ redirect pages, each with a `lastmod` of its `updated`, else its `date`, else no
 shallow clone, a `datePublished` git would give is left out of the JSON-LD and the build notes it once (in CI,
 check out with `fetch-depth: 0`). A layout that shows `page.created` still fails the build there.
 
+**`llms.txt`** ([llmstxt.org](https://llmstxt.org/)) gives a language model the site in one file: the site's title
+(`storefront.site.title`, else the home page's) and the home page's description as a quote, then a `## Pages` section
+with the top-level pages and one section per collection (a folder with an `index.md`, headed by its title and led by
+it), in nav order. Each page is a line `- [title](url): teaser`, its description else its first paragraph. It lists
+the same pages as the sitemap (no draft, no scheduled page, none with `index: false`); tag and category pages are left
+out, since their pages are listed. URLs are absolute with `storefront.url`, else paths from the site's root. `pd
+build` writes it to the site's root (under a path, at `<path>llms.txt`); `pd dev` has none. On unless the site has
+`index: false`; `storefront.llms: false` turns it off.
+
 **`robots.txt`.** Both output roots get one. The storefront's keeps crawlers out of `/preview/` (the live
 examples: component demos, not pages) and names the sitemap. The workbench's keeps them out of its
 previews only; the workbench itself stays searchable. A workbench on the storefront's own host
@@ -1097,6 +1106,7 @@ site/
   404.html                                          the 404 page
   setup/index.html  start/index.html                pages that forward from old routes
   robots.txt  sitemap.xml                           for crawlers (the sitemap with storefront.url)
+  llms.txt                                          the site for language models
   preview/components/callout/index.html            the previews the pages show
   _pd/  assets/                                    what pages and previews reference
   .nojekyll

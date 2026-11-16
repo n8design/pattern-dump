@@ -90,6 +90,16 @@ describe("pd build — a storefront under a path", () => {
     expect(underPath.get("about/index.html")).toContain(`<link rel="canonical" href="https://bench.example.test/sub/about/">`);
   });
 
+  it("writes llms.txt at the site's own root, every link under the path", () => {
+    const llms = underPath.get("llms.txt")!;
+    expect(llms).toContain("- [About](https://bench.example.test/sub/about/): What the bench is for.\n");
+    const links = [...llms.matchAll(/\]\(([^)]+)\)/g)].map(m => m[1]!);
+    expect(links.length).toBe(6);
+    for (const l of links) expect(l, l).toMatch(/^https:\/\/bench\.example\.test\/sub\/[a-z]/);
+    // The same text as at the root, but for the path.
+    expect(llms).toBe(atRoot.get("llms.txt")!.replaceAll("https://bench.example.test/", "https://bench.example.test/sub/"));
+  });
+
   it("says what the host's own robots.txt needs", () => {
     expect(report.notes).toContain("robots.txt is not written: the site is published under /sub/, and crawlers read robots.txt only at a "
       + "host's root. Where you can, add to the host's own robots.txt: Disallow: /sub/preview/; Sitemap: https://bench.example.test/sub/sitemap.xml");

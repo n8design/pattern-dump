@@ -107,6 +107,8 @@ export interface ResolvedConfig {
     /** storefront.tagPages and storefront.categoryPages, as the config writes them (terms.ts reads them). */
     readonly tagPages: boolean | StorefrontTermPages | undefined;
     readonly categoryPages: boolean | StorefrontTermPages | undefined;
+    /** storefront.llms: pd build writes llms.txt; false for a site with index: false. */
+    readonly llms: boolean;
     /** storefront.search as the config writes it (search.ts reads it). */
     readonly search: boolean | undefined;
   } | null;
@@ -253,6 +255,7 @@ export function resolveServerConfig(
       tagPages: config.storefront.tagPages,
       categoryPages: config.storefront.categoryPages,
       search: config.storefront.search,
+      llms: config.storefront.index !== false && config.storefront.llms !== false,
     } : null,
     images,
     overviewsEnabled:    config.overviews !== false,

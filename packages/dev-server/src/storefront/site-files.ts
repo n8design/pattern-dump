@@ -1,5 +1,6 @@
 // The storefront's files for crawlers, at the root of its host: robots.txt, and sitemap.xml when the site has
-// an address (storefront.url). Both are text built from the page model on every request, never stored.
+// an address (storefront.url). Both are text built from the page model on every request, never stored. And
+// llms.txt, for language models, which only pd build writes.
 
 import type { PageModel } from "./pages.js";
 
@@ -30,6 +31,45 @@ export function sitemapXml(entries: readonly SitemapEntry[]): string {
   const urls = entries.map(e => `<url><loc>${escapeXml(e.url)}</loc>${e.lastmod ? `<lastmod>${escapeXml(e.lastmod)}</lastmod>` : ""}</url>`);
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`
     + `${urls.map(u => `${u}\n`).join("")}</urlset>\n`;
+}
+
+/**
+ * llms.txt (llmstxt.org), which pd build writes: `# <title>`, the home page's description (or teaser) as a quote,
+ * then `## Pages` (the top-level pages but the home page) and a section per collection (a folder with an index.md,
+ * headed by its title and led by it), in nav order. Each page is `- [title](url): teaser`, its description else its
+ * first paragraph; no `: ` part when it has neither. The same pages as the sitemap: no draft, no scheduled page, no
+ * page with `index: false`; a section with none left is not written. Tag and category pages are left out: they have
+ * no content of their own, and their pages are listed. `siteUrl`: absolute URLs; without it, the route.
+ */
+export function llmsTxt(model: PageModel, o: { title: string | undefined; siteUrl: string | undefined }): { text: string; pages: number } {
+  const titles = new Map(model.pages.map(p => [p.route, p.title]));
+  const listed = (route: string): boolean => {
+    const file = model.files.get(route), entry = model.entries.get(route);
+    return !!file && !!entry && !entry.draft && !entry.scheduled && file.frontmatter.values["index"] !== "false";
+  };
+  const oneLine = (s: string): string => s.replace(/\s+/g, " ").trim();
+  const linkText = (s: string): string => oneLine(s).replace(/[[\]\\]/g, m => `\\${m}`);
+  const href = (route: string): string => o.siteUrl !== undefined ? new URL(route.slice(1), o.siteUrl).href : route;
+  const line = (route: string): string => {
+    const teaser = model.entries.get(route)?.description;
+    return `- [${linkText(titles.get(route) ?? route)}](${href(route)})${teaser ? `: ${oneLine(teaser)}` : ""}`;
+  };
+  const pagesOf = (folder: string): string[] => (model.folders.get(folder)?.children ?? []).filter(r => r !== "/" && !model.folders.has(r));
+  const sections: { heading: string; routes: string[] }[] = [{ heading: "Pages", routes: pagesOf("/") }];
+  for (const p of model.pages) {
+    if (p.route !== "/" && model.folders.has(p.route)) sections.push({ heading: p.title, routes: [p.route, ...pagesOf(p.route)] });
+  }
+  const out = [`# ${oneLine(o.title ?? titles.get("/") ?? "Site")}`, ""];
+  const about = listed("/") ? model.entries.get("/")?.description : null;
+  if (about) out.push(`> ${oneLine(about)}`, "");
+  let pages = 0;
+  for (const s of sections) {
+    const routes = s.routes.filter(listed);
+    if (!routes.length) continue;
+    pages += routes.length;
+    out.push(`## ${oneLine(s.heading)}`, "", ...routes.map(line), "");
+  }
+  return { text: out.join("\n"), pages };
 }
 
 /**

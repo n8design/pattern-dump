@@ -265,6 +265,12 @@ describe("configProblems — storefront", () => {
     expect(storefront({ ...base, search: "pagefind" })).toEqual([`"storefront.search" must be true or false`]);
   });
 
+  it("takes llms: true or false", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    expect(storefront({ ...base, llms: false })).toEqual([]);
+    expect(storefront({ ...base, llms: "no" })).toEqual([`"storefront.llms" must be true or false`]);
+  });
+
   it("takes tagPages and categoryPages: true, false, or { path, title }", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     for (const ok of [true, false, {}, { path: "topics" }, { title: "Topics" }, { path: "t2", title: "All tags" }]) {

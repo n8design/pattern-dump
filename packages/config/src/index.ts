@@ -261,6 +261,12 @@ export interface StorefrontConfig {
    * `true`: on, and a build without Pagefind stops. `false`: off. The search UI is a component of the skin's.
    */
   search?: boolean;
+  /**
+   * llms.txt (llmstxt.org): pd build writes one at the site's root, with the site's title and description and each
+   * page's title, link and teaser, by collection; the same pages as the sitemap. Left out: on, unless `index` is
+   * false. `false`: none.
+   */
+  llms?: boolean;
 }
 
 /** storefront.tagPages and storefront.categoryPages as an object. */

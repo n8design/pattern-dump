@@ -31,7 +31,7 @@ import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
 import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule } from "./storefront/browser-checks.js";
 import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
-import { workbenchRobotsTxt } from "./storefront/site-files.js";
+import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { withNoindex } from "./storefront/base-path.js";
 import { buildSearchIndex, SEARCH_PATH, searchPagefind, type PagefindModule, type SearchRecord } from "./storefront/search.js";
 
@@ -84,6 +84,8 @@ export interface StaticBuildReport {
   /** The storefront's search index (search.ts), written to its _pd/search/: the pages in it, and its files. Absent
    *  when the site has no search. */
   search?: { pages: number; files: number; bytes: number };
+  /** llms.txt, at the site's root: how many pages it lists. Absent when none is written (storefront.llms). */
+  llms?: { pages: number };
   /** `--browser`: one line per image whose chosen variant doesn't fit the box it is laid out in. */
   images?: { warnings: string[] };
   /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
@@ -429,6 +431,19 @@ export async function buildStaticSite(
         counts.bytes += bytes;
         report.search = { pages: searchRecords.size, files: searchFiles.size, bytes };
       }
+      // The pages as this build has them (no draft, no scheduled page): llms.txt, and the report's drafts and scheduled.
+      const model = await readPages(storefront.pagesDir, {
+        drafts: "leave-out", scheduled: "leave-out", today, categories: storefront.categories, tags: storefront.tags,
+      });
+      if (storefront.llms) {
+        const siteTitle = typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined;
+        const llms = llmsTxt(model, { title: siteTitle, siteUrl: storefront.url });
+        const bytes = Buffer.from(llms.text, "utf8");
+        await writeFile(join(sfOut, "llms.txt"), bytes);
+        counts.files++;
+        counts.bytes += bytes.byteLength;
+        report.llms = { pages: llms.pages };
+      }
       const stubs = new Set((await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse).pages.flatMap(p => p.redirectFrom ?? []));
       const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u) && !stubs.has(u)).length;
       report.storefront = { outDir: sfOut, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };
@@ -450,7 +465,7 @@ export async function buildStaticSite(
       if (linkSummary) report.links = linkSummary;
       if (a11ySummary) report.accessibility = a11ySummary;
       if (imageSummary) report.images = imageSummary;
-      const { drafts, scheduled } = await readPages(storefront.pagesDir, { drafts: "leave-out", scheduled: "leave-out", today });
+      const { drafts, scheduled } = model;
       if (drafts.length) report.drafts = drafts;
       if (scheduled.length) report.scheduled = scheduled;
       log(`… storefront: ${pages} pages, ${counts.files} files`);

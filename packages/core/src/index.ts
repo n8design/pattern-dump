@@ -65,6 +65,7 @@ export async function runBuild(
     console.log(`[pd build] images: ${n ? `${n} with a variant that doesn't fit:` : "every variant fits its box"}`);
     for (const w of report.images.warnings) console.log(`[pd build]   warning: ${w}`);
   }
+  if (report.llms) console.log(`[pd build] llms.txt: ${report.llms.pages} pages`);
   if (report.search) {
     console.log(`[pd build] search: ${report.search.pages} pages indexed → ${report.search.files} files in _pd/search/ (${(report.search.bytes / 1024).toFixed(0)} KB)`);
   }

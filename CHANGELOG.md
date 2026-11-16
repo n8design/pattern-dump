@@ -37,6 +37,9 @@
 
 ### Added
 
+- **`llms.txt`.** `pd build` writes one at the site's root (llmstxt.org): the site's title and description, then
+  the top-level pages and each collection, every page with its title, link and teaser. The same pages as the sitemap;
+  absolute URLs with `storefront.url`, under the site's path. On by default; `storefront.llms: false` turns it off.
 - **Regions.** A layout declares regions besides the body on `page.regions` (`"x-pd-regions": ["sidebar"]`) and writes
   each as `{{{page.regions.sidebar}}}`, null when the page puts nothing there. A placed component goes into one with
   `region="sidebar"` on its tag, or its schema's `"x-pd-region"`; components keep the page's order there. A region

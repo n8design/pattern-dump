@@ -115,6 +115,7 @@ describe("pd build — the storefront root", () => {
       "guides/index.html",
       "guides/setup/index.html",
       "index.html",
+      "llms.txt",
       "preview/components/callout/index.html",
       "preview/components/callout~warning/index.html",
       "robots.txt",
@@ -129,7 +130,9 @@ describe("pd build — the storefront root", () => {
       "tags/layout/index.html",
       "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 50, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 51, bytes: expect.any(Number) });
+    // llms.txt lists six pages: every page of the folder but the home page, whose title and description head it.
+    expect(report.llms).toEqual({ pages: 6 });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
@@ -218,6 +221,37 @@ describe("pd build — the storefront root", () => {
       ["https://bench.example.test/tags/images/", "2026-11-01"], ["https://bench.example.test/tags/layout/", "2026-11-01"]]);
     expect(sitemap.match(/<url>/g)).toHaveLength(locs.length);
     for (const loc of locs) expect(loc.length).toBeLessThanOrEqual(2048);
+  });
+
+  // llmstxt.org: the site's title and description, then a section of the top-level pages and one per collection (a
+  // folder with an index.md, led by it), each page's title, link and teaser. Tag and category pages are left out.
+  it("writes llms.txt: the site, then each collection's pages with their teasers", () => {
+    const llms = files.get("llms.txt")!.bytes.toString("utf8");
+    const at = (route: string) => `https://bench.example.test${route}`;
+    expect(llms).toBe([
+      "# Storefront bench",
+      "",
+      "> A small website rendered from markdown, with the bench's own skin.",
+      "",
+      "## Pages",
+      "",
+      `- [About](${at("/about/")}): What the bench is for.`,
+      "",
+      "## Guides",
+      "",
+      `- [Guides](${at("/guides/")}): Longer texts about the bench.`,
+      `- [Setup](${at("/guides/setup/")}): How the bench is put together.`,
+      "",
+      "## Articles",
+      "",
+      `- [Articles](${at("/articles/")}): Everything written for the bench, newest first.`,
+      `- [A harbour of cable cars](${at("/articles/harbour/")}): This article has no description, so its listing shows this first `
+        + "paragraph instead: the text of the page as it starts, without its markup, never shortened in the data. The card in the "
+        + "listing limits it to three lines.",
+      `- [Plain on purpose](${at("/articles/plain/")}): Why the bench's skin is a wireframe.`,
+      "",
+    ].join("\n"));
+    expect(llms).not.toMatch(/\/tags\/|\/categories\//);
   });
 
   it("writes a page that forwards at each of a page's old routes, out of the sitemap", () => {
@@ -498,6 +532,42 @@ describe("pd build — the storefront's settings", () => {
     const root = await benchCopy();
     await buildStaticSite(withBase(undefined), root, { outDir: join(root, "..", "wb-base-spelled"), basePath: "/workbench", pdVersion: "0.0.0-test", now: NOW });
     await build(root, join(root, "..", "wb-base-cfg-ok"), withBase("/workbench/"));
+  }, 60_000);
+
+  it("leaves drafts, scheduled pages and pages with index: false out of llms.txt", async () => {
+    const root = await benchCopy();
+    const edit = async (path: string, from: string, to: string) => {
+      const file = join(root, "pages", path);
+      await save(file, (await readFile(file, "utf8")).replace(from, to));
+    };
+    await edit("guides/setup.md", "title: Setup\n", "title: Setup\nindex: false\n");
+    await edit("articles/harbour.md", "date: 2026-11-01\n", "date: 2026-11-01\ndraft: true\n");
+    // After the build's day (NOW): scheduled, so left out.
+    await edit("articles/plain.md", "date: 2026-10-02", "date: 2027-03-01");
+    await build(root, join(root, "..", "wb-llms-out"));
+    const llms = await readFile(join(root, ".out", "storefront", "llms.txt"), "utf8");
+    expect(llms).not.toMatch(/\/guides\/setup\/|\/articles\/harbour\/|\/articles\/plain\//);
+    // The rest is there.
+    expect(llms).toContain("## Guides\n\n- [Guides](https://bench.example.test/guides/): Longer texts about the bench.\n\n");
+    expect(llms).toContain("## Articles\n\n- [Articles](https://bench.example.test/articles/): Everything written for the bench, newest first.\n");
+    expect(llms).toContain("- [About](https://bench.example.test/about/)");
+  }, 60_000);
+
+  it("writes no llms.txt with storefront.llms: false, or for a site with index: false", async () => {
+    const root = await benchCopy();
+    await build(root, join(root, "..", "wb-llms-off"), config({ llms: false }));
+    expect(await exists(join(root, ".out", "storefront", "llms.txt"))).toBe(false);
+    await build(root, join(root, "..", "wb-llms-staging"), config({ index: false }));
+    expect(await exists(join(root, ".out", "storefront", "llms.txt"))).toBe(false);
+  }, 60_000);
+
+  it("without storefront.url: llms.txt links each page by its path from the site's root", async () => {
+    const root = await benchCopy();
+    const { url: _u, ...rest } = benchConfig.storefront!;
+    await buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root, { outDir: join(root, "..", "wb-llms-nourl"), pdVersion: "x", now: NOW });
+    const llms = await readFile(join(root, ".out", "storefront", "llms.txt"), "utf8");
+    expect(llms).toContain("- [About](/about/): What the bench is for.\n");
+    expect(llms).not.toContain("https://");
   }, 60_000);
 
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
