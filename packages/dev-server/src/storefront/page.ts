@@ -365,9 +365,6 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
 
   // The pages folder as a whole: a problem there is a problem for every page.
   if (model.problems.length) return fail(model.problems);
-  // A component schema that isn't JSON: every check that reads it would be off, so it is every page's problem.
-  const brokenSchemas = await unreadableSchemas(a.discoveryMap, a.shown);
-  if (brokenSchemas.length) { siteWide = brokenSchemas; return fail(brokenSchemas); }
 
   const notFound = (): AssembledPage =>
     ({ status: 404, html: errorDocument(route, [`there is no page at ${route}`], a.live), problems: [`there is no page at ${route}`], notes: [] });
@@ -405,6 +402,11 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       throw e;
     }
   }
+
+  // A component schema that isn't JSON: every check that reads it would be off, so it is every page's problem (an
+  // address with no page is still a 404, above: it has nothing to check).
+  const brokenSchemas = await unreadableSchemas(a.discoveryMap, a.shown);
+  if (brokenSchemas.length) { siteWide = brokenSchemas; return fail(brokenSchemas); }
 
   const problems: string[] = [...generatedProblems];
   const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags);
@@ -629,8 +631,11 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     problems.push(...headSample);
   }
   // Tags are objects since 0.5.0: a template that still writes one as text fails, naming what to write.
-  problems.push(...await tagsWrittenAsText([checked.layoutId, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view ? [q.view.id] : [])]
-    .filter(id => a.discoveryMap.has(id)), a));
+  // A card's string tags are its check's problem already (cards.ts, naming the listing): not said twice.
+  const STRING_TAGS = " declares tags as a list of strings";
+  const named = new Set(problems.filter(p => p.includes(STRING_TAGS)).map(p => p.slice(0, p.indexOf(" ("))));
+  problems.push(...(await tagsWrittenAsText([checked.layoutId, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view ? [q.view.id] : [])]
+    .filter(id => a.discoveryMap.has(id)), a)).filter(p => !(p.includes(STRING_TAGS) && named.has(p.slice(0, p.indexOf(" ("))))));
   if (problems.length) return fail(problems);
   if (view) {
     try {
