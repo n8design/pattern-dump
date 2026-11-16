@@ -12,6 +12,9 @@ export interface SitemapEntry { url: string; lastmod: string | null }
  */
 export function sitemapEntries(model: PageModel, siteUrl: string): SitemapEntry[] {
   return [...model.pages].sort((a, b) => a.route.localeCompare(b.route)).flatMap(p => {
+    // A tag or category page, or an index of them: its newest page's change.
+    const generated = model.generated.get(p.route);
+    if (generated) return [{ url: new URL(p.route.slice(1), siteUrl).href, lastmod: generated.lastmod }];
     const file = model.files.get(p.route);
     if (!file || file.frontmatter.values["index"] === "false") return [];
     const e = model.entries.get(p.route);

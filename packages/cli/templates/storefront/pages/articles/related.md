@@ -3,6 +3,7 @@ title: Related articles
 description: How an article lists the articles like it, and how to change the list.
 date: 2026-11-15
 tags: [notes]
+categories: [notes]
 ---
 
 Below every article is a short list of related articles: up to three from the same folder, the ones sharing most

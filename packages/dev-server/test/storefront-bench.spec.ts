@@ -41,6 +41,11 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
     ["Setup", "Three folders make a site", "Each markdown file in pages/ is a page", "Guides"]],
   ["layouts/doc", "Doc", "A page with a table of contents, from what the storefront derives for it.", "full",
     ["Setup", "Three folders make a site", "Pages", "Layouts", "Each markdown file in pages/ is a page"]],
+  // The generated pages' layouts: a tag's or category's page, and the index of each.
+  ["layouts/tag", "Tag", "The page of one tag, with every published page that has it.", "full", ["Images", "1 page", "A harbour of cable cars"]],
+  ["layouts/category", "Category", "The page of one category, with every published page in it.", "full", ["Guides", "1 page", "Setup"]],
+  ["layouts/tags", "Tags", "The index of the tags, each linked to its page, with its count.", "full", ["Tags", "Design (2)", "Images (1)"]],
+  ["layouts/categories", "Categories", "The index of the categories, each linked to its page, with its count.", "full", ["Categories", "Guides (1)"]],
   ["layouts/home", "Home", "The front page — the site's name as its heading, an optional description, and the page's body.", "full",
     ["Storefront bench", "A small website rendered from markdown", "The home page: the site’s name", "Guides", "Setup", "About"]],
   ["layouts/listing", "Listing", "A folder's index.md that lists the folder's pages, each as a card.", "full",

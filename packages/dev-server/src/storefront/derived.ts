@@ -11,7 +11,7 @@
 
 import type { StorefrontNavItem, StorefrontPagesResponse } from "@pattern-dump/contracts";
 import type { Entry } from "./collections.js";
-import type { Category } from "./categories.js";
+import type { Category, Term } from "./categories.js";
 
 /** A link to another page. */
 export interface PageLink { route: string; title: string }
@@ -33,23 +33,33 @@ export interface DerivedPage {
   children: Entry[];
   /** The page's date, YYYY-MM-DD: its own, else the day git first saw it. */
   date: string | null;
-  tags: string[];
+  /** The page's tags (categories.ts), in its order; [] when it has none. */
+  tags: Term[];
   /** The page's categories (categories.ts), in its order; [] when it has none. */
   categories: Category[];
+  /** A generated tag or category page (terms.ts): its term, with its count of pages; null on any other page. */
+  term: TermPage | null;
+  /** A generated index of tags or categories: every term with a page, by label; null on any other page. */
+  terms: TermPage[] | null;
   /** A folder's index.md: its pages rendered through the view it names (views.ts), as HTML; null on any other page. */
   listing: string | null;
 }
+
+/** A tag or category with a generated page, as its page and its index get it. */
+export interface TermPage { key: string; label: string; description: string | null; route: string; count: number }
 
 /** A value with no keys of its own; an object with exactly these fields; a list of one shape. */
 export type Shape = "value" | { fields: Record<string, Shape> } | { items: Shape };
 
 const LINK: Shape = { fields: { route: "value", title: "value" } };
-/** A category (categories.ts). */
-export const CATEGORY: Shape = { fields: { key: "value", label: "value", description: "value" } };
+/** A tag or a category (categories.ts). */
+export const TERM: Shape = { fields: { key: "value", label: "value", description: "value", route: "value" } };
+export const CATEGORY: Shape = TERM;
+const TERM_PAGE: Shape = { fields: { key: "value", label: "value", description: "value", route: "value", count: "value" } };
 /** An entry of a listing (collections.ts). */
 export const ENTRY: Shape = {
   fields: {
-    route: "value", title: "value", description: "value", date: "value", updated: "value", image: "value", tags: "value",
+    route: "value", title: "value", description: "value", date: "value", updated: "value", image: "value", tags: { items: TERM },
     categories: { items: CATEGORY }, draft: "value", scheduled: "value",
   },
 };
@@ -66,14 +76,16 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
     updated: "value",
     children: { items: ENTRY },
     date: "value",
-    tags: "value",
+    tags: { items: TERM },
     categories: { items: CATEGORY },
+    term: TERM_PAGE,
+    terms: { items: TERM_PAGE },
     listing: "value",
   },
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories", "listing"];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories", "term", "terms", "listing"];
 
 /** Sub-keys Pattern Dump filled once and no longer does, with what to declare instead. */
 export const RETIRED: Readonly<Record<string, string>> = {

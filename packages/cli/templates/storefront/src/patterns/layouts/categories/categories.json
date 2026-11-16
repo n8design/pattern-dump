@@ -1,0 +1,14 @@
+{
+  "title": "Categories",
+  "page": {
+    "terms": [
+      {
+        "key": "notes",
+        "label": "notes",
+        "description": null,
+        "route": "/categories/notes/",
+        "count": 2
+      }
+    ]
+  }
+}

@@ -29,7 +29,8 @@ import type { PageModel } from "./pages.js";
 import { entryOf, type Entry } from "./collections.js";
 import { checkEntries, readCard, cardOf, type Card } from "./cards.js";
 import { checkViewSampleData, viewOf, type ResolvedView } from "./views.js";
-import { readCategories, readTags } from "./listing-keys.js";
+import { readTerms } from "./listing-keys.js";
+import { TERM_WORDS } from "./categories.js";
 
 export const QUERY_KEY = "x-pd-query";
 export type QueryOption = typeof QUERY_OPTIONS[number];
@@ -110,6 +111,9 @@ export interface QueryContext {
   discoveryMap: DiscoveryMap;
   dates?: GitDates | undefined;
   mode: DatesMode;
+  /** The page's own terms' keys, for `same` and relevance, when it has no entry of its own (a tag or category page:
+   *  its term). Default: its entry's. */
+  own?: { tags: string[]; categories: string[] };
 }
 
 const list = (v: unknown): string[] | undefined =>
@@ -220,34 +224,34 @@ export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise
     }
   }
 
-  let categories: string[] | undefined;
-  if (set.categories) {
-    const v = set.categories.value;
-    const r = list(v) ? readCategories(v as FrontmatterValue, model.categories) : undefined;
-    if (!r) problems.push(`${set.categories.at}: categories must be a category's key or a list of them`);
-    else if (!r.ok) problems.push(`${set.categories.at}: ${r.message}`);
-    else {
-      categories = r.value.keys;
-      for (const x of r.value.renamed) notes.push(`warning: ${set.categories.at}: category "${x.from}" is now "${x.to}" (renamed in storefront.categories): write "${x.to}"`);
-    }
-  }
-
-  let tags: string[] | undefined;
-  if (set.tags) {
-    const v = set.tags.value;
-    const r = list(v) ? readTags(v as FrontmatterValue) : undefined;
-    if (!r) problems.push(`${set.tags.at}: tags must be a tag or a list of them`);
-    else if (!r.ok) problems.push(`${set.tags.at}: ${r.message}`);
-    else {
-      // Tags aren't declared: a tag no page has is a typo, or a query that can never match.
-      const used = [...new Set([...model.entries.values()].flatMap(e => e.tags))].sort();
-      for (const t of r.value.filter(t => !used.includes(t))) {
+  // The page's own terms: its entry's, or (a tag or category page) its term.
+  const ownEntry = model.entries.get(ctx.route);
+  const own = ctx.own ?? { tags: (ownEntry?.tags ?? []).map(t => t.key), categories: (ownEntry?.categories ?? []).map(c => c.key) };
+  /** `tags` or `categories`: `same` (the page's own), or declared keys (an old key works, with the rename warning). */
+  const termsOption = (key: "tags" | "categories"): string[] | undefined => {
+    const s = set[key];
+    if (!s) return undefined;
+    const index = key === "tags" ? model.tags : model.categories;
+    const w = TERM_WORDS[index.kind];
+    if (s.value === SAME) return own[key];
+    const r = list(s.value) ? readTerms(s.value as FrontmatterValue, index) : undefined;
+    if (!r) { problems.push(`${s.at}: ${key} must be a ${w.one}, a list of them, or "${SAME}" (the page's own)`); return undefined; }
+    if (!r.ok) { problems.push(`${s.at}: ${r.message}`); return undefined; }
+    for (const x of r.value.renamed) notes.push(`warning: ${s.at}: ${w.one} "${x.from}" is now "${x.to}" (renamed in ${w.config}): write "${x.to}"`);
+    if (!index.declared) {
+      // Tags the site doesn't declare: a tag no page has is a typo, or a query that can never match.
+      const used = [...new Set([...model.entries.values()].flatMap(e => e.tags.map(t => t.key)))].sort();
+      for (const t of r.value.keys.filter(t => !used.includes(t))) {
         const near = suggest(t, used);
-        problems.push(`${set.tags.at}: no page has the tag "${t}"${near ? `: did you mean "${near}"?` : used.length ? ` (the tags pages have: ${quoted(used)})` : ""}`);
+        problems.push(`${s.at}: no page has the tag "${t}"${near ? `: did you mean "${near}"?` : used.length ? ` (the tags pages have: ${quoted(used)})` : ""}`);
       }
-      tags = r.value;
     }
-  }
+    return r.value.keys;
+  };
+  const categories = termsOption("categories");
+  const tags = termsOption("tags");
+  // `same` on a page with none of its own lists nothing (not every page).
+  const sameButNone = (["tags", "categories"] as const).some(k => set[k]?.value === SAME && own[k].length === 0);
 
   const enumOf = <T extends string>(o: QueryOption, allowed: readonly T[]): T | undefined => {
     const s = set[o];
@@ -290,7 +294,7 @@ export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise
     card = r.card;
   }
   if (problems.length) return none();
-  if (off) return { name: q.name, entries: [], ...(view ? { view } : {}), problems, notes };
+  if (off || sameButNone) return { name: q.name, entries: [], ...(view ? { view } : {}), problems, notes };
 
   // ---- the pages ----
   const routes = pool ?? [...model.folders.keys()];
@@ -309,7 +313,7 @@ export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise
     want === undefined || want.length === 0 || (match === "all" ? want.every(w => have.includes(w)) : want.some(w => have.includes(w)));
   const filtered = candidates.filter(r => {
     const e = model.entries.get(r)!;
-    return matches(e.tags, tags) && matches(e.categories.map(c => c.key), categories);
+    return matches(e.tags.map(t => t.key), tags) && matches(e.categories.map(c => c.key), categories);
   });
 
   const entries: Entry[] = [];
@@ -322,9 +326,8 @@ export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise
   const filled: Entry[] = [];
   for (const r of filtered) { const e = await take(r); if (e) filled.push(e); }
 
-  const own = model.entries.get(ctx.route);
-  const ownKeys = new Set([...(own?.tags ?? []).map(t => `t:${t}`), ...(own?.categories ?? []).map(c => `c:${c.key}`)]);
-  const relevance = (e: Entry) => e.tags.filter(t => ownKeys.has(`t:${t}`)).length + e.categories.filter(c => ownKeys.has(`c:${c.key}`)).length;
+  const ownKeys = new Set([...own.tags.map(t => `t:${t}`), ...own.categories.map(c => `c:${c}`)]);
+  const relevance = (e: Entry) => e.tags.filter(t => ownKeys.has(`t:${t.key}`)).length + e.categories.filter(c => ownKeys.has(`c:${c.key}`)).length;
   const collator = new Intl.Collator("en", { sensitivity: "base" });
   const byRoute = (a: Entry, b: Entry) => a.route < b.route ? -1 : a.route > b.route ? 1 : 0;
   /** Newest first; a page with no date last. */

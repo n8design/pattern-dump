@@ -21,8 +21,8 @@ import { suggest } from "@pattern-dump/config";
 import { checkDeclared, readSchema, type PropertySchema } from "./declared-values.js";
 import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
 import type { FrontmatterValue } from "../frontmatter.js";
-import { readCategories, readChildLayout, readDate, readDraft, readSort, readTags, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
-import { categoryIndex, type CategoryIndex } from "./categories.js";
+import { readChildLayout, readDate, readDraft, readSort, readTerms, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
+import { categoryIndex, termIndex, TERM_WORDS, type CategoryIndex, type TermIndex, type TermKind } from "./categories.js";
 import { declaredQueries } from "./query.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
@@ -66,7 +66,7 @@ const OLD_ROUTE = /^\/(?:(?!\.\.?\/)[^/?#\s]+\/)+$/;
 const ASSET_PATH = /^\/assets\/[^?#]+[^/?#]$/;
 
 function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, at: (key: string, message: string) => void,
-  categories: CategoryIndex, renamed: (from: string, to: string) => void): BuildKeys {
+  terms: { categories: CategoryIndex; tags: TermIndex }, renamed: (kind: TermKind, from: string, to: string) => void): BuildKeys {
   const out: BuildKeys = {};
   const redirect = values["redirectFrom"];
   if (redirect !== undefined) {
@@ -87,7 +87,7 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
     if (typeof image === "string" && ASSET_PATH.test(image)) out.image = image;
     else at("image", `image must be a path to a file in the assets, such as "/assets/images/share.png"`);
   }
-  const take = <K extends "date" | "updated" | "tags" | "draft" | "sort" | "view">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
+  const take = <K extends "date" | "updated" | "draft" | "sort" | "view">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
     if (r === undefined) return;
     if (r.ok) out[key] = r.value;
     else at(key, r.message);
@@ -95,12 +95,13 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
   const v = (key: string) => values[key];
   take("date", v("date") === undefined ? undefined : readDate(v("date")!));
   take("updated", v("updated") === undefined ? undefined : readUpdated(v("updated")!, out.date));
-  take("tags", v("tags") === undefined ? undefined : readTags(v("tags")!));
-  const cats = v("categories") === undefined ? undefined : readCategories(v("categories")!, categories);
-  if (cats?.ok) {
-    out.categories = cats.value.keys;
-    for (const r of cats.value.renamed) renamed(r.from, r.to);
-  } else if (cats) at("categories", cats.message);
+  for (const [key, index] of [["tags", terms.tags], ["categories", terms.categories]] as const) {
+    const r = v(key) === undefined ? undefined : readTerms(v(key)!, index);
+    if (r?.ok) {
+      out[key] = r.value.keys;
+      for (const x of r.value.renamed) renamed(index.kind, x.from, x.to);
+    } else if (r) at(key, r.message);
+  }
   take("draft", v("draft") === undefined ? undefined : readDraft(v("draft")!));
   take("sort", v("sort") === undefined ? undefined : readSort(v("sort")!, path));
   take("view", v("view") === undefined ? undefined : readView(v("view")!, path));
@@ -129,8 +130,9 @@ export function layoutNames(discoveryMap: DiscoveryMap): string[] {
     .sort();
 }
 
-/** `categories`: the declared ones (the page model's); none when left out. */
-export async function checkPageFrontmatter(page: PageFile, discoveryMap: DiscoveryMap, categories: CategoryIndex = categoryIndex(undefined)): Promise<CheckedPage> {
+/** `categories` and `tags`: the declared ones (the page model's); no categories and any tag when left out. */
+export async function checkPageFrontmatter(page: PageFile, discoveryMap: DiscoveryMap, categories: CategoryIndex = categoryIndex(undefined),
+  tags: TermIndex = termIndex("tag", undefined)): Promise<CheckedPage> {
   const { values, errors, lines } = page.frontmatter;
   const problems: PageProblem[] = errors.map(e => ({ file: page.path, line: e.line, message: e.message }));
   const at = (key: string, message: string): void => {
@@ -138,10 +140,11 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   };
   const notes: string[] = [];
   const where = (key: string) => `${page.path}${lines[key] !== undefined ? `:${lines[key]}` : ""}`;
-  const renamed = (from: string, to: string): void => {
-    notes.push(`warning: ${where("categories")}: category "${from}" is now "${to}" (renamed in storefront.categories): write "${to}"`);
+  const renamed = (kind: TermKind, from: string, to: string): void => {
+    const w = TERM_WORDS[kind];
+    notes.push(`warning: ${where(w.many)}: ${w.one} "${from}" is now "${to}" (renamed in ${w.config}): write "${to}"`);
   };
-  const buildKeys = () => checkBuildKeys(values, page.path, at, categories, renamed);
+  const buildKeys = () => checkBuildKeys(values, page.path, at, { categories, tags }, renamed);
 
   // ---- layout: its own, else its folder's childLayout (pages.ts), else the default ----
   const known = layoutNames(discoveryMap);

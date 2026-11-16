@@ -1,0 +1,29 @@
+{
+  "title": "notes",
+  "page": {
+    "term": {
+      "key": "notes",
+      "label": "notes",
+      "description": null,
+      "route": "/tags/notes/",
+      "count": 1
+    },
+    "pages": {
+      "entries": [
+        {
+          "route": "/articles/hello/",
+          "title": "Hello, articles",
+          "description": "The example article.",
+          "date": "2026-11-14",
+          "updated": null,
+          "image": null,
+          "tags": [],
+          "categories": [],
+          "draft": false,
+          "scheduled": false
+        }
+      ],
+      "listing": "<p>The pages, in the list view.</p>"
+    }
+  }
+}

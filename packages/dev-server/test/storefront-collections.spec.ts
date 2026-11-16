@@ -88,7 +88,7 @@ describe("readPages: what a listing shows of each page", () => {
       "articles/bad.md": page("Bad", "date: 2026-02-30\ntags: [Nope]\nimage: one.png\ndraft: maybe\n"),
     });
     const model = await readPages(root);
-    expect(model.entries.get("/articles/one/")).toEqual({ description: "Its own", date: "2026-11-02", updated: null, image: "/assets/images/one.png", tags: ["css", "html"], categories: [], draft: true, scheduled: false });
+    expect(model.entries.get("/articles/one/")).toEqual({ description: "Its own", date: "2026-11-02", updated: null, image: "/assets/images/one.png", tags: [{ key: "css", label: "css", description: null, route: null }, { key: "html", label: "html", description: null, route: null }], categories: [], draft: true, scheduled: false });
     expect(model.entries.get("/articles/two/")).toEqual({ description: "The first words.", date: null, updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false });
     // A value that fails its check is left out; the page's own check reports it.
     expect(model.entries.get("/articles/bad/")).toEqual({ description: "Body of Bad.", date: null, updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false });
@@ -196,7 +196,7 @@ describe("assemblePage: page.children, page.date, page.tags, and datePublished",
     expect(p.problems).toEqual([]);
     expect(data).toEqual({ children: [
       { route: "/articles/new/", title: "New", description: "Newest", date: "2026-11-02", updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false },
-      { route: "/articles/old/", title: "Old", description: "The old one.", date: "2026-01-05", updated: null, image: null, tags: ["css"], categories: [], draft: false, scheduled: false },
+      { route: "/articles/old/", title: "Old", description: "The old one.", date: "2026-01-05", updated: null, image: null, tags: [{ key: "css", label: "css", description: null, route: null }], categories: [], draft: false, scheduled: false },
     ] });
     expect(p.html).toContain("<li>New: Newest</li><li>Old: The old one.</li>");
   });
@@ -206,7 +206,7 @@ describe("assemblePage: page.children, page.date, page.tags, and datePublished",
   });
 
   it("a page gets its own date and tags, the date from git where it has none", async () => {
-    expect((await assemble("/articles/old/", site, ["date", "tags"])).data).toEqual({ date: "2026-01-05", tags: ["css"] });
+    expect((await assemble("/articles/old/", site, ["date", "tags"])).data).toEqual({ date: "2026-01-05", tags: [{ key: "css", label: "css", description: null, route: null }] });
     const fromGit = await assemble("/", site, ["date", "tags"], { dates: fakeDates({ "index.md": "2025-12-24T08:00:00+01:00" }) });
     expect(fromGit.data).toEqual({ date: "2025-12-24", tags: [] });
   });

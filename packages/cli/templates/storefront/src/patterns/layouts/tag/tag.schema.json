@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tag",
+  "description": "The page of one tag: Pattern Dump makes one at /tags/<key>/ for every tag a published page has, titled with its label.",
+  "type": "object",
+  "required": [
+    "title"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "The tag's label"
+    },
+    "description": {
+      "type": "string",
+      "description": "The tag's description, when storefront.tags gives one"
+    },
+    "page": {
+      "type": "object",
+      "description": "What the storefront works out for the page",
+      "properties": {
+        "term": {
+          "description": "The tag: its key, label, description, route and how many pages have it"
+        },
+        "pages": {
+          "description": "Every page with the tag, newest first, in the list view",
+          "x-pd-query": {
+            "tags": "same",
+            "sort": "date",
+            "view": "list"
+          }
+        }
+      }
+    }
+  }
+}

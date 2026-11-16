@@ -51,6 +51,12 @@ export async function readCard(id: string, owner: string, role: string, discover
   const outside = [...new Set(declared.filter(k => !ENTRY_FIELDS.includes(k)))];
   const problems = outside.map(k => `${id} (${role}, ${owner}) declares "${k}", which a page in a listing doesn't have: `
     + `a card declares only the fields Pattern Dump fills (${ENTRY_FIELDS.join(", ")})`);
+  // Tags were strings before 0.5.0: a card still declaring them so would fail every page with a type mismatch.
+  const tagItems = (read.schema.properties?.["tags"] as { items?: { type?: unknown } } | undefined)?.items?.type;
+  if (tagItems === "string" || (Array.isArray(tagItems) && tagItems.includes("string") && !tagItems.includes("object"))) {
+    problems.push(`${id} (${role}, ${owner}) declares tags as a list of strings, but a tag is an object since 0.5.0 `
+      + `(key, label, description, route): declare its items as "type": "object", or leave items out`);
+  }
   return problems.length ? { problems } : { card: { id, schema: read.schema, label: `${role} (${id})` }, problems };
 }
 

@@ -1,0 +1,10 @@
+{{#> partials-base }}
+<article class="page">
+  <h1 class="page-title">{{title}}</h1>
+  <ul class="page-terms" role="list">
+    {{#each page.terms}}
+    <li><a href="{{route}}">{{label}}</a> ({{count}})</li>
+    {{/each}}
+  </ul>
+</article>
+{{/partials-base}}

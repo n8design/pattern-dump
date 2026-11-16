@@ -22,8 +22,8 @@ const CATEGORIES: Record<string, StorefrontCategory> = {
   "design-systems": { label: "Design systems", description: "How they are built", aliases: ["ds"] },
   guides: { label: "Guides" },
 };
-const DS = { key: "design-systems", label: "Design systems", description: "How they are built" };
-const GUIDES = { key: "guides", label: "Guides", description: null };
+const DS = { key: "design-systems", label: "Design systems", description: "How they are built", route: null };
+const GUIDES = { key: "guides", label: "Guides", description: null, route: null };
 
 const page = (title: string, extra = ""): string => `---\ntitle: ${title}\n${extra}---\n\nBody of ${title}.\n`;
 
