@@ -1,0 +1,12 @@
+<search class="search" data-search>
+  <form class="search-form" method="get">
+    <label class="search-label" for="search-field">{{#if label}}{{label}}{{else}}Search this site{{/if}}</label>
+    <div class="search-row">
+      <input class="search-field" id="search-field" type="search" name="q" autocomplete="off" spellcheck="false">
+      <button class="search-button" type="submit">Search</button>
+    </div>
+  </form>
+  <p class="search-status" role="status" data-search-status></p>
+  <ol class="search-results" data-search-results></ol>
+  <noscript><p class="search-status">Search needs JavaScript. Every page is in the navigation above.</p></noscript>
+</search>

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Search",
+  "description": "The site's search: a field, a status line and the results. On a page: <pd-components-search></pd-components-search>.",
+  "type": "object",
+  "properties": {
+    "label": { "type": "string", "description": "The field's label", "default": "Search this site" }
+  }
+}

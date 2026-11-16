@@ -87,7 +87,8 @@ describe("runInit", () => {
     expect(await runInit(init(join(root, "ds"), { storefront: true, install: false, git: false }), io)).toBe(0);
     expect(asked).not.toContain("Include a website (storefront)");
     expect(existsSync(join(root, "ds", ".github", "workflows", "pages.yml"))).toBe(true);
-    expect(logs.at(-1)).toBe("  npm run dev      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/");
+    expect(logs.slice(-2)).toEqual(["  npm run dev      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/",
+      "  npm install --save-dev pagefind   # for the site's search: pd build then writes its index"]);
   });
 
   it("--yes leaves the website out, and the next steps name the workbench only", async () => {

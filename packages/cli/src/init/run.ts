@@ -136,6 +136,7 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   const dev = `npm run ${JSON.parse(plan.packageJson.content).scripts["pd:dev"] ? "pd:dev" : "dev"}`;
   if (storefront) {
     io.log(`  ${dev}      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/`);
+    io.log("  npm install --save-dev pagefind   # for the site's search: pd build then writes its index");
   } else {
     io.log(`  ${dev}      # http://localhost:4000`);
   }
