@@ -23,6 +23,9 @@
 //                        short: the frame can grow to its content but never shrink below this. One value
 //                        covers every variant, so it is the height at the widest column and no taller than
 //                        the shortest variant.
+//   x-pd-regions         on a layout's `page.regions`: its regions, a list of names; with x-pd-toc (true: its pages show
+//                        the table of contents). The storefront checks both (regions.ts in the dev-server).
+//   x-pd-region          at a component's top: the layout region it goes into when a page places it (regions.ts).
 //   x-pd-prose-images    at a layout's top: the slot of the images in its pages' prose, `{ widths, sizes, eager }`.
 //                        A raster image from the assets in a page's markdown is written as an <img> with its variants
 //                        and `sizes="auto, <sizes>"`; the first `eager` (optional, default 0) load at once, with
@@ -46,9 +49,10 @@ export interface SchemaExtensionContext {
 }
 
 type Prop = Record<string, unknown>;
-const KNOWN_PROPERTY_KEYS = new Set(["x-pd-card", "x-pd-component", "x-pd-image", "x-pd-query", "x-pd-view"]);
-const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-prose-images"]);
-const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images, x-pd-query, x-pd-view";
+const KNOWN_PROPERTY_KEYS = new Set(["x-pd-card", "x-pd-component", "x-pd-image", "x-pd-query", "x-pd-regions", "x-pd-toc", "x-pd-view"]);
+const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-prose-images", "x-pd-region"]);
+const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images, x-pd-query, x-pd-region, "
+  + "x-pd-regions, x-pd-toc, x-pd-view";
 /** The options of a query (x-pd-query), in the order the docs list them. Their values are checked by the storefront,
  *  against the site's pages, folders and categories (query.ts in the dev-server). */
 export const QUERY_OPTIONS = ["pages", "collections", "categories", "tags", "match", "sort", "order", "limit", "view"] as const;

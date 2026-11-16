@@ -29,6 +29,8 @@ import { codeBlock, createMarkdown, fenceLanguage, placeOf } from "./code-blocks
 import { escapeAttr, escapeHtml } from "./http-utils.js";
 import { usePlacedTags, type PlacedBlock } from "./placed-tags.js";
 import { placeBlock, type PlacementDeps } from "./storefront/placed.js";
+import { regionLandmarks, type RegionChoice } from "./storefront/regions.js";
+import type { TocAnchor } from "./storefront/toc.js";
 import { readSchema, type PlacedProblem } from "./storefront/declared-values.js";
 import type { PageHeading } from "./storefront/derived.js";
 import { slug, Slugger } from "./storefront/slug.js";
@@ -61,7 +63,23 @@ export type DocEmbed =
  * the body in its file (a page's frontmatter), so problems point into the file; they are collected here,
  * with their positions, and every tag that has one renders as a marker instead of the component.
  */
-export interface DocPlacing { deps: PlacementDeps; lineOffset: number; problems: PlacedProblem[] }
+export interface DocPlacing {
+  deps: PlacementDeps; lineOffset: number; problems: PlacedProblem[];
+  /** The page's regions (regions.ts): where a component that names one goes. Without it every component is in the
+   *  body. */
+  regions?: DocRegions;
+}
+
+/** The regions of the page being rendered: the choice for each placed component, and what each region holds. */
+export interface DocRegions {
+  choose(region: string, what: string): RegionChoice;
+  /** Each region's components' HTML, in the page's order. */
+  filled: Map<string, string[]>;
+  /** Set when the page places a <pd-toc>. */
+  toc: boolean;
+  /** The #anchors its <pd-toc>s link to, to be checked against the page's final headings. */
+  tocAnchors: TocAnchor[];
+}
 
 /**
  * A storefront page's images (frame mode only; the workbench's docs keep markdown's own <img>). Every image needs a
@@ -224,9 +242,24 @@ export async function renderDoc(
   if (placing) {
     for (const [idx, tok] of tokens.entries()) {
       if (tok.type !== "pd_component") continue;
-      const r = await placeBlock(tok.meta as PlacedBlock, placing.deps);
+      const block = tok.meta as PlacedBlock;
+      const r = await placeBlock(block, placing.deps, { headings: embed.embed === "frame" ? embed.headings ?? [] : [] });
       placing.problems.push(...r.problems);
-      if (r.html !== undefined && r.problems.length === 0) resolvedPlaced.set(idx, `${r.html}\n`);
+      if (r.toc && placing.regions) { placing.regions.toc = true; placing.regions.tocAnchors.push(...r.tocAnchors ?? []); }
+      if (r.html === undefined || r.problems.length) continue;
+      // A component that names a region goes there, or nowhere when the page's layout hasn't that region.
+      const choice = r.region !== undefined && placing.regions ? placing.regions.choose(r.region, r.regionFrom ?? "") : { to: "body" as const };
+      if (choice.to === "body") { resolvedPlaced.set(idx, `${r.html}\n`); continue; }
+      resolvedPlaced.set(idx, "");
+      if (choice.to === "problem") { placing.problems.push({ at: block.root!.at, message: choice.message }); continue; }
+      if (choice.to === "none") continue;
+      const brought = regionLandmarks(r.html);
+      if (brought.length) {
+        placing.problems.push({ at: block.root!.at, message: `${r.regionFrom ?? `<${block.root!.name}>`}: what it renders would bring ${brought.join(" and ")} `
+          + `into the region "${choice.region}": the page's landmarks are the layout's` });
+        continue;
+      }
+      placing.regions!.filled.set(choice.region, [...placing.regions!.filled.get(choice.region) ?? [], r.html]);
     }
   }
 

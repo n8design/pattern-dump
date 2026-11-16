@@ -240,8 +240,8 @@ describe("assemblePage — a layout field named like a helper", () => {
 });
 
 describe("the skin's templates", () => {
-  // The two values Pattern Dump renders itself: the page's markdown, and a query's pages through its view.
-  it("use {{{body}}} and a query's listing ({{{page.related.listing}}}, the term pages' {{{page.pages.listing}}}) as their only unescaped values", async () => {
+  // The values Pattern Dump renders itself: the page's markdown, a query's pages through its view, and a region's components.
+  it("use {{{body}}}, a query's listing ({{{page.related.listing}}}, the term pages' {{{page.pages.listing}}}) and a region ({{{page.regions.sidebar}}}) as their only unescaped values", async () => {
     const found: string[] = [];
     const walk = async (dir: string): Promise<void> => {
       for (const e of await readdir(dir, { withFileTypes: true })) {
@@ -253,7 +253,7 @@ describe("the skin's templates", () => {
     await walk(join(patterns, "layouts"));
     await walk(join(patterns, "partials"));
     expect(found).toEqual(["layouts/article/article.hbs: {{{body}}}", "layouts/article/article.hbs: {{{page.related.listing}}}",
-      "layouts/category/category.hbs: {{{page.pages.listing}}}", "layouts/doc/doc.hbs: {{{body}}}", "layouts/doc/doc.hbs: {{{page.related.listing}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/listing/listing.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}",
+      "layouts/category/category.hbs: {{{page.pages.listing}}}", "layouts/doc/doc.hbs: {{{body}}}", "layouts/doc/doc.hbs: {{{page.related.listing}}}", "layouts/doc/doc.hbs: {{{page.regions.sidebar}}}", "layouts/home/home.hbs: {{{body}}}", "layouts/listing/listing.hbs: {{{body}}}", "layouts/page/page.hbs: {{{body}}}",
       "layouts/tag/tag.hbs: {{{page.pages.listing}}}"]);
   });
 });

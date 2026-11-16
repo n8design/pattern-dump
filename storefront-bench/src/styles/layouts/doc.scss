@@ -1,0 +1,27 @@
+// The doc layout: the page, and its sidebar region beside it when the page puts anything there. <body> names the
+// filled regions (data-pd-regions), so an empty sidebar takes no column.
+.doc-frame {
+  display: grid;
+  gap: 2rem;
+  grid-template-areas: "content";
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.doc {
+  grid-area: content;
+}
+
+.doc-sidebar {
+  grid-area: sidebar;
+}
+
+body[data-pd-regions~="sidebar"] .doc-frame {
+  grid-template-areas: "content" "sidebar";
+}
+
+@media (width >= 48rem) {
+  body[data-pd-regions~="sidebar"] .doc-frame {
+    grid-template-areas: "content sidebar";
+    grid-template-columns: minmax(0, 1fr) 14rem;
+  }
+}

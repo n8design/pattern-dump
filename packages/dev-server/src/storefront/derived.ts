@@ -43,13 +43,15 @@ export interface DerivedPage {
   terms: TermPage[] | null;
   /** A folder's index.md: its pages rendered through the view it names (views.ts), as HTML; null on any other page. */
   listing: string | null;
+  /** The layout's regions (regions.ts), by name: each one's HTML, null when the page puts nothing there. */
+  regions: Record<string, string | null>;
 }
 
 /** A tag or category with a generated page, as its page and its index get it. */
 export interface TermPage { key: string; label: string; description: string | null; route: string; count: number }
 
 /** A value with no keys of its own; an object with exactly these fields; a list of one shape. */
-export type Shape = "value" | { fields: Record<string, Shape> } | { items: Shape };
+export type Shape = "value" | { fields: Record<string, Shape> } | { items: Shape } | { map: Shape };
 
 const LINK: Shape = { fields: { route: "value", title: "value" } };
 /** A tag or a category (categories.ts). */
@@ -81,11 +83,12 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
     term: TERM_PAGE,
     terms: { items: TERM_PAGE },
     listing: "value",
+    regions: { map: "value" },
   },
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories", "term", "terms", "listing"];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories", "term", "terms", "listing", "regions"];
 
 /** Sub-keys Pattern Dump filled once and no longer does, with what to declare instead. */
 export const RETIRED: Readonly<Record<string, string>> = {
@@ -170,6 +173,8 @@ export function outsideShape(value: unknown, shape: Shape, path: string): string
     return value.flatMap((v, i) => outsideShape(v, item, `${path}[${i}]`));
   }
   if (!isObject(value)) return [];
+  // Any key, each value of one shape (page.regions: the layout's own region names).
+  if (typeof shape === "object" && "map" in shape) return Object.entries(value).flatMap(([key, v]) => outsideShape(v, shape.map, `${path}.${key}`));
   const fields = typeof shape === "object" && "fields" in shape ? shape.fields : {};
   return Object.entries(value).flatMap(([key, v]) =>
     Object.hasOwn(fields, key) ? outsideShape(v, fields[key]!, `${path}.${key}`) : [`${path}.${key}`]);

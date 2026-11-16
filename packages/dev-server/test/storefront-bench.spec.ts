@@ -39,7 +39,7 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
     ["Storefront bench", "A small website rendered from markdown", "This is the body of a page", "Built with Pattern Dump"]],
   ["layouts/article", "Article", "A longer text — a heading, a lede, and the page's body.", "full",
     ["Setup", "Three folders make a site", "Each markdown file in pages/ is a page", "Guides"]],
-  ["layouts/doc", "Doc", "A page with a table of contents, from what the storefront derives for it.", "full",
+  ["layouts/doc", "Doc", "A page with a sidebar region beside it, for its table of contents; one column when the page puts nothing there.", "full",
     ["Setup", "Three folders make a site", "Pages", "Layouts", "Each markdown file in pages/ is a page"]],
   // The generated pages' layouts: a tag's or category's page, and the index of each.
   ["layouts/tag", "Tag", "The page of one tag, with every published page that has it.", "full", ["Images", "1 page", "A harbour of cable cars"]],
@@ -67,6 +67,9 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
   // The view the layouts' queries show related pages in (page.related), and its card.
   ["views/compact", "Compact", "A list of pages as titles and dates, each a compact card.", "centered",
     ["A harbour of cable cars", "2026-11-01", "Plain on purpose"]],
+  // The table of contents (toc.ts), in the doc layout's sidebar region.
+  ["components/toc", "Table of contents", "The page's table of contents, in the doc layout's sidebar region.", "centered",
+    ["Pages", "Layouts", "Live examples"]],
   ["components/compact-card", "Compact card", "One page in the compact view, its title as a link and its date.", "centered",
     ["A harbour of cable cars", "2026-11-01"]],
 ];

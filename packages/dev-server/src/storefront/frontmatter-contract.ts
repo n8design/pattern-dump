@@ -1,12 +1,12 @@
 // A storefront page's frontmatter, checked against the layout it uses.
 //
-// Thirteen keys belong to the build, not to a layout: `layout` (which layout; when absent, the `childLayout` of the
+// Fourteen keys belong to the build, not to a layout: `layout` (which layout; when absent, the `childLayout` of the
 // nearest folder above the page whose index.md sets one, else `page`), `childLayout` (on a folder's index.md), `order`
 // (where in the nav), the page's search and link-preview keys — `redirectFrom` (old routes that forward
 // here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
 // image, a raster file in the assets; checked against the files in page-image.ts) — and its listing keys
 // (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` and `view` on a
-// folder's index.md. A layout cannot declare any of the thirteen. Every other key must be declared by the chosen layout's schema — the
+// folder's index.md, and `toc` (the table of contents, toc.ts). A layout cannot declare any of the fourteen. Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
 // declares. Nothing is inferred: a key the schema does not declare is an error, and a layout with no
 // schema declares nothing. Four more keys are filled by the storefront itself (`body`, the rendered
@@ -26,7 +26,7 @@ import { categoryIndex, termIndex, TERM_WORDS, type CategoryIndex, type TermInde
 import { declaredQueries } from "./query.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
-export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view"] as const;
+export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view", "toc"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
 export const ASSEMBLY_KEYS = ["body", "nav", "site", "page"] as const;
 
@@ -44,6 +44,8 @@ export interface BuildKeys {
   redirectFrom?: string[];
   /** false: noindex, and no sitemap entry. */
   index?: boolean;
+  /** true: the table of contents in its region (toc.ts); false: none, whatever the layout says. */
+  toc?: boolean;
   /** A /assets/… path. */
   image?: string;
   /** The page's date, YYYY-MM-DD. */
@@ -76,6 +78,11 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
       at("redirectFrom", `redirectFrom: ${bad.map(r => `"${String(r)}"`).join(", ")} ${bad.length === 1 ? "is" : "are"} not `
         + `a route: each old route starts and ends with "/", such as "/old/page/", with no query or fragment`);
     } else if (list.length) out.redirectFrom = list as string[];
+  }
+  const toc = values["toc"];
+  if (toc !== undefined) {
+    if (toc === "true" || toc === "false") out.toc = toc === "true";
+    else at("toc", `toc must be true or false`);
   }
   const index = values["index"];
   if (index !== undefined) {

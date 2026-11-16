@@ -17,9 +17,12 @@ import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, typ
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
 import type { SearchRecord } from "./search.js";
+import { chooseRegion, layoutRegions, regionLandmarks, skinRegions } from "./regions.js";
+import { derivedToc, TOC_ID, tocAnchorProblems } from "./toc.js";
+import { placeTocItems, type PlacementDeps } from "./placed.js";
 import { isHelperNameProblem, itemsWrittenAsText, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
 import { basename } from "node:path";
-import { renderDoc, type ProseImages } from "../markdown.js";
+import { renderDoc, type DocRegions, type ProseImages } from "../markdown.js";
 import { readSchema, type PlacedProblem } from "./declared-values.js";
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
@@ -186,7 +189,8 @@ function exampleHeightCheck(): string {
 /** `base`: the path the site is published under, written as `<meta name="pd-base-path">` on every page of the site
  *  ("/" at a host's root), so a skin's own script can build a URL under it; undefined for a page that is not the
  *  site's (a page with problems). */
-function document(head: string, body: string, live: PageAssembly["live"], lang = "en", base?: string): string {
+/** `regions`: the filled regions of a page whose layout declares regions (regions.ts), on <body> as data-pd-regions. */
+function document(head: string, body: string, live: PageAssembly["live"], lang = "en", base?: string, regions?: readonly string[]): string {
   return `<!DOCTYPE html>
 <html lang="${escapeAttr(lang)}">
 <head>
@@ -195,7 +199,7 @@ function document(head: string, body: string, live: PageAssembly["live"], lang =
 ${base !== undefined ? `<meta name="pd-base-path" content="${escapeAttr(base)}">
 ` : ""}${head}
 </head>
-<body>
+<body${regions ? ` data-pd-regions="${escapeAttr(regions.join(" "))}"` : ""}>
 ${body}
 ${live ? liveScript(live.wsPort, live.generation) : ""}
 </body>
@@ -411,6 +415,13 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const proseSlot = readProseSlot(layoutSchema);
   const imageLookup = a.images ? await a.images() : undefined;
 
+  // The layout's regions (regions.ts), the skin's, and whether the page shows the table of contents (toc.ts).
+  const regionDecl = layoutRegions(layoutSchema, checked.layoutId);
+  problems.push(...regionDecl.problems);
+  const skin = await skinRegions(a.discoveryMap);
+  const wantsToc = checked.build.toc ?? regionDecl.toc;
+  const tocAt = page.frontmatter.lines["toc"];
+  const tocWhat = checked.build.toc === true ? `toc: true` : `${checked.layoutId} (page.regions, x-pd-toc)`;
   /** The page's markdown, rendered; its headings' anchors never take one of `takenIds`. */
   /** The components the page's pd- tags placed (the last rendering of its body). */
   const placedIds = new Set<string>();
@@ -423,6 +434,16 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     placedIds.clear();
     const placedProblems: PlacedProblem[] = [];
     const headings: PageHeading[] = [];
+    const regions: DocRegions = {
+      choose: (region, what) => chooseRegion(region, what, checked.layoutId, regionDecl.regions, skin), filled: new Map(), toc: false, tocAnchors: [],
+    };
+    const deps: PlacementDeps = {
+      discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition,
+      // Each component rendered for a placement: the page loads its behaviour scripts (page-head.ts).
+      render: input => { placedIds.add(input.component.split("~")[0]!); return a.render(input); },
+      schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath)).schema,
+      shown: a.shown,
+    };
     const body = await renderDoc(
       frontmatterBody(source),
       (id, variant) => a.render({ component: id, variant }).then(r => r.html),
@@ -430,20 +451,29 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       {
         embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings, takenIds, ...(prose ? { prose } : {}),
         // Components placed with values (pd- tags): checked against their schemas, rendered into the page.
-        placed: {
-          lineOffset: frontmatterBodyOffset(source),
-          problems: placedProblems,
-          deps: {
-            discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition,
-            // Each component rendered for a placement: the page loads its behaviour scripts (page-head.ts).
-            render: input => { placedIds.add(input.component.split("~")[0]!); return a.render(input); },
-            schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath)).schema,
-            shown: a.shown,
-          },
-        },
+        placed: { lineOffset: frontmatterBodyOffset(source), problems: placedProblems, deps, regions },
       },
     );
-    return { body, headings, docProblems, placedProblems, imageProblems: prose?.problems ?? [] };
+    // The table of contents the page or its layout asks for, with the derived items, first in its region; none when the
+    // page places a <pd-toc> itself, or has no heading for it.
+    const items = derivedToc(headings);
+    if (wantsToc && !isNotFound && !regions.toc && items.length) {
+      const at = { line: tocAt ?? 1, column: 1 };
+      const r = await placeTocItems(items, at, tocWhat, deps);
+      placedProblems.push(...r.problems);
+      if (r.html !== undefined && !r.problems.length) {
+        const choice = r.region === undefined
+          ? { to: "problem" as const, message: `${tocWhat}: ${TOC_ID} names no region (x-pd-region at its schema's root), so the table of contents has no place on the page` }
+          : chooseRegion(r.region, r.regionFrom ?? tocWhat, checked.layoutId, regionDecl.regions, skin);
+        if (choice.to === "problem") placedProblems.push({ at, message: choice.message });
+        else if (choice.to === "region") {
+          const brought = regionLandmarks(r.html);
+          if (brought.length) placedProblems.push({ at, message: `${TOC_ID}: what it renders would bring ${brought.join(" and ")} into the region "${choice.region}": the page's landmarks are the layout's` });
+          else regions.filled.set(choice.region, [r.html, ...regions.filled.get(choice.region) ?? []]);
+        }
+      }
+    }
+    return { body, headings, docProblems, placedProblems, imageProblems: prose?.problems ?? [], regions };
   };
   const first = await renderBody();
   problems.push(...first.docProblems.map(p => `${page.path}: ${p}`));
@@ -614,12 +644,16 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     ...(collections ? { collections: collections.collections } : {}),
     ...(site.categories ? { categories: model.categories.list } : {}),
   };
+  /** The layout's regions as it gets them: each one's HTML, null when empty. */
+  const regionsOf = (filled: ReadonlyMap<string, string[]>): Record<string, string | null> =>
+    Object.fromEntries(regionDecl.regions.map(r => [r, filled.get(r)?.length ? filled.get(r)!.join("\n") : null]));
+  let currentRegions = first.regions.filled;
   const dataFor = (body: string, headings: PageHeading[]) => ({
     ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),
     body,
     nav: markCurrent(model.nav, route),
     site: siteData,
-    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates, ...listing, ...queryValues } as Partial<DerivedPage>) } : {}),
+    ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates, ...listing, ...queryValues, regions: regionsOf(currentRegions) } as Partial<DerivedPage>) } : {}),
   });
   // A template that fails to render (a helper it calls that is not registered, say) is a page problem
   // like any other, listed and escaped, never an unhandled 500.
@@ -633,6 +667,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const isFailed = (r: Awaited<ReturnType<Render>> | AssembledPage): r is AssembledPage => "status" in r;
   let rendered = await renderLayout(first.body, first.headings);
   let finalBody = first.body;
+  let finalHeadings = first.headings;
+  let finalRegions = first.regions;
   if (isFailed(rendered)) return rendered;
   // A layout field named like a registered helper can never be shown by its name: the page fails, as the
   // workbench shows the same SCHEMA_INVALID on the layout.
@@ -647,6 +683,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const colliding = collidingHeadings(first.headings, layoutIds);
   if (colliding.length) {
     const second = await renderBody(layoutIds);
+    currentRegions = second.regions.filled;
+    finalHeadings = second.headings;
+    finalRegions = second.regions;
     rendered = await renderLayout(second.body, second.headings);
     finalBody = second.body;
     if (isFailed(rendered)) return rendered;
@@ -663,6 +702,11 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
         : `because #${h.anchor} went to an earlier heading whose anchor the layout uses`));
     }
   }
+
+  // A <pd-toc>'s #anchors, against the page's headings as they finally are (a suffix can still come from the layout).
+  const finalRender = colliding.length ? finalRegions : first.regions;
+  const badAnchors = tocAnchorProblems(finalRender.tocAnchors, finalHeadings);
+  if (badAnchors.length) return fail(badAnchors.map(p => `${page.path}:${p.at.line}:${p.at.column}: ${p.message}`));
 
   const html = rendered.html;
   // The skin's head partial: the site's values, and body and nav as null so no sample of them can show.
@@ -776,7 +820,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     route, title, body: finalBody, section: collectionOf(route, model), tags: (entry?.tags ?? []).map(t => t.label),
     categories: (entry?.categories ?? []).map(c => c.label), teaser: entry?.description ?? null, lang: a.lang ?? "en",
   };
-  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/"), problems: [], notes,
+  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/",
+    regionDecl.regions.length ? regionDecl.regions.filter(r => currentRegions.get(r)?.length) : undefined), problems: [], notes,
     ...(search ? { search } : {}) };
 }
 
