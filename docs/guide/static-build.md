@@ -52,6 +52,8 @@ The command line wins.
 | `--out <dir>` | `build.outDir` | `outDir`, then `dist` | Output folder, relative to the project root. **Emptied before each build.** |
 | `--base <path>` | `build.basePath` | `/` | Where the site will be hosted: `/` at a domain root, or a subpath such as `/docs/htwoo/` |
 | `--no-audit` / `--audit` | `build.audit` | `true` | Include the corpus audit |
+| `--check-workers <n>` | (none) | cores less one, at most 8 | Threads that check the storefront's pages for accessibility |
+| `--skip-checks=a11y` | `build.skipChecks` | none | [Leave a check out](#leaving-a-check-out) |
 | `--root <path>` | (none) | current folder | Build another project |
 | `--config <path>` | (none) | `pattern-dump.config.ts` in the root | Use a config file outside the root |
 
@@ -91,6 +93,28 @@ diagnostics in the Console are unaffected.
 
 With `build: { audit: false }` as the project default, `npx pd build --audit` includes it for a single
 build.
+
+### Leaving a check out
+
+`pd build` checks everything by default: it is the build CI runs and a site is published from, so nothing goes out
+unchecked because a flag was forgotten. For a quick local build, a check can be left out by name:
+
+```bash
+npx pd build --skip-checks=a11y
+```
+
+`a11y` is the accessibility check of the storefront's pages (axe's rules that jsdom decides, and one main landmark and
+one `<h1>` per page). The build's last line names what it did not check:
+
+```
+[pd build] NOT CHECKED: the accessibility of the site's pages (a11y), as asked (--skip-checks or build.skipChecks)
+```
+
+`build: { skipChecks: ["a11y"] }` sets it for the project; `--skip-checks=` (empty) runs every check for one build.
+`--browser` checks accessibility in Chromium, so it can't be combined with skipping it.
+
+The accessibility check spreads the pages over worker threads (`--check-workers <n>`; by default the cores less one,
+at most 8, within a quarter of the memory). The findings, and their order in the report, are the same with any number.
 
 ---
 
@@ -242,4 +266,4 @@ How a live URL maps to a file (for example `/api/component/atoms/button?variant=
 | `pd build: --out … overlaps …` | The output folder would overwrite folders Pattern Dump reads. Choose a separate folder such as `dist`. |
 | `pd build: storefront.workbenchUrl is /workbench/, so the workbench must be built for /workbench/` | The workbench is linked at that path on the storefront's host. Set `build.basePath` (or `--base`) to the same path. |
 | `[pd] Error: unknown command "build"` | The installed Pattern Dump predates `pd build`: update the `pattern-dump` dependency. |
-| Build is slow on a large design system | Most time goes into per-component checks. `--no-audit` skips the corpus audit; the rest scales with the number of components and variants (about 55 s for hTWOo's 259 components). |
+| Build is slow on a large design system | Most time goes into per-component checks. `--no-audit` skips the corpus audit; the rest scales with the number of components and variants (about 20 s for hTWOo's 261 components). |

@@ -21,7 +21,7 @@
     "@types/jsdom": "*"
   },
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/index.js",
+    "build": "esbuild src/index.ts src/page-worker.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outdir=dist",
     "classify": "node --experimental-strip-types src/classifier.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",

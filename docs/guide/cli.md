@@ -125,6 +125,8 @@ Writes a static snapshot of the workbench: plain files for any static host.
 | `--base <path>` | Where it will be hosted: `/` (default) or a subpath such as `/docs/` |
 | `--browser` | Also check the storefront's pages in Chromium: contrast and the other accessibility rules that need a rendered page, and each image's variant against its box ([storefront.md](storefront.md#checks-in-a-browser-pd-build---browser)). Needs the project's own Playwright |
 | `--no-audit` / `--audit` | Leave the corpus audit out (it is not run, and there is no Audit tab), or force it in. Default: `build.audit` |
+| `--check-workers <n>` | Threads that check the storefront's pages for accessibility. Default: the cores less one, at most 8, within a quarter of the memory; `1` checks them in one thread. The findings are the same with any number |
+| `--skip-checks=a11y` | Leave the accessibility check of the storefront's pages out, for a quick local build. The build's last line says what was not checked. Default: `build.skipChecks`, else every check runs; `--skip-checks=` runs every check |
 
 Full guide: [static-build.md](static-build.md).
 

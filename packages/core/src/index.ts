@@ -32,7 +32,7 @@ export async function runDev(
 export async function runBuild(
   root: string,
   configPath: string | undefined,
-  options: { out?: string; base?: string; audit?: boolean; browser?: boolean; pdVersion: string },
+  options: { out?: string; base?: string; audit?: boolean; browser?: boolean; checkWorkers?: number; skipChecks?: string[]; pdVersion: string },
 ): Promise<void> {
   const config = await loadConfig(root, configPath);
   const outDir = resolve(root, options.out ?? config.build?.outDir ?? config.outDir ?? "dist");
@@ -41,6 +41,8 @@ export async function runBuild(
     ...(options.base !== undefined ? { basePath: options.base } : {}),
     ...(options.audit !== undefined ? { audit: options.audit } : {}),
     ...(options.browser ? { browser: true } : {}),
+    ...(options.checkWorkers !== undefined ? { checkWorkers: options.checkWorkers } : {}),
+    ...(options.skipChecks !== undefined ? { skipChecks: options.skipChecks } : {}),
     pdVersion: options.pdVersion,
     log: line => console.log(`[pd build] ${line}`),
   });
@@ -82,6 +84,11 @@ export async function runBuild(
   }
   for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
   for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
+  // Last, so it is the line a reader sees: what this build did not check.
+  if (report.skippedChecks) {
+    const what: Record<string, string> = { a11y: "the accessibility of the site's pages (a11y)" };
+    console.log(`[pd build] NOT CHECKED: ${report.skippedChecks.map(c => what[c] ?? c).join(", ")}, as asked (--skip-checks or build.skipChecks)`);
+  }
 }
 
 /**

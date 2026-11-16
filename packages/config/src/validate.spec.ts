@@ -11,7 +11,7 @@ const valid = {
   dataDir: "./src/data", helpers: "./src/helpers", documentBase: ["base"], overviews: false,
   shell: { brand: { title: "T", logo: { light: "/a.svg", dark: "/b.svg" }, logoAlt: "T", href: "/" } },
   packages: ["pkg-a", { name: "pkg-b", exclude: ["x/**"] }, { name: "pkg-c", styles: false }], exclude: ["drafts/**"],
-  build: { outDir: "./site", basePath: "/docs/", audit: false },
+  build: { outDir: "./site", basePath: "/docs/", audit: false, skipChecks: ["a11y"] },
   images: { quality: 75, effort: 4 },
   storefront: {
     pagesDir: "./pages", outDir: "./site-www", host: "docs.localhost", workbenchUrl: "https://workbench.example.com/",
@@ -25,6 +25,14 @@ const storefront = (sf: Record<string, unknown>) => configProblems({ ...valid, s
 describe("configProblems", () => {
   it("accepts every documented option", () => {
     expect(configProblems(valid)).toEqual([]);
+  });
+
+  it("build.skipChecks: a list of the checks pd build may skip", () => {
+    const build = (skipChecks: unknown) => configProblems({ ...valid, build: { skipChecks } });
+    expect(build([])).toEqual([]);
+    const said = `"build.skipChecks" must be a list of the checks pd build may skip: "a11y"`;
+    expect(build(["html"])).toEqual([said]);
+    expect(build("a11y")).toEqual([said]);
   });
 
   it("images: quality a whole number from 1 to 100, effort from 0 to 6, for the project and per site", () => {

@@ -13,7 +13,7 @@
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createImageCache } from "@pattern-dump/build";
-import { sameHostWorkbenchPath, type PatternDumpConfig } from "@pattern-dump/config";
+import { sameHostWorkbenchPath, type PatternDumpConfig, SKIPPABLE_CHECKS, type SkippableCheck } from "@pattern-dump/config";
 import {
   componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
   staticPathFor, themeCssUrl,
@@ -30,7 +30,7 @@ import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
 import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule } from "./storefront/browser-checks.js";
-import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
+import { PageCheckError, runPagesA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { checkClasses } from "./storefront/class-check.js";
 import { checkProperties } from "./storefront/property-check.js";
@@ -59,6 +59,12 @@ export interface StaticBuildOptions {
   loadPlaywright?: (root: string) => Promise<PlaywrightModule>;
   /** Where search gets Pagefind from. Default: the project's own (loadProjectPagefind); undefined for none. */
   loadPagefind?: (root: string) => Promise<PagefindModule | undefined>;
+  /** How many worker threads check the storefront's pages for accessibility (@pattern-dump/a11y runPagesA11y);
+   *  1 checks them in this thread. Default: defaultCheckWorkers(), the cores less one, at most 8, within memory. */
+  checkWorkers?: number;
+  /** Checks to leave out (SKIPPABLE_CHECKS in @pattern-dump/config). Default: config.build.skipChecks, else none.
+   *  The report lists them (`skippedChecks`). */
+  skipChecks?: readonly string[];
 }
 
 /** Not a test's watcher barrier (`.__testOnly_barrier`, which tests and the settle hook write into watched
@@ -84,6 +90,8 @@ export interface StaticBuildReport {
   /** The storefront's accessibility check (axe in jsdom, and one <main> and one <h1> per page): the site pages read,
    *  and one line per rule that only warns, with its pages. An error stops the build instead. */
   accessibility?: { pages: number; warnings: string[]; browser?: boolean };
+  /** The checks this build left out (skipChecks), in SKIPPABLE_CHECKS order. Absent when every check ran. */
+  skippedChecks?: SkippableCheck[];
   /** The storefront's search index (search.ts), written to its _pd/search/: the pages in it, and its files. Absent
    *  when the site has no search. */
   search?: { pages: number; files: number; bytes: number };
@@ -213,6 +221,18 @@ async function buildOnce(
     if (changed.length) throw new InputsChangedError(written, changed);
   };
 
+  // The checks this build leaves out (skipChecks, else build.skipChecks): none unless named. --browser checks
+  // accessibility in Chromium, so it can't be asked for with the accessibility check skipped.
+  const asked = opts.skipChecks ?? config.build?.skipChecks ?? [];
+  const unknown = asked.filter(c => !(SKIPPABLE_CHECKS as readonly string[]).includes(c));
+  if (unknown.length) {
+    throw new Error(`pd build: ${unknown.map(c => `"${c}"`).join(", ")} is not a check pd build can skip; it can skip ${SKIPPABLE_CHECKS.map(c => `"${c}"`).join(", ")}`);
+  }
+  const skipped = new Set(asked as readonly SkippableCheck[]);
+  if (skipped.has("a11y") && opts.browser) {
+    throw new Error("pd build: --browser checks the pages' accessibility in Chromium, so it can't be combined with skipping the accessibility check (--skip-checks=a11y or build.skipChecks)");
+  }
+
   // --browser: the project's Playwright, loaded before anything is built, so a missing one stops the build at once.
   const playwright = opts.browser && storefront ? await (opts.loadPlaywright ?? loadProjectPlaywright)(project) : undefined;
   // Search: the project's Pagefind, also before anything is built, so a missing one the site asks for stops at once.
@@ -340,13 +360,22 @@ async function buildOnce(
     // Accessibility (step 6b), also before anything is written: one main landmark and one <h1> per site page, and
     // axe's rules that jsdom decides (@pattern-dump/a11y). A critical or serious WCAG finding, and a page without
     // exactly one main and one <h1>, stop the build; the rest are warnings in the report, grouped by rule.
+    // `skipChecks: ["a11y"]` leaves all of it out (the report says so); --browser, which checks in Chromium, refused it.
     const errors: string[] = [];
     const warned = new Map<string, { finding: PageA11yFinding; pages: string[]; elements: number }>();
-    for (const page of pages) {
-      const html = sfCrawl.documents.get(page);
-      if (html === undefined) continue;
+    // axe runs on worker threads (runPagesA11y); its findings come back in the pages' order, so the report is the
+    // same however the work was spread.
+    const checked = skipped.has("a11y") ? [] : pages.filter(page => sfCrawl.documents.has(page));
+    const htmlOf = (page: string): string => sfCrawl.documents.get(page)!;
+    const axeFindings = await runPagesA11y(checked.map(htmlOf), opts.checkWorkers !== undefined ? { workers: opts.checkWorkers } : {})
+      .catch(async (e: unknown) => {
+        await server.close();
+        throw e instanceof PageCheckError ? new Error(`pd build: the accessibility check of ${checked[e.index]} failed: ${e.message}`) : e;
+      });
+    for (const [k, page] of checked.entries()) {
+      const html = htmlOf(page);
       for (const p of checkPageBasics(html)) errors.push(`${page}: ${p}`);
-      for (const f of await runPageA11y(html)) {
+      for (const f of axeFindings[k]!) {
         const where = f.nodes.map(n => n.target).join(", ");
         if (f.severity === "error") {
           errors.push(`${page}: ${f.ruleId} (${f.impact}): ${f.help}, on ${where} (${f.helpUrl})`);
@@ -376,12 +405,16 @@ async function buildOnce(
       log(`… checked in Chromium at ${VIEWPORTS.map(v => `${v.name} @${v.dpr}x`).join(" and ")}`);
     }
     imageSummary = imageWarnings ? { warnings: imageWarnings } : undefined;
-    a11ySummary = {
-      pages: pages.length, ...(playwright ? { browser: true } : {}),
-      warnings: [...[...warned.values()].map(w => `${w.finding.ruleId} (${w.finding.impact}): ${w.finding.help}, ${w.elements} `
-        + `element${w.elements === 1 ? "" : "s"} on ${w.pages.join(", ")} (${w.finding.helpUrl})`), ...browserWarnings],
-    };
-    log(`… accessibility checked on ${pages.length} pages`);
+    if (skipped.has("a11y")) {
+      log(`… accessibility check skipped (skipChecks: a11y)`);
+    } else {
+      a11ySummary = {
+        pages: pages.length, ...(playwright ? { browser: true } : {}),
+        warnings: [...[...warned.values()].map(w => `${w.finding.ruleId} (${w.finding.impact}): ${w.finding.help}, ${w.elements} `
+          + `element${w.elements === 1 ? "" : "s"} on ${w.pages.join(", ")} (${w.finding.helpUrl})`), ...browserWarnings],
+      };
+      log(`… accessibility checked on ${pages.length} pages`);
+    }
   }
 
   await assertUnchanged("nothing was written").catch(async (e: unknown) => { await server.close(); throw e; });
@@ -597,6 +630,7 @@ async function buildOnce(
     await server.close();
   }
 
+  if (skipped.size) report.skippedChecks = SKIPPABLE_CHECKS.filter(c => skipped.has(c));
   report.ms = Math.round(performance.now() - started);
   return report;
 }

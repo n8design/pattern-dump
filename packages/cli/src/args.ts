@@ -14,7 +14,7 @@ export type Command =
   | { kind: "dev"; root: string; configPath?: string; port?: number; wsPort?: number }
   | { kind: "audit"; root: string; configPath?: string; format: AuditFormat }
   | { kind: "export"; root: string; configPath?: string; out?: string }
-  | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean; browser?: boolean }
+  | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean; browser?: boolean; checkWorkers?: number; skipChecks?: string[] }
   | { kind: "init"; target: string; yes: boolean; name?: string; brand?: string; examples?: boolean;
       storefront?: boolean; install?: boolean; git?: boolean; pdSource?: string }
   | { kind: "help"; topic?: string }
@@ -86,11 +86,16 @@ export function parseCommand(argv: string[], cwd: string): Command {
         options: {
           ...rootAndConfig, out: { type: "string" }, base: { type: "string" },
           audit: { type: "boolean" }, "no-audit": { type: "boolean" }, browser: { type: "boolean" },
+          "check-workers": { type: "string" }, "skip-checks": { type: "string" },
         },
       });
       if (values.help) return { kind: "help", topic: cmd };
       const audit = toggle(values, "audit");
       if (audit instanceof Error) return { kind: "error", message: audit.message };
+      const workers = values["check-workers"];
+      if (workers !== undefined && !/^[1-9]\d*$/.test(workers)) {
+        return { kind: "error", message: `--check-workers takes a whole number of 1 or more (got "${workers}")` };
+      }
       // --out resolves against the ROOT (like every config path), so it is passed through as given.
       return {
         kind: "build", ...base(values, cwd),
@@ -98,6 +103,9 @@ export function parseCommand(argv: string[], cwd: string): Command {
         ...(values.base !== undefined ? { base: values.base } : {}),
         ...(audit !== undefined ? { audit } : {}),
         ...(values.browser ? { browser: true } : {}),
+        ...(workers !== undefined ? { checkWorkers: Number(workers) } : {}),
+        // A comma-separated list; empty skips none (over build.skipChecks in the config).
+        ...(values["skip-checks"] !== undefined ? { skipChecks: values["skip-checks"].split(",").map(c => c.trim()).filter(Boolean) } : {}),
       };
     }
 
@@ -201,6 +209,10 @@ export const USAGE = `Usage: pd <command> [options]
                        Uses the project's own Playwright (npm install --save-dev playwright)
     --no-audit         Leave the corpus audit out: it is not run, and the site has no Audit tab
                        (default: build.audit in the config; --audit forces it back in)
+    --check-workers <n>  Threads that check the storefront's pages for accessibility; 1 checks them in
+                       one (default: the cores less one, at most 8, within a quarter of the memory)
+    --skip-checks=a11y   Leave the accessibility check of the storefront's pages out, for a quick local
+                       build; the report says so. Default: every check runs (build.skipChecks)
 
   export   Write the subject's flattened families back out in corrected form
     --root <path>      Export a specific project root (read-only)

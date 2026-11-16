@@ -4,14 +4,14 @@
 // undefined" from whichever reader touches the key first.
 
 import { relative, resolve, sep } from "node:path";
-import type { PatternDumpConfig, PatternDumpConfigInput } from "./index.js";
+import { SKIPPABLE_CHECKS, type PatternDumpConfig, type PatternDumpConfigInput } from "./index.js";
 
 type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
   | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object" | "hbs-file"
-  | "quality" | "effort" | "categories" | "tags" | "term-pages";
+  | "quality" | "effort" | "categories" | "tags" | "term-pages" | "skip-checks";
 type Shape = Readonly<Record<string, Rule>>;
 
 /** How responsive image variants are encoded: for the project, and overridden per site. */
@@ -57,7 +57,7 @@ const SHAPE: Shape = {
   },
   packages: "packages",
   exclude: "strings",
-  build: { keys: { outDir: "string", basePath: "string", audit: "boolean" } },
+  build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks" } },
   images: IMAGES,
   storefront: {
     keys: {
@@ -138,6 +138,12 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
   if (rule === "string") { if (typeof value !== "string") fail("a string"); return; }
   if (rule === "boolean") { if (typeof value !== "boolean") fail("true or false"); return; }
   if (rule === "strings") { if (!isStrings(value)) fail("a list of strings"); return; }
+  if (rule === "skip-checks") {
+    if (!isStrings(value) || !(value as string[]).every(v => (SKIPPABLE_CHECKS as readonly string[]).includes(v))) {
+      fail(`a list of the checks pd build may skip: ${SKIPPABLE_CHECKS.map(c => `"${c}"`).join(", ")}`);
+    }
+    return;
+  }
   if (rule === "string-or-strings") {
     if (typeof value !== "string" && !isStrings(value)) fail("a string or a list of strings");
     return;

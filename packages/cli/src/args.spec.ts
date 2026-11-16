@@ -61,6 +61,24 @@ describe("pd build", () => {
     expect(parseCommand(["build", "--audit"], "/w")).toEqual({ kind: "build", root: "/w", audit: true });
     expect(parseCommand(["build", "--audit", "--no-audit"], "/w")).toMatchObject({ kind: "error" });
   });
+
+  it("--skip-checks takes a comma-separated list, passed on as given; empty skips none", () => {
+    expect(parseCommand(["build", "--skip-checks=a11y"], "/w")).toEqual({ kind: "build", root: "/w", skipChecks: ["a11y"] });
+    expect(parseCommand(["build", "--skip-checks", "a11y, html"], "/w")).toEqual({ kind: "build", root: "/w", skipChecks: ["a11y", "html"] });
+    expect(parseCommand(["build", "--skip-checks="], "/w")).toEqual({ kind: "build", root: "/w", skipChecks: [] });
+    expect(parseCommand(["build"], "/w")).not.toHaveProperty("skipChecks");
+  });
+
+  it("--check-workers takes a whole number of 1 or more; left out, the build chooses", () => {
+    expect(parseCommand(["build", "--check-workers", "3"], "/w")).toEqual({ kind: "build", root: "/w", checkWorkers: 3 });
+    expect(parseCommand(["build", "--check-workers", "1"], "/w")).toEqual({ kind: "build", root: "/w", checkWorkers: 1 });
+    expect(parseCommand(["build"], "/w")).not.toHaveProperty("checkWorkers");
+    for (const bad of ["0", "-2", "1.5", "many", ""]) {
+      expect(parseCommand(["build", `--check-workers=${bad}`], "/w")).toEqual({
+        kind: "error", message: `--check-workers takes a whole number of 1 or more (got "${bad}")`,
+      });
+    }
+  });
 });
 
 describe("pd export", () => {

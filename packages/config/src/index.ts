@@ -84,6 +84,11 @@ export interface ShellConfig {
  */
 export type PackageReference = string | { name: string; exclude?: string[]; styles?: boolean };
 
+/** Checks `pd build` can be told to skip: the site pages' accessibility check (axe, and one main landmark and one <h1>
+ *  per page). Every check runs unless named. */
+export const SKIPPABLE_CHECKS = ["a11y"] as const;
+export type SkippableCheck = (typeof SKIPPABLE_CHECKS)[number];
+
 export interface PatternDumpConfig {
   sourceDir: string;
   patternsDir: string;
@@ -154,9 +159,11 @@ export interface PatternDumpConfig {
    * `pd build` — the static snapshot. `outDir` (relative to the root) defaults to the top-level
    * `outDir`; `basePath` is where the snapshot will be hosted ("/" at a domain root, "/docs/" under a
    * subpath) and defaults to "/". `audit: false` leaves the corpus audit out — it is not run, and the
-   * static site has no Audit tab. All three can be overridden on the command line.
+   * static site has no Audit tab. All three can be overridden on the command line. `skipChecks` names checks the
+   * build leaves out (SKIPPABLE_CHECKS), for a quick local build: none by default, and the build report names each
+   * one skipped. `--skip-checks` on the command line replaces it.
    */
-  build?: { outDir?: string; basePath?: string; audit?: boolean };
+  build?: { outDir?: string; basePath?: string; audit?: boolean; skipChecks?: SkippableCheck[] };
   /** How responsive image variants are encoded (WebP). Defaults: quality 75, effort 4. A site can override
    *  either in `storefront.images`. */
   images?: ImageSettings;
