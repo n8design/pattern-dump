@@ -18,13 +18,13 @@ import { tagShapeProblems } from "./tag-shape";
 import { checkSchemaExtensions } from "./schema-extensions";
 import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
+import { createSourceStore, deepFreeze, mergeData, templateKey, templateSpec, type SourceStore } from "./source-store";
 import type {
   CreateRenderer, RendererOptions, Diagnostic, RenderMeta,
   ImageLookup, ImageSource,
 } from "@pattern-dump/contracts";
 import { HtmlValidate } from "html-validate";
 import Handlebars from "handlebars";
-import { readFile } from "node:fs/promises";
 import { basename, isAbsolute, relative, sep } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 
@@ -76,18 +76,21 @@ const safePart = (n: string) => n.replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase();
  * not parse is no data plus a DATA_INVALID diagnostic, so the dropped data shows up on the Console
  * instead of the component silently rendering without it.
  */
-async function readDataFile(path: string, display: (absPath: string) => string): Promise<{ data?: Record<string, unknown>; diagnostic?: Diagnostic }> {
-  let text: string;
-  try { text = await readFile(path, "utf-8"); } catch { return {}; }
-  const parsed = parseJson(text);
-  if (parsed.ok) return { data: parsed.value as Record<string, unknown> };
-  return {
-    diagnostic: {
-      kind: "DATA_INVALID", source: "render", severity: "error",
-      message: `${basename(path)} is not valid JSON (${parsed.reason}); its data was not used`,
-      location: { file: display(path), ...(parsed.line !== undefined ? { line: parsed.line, column: parsed.column } : {}) },
-    },
-  };
+function dataFile(store: SourceStore, path: string, display: (absPath: string) => string): Promise<{ data?: Record<string, unknown>; diagnostic?: Diagnostic }> {
+  // Parsed once for the store, and frozen: every render shares it.
+  return store.derived(`data ${path}`, async () => {
+    const text = await store.textOr(path, null);
+    if (text === null) return {};
+    const parsed = parseJson(text);
+    if (parsed.ok) return { data: deepFreeze(parsed.value as Record<string, unknown>) };
+    return {
+      diagnostic: {
+        kind: "DATA_INVALID", source: "render", severity: "error",
+        message: `${basename(path)} is not valid JSON (${parsed.reason}); its data was not used`,
+        location: { file: display(path), ...(parsed.line !== undefined ? { line: parsed.line, column: parsed.column } : {}) },
+      },
+    };
+  });
 }
 
 /**
@@ -265,8 +268,14 @@ export function dryRunHelperRegistrar(register: (handlebars: unknown) => void): 
 
 export const createRenderer: CreateRenderer = (options: RendererOptions) => {
   const display = makeDisplayPath((options.patternRoots ?? []).map(r => r.dir).concat(options.patternsDir), options.displayPath);
+  // Given its maps, the renderer reads each file once for its life (source-store.ts): the caller makes a new
+  // renderer when the design system's files change. Without them it discovers again, and reads again, per call.
+  const ownStore = options.discoveryMap && options.handleMap ? createSourceStore() : undefined;
+  // The global data, copied once and frozen: every render merges it beneath its own data, and none may change it.
+  const globalData = deepFreeze(structuredClone(options.globalData ?? {}));
   return async (input) => {
     const { patternsDir } = options;
+    const store = ownStore ?? createSourceStore();
 
     // Resolve discovery maps per-call: use provided maps or fall back to the M6 internal walk.
     // Called per-call (not cached) so new/removed files are always picked up — same as collectComponents was.
@@ -310,13 +319,13 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // A base-less synthesized node (M6) has hbsPath="" — no markup of its own. It must render a
     // clean empty state, never throw `ENOENT: open ''` (the all-variants gallery is the deferred
     // M6 "render-on-select"; this guard is independent of when that lands).
-    const templateSrc = templateHbsPath ? await readFile(templateHbsPath, "utf-8") : "";
+    const templateSrc = templateHbsPath ? await store.text(templateHbsPath) : "";
 
     // Data files that do not parse, reported once each (DATA_INVALID) — the component's own, the
     // variant's, and those of partials this render actually includes.
     const dataDiagnostics = new Map<string, Diagnostic>();
     const readData = async (path: string): Promise<Record<string, unknown> | undefined> => {
-      const { data, diagnostic } = await readDataFile(path, display);
+      const { data, diagnostic } = await dataFile(store, path, display);
       if (diagnostic) dataDiagnostics.set(path, diagnostic);
       return data;
     };
@@ -325,10 +334,9 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     const variantData = variantJsonPath ? await readData(variantJsonPath) : undefined;
 
     // Cascade (lowest → highest): project global data → component defaults → variant → live.
-    // globalData is the base (cloned so the shared, once-loaded object is never mutated); component
-    // data overrides it on every key.
-    const data = deepMerge(
-      structuredClone(options.globalData ?? {}),
+    // A new object: every source is shared and frozen (source-store.ts), so none is changed.
+    const data = mergeData(
+      globalData,
       defaultData,
       variantData,
       input.data as Record<string, unknown> | undefined
@@ -380,36 +388,54 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
 
     // A template with {{pd-image}} is compiled from its AST with each call's image slot resolved against its
     // component's schema (image-slots.ts); any other template from its source, as before.
-    const schemaJson = async (id: string): Promise<unknown> => {
+    // Each template is compiled once for its hash, and only when a render calls it (source-store.ts).
+    const schemaJson = (id: string): Promise<unknown> => {
       const base = id.includes("~") ? id.slice(0, id.indexOf("~")) : id;
       const path = discoveryMap.get(id)?.schemaPath ?? discoveryMap.get(base)?.schemaPath;
-      if (!path) return null;
-      try { return JSON.parse(await readFile(path, "utf-8")); } catch { return null; }
+      if (!path) return Promise.resolve(null);
+      return store.derived(`schema ${path}`, async () => {
+        try { return deepFreeze(JSON.parse(await store.text(path)) as unknown); } catch { return null; }
+      });
     };
-    const slotted = async (src: string, id: string): Promise<string | hbs.AST.Program> =>
-      src.includes("pd-image") ? withImageSlots(src, await schemaJson(id)) : src;
+    /** What compiles `src` (the template of `id`): its hash, and how to get the input when it isn't compiled yet. */
+    const compileInput = async (src: string, id: string): Promise<{ key: string; input: () => string | hbs.AST.Program }> => {
+      if (!src.includes("pd-image")) return { key: templateKey(src, COMPILE), input: () => src };
+      const schema = await schemaJson(id);
+      return { key: templateKey(src, COMPILE, `pd-image ${JSON.stringify(schema)}`), input: () => withImageSlots(src, schema) };
+    };
 
-    // Register every discovered component as a cascade-aware, base-seeded partial.
+    // Every discovered component as a partial: its files are read once for the store, in parallel, and each
+    // render registers a stand-in per component, which binds its compiled template on its first call only. So a
+    // lookup by name (a helper reading env.partials, like hTWOo's dynamicPartial) finds every component, and a
+    // component no render calls is never compiled.
     // Iterates handleMap (handle → id) and looks up file paths in discoveryMap — no reconstruction.
-    for (const [flatName, compId] of handleMap) {
+    const partialTable = await store.derived("partials", async () => (await Promise.all([...handleMap].map(async ([flatName, compId]) => {
       const compEntry = discoveryMap.get(compId);
-      if (!compEntry?.hbsPath) continue; // skip synthesized base-less nodes (no template to register)
+      if (!compEntry?.hbsPath) return undefined; // skip synthesized base-less nodes (no template to register)
       try {
-        const partialSrc = await readFile(compEntry.hbsPath, "utf-8");
-
+        const partialSrc = await store.text(compEntry.hbsPath);
         // Every discovered component is registered, but only one this render includes reports its
         // invalid data: the diagnostic is added when the partial runs, below.
-        const childData = compEntry.jsonPath ? await readDataFile(compEntry.jsonPath, display) : {};
-        const childDataPath = compEntry.jsonPath;
+        const childData = compEntry.jsonPath ? await dataFile(store, compEntry.jsonPath, display) : {};
         // A variant included by its handle (`{{> "atoms-chip~danger"}}`) gets its base's data beneath
         // its own, exactly as the variant renders on its own page.
         const variantTilde = compId.indexOf("~");
         const baseJsonPath = variantTilde > 0 ? discoveryMap.get(compId.slice(0, variantTilde))?.jsonPath : undefined;
-        const baseData = baseJsonPath ? await readDataFile(baseJsonPath, display) : {};
-        const childDefaults: Record<string, unknown> = deepMerge(structuredClone(baseData.data ?? {}), childData.data);
+        const baseData = baseJsonPath ? await dataFile(store, baseJsonPath, display) : {};
+        return {
+          flatName, compId, hbsPath: compEntry.hbsPath, childData, childDataPath: compEntry.jsonPath, baseData, baseJsonPath,
+          defaults: deepFreeze(mergeData(baseData.data, childData.data)),
+          compile: await compileInput(partialSrc, compId),
+        };
+      } catch {
+        return undefined; // directory without a matching .hbs — skip
+      }
+    }))).filter(p => p !== undefined));
 
-        const childTemplate = env.compile(await slotted(partialSrc, compId), COMPILE);
-        const capturedDefaults = childDefaults;
+    for (const { flatName, compId, hbsPath, childData, childDataPath, baseData, baseJsonPath, defaults, compile } of partialTable) {
+      { // One stand-in per component: its compiled template is bound on its first call in this render.
+        let childTemplate: Handlebars.TemplateDelegate | undefined;
+        const capturedDefaults = defaults;
         const partialSlug = safePart(compId.replace(/[\\/]/g, "-"));
 
         env.registerPartial(
@@ -444,8 +470,8 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
             const savedBase = currentBase;
             currentBase = thisBase;
 
-            const merged = deepMerge(
-              structuredClone(capturedDefaults),
+            const merged = mergeData(
+              capturedDefaults,
               context != null && typeof context === "object" && !Array.isArray(context)
                 ? (context as Record<string, unknown>)
                 : {}
@@ -468,9 +494,10 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
               : { data };
             let result: string;
             try {
+              childTemplate ??= env.template(templateSpec(compile.key, compile.input, COMPILE));
               result = childTemplate(merged, runtime);
             } catch (e) {
-              if (e instanceof MissingHelperError) e.stamp(compId, display(compEntry.hbsPath));
+              if (e instanceof MissingHelperError) e.stamp(compId, display(hbsPath));
               throw e;
             } finally {
               currentBase = savedBase;
@@ -478,8 +505,6 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
             return result;
           } as unknown as string
         );
-      } catch {
-        // directory without a matching .hbs — skip
       }
     }
 
@@ -488,7 +513,8 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // render an empty block rather than throw. Block invocations override this with the real body.
     let html: string;
     try {
-      html = env.compile(await slotted(templateSrc, componentId), COMPILE)(data, {
+      const main = await compileInput(templateSrc, componentId);
+      html = env.template(templateSpec(main.key, main.input, COMPILE))(data, {
         partials: { ...env.partials, "@partial-block": () => "" },
         // The render's image settings, for {{pd-image}} here and in every partial (data frames pass on).
         data: { pdImages: input.images },
@@ -520,7 +546,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
 
     // Schema validation (M4.9). schemaPath comes from the discovery entry — no reconstruction.
     // A schema that doesn't parse is an error, never "no schema": that would turn every check below off unsaid.
-    const schemaText = entry.schemaPath ? await readFile(entry.schemaPath, "utf-8").catch(() => undefined) : undefined;
+    const schemaText = entry.schemaPath ? await store.textOr(entry.schemaPath, undefined) : undefined;
     const parsedSchema = schemaText === undefined ? undefined : parseJson(schemaText);
     if (parsedSchema && !parsedSchema.ok) {
       diagnostics.push({

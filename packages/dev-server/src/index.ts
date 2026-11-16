@@ -18,7 +18,7 @@
 //   /source/:id/data             — Shiki-highlighted JSON data fragment
 //   *                            — SPA shell
 import type { PatternDumpConfig } from "@pattern-dump/config";
-import { PD_HOSTS, type Diagnostic, type Render } from "@pattern-dump/contracts";
+import { PD_HOSTS, type Diagnostic, type DiscoveryResult, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 // Re-exported so the export/CLI orchestration (core) can key its report on the SAME handle derivation
 // as discovery/export, without core depending on discovery directly.
@@ -237,14 +237,26 @@ export async function startDevServer(
     }
   };
   const buildRenderer: BuildRenderer = (registrars, data) => {
-    const renderWith = createRenderer({
-      patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme, displayPath, images: images.lookup,
-      ...(registrars.length ? { helperRegistrars: [...registrars] } : {}),
-      ...(data ? { globalData: data } : {}),
-    });
+    // One renderer per discovery, given that discovery's maps, so a render never walks the pattern folders again.
+    // An .hbs or .json edit anywhere in a pattern root drops the discovery (watch.ts), and the next render gets
+    // a renderer made for the new one. A pd build has one discovery throughout.
+    const renderers = new WeakMap<DiscoveryResult, Render>();
+    const rendererFor = (discovery: DiscoveryResult): Render => {
+      let renderWith = renderers.get(discovery);
+      if (!renderWith) {
+        renderWith = createRenderer({
+          patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme, displayPath, images: images.lookup,
+          discoveryMap: discovery.discoveryMap, handleMap: discovery.handleMap,
+          ...(registrars.length ? { helperRegistrars: [...registrars] } : {}),
+          ...(data ? { globalData: data } : {}),
+        });
+        renderers.set(discovery, renderWith);
+      }
+      return renderWith;
+    };
     return async input => {
       await images.ready(generationNow());
-      const result = await renderWith(input);
+      const result = await rendererFor(await currentDiscovery(state, patternRoots))(input);
       reportHelperNames(result.meta?.diagnostics);
       return result;
     };
