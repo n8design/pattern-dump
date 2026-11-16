@@ -210,7 +210,12 @@ export async function startWatching(ctx: WatchContext): Promise<WatchHandle> {
   // not have: chokidar reports a file that comes back to a path it knew (a folder removed and restored) as a
   // change, not an add. The cached discovery cannot tell: any edit drops it, and the next one is built from
   // disk, file and all, without the tree being told.
-  let treeFiles = componentFilesOf(await currentDiscovery(state, patternRoots));
+  const treeStart = await currentDiscovery(state, patternRoots);
+  let treeFiles = componentFilesOf(treeStart);
+  // The components of that same discovery: who owns which stylesheet was last worked out for this set. Kept
+  // here for the same reason: a request may have built a discovery with a new template in it before the watcher
+  // handled its add, and compared against that, the add would look like no change and nothing would be restyled.
+  let treeIds = baseComponentIds(treeStart);
 
 // The storefront's pages folder (a folder of its own, outside patternsDir — config guarantees it).
 const pagesDir = cfg.storefront?.pagesDir ?? null;
@@ -1170,8 +1175,7 @@ on("change", async (filePath) => {
 // from firing at startup. Theme additions are ignored here (rare; handled on next nav).
 // Helper: rebuild discovery, surface any collisions, then push tree-changed.
 async function rebuildAndSignalTree(label: string): Promise<void> {
-  const previous = await cachedDiscovery(state);
-  const before = previous ? baseComponentIds(previous) : null;
+  const before = treeIds;
   // A discovery built after this change; one that a later change overtakes is never stored (lazy.ts).
   const dr = await rebuildDiscovery(state, patternRoots);
   treeFiles = componentFilesOf(dr);
@@ -1179,7 +1183,8 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   // template was filed under the base layer, and now belongs to the component. Restyle against the new
   // set, so its CSS moves without a restart.
   const after = baseComponentIds(dr);
-  if (!before || before.size !== after.size || [...after].some(id => !before.has(id))) {
+  treeIds = after;
+  if (before.size !== after.size || [...after].some(id => !before.has(id))) {
     await restyleAll(dr, Date.now(), [], false);
   }
   // Structural change (component added / removed) → the corpus node set changed; drop the diagnostics
