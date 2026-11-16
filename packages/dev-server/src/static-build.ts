@@ -460,7 +460,14 @@ export async function buildStaticSite(
       await mkdir(sfOut, { recursive: true });
       const counts = { files: 0, bytes: 0, warnings: [] as string[] };
       const sf = createSnapshotWriter({ outDir: sfOut, basePath: "/", origin: "", report: counts, fetch: sfGet });
-      for (const url of sfCrawl.urls) await sf.capture(url, { fatal: true });
+      // In the crawl's order, so the first URL of a file still writes it. A document or stylesheet is written as the
+      // crawl read it: every check above read that text, and asking again would assemble every page a second time.
+      // What the crawl did not keep (scripts, images, fonts, robots.txt, the sitemap) is asked for again.
+      for (const url of sfCrawl.urls) {
+        const text = sfCrawl.documents.get(url) ?? sfCrawl.stylesheets.get(url);
+        if (text !== undefined) await sf.store(url, text);
+        else await sf.capture(url, { fatal: true });
+      }
       if (sf.failures.length) {
         throw new Error(`pd build: the storefront changed while it was being written:\n${sf.failures.map(f => `  - ${f}`).join("\n")}`);
       }
