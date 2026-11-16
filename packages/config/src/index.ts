@@ -271,7 +271,7 @@ export interface StorefrontConfig {
   checks?: StorefrontChecks;
 }
 
-/** storefront.checks: what pd build checks the site's classes against. */
+/** storefront.checks: what pd build checks the site's classes and custom properties against. */
 export interface StorefrontChecks {
   /**
    * A class on a page that no component or style of the style guide defines: `"warning"` (the default) lists it in
@@ -280,6 +280,9 @@ export interface StorefrontChecks {
   classes?: "warning" | "error" | "off";
   /** Classes a page may carry anyway: names, or a prefix ending in `*` (`"chart-*"`). */
   allowClasses?: string[];
+  /** Custom properties JavaScript sets, which a skin's var() may read without a definition in CSS: names, or a prefix
+   *  ending in `*` (`"--chart-*"`). */
+  allowProperties?: string[];
 }
 
 /** storefront.tagPages and storefront.categoryPages as an object. */

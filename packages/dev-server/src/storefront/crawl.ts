@@ -55,7 +55,7 @@ export interface StorefrontCrawl {
   problems: string[];
   /** The HTML of every document crawled, by its URL: the link check reads it (links.ts). */
   documents: Map<string, string>;
-  /** Every stylesheet crawled, by its URL: the class check reads it (class-check.ts). */
+  /** Every stylesheet crawled, by its URL: the style checks read it (class-check.ts, property-check.ts). */
   stylesheets: Map<string, string>;
 }
 

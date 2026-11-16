@@ -1217,6 +1217,25 @@ person or an agent wrote it.
 
 A warning by default; with `storefront.checks.classes: "error"` it stops the build, and `"off"` skips the check.
 
+### Custom properties nothing defines
+
+A `var(--x)` in the project's own styles (its styles folder, SCSS or CSS) with no `--x` defined anywhere stops the
+build, naming the file and line. Without the check it falls back to nothing, and a colour just goes missing on screen.
+
+- **Defined:** `--x:` or `@property --x` in any compiled stylesheet of the style guide (the project's and its
+  packages', the base layer and the themes) or one the site loads, and `--x:` in a `style` attribute of a page or
+  preview the build writes (`style="--cols: {{cols}}"` in a template).
+- `var(--x, fallback)` is fine: it says what to show without `--x`. A name Sass builds (`var(--#{$name})`) and a
+  `var()` in a comment are not checked. A package's own stylesheets are not checked: they are not the project's to fix.
+- A property JavaScript sets goes in `storefront.checks.allowProperties` (a trailing `*` for a prefix).
+
+```
+pd build: the skin reads custom properties nothing defines, so nothing was written:
+  - src/styles/components/card.scss:42: var(--card-gap) reads a custom property nothing defines: define --card-gap
+    in the skin, give it a fallback (var(--card-gap, ...)), or, if JavaScript sets it, list it in
+    storefront.checks.allowProperties
+```
+
 ### The accessibility check
 
 After the link check, `pd build` checks every page of the site (not the previews or the pages that forward from old

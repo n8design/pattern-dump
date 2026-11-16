@@ -33,6 +33,7 @@ import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModu
 import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { checkClasses } from "./storefront/class-check.js";
+import { checkProperties } from "./storefront/property-check.js";
 import { withNoindex } from "./storefront/base-path.js";
 import { buildSearchIndex, SEARCH_PATH, searchPagefind, type PagefindModule, type SearchRecord } from "./storefront/search.js";
 
@@ -245,8 +246,9 @@ export async function buildStaticSite(
     linkSummary = { pages: pages.length, references: links.references, external: links.external.size };
     log(`… links checked: ${links.references} references on ${pages.length} pages`);
 
-    // The class check, also before anything is written (class-check.ts): every class a site page carries is defined
-    // by the style guide (a warning unless storefront.checks.classes says otherwise).
+    // The style checks, also before anything is written (class-check.ts, property-check.ts): every class a site page
+    // carries is defined by the style guide (a warning unless storefront.checks.classes says otherwise), and every
+    // var() the skin's own styles read without a fallback has a definition somewhere (an error).
     pageModel = await readPages(storefront.pagesDir, {
       drafts: "leave-out", scheduled: "leave-out", today, categories: storefront.categories, tags: storefront.tags,
     });
@@ -256,6 +258,11 @@ export async function buildStaticSite(
       await server.close();
       throw new Error(`pd build: ${what}, so nothing was written:\n${lines.map(l => `  - ${l}`).join("\n")}`);
     };
+    const properties = checkProperties({
+      sources: await styleSources(cfg.stylesDir, project), stylesheets, documents: [...sfCrawl.documents.values()],
+      allow: storefront.checks.allowProperties,
+    });
+    if (properties.length) await fail("the skin reads custom properties nothing defines", properties);
     if (storefront.checks.classes !== "off") {
       const model = pageModel;
       const checkPages = await Promise.all(pages.flatMap(route => {
@@ -522,4 +529,20 @@ export async function buildStaticSite(
 
   report.ms = Math.round(performance.now() - started);
   return report;
+}
+
+/** The project's own style sources (SCSS and CSS) under `stylesDir`, each by its path from the project's root. */
+async function styleSources(stylesDir: string, project: string): Promise<{ path: string; text: string }[]> {
+  const out: { path: string; text: string }[] = [];
+  const walk = async (dir: string): Promise<void> => {
+    let entries;
+    try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => a.name < b.name ? -1 : 1)) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) await walk(p);
+      else if (/\.(?:scss|css)$/.test(e.name)) out.push({ path: relative(project, p).split(sep).join("/"), text: await readFile(p, "utf8") });
+    }
+  };
+  await walk(stylesDir);
+  return out;
 }

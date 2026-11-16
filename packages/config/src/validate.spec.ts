@@ -271,11 +271,11 @@ describe("configProblems — storefront", () => {
     expect(storefront({ ...base, llms: "no" })).toEqual([`"storefront.llms" must be true or false`]);
   });
 
-  it("takes checks: classes warning, error or off, and a list of allowed classes", () => {
+  it("takes checks: classes warning, error or off, and lists of allowed classes and properties", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
-    expect(storefront({ ...base, checks: { classes: "error", allowClasses: ["chart-*"] } })).toEqual([]);
-    expect(storefront({ ...base, checks: { classes: "strict", allowClasses: "chart-*", allowClass: [] } })).toEqual([
-      `unknown key "storefront.checks.allowClass": did you mean "storefront.checks.allowClasses"?`,
+    expect(storefront({ ...base, checks: { classes: "error", allowClasses: ["chart-*"], allowProperties: ["--x"] } })).toEqual([]);
+    expect(storefront({ ...base, checks: { classes: "strict", allowClasses: "chart-*", allowProperty: [] } })).toEqual([
+      `unknown key "storefront.checks.allowProperty": did you mean "storefront.checks.allowProperties"?`,
       `"storefront.checks.classes" must be "warning" or "error" or "off"`,
       `"storefront.checks.allowClasses" must be a list of strings`,
     ]);

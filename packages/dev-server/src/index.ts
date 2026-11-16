@@ -154,7 +154,7 @@ export interface DevServerOptions {
 export interface DevServer {
   port: number;
   close(): Promise<void>;
-  /** For pd build's class check (class-check.ts), not part of the HTTP contract: every compiled
+  /** For pd build's style checks (class-check.ts, property-check.ts), not part of the HTTP contract: every compiled
    *  stylesheet of the style guide (each component's, the base layer, each theme; project and packages) and every
    *  component template's source. */
   styleGuide(): Promise<StyleGuideSources>;

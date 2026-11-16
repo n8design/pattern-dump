@@ -1,17 +1,53 @@
-// The class check's readers: the classes a stylesheet names (css-vocabulary.ts), and what a template and a built
-// page write as classes (class-check.ts).
+// The style checks' readers: what a stylesheet defines and reads (css-vocabulary.ts), and what a template and a
+// built page write as classes (class-check.ts).
 import { describe, expect, it } from "vitest";
-import { nameMatcher, readCss } from "../src/storefront/css-vocabulary.js";
+import { inlineProperties, nameMatcher, readCss, sourceVarUses, varUses } from "../src/storefront/css-vocabulary.js";
 import { checkClasses, documentClasses, templateClasses } from "../src/storefront/class-check.js";
 
-describe("readCss and nameMatcher", () => {
-  it("names the classes of every selector, and reads nothing from text that isn't CSS, rather than failing", () => {
-    expect([...readCss(".a .b:hover, .c > .d { color: red; }\n@media (width > 1px) { .e { margin: 0; } }").classes].sort())
-      .toEqual(["a", "b", "c", "d", "e"]);
-    expect(readCss("{{{").classes.size).toBe(0);
+describe("varUses", () => {
+  it("finds a var() without a fallback, inside calc() and inside another's fallback, and skips one with a fallback", () => {
+    expect(varUses("calc(var(--a) + var(--b, 1px))").map(u => u.name)).toEqual(["--a"]);
+    expect(varUses("var(--x, var(--y))").map(u => u.name)).toEqual(["--y"]);
+    expect(varUses("var(--x, var(--y, red))")).toEqual([]);
+    expect(varUses(`var( --spaced )`).map(u => u.name)).toEqual(["--spaced"]);
   });
 
-  it("matches names and prefixes", () => {
+  it("skips a name Sass builds, and a var() in a quoted string", () => {
+    expect(varUses("var(--#{$name})")).toEqual([]);
+    expect(varUses(`"var(--quoted)" var(--real)`).map(u => u.name)).toEqual(["--real"]);
+  });
+});
+
+describe("readCss", () => {
+  it("names the classes of every selector, the properties defined, and each var() read, by line", () => {
+    const v = readCss(".a .b:hover, .c > .d { --x: 1; color: var(--y); }\n@property --z { syntax: '*'; inherits: false; }\n.e { margin:\n  var(--w); }");
+    expect([...v.classes].sort()).toEqual(["a", "b", "c", "d", "e"]);
+    expect([...v.properties].sort()).toEqual(["--x", "--z"]);
+    expect(v.uses).toEqual([{ name: "--y", line: 1, column: 39 }, { name: "--w", line: 4, column: 3 }]);
+  });
+
+  it("reads nothing from text that isn't CSS, rather than failing", () => {
+    expect(readCss("{{{").classes.size).toBe(0);
+  });
+});
+
+describe("sourceVarUses", () => {
+  it("finds var() in SCSS by line and column, outside comments, and leaves a URL's // alone", () => {
+    const scss = [
+      "// var(--commented)",
+      ".a { /* var(--blocked) */ color: var(--real); }",
+      ".b { background: url(https://example.test/x.png); border-color: var(--after-url); }",
+    ].join("\n");
+    expect(sourceVarUses(scss, true)).toEqual([
+      { name: "--real", line: 2, column: 34 },
+      { name: "--after-url", line: 3, column: 65 },
+    ]);
+  });
+});
+
+describe("inlineProperties and nameMatcher", () => {
+  it("reads the custom properties of a style attribute, and matches names and prefixes", () => {
+    expect(inlineProperties("--cols: 3; color: red; --gap:1rem")).toEqual(["--cols", "--gap"]);
     const m = nameMatcher(["exact", "pre-*"]);
     expect([m("exact"), m("pre-fix"), m("pre"), m("exactly")]).toEqual([true, true, false, false]);
   });

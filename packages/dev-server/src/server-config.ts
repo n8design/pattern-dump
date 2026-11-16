@@ -110,7 +110,7 @@ export interface ResolvedConfig {
     /** storefront.llms: pd build writes llms.txt; false for a site with index: false. */
     readonly llms: boolean;
     /** storefront.checks, with its defaults: the class check warns, nothing is allowed beyond the built-in lists. */
-    readonly checks: { readonly classes: "warning" | "error" | "off"; readonly allowClasses: readonly string[] };
+    readonly checks: { readonly classes: "warning" | "error" | "off"; readonly allowClasses: readonly string[]; readonly allowProperties: readonly string[] };
     /** storefront.search as the config writes it (search.ts reads it). */
     readonly search: boolean | undefined;
   } | null;
@@ -261,6 +261,7 @@ export function resolveServerConfig(
       checks: {
         classes: config.storefront.checks?.classes ?? "warning",
         allowClasses: config.storefront.checks?.allowClasses ?? [],
+        allowProperties: config.storefront.checks?.allowProperties ?? [],
       },
     } : null,
     images,

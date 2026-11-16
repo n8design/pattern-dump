@@ -1,5 +1,6 @@
-// pd build's class check on a storefront, on copies of the bench: a class on a page that nothing in the style guide
-// defines (a warning, or an error with storefront.checks.classes), naming file and line.
+// pd build's two style checks on a storefront, on copies of the bench: a class on a page that nothing in the style
+// guide defines (a warning, or an error with storefront.checks.classes), and a var() in the skin's own styles with no
+// definition anywhere (an error), each naming file and line.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
@@ -89,5 +90,34 @@ describe("pd build — classes outside the design system", () => {
     // .card-title is the card's (in its stylesheet), worn here by another component.
     await placeBadge(root, "is-open has-icon js-toggle card-title");
     expect((await build(root)).classes?.warnings).toEqual([]);
+  }, 60_000);
+});
+
+describe("pd build — custom properties nothing defines", () => {
+  it("stops the build on a var() in the skin with no definition, naming file and line, and writes nothing", async () => {
+    const root = await benchCopy();
+    const card = join(root, "src", "styles", "components", "card.scss");
+    await append(card, `\n.card-title {\n  color: var(--wf-ink-missing);\n}\n`);
+    const line = await lineIn(card, "--wf-ink-missing");
+    await expect(build(root)).rejects.toThrow(
+      `src/styles/components/card.scss:${line}: var(--wf-ink-missing) reads a custom property nothing defines`);
+    expect(await exists(join(root, ".out", "storefront"))).toBe(false);
+  }, 60_000);
+
+  it("builds with a fallback, with allowProperties, and with the property set in a component's style attribute", async () => {
+    const root = await benchCopy();
+    const card = join(root, "src", "styles", "components", "card.scss");
+    await append(card, `\n.card-title {\n  color: var(--wf-ink-missing, currentColor);\n  gap: var(--js-gap);\n  margin: var(--badge-size);\n}\n`);
+    // The badge's template sets --badge-size in a style attribute, on a page the build writes.
+    await placeBadge(root, "");
+    await build(root, config({ allowProperties: ["--js-*"] }));
+    await expect(build(root)).rejects.toThrow(/var\(--js-gap\)/);
+  }, 90_000);
+
+  it("skips a var() in a comment, and one whose name Sass builds", async () => {
+    const root = await benchCopy();
+    await append(join(root, "src", "styles", "components", "card.scss"),
+      `\n// color: var(--in-a-comment);\n/* var(--in-a-block) */\n$k: x;\n.card-title { color: var(--wf-#{$k}); }\n`);
+    await build(root);
   }, 60_000);
 });
