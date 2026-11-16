@@ -67,8 +67,9 @@ export interface PageAssembly {
   site: Record<string, unknown> | undefined;
   /** Where links into the workbench start, ending with "/". */
   workbenchUrl: string;
-  /** Set in `pd dev`: the live-reload socket's port, and the generation the page's request took. */
-  live?: { wsPort: number; generation: string };
+  /** Set in `pd dev`: the live-reload socket's port, the generation the page's request took, and the site's base
+   *  path ("/" or "/docs/"), which the live client puts in front of a changed page's route. */
+  live?: { wsPort: number; generation: string; basePath: string };
   /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created is null. */
   dates?: GitDates;
   /** Checks a link-preview image path against the project's assets (page-image.ts). */
@@ -146,16 +147,24 @@ export function copyScript(): string {
  * was being rendered, loaded or reloaded reached no socket of it; `hello` says the current generation, and
  * a page behind it reloads, once: the reloaded page takes the current one. The comparison is contracts'
  * `generationBehind`, inlined, as the fitter is.
+ *
+ * A socket that closes (pd dev stopped or restarted, the machine asleep) is opened again a second later, and
+ * again while nothing answers, as the workbench's is. The new socket's `hello` decides: a page that missed a
+ * change, or whose server is another process now, is behind and reloads; one that missed nothing stays.
+ *
+ * `page-changed` names a site route ("/about/"); the page is served under the site's base path (`basePath`,
+ * "/" or "/docs/", one trailing slash), so it compares the route there.
  */
-export function liveScript(wsPort: number, generation = ""): string {
-  return `<script data-pd-live>(function(){var g=${JSON.stringify(generation)};`
+export function liveScript(wsPort: number, generation = "", basePath = "/"): string {
+  return `<script data-pd-live>(function(){var g=${JSON.stringify(generation)},base=${JSON.stringify(basePath)};`
     + `var behind=(${generationBehind.toString()});`
-    + `var ws=new WebSocket("ws://"+location.hostname+":${wsPort}");`
+    + `function connect(){var ws=new WebSocket("ws://"+location.hostname+":${wsPort}");`
     + `ws.onmessage=function(e){var m;try{m=JSON.parse(e.data);}catch(x){return;}`
     + `if(m.type==="hello"){if(behind(g,m.generation))location.reload();return;}`
-    + `if((m.type==="page-changed"&&(m.route===null||m.route===location.pathname))||m.type==="content-swap"||m.type==="css-link-swap")location.reload();`
+    + `if((m.type==="page-changed"&&(m.route===null||base+String(m.route).slice(1)===location.pathname))||m.type==="content-swap"||m.type==="css-link-swap")location.reload();`
     + `else if(m.type==="error")(${LIVE_NOTICE})(String(m.message));};`
-    + `})();${exampleHeightCheck()}</script>`;
+    + `ws.onclose=function(){setTimeout(connect,1000);};}`
+    + `connect();})();${exampleHeightCheck()}</script>`;
 }
 
 /** The live client's notice: one fixed list on the page, a line added per problem; the next reload clears it. */
@@ -201,7 +210,7 @@ ${base !== undefined ? `<meta name="pd-base-path" content="${escapeAttr(base)}">
 </head>
 <body${regions ? ` data-pd-regions="${escapeAttr(regions.join(" "))}"` : ""}>
 ${body}
-${live ? liveScript(live.wsPort, live.generation) : ""}
+${live ? liveScript(live.wsPort, live.generation, live.basePath) : ""}
 </body>
 </html>`;
 }
