@@ -207,7 +207,7 @@ lede: Three folders make a site.
 | `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. See [Redirects](#redirects) |
 | `date` | The page's date, a real calendar date written `YYYY-MM-DD`: what a listing sorts and shows, and its JSON-LD `datePublished`. Without it, the day git first saw the page. A date after today holds the page back from `pd build` until that day, see [Scheduled pages](#scheduled-pages). See [Collections](#collections) |
 | `updated` | The page's last real change, `YYYY-MM-DD`, set by its author: not before `date`. The only "last changed" date a reader or a search engine sees, see [Dates](#dates) |
-| `tags` | One tag or a list, each lowercase letters, digits and hyphens, none twice: `tags: [css, design-systems]` |
+| `tags` | One tag or a list, each lowercase letters, digits and hyphens, none twice: `tags: [css, design-systems]`. When the config declares tags (`storefront.tags`), each is a declared one (or an old key of one). See [Tags](#tags) |
 | `categories` | One category or a list, each declared in `storefront.categories` (or an old key of one), none twice: `categories: [guides]`. See [Categories](#categories) |
 | `draft` | `true` shows the page in `pd dev` and leaves it out of `pd build`. See [Drafts](#drafts) |
 | `sort` | On a folder's `index.md` only: `date` lists the folder's pages newest first; `order`, the default, in the folder's order |
@@ -376,8 +376,10 @@ keys below, at any depth.
 | `updated` | The page's `updated`, `YYYY-MM-DD`, else `null`. Never git's last commit, see [Dates](#dates) |
 | `children` | On a folder's `index.md`: the folder's pages, an entry each, sorted as its `sort` says (see [Collections](#collections)); `[]` on any other page |
 | `date` | The page's `date`, else the day git first saw it (`YYYY-MM-DD`), else `null` |
-| `tags` | The page's `tags`, else `[]` |
-| `categories` | The page's categories, in its order, each `{ key, label, description }` (`description` `null` when the config gives none), else `[]` |
+| `tags` | The page's tags, in its order, each `{ key, label, description, route }` (see [Tags](#tags)), else `[]` |
+| `categories` | The page's categories, in its order, each `{ key, label, description, route }` (`description` `null` when the config gives none, `route` the category's page or `null`), else `[]` |
+| `term` | On a tag or category page: the tag or category, `{ key, label, description, route, count }` (see [Tag and category pages](#tag-and-category-pages)), else `null` |
+| `terms` | On the index of the tags or the categories: every one with a page, by label, each as `term`, else `null` |
 | `listing` | On a folder's `index.md`: the folder's pages rendered through the view its `view:` names, as HTML for `{{{page.listing}}}` (see [Listing views](#listing-views)); `null` on any other page |
 
 ```hbs
@@ -463,8 +465,8 @@ has the same fixed shape:
 | `date` | The page's `date`, else the day git first saw it, else `null` |
 | `updated` | The page's `updated`, or `null` |
 | `image` | The page's `image`, a path in the assets, or `null` |
-| `tags` | The page's `tags`, or `[]` |
-| `categories` | The page's categories, each `{ key, label, description }`, or `[]` |
+| `tags` | The page's tags, each `{ key, label, description, route }`, or `[]` |
+| `categories` | The page's categories, each `{ key, label, description, route }`, or `[]` |
 | `draft` | `true` for a draft in `pd dev` |
 | `scheduled` | `true` in `pd dev` for a page dated after today |
 
@@ -586,15 +588,16 @@ the sub-keys Pattern Dump fills.
 |---|---|---|
 | `pages` | Pages picked by hand, by their path in the pages folder (`articles/a.md`): listed first, in this order | none |
 | `collections` | Folders' paths (`articles`, `blog/news`), or `same` for the page's own folder | every folder |
-| `categories` | Declared categories (an old key works, with a warning) | none |
-| `tags` | Tags | none |
+| `categories` | Declared categories (an old key works, with a warning), or `same` for the page's own | none |
+| `tags` | Tags (declared ones, when the config declares tags), or `same` for the page's own | none |
 | `match` | `any`: a page needs one of the listed tags, and one of the categories; `all`: every one | `any` |
 | `sort` | `relevance` (the number of tags and categories a page shares with the current one, then the date), `date` or `title` | `date` |
 | `order` | `asc` or `desc`; not with `relevance`, which always lists the most relevant first | newest first; A to Z |
 | `limit` | How many pages in all, picked ones included: a whole number from 1 | no limit |
 | `view` | A view (`views/<name>`), as for a listing | none |
 
-With both `tags` and `categories`, a page must match both. A page with no date sorts last. Always: the current page
+With both `tags` and `categories`, a page must match both. `same` is the current page's own tags (categories); on a page
+with none the query lists no page. On a tag page it is that tag. A page with no date sorts last. Always: the current page
 is left out, a page never comes twice (a picked page isn't repeated), and drafts and scheduled pages never appear,
 in `pd dev` either.
 
@@ -613,7 +616,8 @@ page, and `related: true` keeps the layout's as it is. The key is the build's: t
 one place a page's frontmatter nests: one level of keys under a key, each a value or a list.
 
 **Every value is checked**, at the page's line or in the layout's schema: an option there isn't, a picked page that
-doesn't exist (with a "did you mean"), a folder that isn't one, a category that isn't declared, a tag no page has, an
+doesn't exist (with a "did you mean"), a folder that isn't one, a category that isn't declared, a tag that isn't declared (or, without declared tags, a
+tag no page has), an
 unknown `sort`, `match` or `order`, `order` with `relevance`, a `limit` that isn't a whole number from 1, more picked
 pages than the limit, a page picked twice, and a view that isn't one; every page is checked against the view's card.
 A picked draft or scheduled page fails `pd build`; in `pd dev` it is a warning, and left out.
@@ -645,9 +649,67 @@ storefront: {
   builds, as the new category, with a warning that names the page and line so it can be updated. An alias that is
   a key of its own, or that two categories claim, is a config problem.
 - **A layout** gets `page.categories` (in the page's order) and each listing entry carries them. `site.categories`
-  is every declared category in the config's order, `{ key, label, description }`, on every page, when
+  is every declared category in the config's order, `{ key, label, description, route }`, on every page, when
   `partials/base`'s schema lists `categories` under `site.properties` (no shape of its own, a description at most).
   The config can't set `site.categories`.
+
+### Tags
+
+A tag is a URL segment a page lists in `tags:`. Without declarations any tag works, and its label is its key. The
+config can declare them, as it declares categories: then they are the list, so a typo stops the page (with a "did you
+mean"), and an old key builds as the tag it now is, with a warning.
+
+```ts
+storefront: {
+  tags: {
+    css: { label: "CSS", description: "Cascading style sheets", aliases: ["styles"] },
+    "design-tokens": { label: "Design tokens" },
+  },
+},
+```
+
+A layout gets each tag as `{ key, label, description, route }`, as it gets a category: `label` to show it, `key` as its
+URL segment, `route` its [tag page](#tag-and-category-pages) or `null`. Write `<a href="{{route}}">{{label}}</a>`.
+
+**Tags were strings before 0.5.0.** A template that still writes one as text, `{{#each page.tags}}{{this}}{{/each}}`,
+would print `[object Object]`, so the page stops instead, naming the template and line and what to write
+(`{{label}}`). A card whose schema declares `tags` as a list of strings stops the listing the same way: declare the
+items as objects, or leave `items` out.
+
+### Tag and category pages
+
+Pattern Dump makes a page for every tag and every category a published page has, and an index of each, through the
+skin's layouts:
+
+| Route | Layout | What the layout gets |
+|---|---|---|
+| `/tags/<key>/` | `layouts/tag` | `title` (the label), `description` (when declared), `page.term` |
+| `/tags/` | `layouts/tags` | `title` ("Tags"), `page.terms` |
+| `/categories/<key>/` | `layouts/category` | as a tag page |
+| `/categories/` | `layouts/categories` | `title` ("Categories"), `page.terms` |
+
+- **Their pages are a query** the layout declares, with `tags: same` (`categories: same`), so views, cards and every
+  check work as on any page:
+
+  ```json
+  "pages": { "x-pd-query": { "tags": "same", "sort": "date", "view": "list" } }
+  ```
+
+- **Published pages only.** Drafts and scheduled pages never count, in `pd dev` either: a tag only they have gets no
+  page, and isn't in the index.
+- **On and off:** `storefront.tagPages` and `storefront.categoryPages`. Left out, the pages are there when the skin has
+  the layout (`layouts/tag`; the index when it has `layouts/tags` too), and a skin without it gets none, with no
+  message. `false` turns them off. `true`, or `{ path, title }`, asks for them: a missing layout is then a problem.
+  `path` is the URL segment (`{ path: "topics" }` gives `/topics/css/`), `title` the index's title.
+- **Old keys forward.** `/tags/<old>/` of a declared tag's alias is a redirect to `/tags/<key>/`, like a page's
+  `redirectFrom`.
+- **Checked:** a page or folder of the pages folder at a generated route, or a `redirectFrom` claiming one, is a
+  problem naming both; the two paths can't be the same.
+- They are in the sitemap (`lastmod`: the newest change of their pages) and have JSON-LD `CollectionPage`. They are
+  not in the nav or any listing, and the workbench doesn't list them under a layout's pages yet.
+- No pagination yet: a tag page lists every page with the tag.
+
+The starter (`pd init --storefront`) has plain `tag`, `tags`, `category` and `categories` layouts.
 
 ### Scheduled pages
 
@@ -813,9 +875,10 @@ or with a path, such as `https://example.github.io/project/`, for a site publish
 
 `og:type` is `website`, except on an article: a page whose frontmatter gives it a `date`, other than the home
 page and a listing (a folder's `index.md` with pages under it). An article gets `og:type` `article`, with
-`article:published_time` (its `date`), `article:modified_time` (its `updated`, when it has one) and one
-`article:tag` per tag, and its JSON-LD graph adds an `Article`
-(headline, dates, `keywords` from its tags) as the page's main entity. The date git gives a page does not make
+`article:published_time` (its `date`), `article:modified_time` (its `updated`, when it has one), `article:section`
+(its first category's label: Open Graph has one) and one `article:tag` per tag (its label), and its JSON-LD graph
+adds an `Article` (headline, dates, `keywords` from its tags' labels, `articleSection` from its categories' labels:
+one string, or a list for several) as the page's main entity. The date git gives a page does not make
 it an article: every committed page has one.
 
 and `pd build` writes `sitemap.xml`. Without it, those are left out and `pd build` says so once. In `pd dev`
