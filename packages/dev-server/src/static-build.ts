@@ -30,7 +30,7 @@ import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
 import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule } from "./storefront/browser-checks.js";
-import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
+import { PageCheckError, runPagesA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { checkClasses } from "./storefront/class-check.js";
 import { checkProperties } from "./storefront/property-check.js";
@@ -59,6 +59,9 @@ export interface StaticBuildOptions {
   loadPlaywright?: (root: string) => Promise<PlaywrightModule>;
   /** Where search gets Pagefind from. Default: the project's own (loadProjectPagefind); undefined for none. */
   loadPagefind?: (root: string) => Promise<PagefindModule | undefined>;
+  /** How many worker threads check the storefront's pages for accessibility (@pattern-dump/a11y runPagesA11y);
+   *  1 checks them in this thread. Default: defaultCheckWorkers(), the cores less one, at most 8, within memory. */
+  checkWorkers?: number;
 }
 
 /** Not a test's watcher barrier (`.__testOnly_barrier`, which tests and the settle hook write into watched
@@ -342,11 +345,19 @@ async function buildOnce(
     // exactly one main and one <h1>, stop the build; the rest are warnings in the report, grouped by rule.
     const errors: string[] = [];
     const warned = new Map<string, { finding: PageA11yFinding; pages: string[]; elements: number }>();
-    for (const page of pages) {
-      const html = sfCrawl.documents.get(page);
-      if (html === undefined) continue;
+    // axe runs on worker threads (runPagesA11y); its findings come back in the pages' order, so the report is the
+    // same however the work was spread.
+    const checked = pages.filter(page => sfCrawl.documents.has(page));
+    const htmlOf = (page: string): string => sfCrawl.documents.get(page)!;
+    const axeFindings = await runPagesA11y(checked.map(htmlOf), opts.checkWorkers !== undefined ? { workers: opts.checkWorkers } : {})
+      .catch(async (e: unknown) => {
+        await server.close();
+        throw e instanceof PageCheckError ? new Error(`pd build: the accessibility check of ${checked[e.index]} failed: ${e.message}`) : e;
+      });
+    for (const [k, page] of checked.entries()) {
+      const html = htmlOf(page);
       for (const p of checkPageBasics(html)) errors.push(`${page}: ${p}`);
-      for (const f of await runPageA11y(html)) {
+      for (const f of axeFindings[k]!) {
         const where = f.nodes.map(n => n.target).join(", ");
         if (f.severity === "error") {
           errors.push(`${page}: ${f.ruleId} (${f.impact}): ${f.help}, on ${where} (${f.helpUrl})`);

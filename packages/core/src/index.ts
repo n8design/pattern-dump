@@ -32,7 +32,7 @@ export async function runDev(
 export async function runBuild(
   root: string,
   configPath: string | undefined,
-  options: { out?: string; base?: string; audit?: boolean; browser?: boolean; pdVersion: string },
+  options: { out?: string; base?: string; audit?: boolean; browser?: boolean; checkWorkers?: number; pdVersion: string },
 ): Promise<void> {
   const config = await loadConfig(root, configPath);
   const outDir = resolve(root, options.out ?? config.build?.outDir ?? config.outDir ?? "dist");
@@ -41,6 +41,7 @@ export async function runBuild(
     ...(options.base !== undefined ? { basePath: options.base } : {}),
     ...(options.audit !== undefined ? { audit: options.audit } : {}),
     ...(options.browser ? { browser: true } : {}),
+    ...(options.checkWorkers !== undefined ? { checkWorkers: options.checkWorkers } : {}),
     pdVersion: options.pdVersion,
     log: line => console.log(`[pd build] ${line}`),
   });

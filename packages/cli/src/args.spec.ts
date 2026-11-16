@@ -61,6 +61,17 @@ describe("pd build", () => {
     expect(parseCommand(["build", "--audit"], "/w")).toEqual({ kind: "build", root: "/w", audit: true });
     expect(parseCommand(["build", "--audit", "--no-audit"], "/w")).toMatchObject({ kind: "error" });
   });
+
+  it("--check-workers takes a whole number of 1 or more; left out, the build chooses", () => {
+    expect(parseCommand(["build", "--check-workers", "3"], "/w")).toEqual({ kind: "build", root: "/w", checkWorkers: 3 });
+    expect(parseCommand(["build", "--check-workers", "1"], "/w")).toEqual({ kind: "build", root: "/w", checkWorkers: 1 });
+    expect(parseCommand(["build"], "/w")).not.toHaveProperty("checkWorkers");
+    for (const bad of ["0", "-2", "1.5", "many", ""]) {
+      expect(parseCommand(["build", `--check-workers=${bad}`], "/w")).toEqual({
+        kind: "error", message: `--check-workers takes a whole number of 1 or more (got "${bad}")`,
+      });
+    }
+  });
 });
 
 describe("pd export", () => {

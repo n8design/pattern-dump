@@ -80,6 +80,7 @@ switch (command.kind) {
       ...(command.base !== undefined ? { base: command.base } : {}),
       ...(command.audit !== undefined ? { audit: command.audit } : {}),
       ...(command.browser ? { browser: true } : {}),
+      ...(command.checkWorkers !== undefined ? { checkWorkers: command.checkWorkers } : {}),
       pdVersion: PD_VERSION,
     })
       .then(() => process.stdout.write("", () => process.exit(0)))

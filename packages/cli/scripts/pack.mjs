@@ -36,10 +36,11 @@ const EXACT = new Set(["sharp"]);
 await rm(outRoot, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 
-// ---- 1. Bundle: the bin and the library entry --------------------------------------------------
+// ---- 1. Bundle: the bin, the library entry, and the accessibility check's worker --------------------
+// The worker is a file of its own, started by path (a11y page-pool.ts finds it beside its module or one folder up).
 const builtins = new Set([...builtinModules, ...builtinModules.map(m => `node:${m}`)]);
 const result = await build({
-  entryPoints: { pd: join(cliDir, "src/index.ts"), index: join(cliDir, "src/lib.ts") },
+  entryPoints: { pd: join(cliDir, "src/index.ts"), index: join(cliDir, "src/lib.ts"), "page-worker": join(repo, "packages/a11y/dist/page-worker.js") },
   outdir: dist,
   bundle: true,
   platform: "node",
