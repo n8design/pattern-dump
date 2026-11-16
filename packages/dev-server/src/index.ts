@@ -138,6 +138,10 @@ export interface DevServerOptions {
    *  build so a build that runs past midnight holds back the same pages throughout. Without it, each request takes the
    *  clock's day. */
   today?: string;
+  /** `pd build` only: the storefront's pages folder is read once and that reading serves every request, since the
+   *  folder doesn't change while a build runs. Without it, the reading is kept only until the folder changes (a
+   *  file's size or time stamp, a new or deleted file), checked on every request. */
+  pagesOnce?: boolean;
   /** `pd build` only: where storefront pages link into the workbench — the built workbench's address
    *  (storefront.workbenchUrl). Without it, pages link to this process's own workbench on pd.localhost. */
   storefrontWorkbenchUrl?: string;
@@ -353,6 +357,7 @@ export async function startDevServer(
   const testHooks = live && process.env["PD_TEST_HOOKS"] === "1";
   const routeCtx: RouteContext = {
     cfg, state, rendering, tracker, devUiDist, boot, now, live, site, ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
+    ...(opts.pagesOnce ? { pagesOnce: true } : {}),
     images: async () => { await images.ready(generationNow()); return images.lookup; },
     ...(testHooks ? { settle: () => settleWatcher ? settleWatcher() : Promise.reject(new Error("settle: the watcher is not running yet")) } : {}),
     ...(live ? { generation: () => hotreloader.generation() } : {}),

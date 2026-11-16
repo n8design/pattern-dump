@@ -26,6 +26,7 @@ import { renderDoc, type DocRegions, type ProseImages } from "../markdown.js";
 import { readSchema, unreadableSchemas, type ObjectSchema, type PlacedProblem } from "./declared-values.js";
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
+import { renderError } from "./pages-cache.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { resolveNavigations } from "./navigations.js";
 import { checkSampleData, includeTree } from "./sample-data.js";
@@ -641,7 +642,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     try {
       listing.listing = (await a.render({ component: view.id, data: { entries: view.entries } })).html;
     } catch (e) {
-      return fail([`${view.id}: ${e instanceof Error ? e.message : String(e)}`]);
+      return fail([`${view.id}: ${renderError(e)}`]);
     }
   } else if (declares("listing")) listing.listing = null;
   // Each query's pages, and the same through its view: rendered once, and not at all when no page matched.
@@ -652,7 +653,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       try {
         html = (await a.render({ component: q.view.id, data: { entries: q.entries } })).html;
       } catch (e) {
-        return fail([`${q.view.id}: ${e instanceof Error ? e.message : String(e)}`]);
+        return fail([`${q.view.id}: ${renderError(e)}`]);
       }
     }
     queryValues[q.name] = { entries: q.entries, listing: html };
@@ -688,7 +689,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     try {
       return await a.render({ component: checked.layoutId, data: dataFor(body, headings) });
     } catch (e) {
-      return fail([`${page.path}: ${e instanceof Error ? e.message : String(e)}`]);
+      return fail([`${page.path}: ${renderError(e)}`]);
     }
   };
   const isFailed = (r: Awaited<ReturnType<Render>> | AssembledPage): r is AssembledPage => "status" in r;
@@ -742,7 +743,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     try {
       headExtra = (await a.render({ component: HEAD_PARTIAL, data: { site: siteData, body: null, nav: null } })).html.trim();
     } catch (e) {
-      const p = `${HEAD_PARTIAL}: ${e instanceof Error ? e.message : String(e)}`;
+      const p = `${HEAD_PARTIAL}: ${renderError(e)}`;
       siteWide = [...siteWide, p];
       return fail([p]);
     }
