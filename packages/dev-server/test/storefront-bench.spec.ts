@@ -129,6 +129,10 @@ describe("storefront bench in the workbench", () => {
       { route: "/guides/setup/", path: "guides/setup.md", source: "own" },
     ]);
     expect(await pagesOf("layouts/page")).toEqual([{ route: "/guides/", path: "guides/index.md", source: "default" }]);
+    // A generated page: by route, with what generated it (a term's page, or the index of its kind).
+    expect(await pagesOf("layouts/tag")).toEqual(["design", "images", "layout"].map(t =>
+      ({ route: `/tags/${t}/`, source: "generated", generated: { kind: "tag", term: t } })));
+    expect(await pagesOf("layouts/tags")).toEqual([{ route: "/tags/", source: "generated", generated: { kind: "tag" } }]);
     // Not a layout: no pages at all.
     expect(await pagesOf("components/card")).toBeUndefined();
   });

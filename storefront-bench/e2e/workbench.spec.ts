@@ -59,6 +59,22 @@ test.describe("the skin in the workbench", () => {
       .toHaveText(["about.md (its own layout)", "articles/plain.md (its own layout)", "guides/setup.md (its own layout)"]);
   });
 
+  // A generated tag or category page has no file: listed by route, with what generated it.
+  test("lists the generated tag pages and their index under their layouts", async ({ page }) => {
+    const itemsOf = async (id: string) => {
+      await page.goto(`${WORKBENCH}/${id}`);
+      await page.waitForSelector("#preview-frame[srcdoc]");
+      await page.click("button[data-tab='relationships']");
+      return page.locator(".rel-panel .rel-group-heading", { hasText: /^Pages$/ }).locator("xpath=following-sibling::ul[1]").locator(".rel-item");
+    };
+    await expect(await itemsOf("layouts/tag")).toHaveText([
+      `/tags/design/ (the page of the tag "design", from storefront.tagPages)`,
+      `/tags/images/ (the page of the tag "images", from storefront.tagPages)`,
+      `/tags/layout/ (the page of the tag "layout", from storefront.tagPages)`,
+    ]);
+    await expect(await itemsOf("layouts/categories")).toHaveText(["/categories/ (the index of the categories, from storefront.categoryPages)"]);
+  });
+
   test("shows no Pages group on a component that is not a layout", async ({ page }) => {
     await page.goto(`${WORKBENCH}/components/card`);
     await page.waitForSelector("#preview-frame[srcdoc]");

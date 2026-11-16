@@ -282,13 +282,19 @@ describe("pd build — the storefront root", () => {
     // A layout's detail lists the pages that render with it (relationships.pages), which only a site has: that, and
     // nothing else, differs.
     const layouts = ["article", "doc", "home", "listing", "page"].map(l => `api/component/layouts/${l}/index.json`);
-    // The generated pages' layouts list none yet (a generated page has no source in contracts' LayoutPageUse): with a
-    // site their list is there, and empty.
-    const generated = ["categories", "category", "tag", "tags"].map(l => `api/component/layouts/${l}/index.json`);
-    expect(differing.sort()).toEqual([...layouts, ...generated].sort());
-    for (const k of generated) {
+    // The generated pages' layouts list the tag and category pages and their indexes, each with what generated it.
+    const generated: Record<string, unknown[]> = {
+      categories: [{ route: "/categories/", source: "generated", generated: { kind: "category" } }],
+      category: ["design-systems", "guides"].map(t => ({ route: `/categories/${t}/`, source: "generated", generated: { kind: "category", term: t } })),
+      tag: ["design", "images", "layout"].map(t => ({ route: `/tags/${t}/`, source: "generated", generated: { kind: "tag", term: t } })),
+      tags: [{ route: "/tags/", source: "generated", generated: { kind: "tag" } }],
+    };
+    const generatedKeys = Object.keys(generated).map(l => `api/component/layouts/${l}/index.json`);
+    expect(differing.sort()).toEqual([...layouts, ...generatedKeys].sort());
+    for (const [l, pages] of Object.entries(generated)) {
+      const k = `api/component/layouts/${l}/index.json`;
       const withSite = JSON.parse(a.get(k)!.bytes.toString("utf8")) as { relationships: { pages?: unknown[] } };
-      expect(withSite.relationships.pages, k).toEqual([]);
+      expect(withSite.relationships.pages, k).toEqual(pages);
       delete withSite.relationships.pages;
       expect(withSite, k).toEqual(JSON.parse(b.get(k)!.bytes.toString("utf8")));
     }
