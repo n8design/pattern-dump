@@ -145,6 +145,18 @@ describe("a template that writes a tag as text", () => {
     });
     expect((await s.assemble("/")).page.problems).toEqual([expect.stringMatching(/^partials\/tags \(tags\.hbs:1\): \{\{#each page\.tags\}\} writes \{\{\.\}\}/)]);
   });
+
+  it("fails it for an included component whose schema declares tags as strings, though its template is right", async () => {
+    const s = await site({ "index.md": page("Home", "tags: [css]\n") }, {
+      pageLayout: "{{#> partials-base}}<main><h1>{{title}}</h1>{{> components-tag-list tags=page.tags}}</main>{{/partials-base}}",
+      patterns: {
+        "components/tag-list/tag-list.hbs": "<ul>{{#each tags}}<li>{{label}}</li>{{/each}}</ul>",
+        "components/tag-list/tag-list.schema.json": JSON.stringify({ type: "object", properties: { tags: { type: "array", items: { type: "string" } } } }),
+      },
+    });
+    expect((await s.assemble("/")).page.problems).toEqual([`components/tag-list (tag-list.schema.json) declares tags as a list of strings, `
+      + `but a tag is an object since 0.5.0 (key, label, description, route): declare its items as "type": "object", or leave items out`]);
+  });
 });
 
 describe("tag pages", () => {

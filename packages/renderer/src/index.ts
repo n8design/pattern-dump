@@ -14,6 +14,7 @@ export { helperShadows, type HelperShadow } from "./helper-shadow";
 export { parseJson, type ParsedJson } from "./json";
 import { helperShadows } from "./helper-shadow";
 import { parseJson } from "./json";
+import { tagShapeProblems } from "./tag-shape";
 import { checkSchemaExtensions } from "./schema-extensions";
 import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
@@ -593,7 +594,17 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
           });
         }
       }
-    } catch { /* no schema file — skip */ }
+    } catch { /* no schema, or one that doesn't parse (reported above) */ }
+
+    // Tags read as objects while the sample data or the schema gives strings, or the reverse (tag-shape.ts).
+    if (templateHbsPath) {
+      diagnostics.push(...tagShapeProblems({
+        template: templateSrc, templateFile: display(templateHbsPath), data,
+        ...(entry.jsonPath ? { dataPath: entry.jsonPath } : {}),
+        ...(parsedSchema?.ok && entry.schemaPath
+          ? { schema: parsedSchema.value as object, schemaPath: entry.schemaPath, schemaFile: display(entry.schemaPath) } : {}),
+      }));
+    }
 
     // A data field a bare {{name}} never reads, since a helper of that name answers (helper-shadow.ts). A field the
     // schema declares is the schema check's error already (SCHEMA_INVALID), and not said twice.

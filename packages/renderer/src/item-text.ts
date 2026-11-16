@@ -12,25 +12,21 @@ type PathNode = { type: string; original?: unknown; parts?: unknown };
 /** Blocks that keep the item as their context: what they hold still writes the item. */
 const SAME_CONTEXT = new Set(["if", "unless"]);
 
+/** One place a field of an item is read: `{{label}}` or `{{this.label}}` in the `{{#each}}` over the list. */
+export interface ItemFieldRead { list: string; field: string; line: number; column: number }
+
 /**
- * Every `{{this}}` / `{{.}}` (escaped or not) written directly in an `{{#each <path>}}` whose path's last segment is
- * `name` (`page.tags`, `tags`), also inside its #if and #unless. Not its {{else}}, not inside a block that changes the
- * context (another #each, #with), not as a helper's argument. A template that does not parse has none here.
+ * Walk every `{{#each <path>}}` whose path's last segment is `name` (`page.tags`, `tags`), visiting each mustache
+ * written directly in it, also inside its #if and #unless. Not its {{else}}, not inside a block that changes the
+ * context (another #each, #with). A template that does not parse has none.
  */
-export function itemsWrittenAsText(template: string, name: string): ItemAsText[] {
+function eachMustache(template: string, name: string, visitMustache: (list: string, s: Node) => void): void {
   let ast: Node;
-  try { ast = Handlebars.parse(template) as unknown as Node; } catch { return []; }
-  const out: ItemAsText[] = [];
-  const isItem = (p: PathNode | undefined) => p?.type === "PathExpression" && (p.original === "this" || p.original === ".");
+  try { ast = Handlebars.parse(template) as unknown as Node; } catch { return; }
   const inEach = (body: unknown[], list: string): void => {
     for (const s of body as Node[]) {
-      if (s.type === "MustacheStatement") {
-        const params = (s["params"] as unknown[] | undefined) ?? [];
-        if (params.length === 0 && isItem(s["path"] as PathNode)) {
-          const loc = s.loc?.start ?? { line: 1, column: 0 };
-          out.push({ list, item: (s["path"] as PathNode).original === "." ? "." : "this", line: loc.line, column: loc.column + 1 });
-        }
-      } else if (s.type === "BlockStatement" && SAME_CONTEXT.has(String((s["path"] as PathNode).original))) {
+      if (s.type === "MustacheStatement") visitMustache(list, s);
+      else if (s.type === "BlockStatement" && SAME_CONTEXT.has(String((s["path"] as PathNode).original))) {
         inEach(((s["program"] as Node | undefined)?.["body"] as unknown[]) ?? [], list);
         inEach(((s["inverse"] as Node | undefined)?.["body"] as unknown[]) ?? [], list);
       }
@@ -48,5 +44,39 @@ export function itemsWrittenAsText(template: string, name: string): ItemAsText[]
     for (const [k, v] of Object.entries(n)) if (k !== "loc" && v && typeof v === "object") visit(v);
   };
   visit(ast);
+}
+
+/**
+ * Every `{{this}}` / `{{.}}` (escaped or not) written directly in an `{{#each <path>}}` whose path's last segment is
+ * `name`, as eachMustache walks it; not as a helper's argument.
+ */
+export function itemsWrittenAsText(template: string, name: string): ItemAsText[] {
+  const out: ItemAsText[] = [];
+  const isItem = (p: PathNode | undefined) => p?.type === "PathExpression" && (p.original === "this" || p.original === ".");
+  eachMustache(template, name, (list, s) => {
+    const params = (s["params"] as unknown[] | undefined) ?? [];
+    if (params.length === 0 && isItem(s["path"] as PathNode)) {
+      const loc = s.loc?.start ?? { line: 1, column: 0 };
+      out.push({ list, item: (s["path"] as PathNode).original === "." ? "." : "this", line: loc.line, column: loc.column + 1 });
+    }
+  });
+  return out;
+}
+
+/** Every read of one of `fields` of the item (`{{label}}`, `{{this.label}}`, escaped or not, not a helper call) in an
+ *  `{{#each <path>}}` whose path's last segment is `name`, as eachMustache walks it. */
+export function itemFieldsRead(template: string, name: string, fields: readonly string[]): ItemFieldRead[] {
+  const out: ItemFieldRead[] = [];
+  eachMustache(template, name, (list, s) => {
+    const params = (s["params"] as unknown[] | undefined) ?? [];
+    const path = s["path"] as PathNode;
+    // One segment of the item itself: not {{../label}} (the parent's), not {{@key}} (data).
+    if (params.length || path?.type !== "PathExpression" || !Array.isArray(path.parts) || path.parts.length !== 1) return;
+    if ((path as { depth?: number }).depth || (path as { data?: boolean }).data) return;
+    const field = String(path.parts[0]);
+    if (!fields.includes(field)) return;
+    const loc = s.loc?.start ?? { line: 1, column: 0 };
+    out.push({ list, field, line: loc.line, column: loc.column + 1 });
+  });
   return out;
 }
