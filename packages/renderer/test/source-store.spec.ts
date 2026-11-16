@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import Handlebars from "handlebars";
+import { HtmlValidate } from "html-validate";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer, deepMerge } from "../src/index";
 import { deepFreeze, mergeData, templateKey } from "../src/source-store";
@@ -116,5 +117,20 @@ describe("a renderer given its maps", () => {
     expect((await render({ component: "atoms/card", data: live })).html).toContain("calm l");
     expect(live).toEqual({ meta: { size: "l" } });
     expect((await render({ component: "atoms/card" })).html).toContain("calm s");
+  });
+
+  it("validates the same markup once, and gives every render its HTML diagnostics", async () => {
+    // Invalid markup on purpose (a <div> inside a <span>), so there is a diagnostic to give each render.
+    const render = await renderer({ "atoms/odd/odd.hbs": "<span><div>odd</div></span>\n" });
+    const validate = vi.spyOn(HtmlValidate.prototype, "validateStringSync");
+    try {
+      const first = await render({ component: "atoms/odd" });
+      const second = await render({ component: "atoms/odd" });
+      const html = (r: typeof first) => (r.meta?.diagnostics ?? []).filter(d => d.kind === "HTML_INVALID");
+      expect(html(first).length).toBeGreaterThan(0);
+      expect(html(second)).toEqual(html(first));
+      expect(html(second)[0]).not.toBe(html(first)[0]);
+      expect(validate).toHaveBeenCalledTimes(1);
+    } finally { validate.mockRestore(); }
   });
 });

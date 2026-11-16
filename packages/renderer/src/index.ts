@@ -528,20 +528,21 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     const diagnostics: Diagnostic[] = [...dataDiagnostics.values()];
 
     // HTML content-model validation (fragment-scoped — no doctype/shell noise).
-    const htmlReport = htmlValidator.validateStringSync(html);
-    for (const result of htmlReport.results) {
-      for (const msg of result.messages) {
-        diagnostics.push({
-          kind: "HTML_INVALID",
-          severity: "warning",
-          source: "html",
-          message: msg.message,
-          // The specific html-validate rule (e.g. "element-permitted-content") — the granular rule id
-          // the diagnostics graph keys its rule nodes on, distinct from the coarse "HTML_INVALID" kind.
-          ...(msg.ruleId ? { ruleId: msg.ruleId } : {}),
-          ...(msg.line != null ? { location: { line: msg.line, column: msg.column } } : {}),
-        });
-      }
+    // Validated once per distinct markup for the store (a component's markup is rendered for its detail, its preview
+    // and its source view alike); each render gets diagnostics of its own.
+    const htmlMessages = store.once(`html ${html}`, () => htmlValidator.validateStringSync(html).results
+      .flatMap(result => result.messages.map(msg => ({ message: msg.message, ruleId: msg.ruleId, line: msg.line, column: msg.column }))));
+    for (const msg of htmlMessages) {
+      diagnostics.push({
+        kind: "HTML_INVALID",
+        severity: "warning",
+        source: "html",
+        message: msg.message,
+        // The specific html-validate rule (e.g. "element-permitted-content") — the granular rule id
+        // the diagnostics graph keys its rule nodes on, distinct from the coarse "HTML_INVALID" kind.
+        ...(msg.ruleId ? { ruleId: msg.ruleId } : {}),
+        ...(msg.line != null ? { location: { line: msg.line, column: msg.column } } : {}),
+      });
     }
 
     // Schema validation (M4.9). schemaPath comes from the discovery entry — no reconstruction.

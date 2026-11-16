@@ -48,11 +48,14 @@ export interface SourceStore {
   textOr<T>(path: string, fallback: T): Promise<string | T>;
   /** Something derived from the store's files, made once under `key`. */
   derived<T>(key: string, make: () => Promise<T>): Promise<T>;
+  /** The same for a value made at once: `make` runs the first time `key` is asked for. */
+  once<T>(key: string, make: () => T): T;
 }
 
 export function createSourceStore(): SourceStore {
   const texts = new Map<string, Promise<string>>();
   const made = new Map<string, Promise<unknown>>();
+  const now = new Map<string, unknown>();
   const text = (path: string): Promise<string> => {
     let t = texts.get(path);
     if (!t) {
@@ -73,6 +76,12 @@ export function createSourceStore(): SourceStore {
         m.catch(() => { if (made.get(key) === m) made.delete(key); });
       }
       return m;
+    },
+    once<T>(key: string, make: () => T): T {
+      if (now.has(key)) return now.get(key) as T;
+      const value = make();
+      now.set(key, value);
+      return value;
     },
   };
 }
