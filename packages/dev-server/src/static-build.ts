@@ -11,7 +11,7 @@
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
 import { cp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { basename, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createImageCache } from "@pattern-dump/build";
 import { sameHostWorkbenchPath, type PatternDumpConfig } from "@pattern-dump/config";
 import {
@@ -33,6 +33,7 @@ import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModu
 import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { workbenchRobotsTxt } from "./storefront/site-files.js";
 import { withNoindex } from "./storefront/base-path.js";
+import { buildSearchIndex, SEARCH_PATH, searchPagefind, type PagefindModule, type SearchRecord } from "./storefront/search.js";
 
 export interface StaticBuildOptions {
   /** Absolute output directory. Emptied first. */
@@ -53,6 +54,8 @@ export interface StaticBuildOptions {
   browser?: boolean;
   /** Where `browser` gets Playwright from. Default: the project's own (loadProjectPlaywright). */
   loadPlaywright?: (root: string) => Promise<PlaywrightModule>;
+  /** Where search gets Pagefind from. Default: the project's own (loadProjectPagefind); undefined for none. */
+  loadPagefind?: (root: string) => Promise<PagefindModule | undefined>;
 }
 
 /** Not a test's watcher barrier (`.__testOnly_barrier`, which tests and the settle hook write into watched
@@ -78,6 +81,9 @@ export interface StaticBuildReport {
   /** The storefront's accessibility check (axe in jsdom, and one <main> and one <h1> per page): the site pages read,
    *  and one line per rule that only warns, with its pages. An error stops the build instead. */
   accessibility?: { pages: number; warnings: string[]; browser?: boolean };
+  /** The storefront's search index (search.ts), written to its _pd/search/: the pages in it, and its files. Absent
+   *  when the site has no search. */
+  search?: { pages: number; files: number; bytes: number };
   /** `--browser`: one line per image whose chosen variant doesn't fit the box it is laid out in. */
   images?: { warnings: string[] };
   /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
@@ -87,6 +93,16 @@ export interface StaticBuildReport {
    *  scheduled folder's index.md), each with the first day it is built. Absent when there are none. */
   scheduled?: ScheduledPage[];
   ms: number;
+}
+
+/** A word --browser searches for: the longest word of the first indexed page's title (by route) that has one of three
+ *  letters or more, so it finds that page. */
+export function searchWord(records: readonly SearchRecord[]): string {
+  for (const r of [...records].sort((a, b) => a.route < b.route ? -1 : 1)) {
+    const words = r.title.match(/\p{L}{3,}/gu);
+    if (words) return [...words].sort((a, b) => b.length - a.length)[0]!;
+  }
+  return "search";
 }
 
 export async function buildStaticSite(
@@ -141,6 +157,10 @@ export async function buildStaticSite(
 
   // --browser: the project's Playwright, loaded before anything is built, so a missing one stops the build at once.
   const playwright = opts.browser && storefront ? await (opts.loadPlaywright ?? loadProjectPlaywright)(project) : undefined;
+  // Search: the project's Pagefind, also before anything is built, so a missing one the site asks for stops at once.
+  const pagefind = storefront ? await searchPagefind(storefront.search, project, opts.loadPagefind) : undefined;
+  /** What each page gives the index, by route, as the crawl serves it. */
+  const searchRecords = new Map<string, SearchRecord>();
 
   const fixed = opts.now;
   const now = fixed ? (): Date => new Date(fixed.getTime()) : (): Date => new Date();
@@ -151,6 +171,7 @@ export async function buildStaticSite(
   const server = await startDevServer(config, root, {
     port: 0, live: false, now, today, ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
     onStorefrontNote: note => { storefrontNotes.add(note); },
+    ...(pagefind ? { onSearchRecord: (r: SearchRecord) => { searchRecords.set(r.route, r); } } : {}),
   });
   log("… server ready");
 
@@ -169,6 +190,12 @@ export async function buildStaticSite(
     throw new Error(`pd build: the storefront has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
   }
   if (sfCrawl) log(`… storefront checked: ${sfCrawl.urls.length} files`);
+  // The search index, from the pages the crawl served, in memory: checked in Chromium with --browser, written with the
+  // site.
+  const searchFiles = pagefind && sfCrawl
+    ? await buildSearchIndex([...searchRecords.values()], pagefind, sfBase).catch(async (e: unknown) => { await server.close(); throw e; })
+    : undefined;
+  if (searchFiles) log(`… search index: ${searchRecords.size} pages`);
   const origin = `http://127.0.0.1:${server.port}`;
 
   // The link check (links.ts), also before anything is written: every reference on every site page (its pages and
@@ -239,7 +266,7 @@ export async function buildStaticSite(
     let imageWarnings: string[] | undefined;
     const browserWarnings: string[] = [];
     if (playwright) {
-      const checked = await runBrowserChecks({ pages, get: sfGet, playwright, basePath: sfBase }).catch(async (e: unknown) => { await server.close(); throw e; });
+      const checked = await runBrowserChecks({ pages, get: sfGet, playwright, basePath: sfBase, ...(searchFiles ? { search: { files: searchFiles, word: searchWord([...searchRecords.values()]) } } : {}) }).catch(async (e: unknown) => { await server.close(); throw e; });
       if (checked.errors.length) {
         await server.close();
         throw new Error(`pd build: the storefront has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
@@ -390,6 +417,18 @@ export async function buildStaticSite(
       }
       await writeFile(join(sfOut, ".nojekyll"), "");
       counts.files++;
+      if (searchFiles) {
+        let bytes = 0;
+        for (const [path, content] of searchFiles) {
+          const file = join(sfOut, ...SEARCH_PATH.split("/").filter(Boolean), ...path.split("/"));
+          await mkdir(dirname(file), { recursive: true });
+          await writeFile(file, content);
+          bytes += content.byteLength;
+        }
+        counts.files += searchFiles.size;
+        counts.bytes += bytes;
+        report.search = { pages: searchRecords.size, files: searchFiles.size, bytes };
+      }
       const stubs = new Set((await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse).pages.flatMap(p => p.redirectFrom ?? []));
       const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u) && !stubs.has(u)).length;
       report.storefront = { outDir: sfOut, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };

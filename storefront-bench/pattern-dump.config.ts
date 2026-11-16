@@ -31,6 +31,7 @@ export default defineConfig({
       images: { label: "Images", description: "Pictures, and how pages show them", aliases: ["pictures"] },
       layout: { label: "Layout" },
     },
+    // Search is left out (storefront.search): pd build indexes the site because the repository has Pagefind.
     // The link-preview image of every page that names none of its own.
     image: "/assets/images/share.png",
     site: {

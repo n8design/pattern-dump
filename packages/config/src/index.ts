@@ -255,6 +255,12 @@ export interface StorefrontConfig {
   /** A page per category and an index of them, as tagPages (`layouts/category`, `layouts/categories`; default path
    *  `categories`, title "Categories"). */
   categoryPages?: boolean | StorefrontTermPages;
+  /**
+   * Search with Pagefind: pd build indexes each page's own content and writes the index to `_pd/search/` in the site.
+   * Pagefind is the project's own (`npm install --save-dev pagefind`). Left out: on when the project has Pagefind.
+   * `true`: on, and a build without Pagefind stops. `false`: off. The search UI is a component of the skin's.
+   */
+  search?: boolean;
 }
 
 /** storefront.tagPages and storefront.categoryPages as an object. */

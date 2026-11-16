@@ -107,6 +107,8 @@ export interface ResolvedConfig {
     /** storefront.tagPages and storefront.categoryPages, as the config writes them (terms.ts reads them). */
     readonly tagPages: boolean | StorefrontTermPages | undefined;
     readonly categoryPages: boolean | StorefrontTermPages | undefined;
+    /** storefront.search as the config writes it (search.ts reads it). */
+    readonly search: boolean | undefined;
   } | null;
 
   readonly overviewsEnabled: boolean;
@@ -250,6 +252,7 @@ export function resolveServerConfig(
       tags: config.storefront.tags,
       tagPages: config.storefront.tagPages,
       categoryPages: config.storefront.categoryPages,
+      search: config.storefront.search,
     } : null,
     images,
     overviewsEnabled:    config.overviews !== false,

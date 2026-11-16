@@ -11,6 +11,11 @@
 //   - on a site published under a path: every request the page makes to the site's own host outside that path is an
 //     error. The base-path pass puts the path in front of every reference in the markup and CSS, so such a request
 //     comes from a script that builds its URL itself (it can read <meta name="pd-base-path">).
+//   - with search (search.ts): the index, served from memory at _pd/search/. On the first page with a search field
+//     (input[type=search]), at each viewport, a word of an indexed page's title is typed and submitted: the page must
+//     load a result (a fragment of the index) within 5 s, and is checked with axe again showing it. Once per viewport:
+//     the search component is the skin's, the same on every page. A request under _pd/search/ the index doesn't have
+//     is an error.
 //
 // Playwright is the project's own (`npm install --save-dev playwright`); Pattern Dump does not depend on it. Without
 // it, or without its Chromium, the build stops with a named error before anything is built.
@@ -18,6 +23,12 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { axeScript, pageRuleTiers, severityOf } from "@pattern-dump/a11y";
+import { SEARCH_PATH } from "./search.js";
+
+/** A page's search field. */
+const FIELD = `input[type="search"]`;
+const typeOf = (path: string): string => path.endsWith(".js") ? "text/javascript" : path.endsWith(".json") ? "application/json"
+  : "application/octet-stream";
 
 /** The part of Playwright this uses. */
 export interface PlaywrightModule {
@@ -32,6 +43,9 @@ interface PwContext {
 interface PwRoute { request(): { url(): string }; fulfill(o: { status: number; headers?: Record<string, string>; body: Buffer }): Promise<void>; abort(): Promise<void> }
 interface PwPage {
   goto(url: string, o?: { waitUntil?: "load" }): Promise<unknown>;
+  fill(selector: string, value: string): Promise<void>;
+  press(selector: string, key: string): Promise<void>;
+  waitForTimeout(ms: number): Promise<void>;
   addScriptTag(o: { content: string }): Promise<unknown>;
   evaluate<R, A>(fn: (arg: A) => R | Promise<R>, arg: A): Promise<R>;
 }
@@ -78,6 +92,8 @@ export async function runBrowserChecks(o: {
   get: (url: string) => Promise<Response>;
   playwright: PlaywrightModule;
   basePath?: string;
+  /** The site's search index, by path under _pd/search/, and a word to search for that finds a page. */
+  search?: { files: ReadonlyMap<string, Uint8Array>; word: string };
 }): Promise<BrowserCheckResult> {
   const base = o.basePath ?? "/";
   let browser: PwBrowser;
@@ -97,6 +113,8 @@ export async function runBrowserChecks(o: {
   };
   /** The page being checked: the requests it makes are named by it. */
   let current = "";
+  /** The results the pages loaded from the search index (its fragments). */
+  let fragments = 0;
   try {
     for (const vp of VIEWPORTS) {
       const context = await browser.newContext({ viewport: vp.viewport, deviceScaleFactor: vp.dpr });
@@ -104,6 +122,19 @@ export async function runBrowserChecks(o: {
       await context.route("**/*", async route => {
         const url = new URL(route.request().url());
         if (url.origin !== origin) { await route.abort(); return; }
+        const searchAt = `${base}${SEARCH_PATH.slice(1)}`;
+        if (o.search && url.pathname.startsWith(searchAt)) {
+          const file = o.search.files.get(url.pathname.slice(searchAt.length));
+          if (file === undefined) {
+            const text = `${current}: a request to ${url.pathname} is under ${searchAt}, and the search index has no such file`;
+            note("error", text, text, vp.name);
+            await route.fulfill({ status: 404, body: Buffer.from("") });
+            return;
+          }
+          if (url.pathname.startsWith(`${searchAt}fragment/`)) fragments++;
+          await route.fulfill({ status: 200, headers: { "content-type": typeOf(url.pathname) }, body: Buffer.from(file) });
+          return;
+        }
         if (!url.pathname.startsWith(base)) {
           // The browser's own favicon request is not the page's.
           if (url.pathname !== "/favicon.ico") {
@@ -121,20 +152,24 @@ export async function runBrowserChecks(o: {
         await route.fulfill({ status: res.status, headers, body: Buffer.from(await res.arrayBuffer()) });
       });
       const page = await context.newPage();
+      let searched = false;
       for (const path of o.pages) {
         current = path;
         await page.goto(`${origin}${base}${path.slice(1)}`, { waitUntil: "load" });
         await page.addScriptTag({ content: axe });
-        const violations = await page.evaluate(async (rules: string[]) => {
-          const r = await (window as unknown as { axe: { run(c: unknown, o: unknown): Promise<{ violations: unknown[] }> } }).axe
-            .run(document, { runOnly: { type: "rule", values: rules }, resultTypes: ["violations"], iframes: false });
-          return r.violations;
-        }, pageRuleTiers.browser) as AxeViolation[];
-        for (const v of violations) {
-          const where = v.nodes.map(n => n.target.map(String).join(" ")).join(", ");
-          const text = `${path}: ${v.id} (${v.impact ?? "minor"}): ${v.help}, on ${where} (${v.helpUrl})`;
-          note(severityOf(v.impact, v.tags) === "error" ? "error" : "a11y", `a11y ${text}`, text, vp.name);
-        }
+        const runAxe = async (state: string) => {
+          const violations = await page.evaluate(async (rules: string[]) => {
+            const r = await (window as unknown as { axe: { run(c: unknown, o: unknown): Promise<{ violations: unknown[] }> } }).axe
+              .run(document, { runOnly: { type: "rule", values: rules }, resultTypes: ["violations"], iframes: false });
+            return r.violations;
+          }, pageRuleTiers.browser) as AxeViolation[];
+          for (const v of violations) {
+            const where = v.nodes.map(n => n.target.map(String).join(" ")).join(", ");
+            const text = `${path}${state}: ${v.id} (${v.impact ?? "minor"}): ${v.help}, on ${where} (${v.helpUrl})`;
+            note(severityOf(v.impact, v.tags) === "error" ? "error" : "a11y", `a11y ${text}`, text, vp.name);
+          }
+        };
+        await runAxe("");
         // Each image with variants, in view (a lazy one loads), then its chosen candidate against its box.
         const images = await page.evaluate(async () => {
           const seen: ImageSeen[] = [];
@@ -155,6 +190,23 @@ export async function runBrowserChecks(o: {
           }
           return seen;
         }, undefined) as ImageSeen[];
+        // The search field, used (its images are read already): a word that finds a page, submitted, must load a result.
+        if (o.search && !searched && await page.evaluate((field: string) => document.querySelector(field) !== null, FIELD)) {
+          searched = true;
+          const before = fragments;
+          await page.fill(FIELD, o.search.word);
+          await page.press(FIELD, "Enter");
+          for (let waited = 0; fragments === before && waited < 5000; waited += 100) await page.waitForTimeout(100);
+          if (fragments === before) {
+            const text = `${path}: searching for "${o.search.word}" in its search field (${FIELD}) showed no result within 5 s, `
+              + `though the index has a page with it: the search component loads ${SEARCH_PATH}pagefind.js under the site's path `
+              + `(<meta name="pd-base-path">) and shows each result's data()`;
+            note("error", text, text, vp.name);
+          } else {
+            await page.addScriptTag({ content: axe });
+            await runAxe(` (showing the results for "${o.search.word}")`);
+          }
+        }
         for (const img of images) {
           if (img.chosen === null || img.box === 0) continue;
           const need = Math.round(img.box * vp.dpr);

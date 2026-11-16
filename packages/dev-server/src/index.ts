@@ -64,6 +64,7 @@ import { surfaceAssetRoots, surfaceCollisions, surfaceDefaultTheme, surfaceDocum
 export { runDiagnosticsAudit } from "./audit.js";
 export { buildStaticSite } from "./static-build.js";
 export { withBasePath } from "./snapshot-writer.js";
+export { loadProjectPagefind, PAGEFIND_INSTALL } from "./storefront/search.js";
 export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // Folder overview gallery — public leaves under a group node.
 // Component detail. Widest fan-out in the package — nothing may import it back.
@@ -89,6 +90,7 @@ import { watchedRoots } from "./watch-roots.js";
 import { startWatching, type WatchHandle } from "./watch.js";
 import { createGitDates } from "./storefront/git-dates.js";
 import { readPages } from "./storefront/pages.js";
+import { projectPagefindEntry, type SearchRecord } from "./storefront/search.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
 // module graph. Substrate for the style and style-modules graphs.
 import { buildAllStyleData } from "./style-index.js";
@@ -141,6 +143,8 @@ export interface DevServerOptions {
   /** `pd build` only: receives each note a storefront page gives (a suffixed heading anchor), for the build
    *  report. Without it, notes are printed to the terminal. */
   onStorefrontNote?: (note: string) => void;
+  /** `pd build` only: receives what each storefront page gives the search index (search.ts), as it is served. */
+  onSearchRecord?: (record: SearchRecord) => void;
   /** `pd dev` only: the config file, watched, and how to load it again (core owns config loading). A change
    *  to `storefront.site` alone is taken live and every storefront page reloads; any other change asks for a
    *  restart. Without them the config is read once, at start. */
@@ -338,6 +342,7 @@ export async function startDevServer(
     ...(live ? { generation: () => hotreloader.generation() } : {}),
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
     ...(opts.onStorefrontNote ? { onStorefrontNote: opts.onStorefrontNote } : {}),
+    ...(opts.onSearchRecord ? { onSearchRecord: opts.onSearchRecord } : {}),
   };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 
@@ -356,6 +361,10 @@ export async function startDevServer(
   if (live) {
     if (cfg.storefront) console.log(`[dev-server] Website:   http://${cfg.storefront.host}:${actualPort}${cfg.storefront.basePath}`);
     console.log(`[dev-server] Workbench: http://${cfg.storefront ? PD_HOSTS.workbench : "localhost"}:${actualPort}/`);
+    // Search is built by pd build only: an index on every save would slow it down.
+    if (cfg.storefront && cfg.storefront.search !== false && (cfg.storefront.search === true || projectPagefindEntry(cfg.cwd) !== undefined)) {
+      console.log(`[dev-server] Search: the index is built by pd build, so the site's search finds nothing in pd dev`);
+    }
   }
   const startupDiscovery = await cachedDiscovery(state);
   const componentCount = startupDiscovery ? [...startupDiscovery.discoveryMap.keys()].filter(id => !id.includes("~")).length : 0;

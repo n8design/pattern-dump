@@ -16,6 +16,7 @@
 import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
+import type { SearchRecord } from "./search.js";
 import { isHelperNameProblem, itemsWrittenAsText, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
 import { basename } from "node:path";
 import { renderDoc, type ProseImages } from "../markdown.js";
@@ -96,6 +97,9 @@ export interface AssembledPage {
   problems: string[];
   /** Notes about a page that rendered, one line each: a heading whose anchor was suffixed (anchors.ts). */
   notes: string[];
+  /** What the page gives the site's search index (search.ts): a page of the site that rendered, other than the 404
+   *  page, a tag or category page, and a page with `index: false`. */
+  search?: SearchRecord;
 }
 
 /** The fitter's glue: a frame with a declared height (its `height` attribute, from the component's
@@ -766,5 +770,20 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     // One main landmark and one <h1> (page-basics.ts): errors in pd build, warnings here.
     notes.push(...checkPageBasics(html).map(p => `warning: ${page!.path}: ${p}`));
   }
-  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/"), problems: [], notes };
+  // The page's own content for the search index: its body, never the layout's markup (search.ts).
+  const entry = model.entries.get(route);
+  const search: SearchRecord | undefined = isNotFound || generated || checked.build.index === false ? undefined : {
+    route, title, body: finalBody, section: collectionOf(route, model), tags: (entry?.tags ?? []).map(t => t.label),
+    categories: (entry?.categories ?? []).map(c => c.label), teaser: entry?.description ?? null, lang: a.lang ?? "en",
+  };
+  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/"), problems: [], notes,
+    ...(search ? { search } : {}) };
+}
+
+/** The label of the collection `route` is in: the folder that lists it (a folder's index page is its own), by its
+ *  index page's title; null for a page at the top. */
+export function collectionOf(route: string, model: PageModel): string | null {
+  const folder = route !== "/" && model.folders.has(route) ? route
+    : [...model.folders].find(([r, f]) => r !== "/" && f.children.includes(route))?.[0];
+  return folder === undefined ? null : model.pages.find(p => p.route === folder)?.title ?? null;
 }

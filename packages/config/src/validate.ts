@@ -63,7 +63,7 @@ const SHAPE: Shape = {
     keys: {
       pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", site: "plain-object",
       url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES, head: "hbs-file",
-      categories: "categories", tags: "tags", tagPages: "term-pages", categoryPages: "term-pages",
+      categories: "categories", tags: "tags", tagPages: "term-pages", categoryPages: "term-pages", search: "boolean",
     },
     required: ["pagesDir", "outDir"],
   },

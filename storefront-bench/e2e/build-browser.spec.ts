@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { crc32, deflateSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
-import { buildStaticSite } from "@pattern-dump/dev-server";
+import { buildStaticSite, loadProjectPagefind } from "@pattern-dump/dev-server";
 import benchConfig from "../pattern-dump.config.js";
 import { save } from "../../test-support/save.js";
 
@@ -207,4 +207,22 @@ test("the bench passes in a browser: no accessibility finding, every variant fit
   const report = await buildStaticSite(cfg, bench, { outDir: join(tmp, "bench-wb"), pdVersion: "0.0.0-test", browser: true, loadPlaywright });
   expect(report.accessibility).toMatchObject({ browser: true, warnings: [] });
   expect(report.images).toEqual({ warnings: [] });
+});
+
+test("with search, a search field that shows no result for a word the index has stops the build, and nothing is written", async () => {
+  const root = await project("search-dead", {
+    // A search field with no script behind it: submitting it reloads the page, and no result is ever loaded.
+    "src/patterns/layouts/page/page.hbs": `<header><form><label for="q">Search</label> <input id="q" type="search" name="q"></form></header>`
+      + `<main class="page"><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n`,
+    "pages/index.md": "---\ntitle: Home\n---\n\nText.\n",
+    "pages/harbour.md": "---\ntitle: Harbour\n---\n\nBoats.\n",
+  });
+  const cfg = validateConfig({ ...config, storefront: { ...config.storefront!, search: true } }, "test");
+  const message = await buildStaticSite(cfg, root, {
+    outDir: join(root, ".out", "wb"), pdVersion: "0.0.0-test", browser: true, loadPlaywright, loadPagefind: () => loadProjectPagefind(bench),
+  }).then(() => "built", (e: Error) => e.message);
+  expect(message).toContain("pd build: the storefront has problems in a browser, so nothing was written:");
+  expect(message).toContain(`  - /harbour/: searching for "Home" in its search field (input[type="search"]) showed no result within 5 s, though the index has a page with it: `
+    + `the search component loads /_pd/search/pagefind.js under the site's path (<meta name="pd-base-path">) and shows each result's data() (at 1000×720 and 390×844)`);
+  expect(existsSync(join(root, ".out"))).toBe(false);
 });
