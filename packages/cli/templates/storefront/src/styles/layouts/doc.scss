@@ -1,0 +1,14 @@
+@use "../base/tokens";
+
+// One column; a second beside it when the page fills the sidebar (<body data-pd-regions="sidebar">).
+.doc { display: grid; gap: tokens.$space-lg; grid-template-areas: "content"; grid-template-columns: minmax(0, 1fr); }
+.doc-content { grid-area: content; }
+.doc-sidebar { grid-area: sidebar; }
+body[data-pd-regions~="sidebar"] .doc { grid-template-areas: "content" "sidebar"; }
+
+@media (width >= 56rem) {
+  body[data-pd-regions~="sidebar"] .doc { grid-template-areas: "content sidebar"; grid-template-columns: minmax(0, 1fr) 14rem; }
+}
+.doc-content .page-title { margin-block: 0 tokens.$space-sm; line-height: 1.2; }
+.doc-content .page-description { margin-block: 0 tokens.$space-lg; color: var(--color-text-muted, #4b5563); }
+.doc-content .page-body iframe { width: 100%; border: 0; }

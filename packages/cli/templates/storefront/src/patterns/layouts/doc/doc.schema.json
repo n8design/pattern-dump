@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Doc",
+  "description": "A page with a sidebar beside it: the table of contents, and whatever the page places there. Without either, one column.",
+  "type": "object",
+  "x-pd-prose-images": { "widths": [480, 672, 1344], "sizes": "(min-width: 44rem) 42rem, calc(100vw - 2rem)" },
+  "required": ["title"],
+  "properties": {
+    "title": { "type": "string", "description": "The page's heading, its title in the navigation and in search results" },
+    "description": { "type": "string", "description": "One sentence under the heading, and the page's description for search results" },
+    "page": {
+      "type": "object",
+      "description": "What the storefront works out for the page",
+      "properties": {
+        "next": { "description": "The page after this one in the navigation" },
+        "regions": { "description": "The layout's regions: the sidebar, empty when the page puts nothing there", "x-pd-regions": ["sidebar"] }
+      }
+    }
+  }
+}

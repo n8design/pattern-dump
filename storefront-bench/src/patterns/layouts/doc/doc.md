@@ -1,6 +1,6 @@
 ---
 title: Doc
-description: A page with a table of contents, from what the storefront derives for it.
+description: A page with a sidebar region beside it, for its table of contents; one column when the page puts nothing there.
 ---
 
 | Frontmatter | Type | |

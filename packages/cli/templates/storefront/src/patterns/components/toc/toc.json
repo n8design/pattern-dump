@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "text": "Install", "href": "#install", "level": 2 },
+    { "text": "Configure", "href": "#configure", "level": 2 },
+    { "text": "Options", "href": "#options", "level": 3 }
+  ]
+}

@@ -212,10 +212,11 @@ lede: Three folders make a site.
 | `draft` | `true` shows the page in `pd dev` and leaves it out of `pd build`. See [Drafts](#drafts) |
 | `sort` | On a folder's `index.md` only: `date` lists the folder's pages newest first; `order`, the default, in the folder's order |
 | `view` | On a folder's `index.md` only: the view its listing is shown in, `views/<name>` in the skin. See [Listing views](#listing-views) |
+| `toc` | `true` shows the table of contents in its region; `false` keeps it out, whatever the layout says. See [The table of contents](#the-table-of-contents) |
 | any other key | Must be declared by the layout's schema |
 
 `layout`, `childLayout`, `order`, `image`, `index`, `redirectFrom`, `date`, `updated`, `tags`, `categories`, `draft`,
-`sort` and `view` belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
+`sort`, `view` and `toc` belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
 them (a layout shows them through `page.date`, `page.updated`, `page.tags` and `page.categories`).
 
 **The layout's schema is the frontmatter contract.** A layout is a component, and its
@@ -415,6 +416,73 @@ it: a new commit is seen on restart. Two limits:
   (`fetch-depth: 0` with `actions/checkout`). `pd dev` notes it.
 - **A page moved into the pages folder from outside it** counts as created at the move: the history read
   is limited to the pages folder, so that move reads as an add.
+
+### Regions
+
+A layout can have regions besides the body: places, such as a sidebar, that a page's placed components go into. A page
+with nothing for a region has an empty one, so the layout leaves it out: the sidebar is there or not by what the page
+holds.
+
+**A layout declares them** on `page.regions` in its schema, and writes each where it wants it:
+
+```json
+"page": { "properties": { "regions": { "x-pd-regions": ["sidebar"], "x-pd-toc": true } } }
+```
+
+```handlebars
+{{#if page.regions.sidebar}}<div class="doc-sidebar">{{{page.regions.sidebar}}}</div>{{/if}}
+```
+
+- `page.regions.<name>` is the region's HTML, or null when the page puts nothing there.
+- `x-pd-toc` (optional) shows the [table of contents](#the-table-of-contents) on the layout's pages.
+- **CSS is told what is filled:** a page whose layout declares regions names the filled ones on its `<body>`,
+  `<body data-pd-regions="sidebar">` (empty when none), so a skin switches its grid without `:has()`:
+
+  ```css
+  body[data-pd-regions~="sidebar"] .doc { grid-template-areas: "content sidebar"; }
+  ```
+
+**A component goes into a region** by its tag, `region="sidebar"` on the `pd-` tag, or by its default, `"x-pd-region":
+"sidebar"` at its schema's root. The tag wins. Inside a region, components keep the page's order, and each is checked
+against its schema wherever it ends up.
+
+- A region another layout of the skin has, and this page's layout doesn't: the component is left out, with no
+  message. Some layouts have a sidebar, some don't.
+- A region no layout of the skin declares stops the page, with a "did you mean".
+- `region` on a tag is Pattern Dump's: a component whose schema declares a `region` property can't be placed with it.
+
+**The layout's own landmarks are not regions:** `header`, `footer`, `nav` and `main` (the body itself). A layout may use
+them as grid-area names for its own markup, but declaring one as a region stops its pages, and so does a tag or a
+default region naming one (the message lists the regions the layout offers). A component in a region may not bring a
+landmark of its own either: a `<main>`, or a `<header>` or `<footer>` outside `article`, `aside`, `nav` and `section`
+(a banner or contentinfo). axe still checks the page's landmarks as a whole.
+
+### The table of contents
+
+The table of contents is the skin's `components/toc`, given `items: [{ text, href, level }]`. Its schema's
+`x-pd-region` says which region it goes into.
+
+- `toc: true` in a page's frontmatter, or `x-pd-toc` on its layout, shows it with the page's headings of level 2 and 3,
+  first in its region. `toc: false` keeps it out. A page with no such heading gets none.
+- `<pd-toc></pd-toc>` in the markdown places it where the tag is, or in its region, with the same items. With a list of
+  links inside, it shows those instead, the nesting giving the level:
+
+  ```md
+  <pd-toc>
+  - [Install](#install)
+    - [Options](#options)
+  - [About](/about/)
+  </pd-toc>
+  ```
+
+  Each item is one link. An `#anchor` must be a heading of the page (as it finally is, a suffixed anchor included),
+  or the page stops with a "did you mean"; any other link is checked by the link check, as everywhere. A page with a
+  `<pd-toc>` gets no derived one besides.
+- Asking for it without a `components/toc` in the skin is a problem naming it.
+
+The starter (`pd init --storefront`) has a `doc` layout with a sidebar that collapses to one column when it is empty,
+and a `components/toc`: the about page uses `toc: true`, the guide lists its own links, and the search page has
+neither.
 
 ### Declared navigations
 

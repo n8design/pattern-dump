@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "text": "Pages", "href": "#pages", "level": 2 },
+    { "text": "Layouts", "href": "#layouts", "level": 2 },
+    { "text": "Live examples", "href": "#live-examples", "level": 3 }
+  ]
+}

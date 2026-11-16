@@ -153,6 +153,12 @@
             "sort": "date",
             "view": "compact"
           }
+        },
+        "regions": {
+          "description": "The layout's regions: the sidebar, which holds the table of contents and whatever a page places there; empty, the layout is one column",
+          "x-pd-regions": [
+            "sidebar"
+          ]
         }
       }
     }

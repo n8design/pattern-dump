@@ -1,5 +1,5 @@
 // Heading anchors on a storefront page, read off the rendered DOM: every heading of the page's markdown
-// carries its id, the doc layout's table of contents (from page.headings) links to them, and a heading whose
+// carries its id, the setup page's table of contents (its own links, in a <pd-toc>) links to them, and a heading whose
 // anchor the layout already has as an id ("Main", against <main id="main">) gets the next free suffix.
 // Against pd dev and the built root alike.
 import type { Page } from "@playwright/test";
@@ -30,8 +30,8 @@ test("the setup page's headings carry their anchors, and its table of contents r
   await expect(page.locator(".doc-body h2")).toHaveText(["Pages", "Layouts", "Main"]);
   expect(await page.locator(".doc-body h2").evaluateAll(hs => hs.map(h => h.id))).toEqual(["pages", "layouts", "main-1"]);
   const toc = page.locator(".doc-toc a");
-  await expect(toc).toHaveText(["Pages", "Layouts", "Main"]);
-  expect(await toc.evaluateAll(as => as.map(a => a.getAttribute("href")))).toEqual(["#pages", "#layouts", "#main-1"]);
+  await expect(toc).toHaveText(["Pages", "Layouts", "Main", "About the bench"]);
+  expect(await toc.evaluateAll(as => as.map(a => a.getAttribute("href")))).toEqual(["#pages", "#layouts", "#main-1", "/about/"]);
   await reaches(page, "Layouts", "layouts");
 });
 

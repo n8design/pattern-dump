@@ -17,7 +17,10 @@ import { createMarkdown } from "../code-blocks.js";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
 import { checkSchemaExtensions, isHelperNameProblem, unescapedOutputs } from "@pattern-dump/renderer";
 import type { CompositionRegistry } from "../composition.js";
-import { toPlaced, type PlacedBlock, type PlacedResolver } from "../placed-tags.js";
+import { toPlaced, type PlacedBlock, type PlacedResolver, type PlacedTag } from "../placed-tags.js";
+import type { PageHeading } from "./derived.js";
+import { defaultRegion } from "./regions.js";
+import { TOC_ID, TOC_TAG, tocItems, type TocAnchor, type TocItem } from "./toc.js";
 import { checkPlaced, type ObjectSchema, type PlacedProblem, type PropertySchema } from "./declared-values.js";
 import { includeTree } from "./sample-data.js";
 
@@ -153,18 +156,51 @@ async function schemaProblems(id: string, at: PlacedProblem["at"], deps: Placeme
   return problems;
 }
 
-/** A claimed `pd-` block: its HTML, or every problem (nothing is rendered when there is one). */
-export async function placeBlock(block: PlacedBlock, deps: PlacementDeps): Promise<{ html?: string; problems: PlacedProblem[] }> {
+/** A placed block, rendered: its HTML (none when it has a problem), the region it asks for, and what asks. */
+export interface PlacedResult {
+  html?: string;
+  problems: PlacedProblem[];
+  /** The region its tag names (region="..."), else its component's default (x-pd-region); undefined for the body. */
+  region?: string;
+  /** How messages name where the region came from: the tag, or the component's default. */
+  regionFrom?: string;
+  /** A <pd-toc>: the page's table of contents. */
+  toc?: boolean;
+  /** A <pd-toc>'s #anchors, checked once the page's headings are final. */
+  tocAnchors?: TocAnchor[];
+}
+
+/** A claimed `pd-` block: its HTML, or every problem (nothing is rendered when there is one). `headings`: the page's,
+ *  for a <pd-toc>. */
+export async function placeBlock(block: PlacedBlock, deps: PlacementDeps, page: { headings?: readonly PageHeading[] } = {}): Promise<PlacedResult> {
   const problems = [...block.problems];
   if (problems.length || !block.root) return { problems };
+  // region="..." on the root tag is Pattern Dump's: where the component goes, never one of its values.
+  const regionAttr = block.root.attrs.find(a => a.name === "region");
+  const root = { ...block.root, attrs: block.root.attrs.filter(a => a.name !== "region") };
+  if (regionAttr && (regionAttr.value === null || regionAttr.value === "")) {
+    return { problems: [{ at: regionAttr.at, message: `<${block.root.name}>: region names a region of the layout, such as region="sidebar"` }] };
+  }
+  const tagRegion = regionAttr?.value ?? undefined;
+  const fromTag = `<${block.root.name} region="${tagRegion}">`;
+  if (block.root.name === TOC_TAG) return placeToc(block.root, deps, page.headings ?? [], tagRegion, fromTag);
   const resolver: PlacedResolver = {
     idOf: handle => deps.handleMap.get(handle),
     handleOf: id => [...deps.handleMap].find(([, v]) => v === id)?.[0] ?? id,
     handles: () => [...deps.handleMap.keys()],
     schemaOf: deps.schemaOf,
   };
-  const { id, values } = await toPlaced(block.root, resolver, problems);
+  const { id, values } = await toPlaced(root, resolver, problems);
   if (!id || !values) return { problems };
+  const schema = await deps.schemaOf(id);
+  if (regionAttr && schema?.properties && Object.hasOwn(schema.properties, "region")) {
+    return { problems: [{ at: regionAttr.at, message: `<${block.root.name}>: region="..." is Pattern Dump's (the layout's region the component goes into), `
+      + `and ${id} declares a property "region" as well: rename that property to place it in a region` }] };
+  }
+  const own = defaultRegion(schema, id);
+  if (own.problem) return { problems: [{ at: block.root.at, message: own.problem }] };
+  const region = tagRegion ?? own.region;
+  const regionFrom = tagRegion !== undefined ? fromTag : `<${block.root.name}> (${id}'s default region, x-pd-region)`;
   const broken = await schemaProblems(id, block.root.at, deps);
   if (broken.length) return { problems: [...problems, ...broken] };
   const checked = await checkPlaced(id, values, `<${block.root.name}>`, {
@@ -174,12 +210,40 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps): Promi
     markdown: text => contentMd.render(text, { pdCodeBlocks: { storefront: true } }),
   });
   problems.push(...checked.problems, ...await unsafeOutputs(id, block.root.at, deps), ...await sampleDataProblems(id, block.root.at, deps));
-  if (problems.length) return { problems };
+  const where = region !== undefined ? { region, regionFrom } : {};
+  if (problems.length) return { problems, ...where };
   // A placement that fails to render (an image that can't be served as variants, a helper that isn't registered)
   // is a problem of the page at the tag, listed and escaped like any other, never an unhandled 500.
   try {
-    return { html: (await deps.render({ component: id, data: checked.value })).html, problems };
+    return { html: (await deps.render({ component: id, data: checked.value })).html, problems, ...where };
   } catch (e) {
     return { problems: [{ at: block.root.at, message: `<${block.root.name}>: ${e instanceof Error ? e.message : String(e)}` }] };
   }
+}
+
+/** The table of contents (toc.ts), placed with `items`: from the tag's links, or derived from the page's headings. */
+export async function placeTocItems(items: TocItem[], at: PlacedProblem["at"], what: string, deps: PlacementDeps, tagRegion?: string, fromTag?: string): Promise<PlacedResult> {
+  if (!deps.discoveryMap.has(TOC_ID)) {
+    return { problems: [{ at, message: `${what} places the table of contents, which is the skin's ${TOC_ID}, and the skin has none: add it (it gets items: [{ text, href, level }])` }] };
+  }
+  const schema = await deps.schemaOf(TOC_ID);
+  const problems: PlacedProblem[] = [];
+  if (!schema?.properties?.["items"]) problems.push({ at, message: `${TOC_ID}: its schema declares no "items", the list of { text, href, level } it shows` });
+  const own = defaultRegion(schema, TOC_ID);
+  if (own.problem) problems.push({ at, message: own.problem });
+  problems.push(...await unsafeOutputs(TOC_ID, at, deps), ...await sampleDataProblems(TOC_ID, at, deps));
+  const region = tagRegion ?? own.region;
+  const where = region !== undefined ? { region, regionFrom: tagRegion !== undefined ? fromTag! : `${what} (${TOC_ID}'s default region, x-pd-region)` } : {};
+  if (problems.length) return { problems, toc: true, ...where };
+  try {
+    return { html: (await deps.render({ component: TOC_ID, data: { items } })).html, problems, toc: true, ...where };
+  } catch (e) {
+    return { problems: [{ at, message: `${TOC_ID}: ${e instanceof Error ? e.message : String(e)}` }], toc: true };
+  }
+}
+
+async function placeToc(tag: PlacedTag, deps: PlacementDeps, headings: readonly PageHeading[], tagRegion: string | undefined, fromTag: string): Promise<PlacedResult> {
+  const read = tocItems(tag, headings);
+  if (read.problems.length) return { problems: read.problems, toc: true };
+  return { ...await placeTocItems(read.items, tag.at, `<${TOC_TAG}>`, deps, tagRegion, fromTag), tocAnchors: read.anchors };
 }

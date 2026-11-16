@@ -4,6 +4,7 @@
 
 ### Changed
 
+- `toc` is a key the build owns now (the table of contents): a layout's schema that declares it must rename it.
 - **A storefront page's "last changed" date is the author's, never git's.** Git's last commit counts a typo fix or a
   reformat as a change, so it is no longer used for anything a reader or a search engine sees. A page sets
   `updated: YYYY-MM-DD` for a real change instead. What changes for an existing site:
@@ -36,6 +37,17 @@
 
 ### Added
 
+- **Regions.** A layout declares regions besides the body on `page.regions` (`"x-pd-regions": ["sidebar"]`) and writes
+  each as `{{{page.regions.sidebar}}}`, null when the page puts nothing there. A placed component goes into one with
+  `region="sidebar"` on its tag, or its schema's `"x-pd-region"`; components keep the page's order there. A region
+  another layout has is left out without a message; one no layout has stops the page with a "did you mean". `<body>`
+  names the filled regions (`data-pd-regions="sidebar"`), so a skin's grid can collapse an empty one. `header`,
+  `footer`, `nav` and `main` are the layout's own landmarks and can't be regions, and a component in a region can't
+  bring a main, banner or contentinfo.
+- **The table of contents in a region:** the skin's `components/toc`, with `items: [{ text, href, level }]`.
+  `toc: true` in a page (or `x-pd-toc` on its layout) shows it with the page's headings of level 2 and 3; `toc: false`
+  keeps it out. `<pd-toc>` places it in the markdown, with the derived items or a list of links of its own, whose
+  `#anchors` must be headings of the page. The starter has a `doc` layout with a sidebar and a `components/toc`.
 - **Search with Pagefind.** `pd build` indexes each page's own content (its markdown and placed components, never the
   layout's header, navigation or listings) and writes the index into the site at `_pd/search/`, under the site's path,
   with `section`, `tag` and `category` filters by label. Pagefind is the project's own

@@ -13,6 +13,13 @@ related:
 lede: Three folders make a site — the pages, the layouts that dress them, and the components they show.
 ---
 
+<pd-toc>
+- [Pages](#pages)
+- [Layouts](#layouts)
+- [Main](#main-1)
+- [About the bench](/about/)
+</pd-toc>
+
 ## Pages
 
 Each markdown file in `pages/` is a page. A folder's `index.md` is the folder's own page.

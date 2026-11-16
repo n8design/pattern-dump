@@ -1,4 +1,5 @@
 {{#> partials-base }}
+<div class="doc-frame">
 <article class="doc">
   {{#if page.breadcrumbs.length}}
   <nav class="doc-breadcrumbs" aria-label="Breadcrumbs">
@@ -20,15 +21,6 @@
     </ul>
     {{/if}}
   </header>
-  {{#if page.headings.length}}
-  <nav class="doc-toc" aria-label="On this page">
-    <ul>
-      {{#each page.headings}}
-      <li class="doc-toc-h{{level}}"><a href="#{{anchor}}">{{text}}</a></li>
-      {{/each}}
-    </ul>
-  </nav>
-  {{/if}}
   <div class="doc-body">{{{body}}}</div>
   {{#if page.related.listing}}
   <section class="related" aria-labelledby="related-title">
@@ -47,4 +39,8 @@
     {{#if page.next}}<a class="doc-next" rel="next" href="{{page.next.route}}">{{page.next.title}}</a>{{/if}}
   </nav>
 </article>
+{{#if page.regions.sidebar}}
+<div class="doc-sidebar">{{{page.regions.sidebar}}}</div>
+{{/if}}
+</div>
 {{/partials-base}}

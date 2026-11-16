@@ -76,6 +76,7 @@ describe("pd build — the storefront root", () => {
       "_pd/components/components/card.css",
       "_pd/components/components/slide.css",
       "_pd/components/components/slider.css",
+      "_pd/components/layouts/doc.css",
       "_pd/components/partials/base.css",
       "_pd/components/partials/footer.css",
       "_pd/components/partials/header.css",
@@ -128,7 +129,7 @@ describe("pd build — the storefront root", () => {
       "tags/layout/index.html",
       "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 49, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 50, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
