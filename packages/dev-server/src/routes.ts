@@ -31,10 +31,10 @@ import { compositionFor, currentDiscovery, type ServerState } from "./server-sta
 import { createDisplayPath } from "./display-path.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
-import { buildShellHtml, json, mimeType, serveFile, servesShell } from "./http-utils.js";
+import { buildShellHtml, json, mimeType, serveFile, servesShell, workbenchTitle } from "./http-utils.js";
 import { baseComponentIds } from "./discovery-index.js";
 import { buildComponentTree } from "./component-tree.js";
-import { buildComponentDetail } from "./detail.js";
+import { buildComponentDetail, previewTitle } from "./detail.js";
 import { buildFolderOverview } from "./overview.js";
 import { buildPreviewDocument, normalizeAssetRefs } from "./preview-document.js";
 import { resolveDocumentAssets } from "./document-layers.js";
@@ -495,7 +495,8 @@ async function routeRequest(
         const previewDoc = buildPreviewDocument(
           normalizeAssetRefs(previewHtml, assetRootNames), assets.closureIds, detail.layout, themeNames, defaultTheme,
           assets.scripts, assets.svgContents, assetsCss, componentId, undefined, assets.scriptVersions,
-          documentBaseEnabled, themeSwitch, state.baseCssVersion
+          documentBaseEnabled, themeSwitch, state.baseCssVersion,
+          await previewTitle(componentId, variant, discovery.discoveryMap, workbenchTitle(config.shell?.brand))
         );
         json(res, 200, { ...detail, document: previewDoc, diagnostics } satisfies ComponentDetailResponse);
       } catch (e) {
@@ -590,7 +591,8 @@ async function routeRequest(
         const doc = buildPreviewDocument(
           normalizeAssetRefs(html, assetRootNames), assets.closureIds, layout, themeNames, effectiveTheme,
           assets.scripts, assets.svgContents, assetsCss, requestedId, undefined, assets.scriptVersions,
-          documentBaseEnabled, themeSwitch, state.baseCssVersion
+          documentBaseEnabled, themeSwitch, state.baseCssVersion,
+          await previewTitle(componentId, variant, previewDiscoveryMap, workbenchTitle(config.shell?.brand))
         );
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(doc);

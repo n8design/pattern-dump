@@ -14,7 +14,7 @@
 import type { LayoutMode, ThemeSwitch } from "@pattern-dump/contracts";
 import { scriptUrl } from "@pattern-dump/contracts";
 import { stylesheetLayers } from "./document-layers.js";
-import { escapeAttr } from "./http-utils.js";
+import { escapeAttr, escapeHtml } from "./http-utils.js";
 
 /**
  * How wide a `centered` preview's content needs the viewport to be, measured without touching the
@@ -87,7 +87,9 @@ export function buildPreviewDocument(
   themeSwitch: ThemeSwitch = "attribute",
   // baseCssVersion: stamped as ?v= once the base layer has changed since boot, so a preview reloaded
   // after a base edit fetches the new sheet. 0 (never changed) keeps the bare URL.
-  baseCssVersion = 0
+  baseCssVersion = 0,
+  // title: the document's <title> (detail.ts, previewTitle), as every page has one; escaped here.
+  title?: string
 ): string {
   const componentAttr = componentId ? ` data-component-id="${escapeAttr(componentId)}"` : "";
   const bodyAttr = `${defaultTheme ? ` data-theme="${escapeAttr(defaultTheme)}"` : ""}${componentAttr}`;
@@ -131,7 +133,7 @@ export function buildPreviewDocument(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-${baseTag}${layers.base}
+${title !== undefined ? `<title>${escapeHtml(title)}</title>\n` : ""}${baseTag}${layers.base}
 ${layers.assets}
 ${layers.themes}
 ${layers.closure}
