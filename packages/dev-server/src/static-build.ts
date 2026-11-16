@@ -182,6 +182,13 @@ export async function buildStaticSite(
   });
   log("… server ready");
 
+  // A component schema that isn't JSON would turn that component's checks off: no build, with or without a site.
+  const brokenSchemas = await server.schemaProblems();
+  if (brokenSchemas.length) {
+    await server.close();
+    throw new Error(`pd build: a component schema isn't valid JSON, so nothing was written:\n${brokenSchemas.map(p => `  - ${p}`).join("\n")}`);
+  }
+
   // The storefront, crawled before anything is written: a problem anywhere stops the build with both
   // output roots as they were.
   // A site published under a path is asked for under it, as a browser asks: everything is checked as it is served.

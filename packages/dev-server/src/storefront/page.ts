@@ -23,7 +23,7 @@ import { placeTocItems, type PlacementDeps } from "./placed.js";
 import { isHelperNameProblem, itemsWrittenAsText, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
 import { basename } from "node:path";
 import { renderDoc, type DocRegions, type ProseImages } from "../markdown.js";
-import { readSchema, type PlacedProblem } from "./declared-values.js";
+import { readSchema, unreadableSchemas, type PlacedProblem } from "./declared-values.js";
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
@@ -355,6 +355,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
 
   // The pages folder as a whole: a problem there is a problem for every page.
   if (model.problems.length) return fail(model.problems);
+  // A component schema that isn't JSON: every check that reads it would be off, so it is every page's problem.
+  const brokenSchemas = await unreadableSchemas(a.discoveryMap, a.shown);
+  if (brokenSchemas.length) { siteWide = brokenSchemas; return fail(brokenSchemas); }
 
   const notFound = (): AssembledPage =>
     ({ status: 404, html: errorDocument(route, [`there is no page at ${route}`], a.live), problems: [`there is no page at ${route}`], notes: [] });
