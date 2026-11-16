@@ -62,6 +62,13 @@ describe("pd build", () => {
     expect(parseCommand(["build", "--audit", "--no-audit"], "/w")).toMatchObject({ kind: "error" });
   });
 
+  it("--skip-checks takes a comma-separated list, passed on as given; empty skips none", () => {
+    expect(parseCommand(["build", "--skip-checks=a11y"], "/w")).toEqual({ kind: "build", root: "/w", skipChecks: ["a11y"] });
+    expect(parseCommand(["build", "--skip-checks", "a11y, html"], "/w")).toEqual({ kind: "build", root: "/w", skipChecks: ["a11y", "html"] });
+    expect(parseCommand(["build", "--skip-checks="], "/w")).toEqual({ kind: "build", root: "/w", skipChecks: [] });
+    expect(parseCommand(["build"], "/w")).not.toHaveProperty("skipChecks");
+  });
+
   it("--check-workers takes a whole number of 1 or more; left out, the build chooses", () => {
     expect(parseCommand(["build", "--check-workers", "3"], "/w")).toEqual({ kind: "build", root: "/w", checkWorkers: 3 });
     expect(parseCommand(["build", "--check-workers", "1"], "/w")).toEqual({ kind: "build", root: "/w", checkWorkers: 1 });

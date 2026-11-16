@@ -81,6 +81,7 @@ switch (command.kind) {
       ...(command.audit !== undefined ? { audit: command.audit } : {}),
       ...(command.browser ? { browser: true } : {}),
       ...(command.checkWorkers !== undefined ? { checkWorkers: command.checkWorkers } : {}),
+      ...(command.skipChecks !== undefined ? { skipChecks: command.skipChecks } : {}),
       pdVersion: PD_VERSION,
     })
       .then(() => process.stdout.write("", () => process.exit(0)))
