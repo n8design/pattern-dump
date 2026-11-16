@@ -14,7 +14,8 @@ import { runPageA11y, type PageA11yFinding } from "./page.js";
 /** Past this many workers the check got no faster, only bigger. */
 export const MOST_CHECK_WORKERS = 8;
 /** Pages a worker checks before a fresh one takes over. On the 500-page benchmark site, 8 workers: never replaced,
- *  4.4 GB at the peak; every 16 pages, 2.8 GB (the main process alone holds about 2.7 GB) for 1.6 s more. */
+ *  4.4 GB at the peak; every 16 pages, 2.8 GB, for 1.6 s more: the peak of checking them one by one in this thread
+ *  (2.7 GB; the build without the check peaks at 0.6 GB, so most of it is the windows the check leaves for V8). */
 export const PAGES_PER_WORKER = 16;
 /** What one worker is allowed in the memory cap, in bytes. */
 const WORKER_BYTES = 350 * 1024 * 1024;
