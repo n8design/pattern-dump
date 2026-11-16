@@ -215,8 +215,10 @@ describe("a reload that fails keeps the last good state, and the next good save 
 });
 
 describe("the storefront page's live client", () => {
-  /** Run the served live client against a stand-in page; returns what it did. */
-  function client() {
+  /** Run the served live client against a stand-in page at `pathname`, rendered at `generation` for a site under
+   *  `base`; returns what it did. Each socket it opens is kept; `close()` ends the newest, as a server going away
+   *  does, and `tick()` runs the timers the client set. */
+  function client({ pathname = "/about/", generation = "", base = "/" } = {}) {
     const elements: Array<{ tag: string; attrs: Record<string, string>; children: unknown[]; textContent: string; style: { cssText: string } }> = [];
     const make = (tag: string) => {
       const el = { tag, attrs: {} as Record<string, string>, children: [] as unknown[], textContent: "", style: { cssText: "" },
@@ -227,7 +229,8 @@ describe("the storefront page's live client", () => {
       return el;
     };
     const body = make("body");
-    let onmessage: ((e: { data: string }) => void) | undefined;
+    const sockets: Array<{ url: string; onmessage?: (e: { data: string }) => void; onclose?: () => void }> = [];
+    const timers: Array<() => void> = [];
     const reloads: string[] = [];
     const document = {
       body,
@@ -235,10 +238,20 @@ describe("the storefront page's live client", () => {
       querySelector: (sel: string) => elements.find(e => sel === "[data-pd-live-notice]" && "data-pd-live-notice" in e.attrs) ?? null,
       querySelectorAll: () => [], // no live examples on this stand-in page
     };
-    class WebSocket { set onmessage(f: (e: { data: string }) => void) { onmessage = f; } }
-    const src = /<script data-pd-live>([\s\S]*)<\/script>/.exec(liveScript(4321))![1];
-    runInContext(src, createContext({ WebSocket, document, location: { hostname: "live.localhost", pathname: "/about/", reload: () => reloads.push("reload") } }));
-    return { send: (m: unknown) => onmessage!({ data: JSON.stringify(m) }), elements, reloads };
+    class WebSocket {
+      onmessage?: (e: { data: string }) => void;
+      onclose?: () => void;
+      constructor(readonly url: string) { sockets.push(this); }
+    }
+    const setTimeout = (f: () => void) => { timers.push(f); };
+    const src = /<script data-pd-live>([\s\S]*)<\/script>/.exec(liveScript(4321, generation, base))![1];
+    runInContext(src, createContext({ WebSocket, document, setTimeout, location: { hostname: "live.localhost", pathname, reload: () => reloads.push("reload") } }));
+    return {
+      send: (m: unknown) => sockets.at(-1)!.onmessage!({ data: JSON.stringify(m) }),
+      close: () => sockets.at(-1)!.onclose?.(),
+      tick: () => { for (const f of timers.splice(0)) f(); },
+      sockets, elements, reloads,
+    };
   }
 
   it("lists each build problem in one notice on the page, and reloads on a change", () => {
@@ -252,5 +265,49 @@ describe("the storefront page's live client", () => {
     expect(c.reloads).toEqual([]);
     c.send({ type: "content-swap", componentId: "atoms/loud" });
     expect(c.reloads).toEqual(["reload"]);
+  });
+
+  it("connects again when its socket closes, and reloads only when the server moved on meanwhile", () => {
+    const c = client({ generation: "boot1.3" });
+    expect(c.sockets.map(s => s.url)).toEqual(["ws://live.localhost:4321"]);
+    // The server goes away: the client tries again, and again while nothing answers.
+    c.close();
+    c.tick();
+    expect(c.sockets).toHaveLength(2);
+    c.close();
+    c.tick();
+    expect(c.sockets).toHaveLength(3);
+    // Back, with nothing sent meanwhile: the page is current, no reload.
+    c.send({ type: "hello", protocol: 1, generation: "boot1.3" });
+    expect(c.reloads).toEqual([]);
+    // Gone again, and back as another process (pd dev restarted): the page may predate a change, so it reloads.
+    c.close();
+    c.tick();
+    c.send({ type: "hello", protocol: 1, generation: "boot2.0" });
+    expect(c.reloads).toEqual(["reload"]);
+    // And after a reconnect it still reloads on a change.
+    c.send({ type: "content-swap", componentId: "atoms/loud" });
+    expect(c.reloads).toEqual(["reload", "reload"]);
+  });
+
+  it("matches a page-changed route under the site's base path", () => {
+    // "/about/" is the site's route; the page is served at /sub/about/.
+    const own = client({ pathname: "/sub/about/", base: "/sub/" });
+    own.send({ type: "page-changed", route: "/about/" });
+    expect(own.reloads).toEqual(["reload"]);
+    const other = client({ pathname: "/sub/guides/", base: "/sub/" });
+    other.send({ type: "page-changed", route: "/about/" });
+    expect(other.reloads).toEqual([]);
+    // The home page: "/" is /sub/.
+    const home = client({ pathname: "/sub/", base: "/sub/" });
+    home.send({ type: "page-changed", route: "/" });
+    expect(home.reloads).toEqual(["reload"]);
+    // null: a page was added or removed, every page reloads.
+    other.send({ type: "page-changed", route: null });
+    expect(other.reloads).toEqual(["reload"]);
+    // At the host's root, as before.
+    const root = client({ pathname: "/about/" });
+    root.send({ type: "page-changed", route: "/about/" });
+    expect(root.reloads).toEqual(["reload"]);
   });
 });

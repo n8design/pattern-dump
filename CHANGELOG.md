@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **An open site page in `pd dev` reloads again after its connection drops.** When `pd dev` was stopped and
+  started again (or the computer slept) with a site page open, that page never reloaded again until a manual
+  refresh: an edit to a component in a linked style guide package, or anywhere else, seemed to have no effect. The
+  page now connects again, and reloads once if anything changed meanwhile, as the workbench already did.
+- **Site pages under a base path reload on every change in `pd dev`.** With `storefront.url` on a path
+  (`https://example.com/docs/`), an edit to the page's markdown, a base-layer stylesheet, global data, a script or
+  an asset did not reload the open page.
+
 ## 0.5.0
 
 Everything a documentation site needs: categories and tags with their own pages, listings with cards and views,

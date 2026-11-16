@@ -34,7 +34,7 @@ export default defineConfig({
   reporter: process.env["CI"] ? [["github"], ["list"]] : [["list"]],
   use: { trace: "on-first-retry", video: "retain-on-failure" },
   projects: [
-    { name: "package", testMatch: /\breload\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } },
+    { name: "package", testMatch: /\b(reload|live-client)\.spec\.ts$/, use: { ...devices["Desktop Chrome"] } },
     { name: "package-static", testMatch: /\bstatic\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: `http://127.0.0.1:${STATIC_PORT}` } },
   ],
