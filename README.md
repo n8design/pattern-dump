@@ -7,7 +7,8 @@ how they relate, and publishes the result as a static site.
 **Demo:** a style guide and the website built from it, at https://lab.n8d.studio/pattern-dump-demo/
 
 > **0.x.** Pattern Dump works end to end, but breaking changes are possible between minor versions
-> (0.3 to 0.4); the [changelog](CHANGELOG.md) names each one.
+> (0.4 to 0.5); the [changelog](CHANGELOG.md) names each one. Coming from 0.4: see
+> [Upgrading to 0.5](docs/guide/upgrading-to-0.5.md).
 
 **Coming from Pattern Lab?** Point `patternsDir` at your patterns folder: Handlebars templates, `.json` data and
 `~` variants work as they are, and no build step of your own is needed.
@@ -77,6 +78,7 @@ npx pd build             # a static site in ./dist
 | [Static build](docs/guide/static-build.md) | `pd build`: options, hosting and troubleshooting |
 | [Storefront](docs/guide/storefront.md) | A website written in markdown, with live examples, beside the workbench |
 | [Command line](docs/guide/cli.md) | Every `pd` command and option |
+| [Upgrading to 0.5](docs/guide/upgrading-to-0.5.md) | What a 0.4 site changes, step by step, and what's new |
 
 ## Developing Pattern Dump
 

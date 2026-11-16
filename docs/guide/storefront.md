@@ -774,7 +774,8 @@ skin's layouts:
 - **Checked:** a page or folder of the pages folder at a generated route, or a `redirectFrom` claiming one, is a
   problem naming both; the two paths can't be the same.
 - They are in the sitemap (`lastmod`: the newest change of their pages) and have JSON-LD `CollectionPage`. They are
-  not in the nav or any listing, and the workbench doesn't list them under a layout's pages yet.
+  not in the nav or any listing. The workbench lists them under their layout's pages, each naming what made it
+  (`from storefront.tagPages`).
 - No pagination yet: a tag page lists every page with the tag.
 
 The starter (`pd init --storefront`) has plain `tag`, `tags`, `category` and `categories` layouts.
