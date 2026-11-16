@@ -1,9 +1,32 @@
 # Changelog
 
-## Unreleased
+## 0.5.1
+
+A patch release: two live-reload fixes for site pages, and four problems that showed a wrong page or wrong output with
+no message.
 
 ### Fixed
 
+- **A component schema that isn't valid JSON stops the build.** It used to read as "no schema", which turned every
+  check of that component off without a word. Now one problem names the file, line and column and says the component
+  isn't checked until it's fixed: in the workbench (an error on the component), on every `pd dev` site page, and in
+  `pd build`, which writes nothing, with or without a site:
+  `src/patterns/atoms/chip/chip.schema.json:5:5: not valid JSON (Expected ',' or '}' after property value), so atoms/chip isn't checked against its schema until it's fixed`.
+  A build that passed on 0.5.0 with such a file now stops; before, its output was unchecked.
+- **Tags given as strings are reported, not rendered empty.** A component included without `x-pd-card` whose template
+  reads `{{label}}` while its sample data gives tags as strings showed empty list items in the workbench. A component
+  that contradicts itself about tags is now an error, naming the fix:
+  `{{#each tags}} reads {{label}}, but the tags in the sample data are strings: a tag is an object since 0.5.0 (key, label, description, route): give each one as { "key": "design", "label": "Design" } in tag-list.json`.
+  The same for a schema that declares tags as strings while the template reads their fields, and a template that
+  writes `{{this}}` while the schema declares objects. On the site, a schema that a page's layout or view includes and
+  that declares tags as strings fails the page, as a card's already did. Tags that are plain strings, written as
+  strings, are left alone.
+- **`pd dev` stops when its port is taken on IPv6.** Another server holding the port on `::1` let `pd dev` start on
+  127.0.0.1 anyway, and a browser that resolves `localhost` names to `::1` showed the other server's pages. Both ports
+  (the workbench's and live reload's) are now checked on IPv4 and IPv6, with the usual message:
+  `Port 4000 is already in use, so the workbench cannot start.`
+- **Preview pages have a title:** "Button · secondary · Acme DS" (the component, its variant, the workbench's name).
+  Accessibility checks reported every preview without one.
 - **An open site page in `pd dev` reloads again after its connection drops.** When `pd dev` was stopped and
   started again (or the computer slept) with a site page open, that page never reloaded again until a manual
   refresh: an edit to a component in a linked style guide package, or anywhere else, seemed to have no effect. The

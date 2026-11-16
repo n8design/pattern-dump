@@ -742,7 +742,12 @@ URL segment, `route` its [tag page](#tag-and-category-pages) or `null`. Write `<
 **Tags were strings before 0.5.0.** A template that still writes one as text, `{{#each page.tags}}{{this}}{{/each}}`,
 would print `[object Object]`, so the page stops instead, naming the template and line and what to write
 (`{{label}}`). A card whose schema declares `tags` as a list of strings stops the listing the same way: declare the
-items as objects, or leave `items` out.
+items as objects, or leave `items` out. So does any other schema a page's layout or view includes.
+
+In the workbench, a component that contradicts itself about tags is an error too: its template reads `{{label}}` (or
+`key`, `route`, `description`) while its sample data or its schema gives the tags as strings, which would show empty
+list items; or it writes `{{this}}` while its schema declares objects. Give the tags in its `.json` as objects,
+`{ "key": "design", "label": "Design" }`.
 
 ### Tag and category pages
 
