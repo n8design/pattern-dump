@@ -188,6 +188,7 @@ in [storefront.md](storefront.md).
 | `storefront.tags` | object | (none) | The tags a page's `tags:` may name, declared as categories are: `{ css: { label: "CSS", aliases: ["styles"] } }`. Without it any tag works, labelled with its key ([storefront.md](storefront.md#tags)) |
 | `storefront.tagPages` | boolean or object | on when the skin has `layouts/tag` | A page per tag at `/tags/<key>/` and an index at `/tags/`. `false`: off; `true` or `{ path, title }`: on, and a missing layout is a problem ([storefront.md](storefront.md#tag-and-category-pages)) |
 | `storefront.categoryPages` | boolean or object | on when the skin has `layouts/category` | The same for categories, at `/categories/` |
+| `storefront.search` | boolean | on when the project has Pagefind | Search: `pd build` indexes every page's own content with Pagefind into `_pd/search/`. `true`: a build without Pagefind stops; `false`: off ([storefront.md](storefront.md#search)) |
 | `storefront.site` | object | (none) | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
 
 ## When changes take effect

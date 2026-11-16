@@ -36,6 +36,14 @@
 
 ### Added
 
+- **Search with Pagefind.** `pd build` indexes each page's own content (its markdown and placed components, never the
+  layout's header, navigation or listings) and writes the index into the site at `_pd/search/`, under the site's path,
+  with `section`, `tag` and `category` filters by label. Pagefind is the project's own
+  (`npm install --save-dev pagefind`): with `storefront.search` left out the site is indexed when the project has it;
+  `true` makes a build without it stop, `false` turns it off. The 404 page, tag and category pages and a page with
+  `index: false` are left out. `pd dev` builds no index. `pd build --browser` uses the site's search field once per
+  viewport and stops when it shows no result. The starter has a search page and a plain, accessible
+  `components/search`.
 - Tag declarations: `storefront.tags`, declared as categories are (label, description, old keys). Optional: without it
   any tag works, labelled with its key. With it, a tag that isn't declared stops the page with a "did you mean", and an
   old key builds with a warning. A query's `tags` are checked against the declarations.
