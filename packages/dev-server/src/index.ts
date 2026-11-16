@@ -80,7 +80,7 @@ import { createImageService } from "./image-service.js";
 import { handleRequest, type RouteContext, type BootStamp } from "./routes.js";
 import { createSiteValues } from "./storefront/site-values.js";
 import { resolveDevUiDist } from "./assets.js";
-import { describeBindError } from "./ports.js";
+import { assertPortFree, describeBindError } from "./ports.js";
 export { PortInUseError } from "./ports.js";
 import { loadPatternPackages } from "./packages.js";
 import { createDisplayPath } from "./display-path.js";
@@ -252,12 +252,15 @@ export async function startDevServer(
   // hosts, at its HTTP port (known once it listens; until then no page of it exists).
   let httpPort = -1;
   const hosts = ownHosts(cfg.storefront?.host);
+  // Before binding anything: a port another server holds on IPv4 or IPv6 stops pd dev (ports.ts, assertPortFree).
+  const wsPortChosen = opts.wsPort !== undefined || process.env["PD_WS_PORT"] !== undefined;
+  if (live) await assertPortFree(wsPort, "live reload", { http: port, wsChosen: wsPortChosen });
+  await assertPortFree(port, "workbench", { http: port, wsChosen: wsPortChosen });
   const hotreloader: HotReloader = live
     ? createHotReloader(wsPort, { acceptOrigin: origin => isOwnOrigin(origin, hosts, httpPort) })
     : SILENT_RELOADER;
   if (live) generationNow = () => hotreloader.generation();
   // Fail here, before compiling anything, if live reload's port is taken.
-  const wsPortChosen = opts.wsPort !== undefined || process.env["PD_WS_PORT"] !== undefined;
   await hotreloader.listening.catch((e: unknown) => {
     throw describeBindError(e, wsPort, "live reload", { http: port, wsChosen: wsPortChosen });
   });
