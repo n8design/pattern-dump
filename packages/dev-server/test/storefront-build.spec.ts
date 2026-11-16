@@ -106,6 +106,11 @@ describe("pd build — the storefront root", () => {
       // The favicon the skin's head partial links on every page.
       "assets/images/favicon.png",
       "assets/images/share.png",
+      // The category pages and their index, and the page that forwards from an old category key (ds).
+      "categories/design-systems/index.html",
+      "categories/ds/index.html",
+      "categories/guides/index.html",
+      "categories/index.html",
       "guides/index.html",
       "guides/setup/index.html",
       "index.html",
@@ -116,8 +121,14 @@ describe("pd build — the storefront root", () => {
       "setup/index.html",
       "sitemap.xml",
       "start/index.html",
+      // The tag pages and their index, and the page that forwards from an old tag key (pictures).
+      "tags/design/index.html",
+      "tags/images/index.html",
+      "tags/index.html",
+      "tags/layout/index.html",
+      "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 7, files: 40, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 49, bytes: expect.any(Number) });
   });
 
   it("notes a heading whose anchor the layout has, and leaves nothing out for it", () => {
@@ -126,7 +137,7 @@ describe("pd build — the storefront root", () => {
       "the pages folder is not in a git repository: no page has dates",
       `guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"`,
       // The bench's one link to another host, listed by the link check, not fetched.
-      `an external link, not checked: https://example.test/source (on /, /guides/, /guides/setup/, /about/, /articles/, /articles/harbour/, /articles/plain/, /404.html)`,
+      `an external link, not checked: https://example.test/source (on /, /guides/, /guides/setup/, /about/, /articles/, /articles/harbour/, /articles/plain/, /tags/, /tags/design/, /tags/images/, /tags/layout/, /categories/, /categories/design-systems/, /categories/guides/, /404.html)`,
     ]);
     expect(report.warnings).toEqual([]);
     const setup = files.get("guides/setup/index.html")!.bytes.toString("utf8");
@@ -198,7 +209,12 @@ describe("pd build — the storefront root", () => {
     const locs = urls.map(u => u[0]!);
     expect(urls).toEqual([["https://bench.example.test/", null], ["https://bench.example.test/about/", null], ["https://bench.example.test/articles/", null],
       ["https://bench.example.test/articles/harbour/", "2026-11-01"], ["https://bench.example.test/articles/plain/", "2026-10-02"],
-      ["https://bench.example.test/guides/", null], ["https://bench.example.test/guides/setup/", "2026-11-15"]]);
+      // The generated pages: each its newest page's change.
+      ["https://bench.example.test/categories/", "2026-11-15"], ["https://bench.example.test/categories/design-systems/", "2026-11-15"],
+      ["https://bench.example.test/categories/guides/", "2026-11-15"],
+      ["https://bench.example.test/guides/", null], ["https://bench.example.test/guides/setup/", "2026-11-15"],
+      ["https://bench.example.test/tags/", "2026-11-01"], ["https://bench.example.test/tags/design/", "2026-10-02"],
+      ["https://bench.example.test/tags/images/", "2026-11-01"], ["https://bench.example.test/tags/layout/", "2026-11-01"]]);
     expect(sitemap.match(/<url>/g)).toHaveLength(locs.length);
     for (const loc of locs) expect(loc.length).toBeLessThanOrEqual(2048);
   });
@@ -265,7 +281,16 @@ describe("pd build — the storefront root", () => {
     // A layout's detail lists the pages that render with it (relationships.pages), which only a site has: that, and
     // nothing else, differs.
     const layouts = ["article", "doc", "home", "listing", "page"].map(l => `api/component/layouts/${l}/index.json`);
-    expect(differing.sort()).toEqual(layouts);
+    // The generated pages' layouts list none yet (a generated page has no source in contracts' LayoutPageUse): with a
+    // site their list is there, and empty.
+    const generated = ["categories", "category", "tag", "tags"].map(l => `api/component/layouts/${l}/index.json`);
+    expect(differing.sort()).toEqual([...layouts, ...generated].sort());
+    for (const k of generated) {
+      const withSite = JSON.parse(a.get(k)!.bytes.toString("utf8")) as { relationships: { pages?: unknown[] } };
+      expect(withSite.relationships.pages, k).toEqual([]);
+      delete withSite.relationships.pages;
+      expect(withSite, k).toEqual(JSON.parse(b.get(k)!.bytes.toString("utf8")));
+    }
     for (const k of layouts) {
       const withSite = JSON.parse(a.get(k)!.bytes.toString("utf8")) as { relationships: { pages?: unknown[] } };
       expect(withSite.relationships.pages?.length, k).toBeGreaterThan(0);

@@ -6,7 +6,12 @@
       "date": "2026-11-14",
       "description": "Its teaser: the page's description, or its first paragraph.",
       "tags": [
-        "notes"
+        {
+          "key": "notes",
+          "label": "notes",
+          "description": null,
+          "route": "/tags/notes/"
+        }
       ]
     },
     {

@@ -16,14 +16,15 @@
 import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
-import { isHelperNameProblem, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
+import { isHelperNameProblem, itemsWrittenAsText, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
+import { basename } from "node:path";
 import { renderDoc, type ProseImages } from "../markdown.js";
 import { readSchema, type PlacedProblem } from "./declared-values.js";
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
-import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageModel } from "./pages.js";
+import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { resolveNavigations } from "./navigations.js";
-import { checkSampleData } from "./sample-data.js";
+import { checkSampleData, includeTree } from "./sample-data.js";
 import { checkPageDeclaration, FILLED, pageValue, positionOf, RETIRED, type DerivedPage, type PageHeading } from "./derived.js";
 import { checkDeclaredQueries, declaredQueries, resolveQuery, type ResolvedQuery } from "./query.js";
 import { collidingHeadings, idsBesides } from "./anchors.js";
@@ -36,11 +37,11 @@ import { checkHeadMarkup, HEAD_PARTIAL } from "./head-partial.js";
 import { checkImages, type ImageFinding } from "./image-checks.js";
 import { checkLinks } from "./links.js";
 import { checkPageBasics } from "./page-basics.js";
-import { redirectsOf } from "./redirects.js";
 import { dateOf, entriesOf, resolveCollections, type Entry } from "./collections.js";
 import { cardOf, checkEntries, readCard } from "./cards.js";
 import { checkViewSampleData, DEFAULT_VIEW_KEY, resolveView } from "./views.js";
-import type { Category } from "./categories.js";
+import { termOf, type Category, type Term } from "./categories.js";
+import type { GeneratedPage } from "./terms.js";
 
 /** Said once (the same text from every page) when JSON-LD leaves git's date out for a shallow clone. */
 export const SHALLOW_SEO_NOTE = "the repository is a shallow clone, so pages without a date of their own have no datePublished "
@@ -197,8 +198,8 @@ ${live ? liveScript(live.wsPort, live.generation) : ""}
 </html>`;
 }
 
-/** A page that is an article: its own date, its own updated (when it has one) and its tags. */
-export interface PageArticle { published: string; modified?: string; tags: string[] }
+/** A page that is an article: its own date, its own updated (when it has one), its tags' and its categories' labels. */
+export interface PageArticle { published: string; modified?: string; tags: string[]; sections: string[] }
 
 /**
  * Whether the page at `route` is an article, for og:type and JSON-LD: a page whose frontmatter gives it a `date`, other
@@ -207,7 +208,9 @@ export interface PageArticle { published: string; modified?: string; tags: strin
  */
 export function articleOf(route: string, model: PageModel, ownDate: string | undefined, updated?: string): PageArticle | undefined {
   if (ownDate === undefined || route === "/" || (model.folders.get(route)?.children.length ?? 0) > 0) return undefined;
-  return { published: ownDate, ...(updated !== undefined ? { modified: updated } : {}), tags: model.entries.get(route)?.tags ?? [] };
+  const e = model.entries.get(route);
+  return { published: ownDate, ...(updated !== undefined ? { modified: updated } : {}), tags: (e?.tags ?? []).map(t => t.label),
+    sections: (e?.categories ?? []).map(c => c.label) };
 }
 
 /**
@@ -218,7 +221,8 @@ export function articleOf(route: string, model: PageModel, ownDate: string | und
 export function seoTags(p: {
   route: string; title: string; description: string | undefined; siteTitle: string | undefined;
   siteUrl: string | undefined; image: PageImage | undefined; index: boolean;
-  /** The page is an article (articleOf): og:type article, with its date and one article:tag per tag. */
+  /** The page is an article (articleOf): og:type article, with its date, its first category as article:section (Open
+   *  Graph has one) and one article:tag per tag, each by its label. */
   article?: PageArticle | undefined;
 }): string[] {
   const tags: string[] = [];
@@ -237,6 +241,7 @@ export function seoTags(p: {
   if (p.article) {
     tags.push(`<meta property="article:published_time" content="${escapeAttr(p.article.published)}">`,
       ...(p.article.modified !== undefined ? [`<meta property="article:modified_time" content="${escapeAttr(p.article.modified)}">`] : []),
+      ...(p.article.sections[0] !== undefined ? [`<meta property="article:section" content="${escapeAttr(p.article.sections[0])}">`] : []),
       ...p.article.tags.map(t => `<meta property="article:tag" content="${escapeAttr(t)}">`));
   }
   if (p.image) {
@@ -299,6 +304,34 @@ const defaultView = (schema: { properties?: Record<string, unknown> } | undefine
   return typeof v === "string" ? v : undefined;
 };
 
+/** A generated page (terms.ts) as a page file: its layout, its title and description as its frontmatter would give
+ *  them (only what the layout declares; a layout that doesn't declare a title is a problem), and no body. */
+async function generatedFile(g: GeneratedPage, discoveryMap: DiscoveryMap): Promise<{ page: PageFile; problems: string[] }> {
+  const declared = (await readSchema(discoveryMap.get(`layouts/${g.layout}`)?.schemaPath)).schema?.properties ?? {};
+  const problems: string[] = [];
+  const values: Record<string, string> = { layout: g.layout };
+  const whose = g.role === "index" ? `the index of the ${g.kind === "tag" ? "tags" : "categories"}` : `a ${g.kind} page`;
+  if (Object.hasOwn(declared, "title")) values["title"] = g.title;
+  else problems.push(`layouts/${g.layout}: ${whose}'s title is ${g.role === "index" ? "its title" : `the ${g.kind}'s label`}, so the layout declares "title"`);
+  if (g.description !== null && Object.hasOwn(declared, "description")) values["description"] = g.description;
+  return { page: { route: g.route, file: "", path: `${g.route.slice(1, -1)} (generated)`, frontmatter: { values, maps: {}, errors: [], lines: {} } }, problems };
+}
+
+/** Every template among `ids` (with what each includes) that writes a tag as text, which an object can't be shown as. */
+async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promise<string[]> {
+  const problems: string[] = [];
+  for (const id of [...new Set(ids.flatMap(id => includeTree(id, a.composition)))]) {
+    const hbs = a.discoveryMap.get(id)?.hbsPath;
+    if (!hbs) continue;
+    const source = await readFile(hbs, "utf8").catch(() => "");
+    for (const f of itemsWrittenAsText(source, "tags")) {
+      problems.push(`${id} (${basename(hbs)}:${f.line}): {{#each ${f.list}}} writes {{${f.item}}}, but a tag is an object since 0.5.0 `
+        + `(key, label, description, route): write {{label}} to show it ({{key}} is its URL segment, {{route}} its page)`);
+    }
+  }
+  return problems;
+}
+
 export async function assemblePage(route: string, model: PageModel, a: PageAssembly): Promise<AssembledPage> {
   let siteWide: string[] = [];
   const fail = (problems: string[]): AssembledPage => ({ status: 500, html: errorDocument(route, problems, a.live, siteWide), problems, notes: [] });
@@ -312,6 +345,15 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const isNotFound = route === PD_ROUTES.notFound;
   let page = isNotFound ? model.notFound : model.files.get(route);
   let source: string | undefined;
+  // A tag or category page, or an index of them: generated, with no file.
+  const generated = isNotFound || page ? undefined : model.generated.get(route);
+  const generatedProblems: string[] = [];
+  if (generated) {
+    const g = await generatedFile(generated, a.discoveryMap);
+    page = g.page;
+    source = "";
+    generatedProblems.push(...g.problems);
+  }
   if (isNotFound && !page) {
     const layoutId = `layouts/${DEFAULT_LAYOUT}`;
     if (!a.discoveryMap.has(layoutId)) {
@@ -334,8 +376,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     }
   }
 
-  const problems: string[] = [];
-  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories);
+  const problems: string[] = [...generatedProblems];
+  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags);
   problems.push(...checked.problems.map(p => `${p.file}${p.line !== undefined ? `:${p.line}` : ""}: ${p.message}`));
   if (isNotFound && checked.build.redirectFrom) {
     const line = page.frontmatter.lines["redirectFrom"];
@@ -433,7 +475,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     else published ??= dated.dates.created;
   }
   // A listing's entries, and the page's own date and tags (collections.ts), for a layout that shows them.
-  const listing: { children?: Entry[]; date?: string | null; updated?: string | null; tags?: string[]; categories?: Category[]; listing?: string | null } = {};
+  const listing: { children?: Entry[]; date?: string | null; updated?: string | null; tags?: Term[]; categories?: Category[]; listing?: string | null;
+    term?: GeneratedPage["term"] | null; terms?: GeneratedPage["terms"] | null } = {};
   // The layout's card for them (x-pd-card on page.children): every page of the listing is checked against it.
   const layoutCard = cardOf(layoutSchema?.properties?.["page"]?.properties?.["children"]);
   if (declares("children")) {
@@ -482,7 +525,11 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       for (const q of declaredQs) {
         if (isNotFound) { queries.push({ name: q.name, entries: [], problems: [], notes: [] }); continue; }
         const r = await resolveQuery(q, { route, path: page.path, frontmatter: page.frontmatter, layoutId: checked.layoutId, model,
-          discoveryMap: a.discoveryMap, dates: a.dates, mode });
+          discoveryMap: a.discoveryMap, dates: a.dates, mode,
+          ...(generated ? { own: {
+            tags: generated.kind === "tag" && generated.term ? [generated.term.key] : [],
+            categories: generated.kind === "category" && generated.term ? [generated.term.key] : [],
+          } } : {}) });
         problems.push(...r.problems);
         notes.push(...r.notes);
         queries.push(r);
@@ -496,8 +543,11 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     notes.push(...dated.notes);
   }
   if (declares("updated")) listing.updated = checked.build.updated ?? null;
-  if (declares("tags")) listing.tags = model.entries.get(route)?.tags ?? [];
-  if (declares("categories")) listing.categories = (checked.build.categories ?? []).map(k => model.categories.byKey.get(k)!);
+  // A page's own tags and categories, with their pages' routes (the 404 page has no entry: its own, by key).
+  if (declares("tags")) listing.tags = model.entries.get(route)?.tags ?? (checked.build.tags ?? []).map(k => termOf(model.tags, k));
+  if (declares("categories")) listing.categories = model.entries.get(route)?.categories ?? (checked.build.categories ?? []).map(k => termOf(model.categories, k));
+  if (declares("term")) listing.term = generated?.term ?? null;
+  if (declares("terms")) listing.terms = generated?.terms ?? null;
   // The collections the skin lists (site.collections), on every page.
   const collections = site.collections.length ? await resolveCollections(site.collections, model, { dates: a.dates, mode }) : undefined;
   if (collections) {
@@ -522,6 +572,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     siteWide = [...siteWide, ...headSample];
     problems.push(...headSample);
   }
+  // Tags are objects since 0.5.0: a template that still writes one as text fails, naming what to write.
+  problems.push(...await tagsWrittenAsText([checked.layoutId, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view ? [q.view.id] : [])]
+    .filter(id => a.discoveryMap.has(id)), a));
   if (problems.length) return fail(problems);
   if (view) {
     try {
@@ -653,7 +706,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       index: !isNotFound && a.siteIndex !== false && checked.build.index !== false, article,
     }),
     ...(a.siteUrl !== undefined && !isNotFound
-      ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published, article })]
+      ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published, article,
+        ...(generated ? { collection: true } : {}) })]
       : []),
     ...(headExtra ? [headExtra] : []),
     ...(siteHead ? [siteHead] : []),
@@ -704,7 +758,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   // (links.ts). pd build checks every link of every page once the whole site is built (static-build.ts).
   if (a.live) {
     const self = isNotFound ? PD_ROUTES.notFound : route;
-    const routes = new Set<string>([...model.files.keys(), ...[...model.files.values()].flatMap(redirectsOf), PD_ROUTES.notFound]);
+    const routes = new Set<string>([...model.pages.map(p => p.route), ...model.pages.flatMap(p => p.redirectFrom ?? []), PD_ROUTES.notFound]);
     routes.add(self);
     const links = checkLinks({ built: routes, documents: new Map([[self, html]]), pages: [self], pagesOnly: true,
       ...(a.basePath !== undefined ? { pathHint: a.basePath } : {}) });

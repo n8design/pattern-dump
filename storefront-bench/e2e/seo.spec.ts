@@ -24,8 +24,15 @@ const TRAILS: Record<string, string[]> = {
 const PUBLISHED: Record<string, string> = { "/articles/harbour/": "2026-11-01", "/articles/plain/": "2026-10-02" };
 /** The pages with an updated date of their own: their dateModified and lastmod. */
 const UPDATED: Record<string, string> = { "/guides/setup/": "2026-11-15" };
-/** The articles: the pages with their own date (not the home page, not a listing), and their tags. */
-const ARTICLE_TAGS: Record<string, string[]> = { "/articles/harbour/": ["images", "layout"], "/articles/plain/": ["design"] };
+/** The articles: the pages with their own date (not the home page, not a listing), and their tags' labels. */
+const ARTICLE_TAGS: Record<string, string[]> = { "/articles/harbour/": ["Images", "Layout"], "/articles/plain/": ["Design"] };
+/** An article's categories' labels: article:section is the first, the Article's articleSection all of them. */
+const SECTIONS: Record<string, string[]> = { "/articles/plain/": ["Design systems"] };
+/** The tag and category pages, with their sitemap lastmod: the newest change of their pages. */
+const GENERATED: Record<string, string> = {
+  "/tags/": "2026-11-01", "/tags/design/": "2026-10-02", "/tags/images/": "2026-11-01", "/tags/layout/": "2026-11-01",
+  "/categories/": "2026-11-15", "/categories/design-systems/": "2026-11-15", "/categories/guides/": "2026-11-15",
+};
 
 for (const [route, title, [image, width, height]] of PAGES) {
   test(`${route}: canonical, Open Graph and the card, at the site's address`, async ({ page, request }, info) => {
@@ -46,6 +53,7 @@ for (const [route, title, [image, width, height]] of PAGES) {
     expect(head.meta["og:type"]).toBe(article ? "article" : "website");
     expect(head.meta["article:published_time"]).toBe(article ? PUBLISHED[route] : undefined);
     expect(head.tags).toEqual(article ?? []);
+    expect(head.meta["article:section"]).toBe(article ? SECTIONS[route]?.[0] : undefined);
     expect(head.meta["og:site_name"]).toBe("Storefront bench");
     expect([head.meta["og:image:width"], head.meta["og:image:height"]]).toEqual([width, height]);
     expect(head.meta["twitter:card"]).toBe("summary_large_image");
@@ -68,6 +76,8 @@ for (const [route, title, [image, width, height]] of PAGES) {
     if (article) {
       expect(graph[2]).toMatchObject({ headline: title, mainEntityOfPage: { "@id": url }, datePublished: PUBLISHED[route],
         ...(article.length ? { keywords: article } : {}) });
+      const sections = SECTIONS[route] ?? [];
+      expect(graph[2]!["articleSection"]).toEqual(sections.length > 1 ? sections : sections[0]);
       expect(graph[2]!["dateModified"]).toBe(graph[1]!["dateModified"]);
     }
     expect(graph[0]).toMatchObject({ url: site, name: "Storefront bench" });
@@ -91,10 +101,11 @@ test("robots.txt keeps crawlers out of the previews and names the sitemap; the s
   const sitemap = await request.get("/sitemap.xml");
   expect(sitemap.status()).toBe(200);
   const entries = [...(await sitemap.text()).matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?<\/url>/g)];
-  expect(entries.map(m => m[1])).toEqual(PAGES.map(([route]) => new URL(route.slice(1), site).href).sort());
-  // lastmod: the page's own updated, else its own date, else none; never git's last commit.
+  expect(entries.map(m => m[1])).toEqual([...PAGES.map(([route]) => route), ...Object.keys(GENERATED)].map(route => new URL(route.slice(1), site).href).sort());
+  // lastmod: the page's own updated, else its own date, else none; never git's last commit. A tag or category page:
+  // its pages' newest.
   for (const m of entries) {
     const route = new URL(m[1]!).pathname.slice(new URL(site).pathname.length - 1);
-    expect(m[2], m[1]).toBe(UPDATED[route] ?? PUBLISHED[route]);
+    expect(m[2], m[1]).toBe(GENERATED[route] ?? UPDATED[route] ?? PUBLISHED[route]);
   }
 });

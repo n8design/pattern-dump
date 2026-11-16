@@ -6,7 +6,8 @@
 //
 //   date: 2026-11-02          a real calendar date, written YYYY-MM-DD
 //   updated: 2026-11-10       the same, set by the author for a real content change; never before `date`
-//   tags: [design, css]       each lowercase letters, digits and hyphens (a URL segment), no duplicates
+//   tags: [design, css]       each lowercase letters, digits and hyphens (a URL segment), no duplicates; declared in
+//                             storefront.tags (or an old key of one) when the site declares tags
 //   categories: [guides]      each declared in storefront.categories (or an old key of one), no duplicates
 //   draft: true               true or false
 //   sort: date                on a folder's index.md: its pages newest first ("order", the default: the nav's order)
@@ -15,7 +16,7 @@
 
 import { suggest } from "@pattern-dump/config";
 import type { FrontmatterValue } from "../frontmatter.js";
-import type { CategoryIndex } from "./categories.js";
+import { TERM_WORDS, type CategoryIndex, type TermIndex } from "./categories.js";
 
 export type Read<T> = { ok: true; value: T } | { ok: false; message: string };
 
@@ -56,17 +57,27 @@ export function readTags(v: FrontmatterValue): Read<string[]> {
   return { ok: true, value: list };
 }
 
-/** A page's categories, resolved: declared keys, in the page's order; `renamed`: each old key the page used. */
-export interface PageCategories { keys: string[]; renamed: Array<{ from: string; to: string }> }
+/** A page's terms of one kind, resolved: their keys, in the page's order; `renamed`: each old key the page used. */
+export interface PageTerms { keys: string[]; renamed: Array<{ from: string; to: string }> }
+/** A page's categories, resolved. */
+export type PageCategories = PageTerms;
 
-/** `categories: [a, b]` (or one value): each a declared key or an old key of one (categories.ts). */
-export function readCategories(v: FrontmatterValue, index: CategoryIndex): Read<PageCategories> {
+/**
+ * `tags:` or `categories:` (one value, or a list): each a declared key or an old key of one (categories.ts). Tags a
+ * site doesn't declare are any URL segments, as readTags reads them.
+ */
+export function readTerms(v: FrontmatterValue, index: TermIndex): Read<PageTerms> {
+  if (!index.declared) {
+    const r = readTags(v);
+    return r.ok ? { ok: true, value: { keys: r.value, renamed: [] } } : r;
+  }
+  const w = TERM_WORDS[index.kind];
   const list = Array.isArray(v) ? v : [v];
-  const keys: string[] = [], renamed: PageCategories["renamed"] = [];
+  const keys: string[] = [], renamed: PageTerms["renamed"] = [];
   const problems: string[] = [];
   for (const value of list) {
     if (!TAG.test(value)) {
-      problems.push(`"${value}" is not a category: a category is lowercase letters, digits and hyphens, such as "design-systems"`);
+      problems.push(`"${value}" is not a ${w.one}: a ${w.one} is lowercase letters, digits and hyphens, such as "design-systems"`);
       continue;
     }
     const key = index.byKey.has(value) ? value : index.aliases.get(value);
@@ -74,9 +85,9 @@ export function readCategories(v: FrontmatterValue, index: CategoryIndex): Read<
       const known = [...index.byKey.keys()];
       const near = suggest(value, [...known, ...index.aliases.keys()]);
       const hint = near ? `did you mean "${index.aliases.get(near) ?? near}"?`
-        : known.length ? `the categories are ${[...known].sort().map(k => `"${k}"`).join(", ")} (storefront.categories)`
-          : "the site declares none (storefront.categories in the config)";
-      problems.push(`"${value}" is not a category: ${hint}`);
+        : known.length ? `the ${w.many} are ${[...known].sort().map(k => `"${k}"`).join(", ")} (${w.config})`
+          : `the site declares none (${w.config} in the config)`;
+      problems.push(`"${value}" is not a ${w.one}: ${hint}`);
       continue;
     }
     if (key !== value) renamed.push({ from: value, to: key });
@@ -87,8 +98,11 @@ export function readCategories(v: FrontmatterValue, index: CategoryIndex): Read<
     }
     keys.push(key);
   }
-  return problems.length ? { ok: false, message: `categories: ${problems.join("; ")}` } : { ok: true, value: { keys, renamed } };
+  return problems.length ? { ok: false, message: `${w.many}: ${problems.join("; ")}` } : { ok: true, value: { keys, renamed } };
 }
+
+/** `categories: [a, b]` (or one value): each a declared key or an old key of one (categories.ts). */
+export const readCategories = (v: FrontmatterValue, index: CategoryIndex): Read<PageCategories> => readTerms(v, index);
 
 export function readDraft(v: FrontmatterValue): Read<boolean> {
   return v === "true" || v === "false" ? { ok: true, value: v === "true" } : { ok: false, message: "draft must be true or false" };

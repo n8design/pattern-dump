@@ -11,6 +11,12 @@
     // Or a subfolder, such as a GitHub project page: the site is then served under the path, in `npm run dev` too,
     // and the workbench goes under it as well (workbenchUrl and build.basePath "/<repository>/workbench/").
     // url: "https://<owner>.github.io/<repository>/",
+    // What a page can be about, independent of its folder: a page names them in `categories:`. Each category and each
+    // tag gets a page (layouts/category, layouts/tag) and an index (/categories/, /tags/). Tags can be declared the
+    // same way (tags: { ... }), so a typo fails the build; undeclared, any tag works.
+    categories: {
+      notes: { label: "Notes", description: "Short articles about this site" },
+    },
     site: { title: __PD_BRAND_JSON__, footer: "Made with Pattern Dump." },
   },
   build: { basePath: "/workbench/" },

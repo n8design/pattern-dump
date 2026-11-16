@@ -218,6 +218,8 @@ const pagesDir = cfg.storefront?.pagesDir ?? null;
 const workbenchPath = sameHostWorkbenchPath(cfg.storefront ?? undefined);
 // A page's categories are resolved against the config's (a change to them restarts the server).
 const categories = cfg.storefront?.categories;
+// Tags too, when the site declares them: their labels are in every listing.
+const tags = cfg.storefront?.tags;
 // What every page shows of the others (handlePages): read before the watcher starts, then after each event
 // in the pages folder.
 let pagesPrint = await pagesFingerprint();
@@ -1030,7 +1032,7 @@ const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p)
  *  storefront. Compared, never parsed. */
 async function pagesFingerprint(): Promise<string | null> {
   if (!pagesDir) return null;
-  const model = await readPages(pagesDir, { workbenchPath, categories });
+  const model = await readPages(pagesDir, { workbenchPath, categories, tags });
   return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems, entries: [...model.entries], folders: [...model.folders] });
 }
 

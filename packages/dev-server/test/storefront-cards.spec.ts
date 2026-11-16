@@ -76,7 +76,14 @@ describe("x-pd-card: each page of a listing, checked against its card", () => {
 
   it("checks a page's value against the type the card declares", async () => {
     const p = await assemble("/articles/", { ...LISTING, ...card({ properties: { title: { type: "string" }, tags: { type: "string" } } }) });
-    expect(p.problems).toEqual([`articles/index.md: articles/one.md: tags must be text (got ["css"]) for the listing's card (components/card)`]);
+    expect(p.problems).toEqual([`articles/index.md: articles/one.md: tags must be text (got [{"key":"css","label":"css","description":null,"route":null}]) for the listing's card (components/card)`]);
+  });
+
+  it("refuses a card that declares tags as a list of strings, naming the fix (tags are objects since 0.5.0)", async () => {
+    const p = await assemble("/articles/", { ...LISTING, ...card({ properties: { title: { type: "string" }, tags: { type: "array", items: { type: "string" } } } }) });
+    expect(p.status).toBe(500);
+    expect(p.problems).toEqual([`components/card (the listing's card, layouts/listing) declares tags as a list of strings, but a tag is an object `
+      + `since 0.5.0 (key, label, description, route): declare its items as "type": "object", or leave items out`]);
   });
 
   it("refuses a card that declares a field a listing's page doesn't have, once", async () => {

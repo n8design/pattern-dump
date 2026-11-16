@@ -33,9 +33,29 @@
     "tags": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "route": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
-      "description": "The page's tags"
+      "description": "The page's tags: each its label, linked to its tag page when the site has one"
     }
   }
 }

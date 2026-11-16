@@ -1,0 +1,21 @@
+{
+  "title": "Tags",
+  "page": {
+    "terms": [
+      {
+        "key": "design",
+        "label": "Design",
+        "description": null,
+        "route": "/tags/design/",
+        "count": 2
+      },
+      {
+        "key": "images",
+        "label": "Images",
+        "description": null,
+        "route": "/tags/images/",
+        "count": 1
+      }
+    ]
+  }
+}

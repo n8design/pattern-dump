@@ -19,8 +19,10 @@ export interface JsonLdPage {
   modified: string | null;
   /** The page's date: its own (frontmatter `date`, YYYY-MM-DD), else git's first commit of it (ISO 8601), or null. */
   published?: string | null;
-  /** The page is an article: its own date and its tags (page.ts articleOf). */
-  article?: { published: string; tags: string[] } | undefined;
+  /** The page is an article: its own date, its tags' and its categories' labels (page.ts articleOf). */
+  article?: { published: string; tags: string[]; sections: string[] } | undefined;
+  /** A generated tag or category page, or an index of them (terms.ts): a CollectionPage, not a WebPage. */
+  collection?: boolean;
 }
 
 /** The page's JSON-LD as a <script> element. Every "<" in it is written <, so no value can end the
@@ -32,7 +34,7 @@ export function jsonLdScript(p: JsonLdPage): string {
   const graph: Record<string, unknown>[] = [
     { "@type": "WebSite", "@id": site, url: p.siteUrl, ...(p.siteTitle ? { name: p.siteTitle } : {}) },
     {
-      "@type": "WebPage", "@id": abs(p.route), url: abs(p.route), name: p.title,
+      "@type": p.collection ? "CollectionPage" : "WebPage", "@id": abs(p.route), url: abs(p.route), name: p.title,
       ...(p.description ? { description: p.description } : {}),
       isPartOf: { "@id": site },
       ...(p.published ? { datePublished: p.published } : {}),
@@ -53,6 +55,7 @@ export function jsonLdScript(p: JsonLdPage): string {
       datePublished: p.article.published,
       ...(p.modified ? { dateModified: p.modified } : {}),
       ...(p.article.tags.length ? { keywords: p.article.tags } : {}),
+      ...(p.article.sections.length ? { articleSection: p.article.sections.length === 1 ? p.article.sections[0] : p.article.sections } : {}),
     });
   }
   const json = JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c");

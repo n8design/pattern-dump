@@ -20,6 +20,14 @@
   now. `pd dev` shows it, and the report names it: `scheduled: 1 held back (articles/launch.md until 2026-12-01)`.
 - `updated` and `categories` are now keys the build owns: a layout's schema that declares either must rename it.
 - `childLayout` and `view` are keys the build owns too, so the same holds for them.
+- **A tag is an object now, not a string:** `page.tags` and every listing entry's `tags` are
+  `{ key, label, description, route }`, as categories are (which gain `route` too). A template that writes a tag as
+  text (`{{#each page.tags}}{{this}}{{/each}}`) stops the page, naming the template, its line and the fix: write
+  `{{label}}`. A card whose schema declares `tags` as a list of strings stops its listing the same way. The starter's
+  layouts and cards write `{{label}}`, linked to the tag's page.
+- `article:tag` and the JSON-LD `keywords` write a tag's label, not its key (the same for an undeclared tag).
+- A skin with `layouts/tag` or `layouts/category` gets tag or category pages without asking (see Added): a page of the
+  pages folder at `/tags/` or `/categories/` then stops the build, naming the fix.
 
 ### Deprecated
 
@@ -27,6 +35,20 @@
   the query to declare instead (`x-pd-query` on a sub-key of `page`). It goes in a later release.
 
 ### Added
+
+- Tag declarations: `storefront.tags`, declared as categories are (label, description, old keys). Optional: without it
+  any tag works, labelled with its key. With it, a tag that isn't declared stops the page with a "did you mean", and an
+  old key builds with a warning. A query's `tags` are checked against the declarations.
+- Tag and category pages: a page for every tag and every category a published page has (`/tags/<key>/`,
+  `/categories/<key>/`), and an index of each (`/tags/`, `/categories/`), through the skin's `layouts/tag`,
+  `layouts/tags`, `layouts/category` and `layouts/categories`. A term page gets `page.term` and lists its pages
+  through a query; an index gets `page.terms`. Drafts and scheduled pages never count. `storefront.tagPages` and
+  `storefront.categoryPages` turn them off (`false`), ask for them (`true`: a missing layout is a problem), or set the
+  path and the index's title. An old key's route forwards to the new one. They are in the sitemap, with JSON-LD
+  `CollectionPage`. The starter has plain layouts for all four.
+- `same` for a query's `tags` and `categories`: the current page's own (on a tag page, its tag).
+- Categories in search and link previews: `article:section` (the first category's label) and the `Article`'s
+  `articleSection`.
 
 - `childLayout:` on a folder's `index.md`: the layout of the pages under it that name none. The nearest folder that
   sets one wins, and a page's own `layout:` wins over it. A `childLayout` that names no layout fails the `index.md`

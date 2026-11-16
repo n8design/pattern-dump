@@ -29,9 +29,10 @@ import { PD_ROUTES, type LayoutPageUse, type StorefrontNavItem, type StorefrontP
 import { frontmatterBody, readFrontmatterStrict, type FrontmatterReading } from "../frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable } from "../tree-order.js";
 import { redirectProblems, redirectsOf, workbenchPlace } from "./redirects.js";
-import { readCategories, readChildLayout, readDate, readDraft, readSort, readTags, readUpdated, type SortBy } from "./listing-keys.js";
-import { categoryIndex, type Category, type CategoryIndex } from "./categories.js";
-import type { StorefrontCategory } from "@pattern-dump/config";
+import { readChildLayout, readDate, readDraft, readSort, readTerms, readUpdated, type SortBy } from "./listing-keys.js";
+import { termIndex, termOf, type Category, type CategoryIndex, type Term, type TermIndex } from "./categories.js";
+import type { StorefrontCategory, StorefrontTermPages } from "@pattern-dump/config";
+import { termPages, type GeneratedPage } from "./terms.js";
 import { teaserOf } from "./teaser.js";
 
 /** The layout a page uses when its frontmatter names none. */
@@ -65,7 +66,8 @@ export interface PageEntryFields {
   updated: string | null;
   /** Its image, a path in the assets, or null. */
   image: string | null;
-  tags: string[];
+  /** Its tags, resolved (an old key as the tag it is now). */
+  tags: Term[];
   /** Its categories, resolved (an old key as the category it is now). */
   categories: Category[];
   draft: boolean;
@@ -106,13 +108,18 @@ export interface PageModel extends StorefrontPagesResponse {
   notFound?: PageFile;
   /** The declared categories (storefront.categories), which pages' `categories:` are checked against. */
   categories: CategoryIndex;
+  /** The declared tags (storefront.tags), which pages' `tags:` are checked against when there are any. */
+  tags: TermIndex;
+  /** The tag and category pages (terms.ts), by route: in `pages` too, never in `files`, the nav or a listing. */
+  generated: Map<string, GeneratedPage>;
   /** Problems with the folder as a whole, one line each. Empty when it is a sound site. */
   problems: string[];
 }
 
 /** The pages that render with the layout `name`, by path, each with where it got it (the workbench's Relationships). */
 export function layoutPages(model: PageModel, name: string): LayoutPageUse[] {
-  return model.pages.filter(p => p.layout === name).map(p => {
+  // A generated tag or category page has no file: not listed yet (contracts' LayoutPageUse has no source for it).
+  return model.pages.filter(p => p.layout === name && model.files.has(p.route)).map(p => {
     const f = model.files.get(p.route)!;
     const source = p.layoutFrom !== undefined ? "folder" : f.frontmatter.values["layout"] !== undefined ? "own" : "default";
     return { route: p.route, path: f.path, source, ...(p.layoutFrom !== undefined ? { from: p.layoutFrom } : {}) } satisfies LayoutPageUse;
@@ -170,13 +177,20 @@ const scalar = (v: string | string[] | undefined): string | undefined => typeof 
 export async function readPages(pagesDir: string, opts: {
   workbenchPath?: string | undefined; drafts?: "show" | "leave-out"; scheduled?: "show" | "leave-out"; today?: string | undefined;
   categories?: Readonly<Record<string, StorefrontCategory>> | undefined;
+  tags?: Readonly<Record<string, StorefrontCategory>> | undefined;
+  tagPages?: boolean | StorefrontTermPages | undefined; categoryPages?: boolean | StorefrontTermPages | undefined;
+  /** The skin's layouts, by name: tag and category pages are generated only when it is given (terms.ts). */
+  layouts?: ReadonlySet<string> | undefined;
 } = {}): Promise<PageModel> {
   const problems: string[] = [];
-  const categories = categoryIndex(opts.categories);
+  // Fresh per reading: the generated pages set the terms' routes on them.
+  const categories = termIndex("category", opts.categories);
+  const tags = termIndex("tag", opts.tags);
+  const generated = new Map<string, GeneratedPage>();
   const files = new Map<string, PageFile>();
   let notFound: PageFile | undefined;
   if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
-    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], scheduled: [], categories, problems: [`the pages folder ${pagesDir} does not exist`] };
+    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], scheduled: [], categories, tags, generated, problems: [`the pages folder ${pagesDir} does not exist`] };
   }
   const bodies = new Map<string, string>();
   for (const path of (await markdownFiles(pagesDir, pagesDir, problems)).sort()) {
@@ -354,6 +368,32 @@ export async function readPages(pagesDir: string, opts: {
     return r.ok ? r.value : undefined;
   };
   const entries = new Map<string, PageEntryFields>();
+  const termKeys = new Map<string, { tags: string[]; categories: string[] }>();
+  for (const route of routes) {
+    const v = files.get(route)!.frontmatter.values;
+    termKeys.set(route, {
+      tags: ok(v["tags"], x => readTerms(x, tags))?.keys ?? [],
+      categories: ok(v["categories"], x => readTerms(x, categories))?.keys ?? [],
+    });
+  }
+  // The tag and category pages, from the published pages; then every term knows its route.
+  const isPublished = (route: string) => !isDraft(files.get(route)) && !ownScheduled.has(route);
+  const generatedPages = termPages({
+    indexes: { tag: tags, category: categories }, settings: { tag: opts.tagPages, category: opts.categoryPages }, layouts: opts.layouts,
+    files: new Map([...files.values()].map(f => [f.route, { path: f.path }])),
+    sources: routes.filter(isPublished).map(route => {
+      const v = files.get(route)!.frontmatter.values;
+      const date = ok(v["date"], x => readDate(x)) ?? null;
+      return { route, path: files.get(route)!.path, ...termKeys.get(route)!, date,
+        updated: ok(v["updated"], x => readUpdated(x, date ?? undefined)) ?? null, redirectFrom: redirectsOf(files.get(route)!) };
+    }),
+  });
+  problems.push(...generatedPages.problems);
+  for (const g of generatedPages.pages) generated.set(g.route, g);
+  const routeOf = new Map(generatedPages.pages.filter(g => g.term).map(g => [`${g.kind}:${g.term!.key}`, g.route]));
+  for (const index of [tags, categories]) for (const t of index.list) t.route = routeOf.get(`${index.kind}:${t.key}`) ?? null;
+  const termsOf = (index: TermIndex, keys: string[]): Term[] =>
+    keys.map(k => ({ ...termOf(index, k), route: routeOf.get(`${index.kind}:${k}`) ?? null }));
   for (const route of routes) {
     const f = files.get(route)!;
     const v = f.frontmatter.values;
@@ -365,8 +405,8 @@ export async function readPages(pagesDir: string, opts: {
       date,
       updated: ok(v["updated"], x => readUpdated(x, date ?? undefined)) ?? null,
       image: image !== undefined && /^\/assets\/[^?#]+[^/?#]$/.test(image) ? image : null,
-      tags: ok(v["tags"], readTags) ?? [],
-      categories: (ok(v["categories"], x => readCategories(x, categories))?.keys ?? []).map(k => categories.byKey.get(k)!),
+      tags: termsOf(tags, termKeys.get(route)!.tags),
+      categories: termsOf(categories, termKeys.get(route)!.categories),
       draft: ok(v["draft"], readDraft) ?? false,
       scheduled: ownScheduled.has(route),
     });
@@ -380,5 +420,10 @@ export async function readPages(pagesDir: string, opts: {
       children: ordered(folder).map(c => c.route).filter(r => files.has(r)),
     });
   }
-  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, scheduled, categories, problems, ...(notFound ? { notFound } : {}) };
+  // The generated pages are pages of the site (crawled, in the sitemap), after the folder's.
+  for (const g of generated.values()) {
+    pages.push({ route: g.route, title: g.title, layout: g.layout, ...(g.redirectFrom.length ? { redirectFrom: g.redirectFrom } : {}) });
+  }
+  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, scheduled, categories, tags, generated,
+    problems, ...(notFound ? { notFound } : {}) };
 }

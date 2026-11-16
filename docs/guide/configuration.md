@@ -185,6 +185,9 @@ in [storefront.md](storefront.md).
 | `storefront.image` | string | (none) | The link-preview image of every page that names none: a PNG, JPEG, GIF or WebP file in the assets, such as `/assets/images/share.png` |
 | `storefront.images` | object | (none) | The site's own `quality` and `effort` for its images, over `images` (above) |
 | `storefront.categories` | object | (none) | The categories a page's `categories:` may name, by key (lowercase letters, digits and hyphens): `{ guides: { label: "Guides", description: "…", aliases: ["how-to"] } }`. `label` is required; `aliases` are old keys kept after a rename. Independent of the folders, so a page changes category without changing its URL ([storefront.md](storefront.md#categories)) |
+| `storefront.tags` | object | (none) | The tags a page's `tags:` may name, declared as categories are: `{ css: { label: "CSS", aliases: ["styles"] } }`. Without it any tag works, labelled with its key ([storefront.md](storefront.md#tags)) |
+| `storefront.tagPages` | boolean or object | on when the skin has `layouts/tag` | A page per tag at `/tags/<key>/` and an index at `/tags/`. `false`: off; `true` or `{ path, title }`: on, and a missing layout is a problem ([storefront.md](storefront.md#tag-and-category-pages)) |
+| `storefront.categoryPages` | boolean or object | on when the skin has `layouts/category` | The same for categories, at `/categories/` |
 | `storefront.site` | object | (none) | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
 
 ## When changes take effect

@@ -245,6 +245,40 @@ describe("configProblems — storefront", () => {
     ]);
   });
 
+  it("takes tags as categories are: each key a URL segment, with a label, an optional description and old keys", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    expect(storefront({ ...base, tags: { css: { label: "CSS", aliases: ["styles"] }, "design-tokens": { label: "Design tokens" } } })).toEqual([]);
+    expect(storefront({ ...base, tags: ["css"] })).toEqual([
+      `"storefront.tags" must be an object of tags by key, such as { css: { label: "CSS" } }`,
+    ]);
+    expect(storefront({ ...base, tags: { CSS: { label: "CSS" }, js: {}, html: { label: "HTML", aliases: ["js"] } } })).toEqual([
+      `"storefront.tags.CSS": a tag's key is part of a URL, so it is lowercase letters, digits and hyphens only`,
+      `missing required "storefront.tags.js.label"`,
+      `"storefront.tags.html.aliases": "js" is a tag of its own, so it can't be an old key of "html"`,
+    ]);
+  });
+
+  it("takes tagPages and categoryPages: true, false, or { path, title }", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    for (const ok of [true, false, {}, { path: "topics" }, { title: "Topics" }, { path: "t2", title: "All tags" }]) {
+      expect(storefront({ ...base, tagPages: ok }), JSON.stringify(ok)).toEqual([]);
+      expect(storefront({ ...base, categoryPages: ok }), JSON.stringify(ok)).toEqual([]);
+    }
+    expect(storefront({ ...base, tagPages: "yes" })).toEqual([
+      `"storefront.tagPages" must be true, false, or { path, title }, such as { path: "topics" }`,
+    ]);
+    expect(storefront({ ...base, categoryPages: { path: "Topics/x", slug: 1 } })).toEqual([
+      `"storefront.categoryPages.path": the pages' first URL segment, so lowercase letters, digits and hyphens only, such as "topics"`,
+      `unknown key "storefront.categoryPages.slug"`,
+    ]);
+    expect(storefront({ ...base, tagPages: { path: "topics" }, categoryPages: { path: "topics" } })).toEqual([
+      `"storefront.tagPages.path" and "storefront.categoryPages.path" are both "topics": tag pages and category pages need a path each`,
+    ]);
+    expect(storefront({ ...base, categoryPages: { path: "tags" } })).toEqual([
+      `"storefront.tagPages.path" and "storefront.categoryPages.path" are both "tags": tag pages and category pages need a path each`,
+    ]);
+  });
+
   it("accepts a workbench URL with a subpath", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, workbenchUrl: "https://htwoo.io/workbench/" })).toEqual([]);

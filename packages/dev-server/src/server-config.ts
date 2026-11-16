@@ -10,7 +10,7 @@
 
 import { basename, join, resolve } from "node:path";
 import type { ImageEncoding } from "@pattern-dump/build";
-import { storefrontBasePath, type PatternDumpConfig, type StorefrontCategory } from "@pattern-dump/config";
+import { storefrontBasePath, type PatternDumpConfig, type StorefrontCategory, StorefrontTermPages } from "@pattern-dump/config";
 import { PD_HOSTS, type ThemeSwitch } from "@pattern-dump/contracts";
 import type { PatternRoot } from "@pattern-dump/discovery";
 import type { ResolvedPackage } from "./packages.js";
@@ -102,6 +102,11 @@ export interface ResolvedConfig {
     readonly headName: string | undefined;
     /** storefront.categories: what a page's `categories:` may name. */
     readonly categories: Readonly<Record<string, StorefrontCategory>> | undefined;
+    /** storefront.tags: what a page's `tags:` may name; any tag when left out. */
+    readonly tags: Readonly<Record<string, StorefrontCategory>> | undefined;
+    /** storefront.tagPages and storefront.categoryPages, as the config writes them (terms.ts reads them). */
+    readonly tagPages: boolean | StorefrontTermPages | undefined;
+    readonly categoryPages: boolean | StorefrontTermPages | undefined;
   } | null;
 
   readonly overviewsEnabled: boolean;
@@ -242,6 +247,9 @@ export function resolveServerConfig(
       head: config.storefront.head !== undefined ? resolve(cwd, config.storefront.head) : undefined,
       headName: config.storefront.head,
       categories: config.storefront.categories,
+      tags: config.storefront.tags,
+      tagPages: config.storefront.tagPages,
+      categoryPages: config.storefront.categoryPages,
     } : null,
     images,
     overviewsEnabled:    config.overviews !== false,

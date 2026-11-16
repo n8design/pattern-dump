@@ -6,7 +6,7 @@
   "nav": [{ "route": "/", "title": "Home" }, { "route": "/articles/", "title": "Articles", "current": true }],
   "page": {
     "date": "2026-11-14",
-    "tags": ["notes"],
+    "tags": [{ "key": "notes", "label": "notes", "description": null, "route": "/tags/notes/" }],
     "related": {
       "entries": [{ "route": "/articles/second/", "title": "A second article", "date": "2026-11-15" }],
       "listing": "<ul class=\"view-compact\" role=\"list\"><li><p class=\"compact-card\"><a href=\"/articles/second/\">A second article</a> <time class=\"compact-card-date\" datetime=\"2026-11-15\">2026-11-15</time></p></li></ul>"

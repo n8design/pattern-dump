@@ -1,0 +1,29 @@
+{
+  "title": "Guides",
+  "page": {
+    "term": {
+      "key": "guides",
+      "label": "Guides",
+      "description": null,
+      "route": "/categories/guides/",
+      "count": 1
+    },
+    "pages": {
+      "entries": [
+        {
+          "route": "/articles/harbour/",
+          "title": "A harbour of cable cars",
+          "description": null,
+          "date": "2026-11-01",
+          "updated": null,
+          "image": null,
+          "tags": [],
+          "categories": [],
+          "draft": false,
+          "scheduled": false
+        }
+      ],
+      "listing": "<p>Setup</p>"
+    }
+  }
+}

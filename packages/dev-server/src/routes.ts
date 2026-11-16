@@ -18,7 +18,7 @@ import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile } from "node:fs/promises";
-import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
+import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
@@ -75,10 +75,12 @@ const printedNotes = new WeakMap<RouteContext, Set<string>>();
 
 /** The website's pages as this server serves them: pd dev shows drafts and scheduled pages; pd build leaves them out,
  *  as if their files weren't there. */
-function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>): ReturnType<typeof readPages> {
+function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>, discoveryMap?: DiscoveryMap): ReturnType<typeof readPages> {
   return readPages(sf.pagesDir, {
     workbenchPath: sameHostWorkbenchPath(sf), drafts: ctx.live ? "show" : "leave-out", scheduled: ctx.live ? "show" : "leave-out",
-    today: ctx.today ?? todayOf(ctx.now()), categories: sf.categories,
+    today: ctx.today ?? todayOf(ctx.now()), categories: sf.categories, tags: sf.tags, tagPages: sf.tagPages, categoryPages: sf.categoryPages,
+    // The skin's layouts: tag and category pages are generated through them (terms.ts).
+    ...(discoveryMap ? { layouts: new Set([...discoveryMap.keys()].filter(id => /^layouts\/[^/~]+$/.test(id)).map(id => id.slice("layouts/".length))) } : {}),
   });
 }
 
@@ -640,7 +642,7 @@ async function routeRequest(
     if (cfg.storefront && host === cfg.storefront.host) {
       const discovery = await currentDiscovery(state, patternRoots);
       const discoveryMap = discovery.discoveryMap;
-      const model = await readStorefrontPages(ctx, cfg.storefront);
+      const model = await readStorefrontPages(ctx, cfg.storefront, discoveryMap);
       if (pathname === PD_ROUTES.pages) {
         if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
         json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);
@@ -675,7 +677,7 @@ async function routeRequest(
       }
       // /404.html, and every address with no page, is the site's 404 page with status 404, as a static host
       // serves it (a 404 page with problems is a 500 listing them).
-      const target = pathname === PD_ROUTES.notFound || route === null || (!model.problems.length && !model.files.has(route))
+      const target = pathname === PD_ROUTES.notFound || route === null || (!model.problems.length && !model.files.has(route) && !model.generated.has(route))
         ? PD_ROUTES.notFound : route;
       // In pd dev a page links to the workbench of this same process, whatever the config's build-time
       // URL; pd build passes that URL in, for the built site.

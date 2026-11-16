@@ -241,7 +241,32 @@ export interface StorefrontConfig {
    * category, with a note naming the page so it can be updated.
    */
   categories?: Record<string, StorefrontCategory>;
+  /**
+   * The tags a page can have (its `tags:`), by key, declared as categories are. Optional: without it every tag works,
+   * labelled with its key. With it, it is the list, so a typo fails the build; an alias is an old key that still builds.
+   */
+  tags?: Record<string, StorefrontTag>;
+  /**
+   * A page per tag (`/tags/<key>/`) and an index of them (`/tags/`), each through the skin's `layouts/tag` and
+   * `layouts/tags`. Left out: on when the skin has `layouts/tag`. `false`: off. `true` or an object: on, and a missing
+   * layout is a problem. `path`: the URL segment (default `tags`); `title`: the index page's title (default "Tags").
+   */
+  tagPages?: boolean | StorefrontTermPages;
+  /** A page per category and an index of them, as tagPages (`layouts/category`, `layouts/categories`; default path
+   *  `categories`, title "Categories"). */
+  categoryPages?: boolean | StorefrontTermPages;
 }
+
+/** storefront.tagPages and storefront.categoryPages as an object. */
+export interface StorefrontTermPages {
+  /** The pages' first URL segment: lowercase letters, digits and hyphens. */
+  path?: string;
+  /** The index page's title. */
+  title?: string;
+}
+
+/** A declared tag (`storefront.tags.<key>`): the same shape as a category. */
+export type StorefrontTag = StorefrontCategory;
 
 /** A declared category (`storefront.categories.<key>`). */
 export interface StorefrontCategory {

@@ -175,7 +175,8 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
       [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"],
-        ["layouts/article", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
+        ["layouts/article", "ok"], ["layouts/categories", "ok"], ["layouts/category", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"],
+        ["layouts/tag", "ok"], ["layouts/tags", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
         ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
   }, 120_000);
 
@@ -203,7 +204,21 @@ describe("the starter project with a website (--storefront, no examples)", () =>
       expect(articles.body).toContain(`href="${componentCssUrl("components/listing-card").replace(/\.css$/, "")}`);
       const hello = await onHost(server.port, "live.localhost", "/articles/hello/");
       expect(hello.status).toBe(200);
-      expect(hello.body).toContain(`<ul class="page-tags" aria-label="Tags"><li>getting-started</li><li>notes</li></ul>`);
+      // Each tag by its label, linked to its tag page.
+      expect(hello.body).toContain(`<ul class="page-tags" aria-label="Tags"><li><a href="/tags/getting-started/">getting-started</a></li><li><a href="/tags/notes/">notes</a></li></ul>`);
+      // The tag and category pages, and their indexes, through the starter's plain layouts.
+      const notes = await onHost(server.port, "live.localhost", "/tags/notes/");
+      expect(notes.status).toBe(200);
+      expect(notes.body).toContain(`<h1 class="page-title">notes</h1>`);
+      expect([...notes.body.matchAll(/<h2 class="listing-card-title"><a href="([^"]+)"/g)].map(m => m[1])).toEqual(["/articles/related/", "/articles/hello/"]);
+      const tags = await onHost(server.port, "live.localhost", "/tags/");
+      expect(tags.body).toContain(`<li><a href="/tags/getting-started/">getting-started</a> (1)</li>`);
+      expect(tags.body).toContain(`<li><a href="/tags/notes/">notes</a> (2)</li>`);
+      const category = await onHost(server.port, "live.localhost", "/categories/notes/");
+      expect(category.status).toBe(200);
+      expect(category.body).toContain(`<h1 class="page-title">Notes</h1>`);
+      expect(category.body).toContain(`<p class="page-description">Short articles about this site</p>`);
+      expect((await onHost(server.port, "live.localhost", "/categories/")).body).toContain(`<li><a href="/categories/notes/">Notes</a> (2)</li>`);
       // Its related articles: the article layout's query (the same folder, by relevance, three), in the compact view.
       expect(hello.body).toMatch(/<h2 id="article-related-title">Related articles<\/h2>\s*<ul class="view-compact" role="list">\s*<li><p class="compact-card"><a href="\/articles\/related\/">Related articles<\/a> <time class="compact-card-date" datetime="2026-11-15">/);
       expect(hello.body).toContain(`href="${componentCssUrl("views/compact").replace(/\.css$/, "")}`);

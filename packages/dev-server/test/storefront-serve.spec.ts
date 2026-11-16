@@ -72,8 +72,22 @@ describe("storefront pages on the storefront host", () => {
       expect(r.body, path).toContain(`<title>${title}</title>`);
     }
     const pages = JSON.parse((await get(port, "live.localhost", "/api/pages")).body) as { pages: Array<{ route: string }> };
-    expect(pages.pages.map(p => p.route)).toEqual(["/", "/guides/", "/guides/setup/", "/about/", "/articles/", "/articles/harbour/", "/articles/plain/"]);
+    // Then the generated pages: the tag pages and the category pages, each kind's index first.
+    expect(pages.pages.map(p => p.route)).toEqual(["/", "/guides/", "/guides/setup/", "/about/", "/articles/", "/articles/harbour/", "/articles/plain/",
+      "/tags/", "/tags/design/", "/tags/images/", "/tags/layout/", "/categories/", "/categories/design-systems/", "/categories/guides/"]);
     expect((await get(port, "live.localhost", "/nope/")).status).toBe(404);
+  });
+
+  it("serves the tag and category pages, and an old tag key's route forwards to its tag's page", async () => {
+    for (const [path, title] of [["/tags/", "Tags · Storefront bench"], ["/tags/images/", "Images · Storefront bench"], ["/categories/guides/", "Guides · Storefront bench"]]) {
+      const r = await get(port, "live.localhost", path);
+      expect(r.status, path).toBe(200);
+      expect(r.body, path).toContain(`<title>${title}</title>`);
+    }
+    expect((await get(port, "live.localhost", "/tags/images/")).body).toContain(`href="/articles/harbour/"`);
+    const old = await get(port, "live.localhost", "/tags/pictures/");
+    expect(old.status).toBe(200);
+    expect(old.body).toContain(`<meta http-equiv="refresh" content="0; url=/tags/images/">`);
   });
 
   it("links to the workbench of this same process, not the build's workbenchUrl", async () => {

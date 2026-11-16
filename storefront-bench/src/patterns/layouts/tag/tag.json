@@ -1,0 +1,29 @@
+{
+  "title": "Images",
+  "page": {
+    "term": {
+      "key": "images",
+      "label": "Images",
+      "description": null,
+      "route": "/tags/images/",
+      "count": 1
+    },
+    "pages": {
+      "entries": [
+        {
+          "route": "/articles/harbour/",
+          "title": "A harbour of cable cars",
+          "description": null,
+          "date": "2026-11-01",
+          "updated": null,
+          "image": null,
+          "tags": [],
+          "categories": [],
+          "draft": false,
+          "scheduled": false
+        }
+      ],
+      "listing": "<p>A harbour of cable cars</p>"
+    }
+  }
+}

@@ -39,7 +39,12 @@
           "date": "2026-11-01",
           "image": null,
           "tags": [
-            "images"
+            {
+              "key": "images",
+              "label": "Images",
+              "description": null,
+              "route": "/tags/images/"
+            }
           ],
           "draft": false
         },
