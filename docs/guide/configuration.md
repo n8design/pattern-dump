@@ -190,6 +190,8 @@ in [storefront.md](storefront.md).
 | `storefront.categoryPages` | boolean or object | on when the skin has `layouts/category` | The same for categories, at `/categories/` |
 | `storefront.search` | boolean | on when the project has Pagefind | Search: `pd build` indexes every page's own content with Pagefind into `_pd/search/`. `true`: a build without Pagefind stops; `false`: off ([storefront.md](storefront.md#search)) |
 | `storefront.llms` | boolean | `true` (`false` with `index: false`) | `pd build` writes `llms.txt` at the site's root: the site's title and description and each page's title, link and teaser, by collection ([storefront.md](storefront.md#search-engines-and-link-previews)). `false`: none |
+| `storefront.checks.classes` | `"warning"`, `"error"` or `"off"` | `"warning"` | The class check: a class on a page that no component or style of the style guide defines is listed in the report, stops the build, or isn't checked ([storefront.md](storefront.md#the-class-check)) |
+| `storefront.checks.allowClasses` | list of strings | `[]` | Classes a page may carry anyway: names, or a prefix ending in `*` (`"chart-*"`) |
 | `storefront.site` | object | (none) | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
 
 ## When changes take effect

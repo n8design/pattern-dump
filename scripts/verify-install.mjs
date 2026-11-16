@@ -283,6 +283,10 @@ if (failures.length === 0 && tmp) {
   check(built.status === 0, "npm run build on the website starter", `${built.stdout}${built.stderr}`.slice(-800));
   check(!`${built.stdout}${built.stderr}`.includes("add its rule"),
     "the build doesn't ask for the workbench's robots rule: the website's robots.txt carries it", `${built.stdout}`.slice(-800));
+  // A new site starts inside its design system: no class on its pages that the style guide doesn't define.
+  check(built.stdout.includes("classes: every class on the site's pages is the style guide's"),
+    "the website starter's pages carry only the style guide's classes", built.stdout.split("\n").filter(l => /class/.test(l)).join("\n").slice(-800));
+  check(existsSync(join(starter, "site", "llms.txt")), "the website starter's build writes llms.txt");
   // As the workflow does it: the website at the root, the workbench copied in under /workbench/.
   const out = join(tmp, "website-pages");
   await cp(join(starter, "site"), out, { recursive: true });

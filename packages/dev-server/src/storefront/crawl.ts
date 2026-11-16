@@ -55,6 +55,8 @@ export interface StorefrontCrawl {
   problems: string[];
   /** The HTML of every document crawled, by its URL: the link check reads it (links.ts). */
   documents: Map<string, string>;
+  /** Every stylesheet crawled, by its URL: the class check reads it (class-check.ts). */
+  stylesheets: Map<string, string>;
 }
 
 /** `files`: the root files to write besides the pages and what they reference (robots.txt, sitemap.xml). `get`
@@ -68,12 +70,13 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
     const body = await list.text();
     let error = body;
     try { error = (JSON.parse(body) as { error?: string }).error ?? body; } catch { /* not JSON */ }
-    return { urls: [], problems: error.split("\n").filter(Boolean), documents: new Map() };
+    return { urls: [], problems: error.split("\n").filter(Boolean), documents: new Map(), stylesheets: new Map() };
   }
   const { pages } = await list.json() as StorefrontPagesResponse;
 
   const urls: string[] = [];
   const documents = new Map<string, string>();
+  const stylesheets = new Map<string, string>();
   const seen = new Set<string>();
   const queue: string[] = [];
   const add = (url: string): void => { if (!seen.has(url)) { seen.add(url); queue.push(url); } };
@@ -104,7 +107,11 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
       documents.set(url, html);
       for (const ref of markupRefs(html, basePath)) add(ref);
     }
-    else if (/text\/css/.test(type)) for (const ref of cssRefs(await res.text(), basePath)) add(ref);
+    else if (/text\/css/.test(type)) {
+      const css = await res.text();
+      stylesheets.set(url, css);
+      for (const ref of cssRefs(css, basePath)) add(ref);
+    }
   }
-  return { urls, problems, documents };
+  return { urls, problems, documents, stylesheets };
 }

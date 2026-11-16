@@ -1193,6 +1193,30 @@ pd build: the storefront has broken links, so nothing was written:
 Code examples are text, so a link written in one is not checked. In `pd dev`, a page's links to pages that don't
 exist and to anchors it doesn't have are warnings in the terminal; the full check runs in `pd build`.
 
+### The class check
+
+Before it writes anything, `pd build` looks at every class on every page of the site (its pages and its 404 page)
+and lists each one the style guide doesn't define, so a class improvised outside the design system shows, whether a
+person or an agent wrote it.
+
+- **Defined:** a class a stylesheet of the style guide names in a selector (the project's and its packages', and each
+  stylesheet the site loads), and a class a component's template writes, styled or not. A word a template builds
+  from a value, such as `doc-toc-h{{level}}`, defines every class that starts that way. A page's own `<style>` counts
+  too.
+- **Allowed:** state classes JavaScript adds (`is-`, `has-`, `js-`), the classes Pattern Dump writes itself (code
+  highlighting, the copy button, pattern links, live examples), and the names in `storefront.checks.allowClasses`
+  (a trailing `*` for a prefix).
+- A page's markdown can't write HTML, so what the check finds is a value a component writes into a `class`
+  attribute (`<pd-components-badge look="hero-big-title">`, a template with `class="{{look}}"`). It names the page's
+  file and the line that gives the value.
+
+```
+[pd build] classes: 1 outside the design system:
+[pd build]   warning: about.md:12: class "hero-big-title" isn't defined by any component or style
+```
+
+A warning by default; with `storefront.checks.classes: "error"` it stops the build, and `"off"` skips the check.
+
 ### The accessibility check
 
 After the link check, `pd build` checks every page of the site (not the previews or the pages that forward from old

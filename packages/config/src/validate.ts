@@ -65,6 +65,7 @@ const SHAPE: Shape = {
       url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES, head: "hbs-file",
       categories: "categories", tags: "tags", tagPages: "term-pages", categoryPages: "term-pages", search: "boolean",
       llms: "boolean",
+      checks: { keys: { classes: { values: ["warning", "error", "off"] }, allowClasses: "strings" } },
     },
     required: ["pagesDir", "outDir"],
   },

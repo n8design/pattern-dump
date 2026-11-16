@@ -267,6 +267,19 @@ export interface StorefrontConfig {
    * false. `false`: none.
    */
   llms?: boolean;
+  /** pd build's checks of the site against its style guide. */
+  checks?: StorefrontChecks;
+}
+
+/** storefront.checks: what pd build checks the site's classes against. */
+export interface StorefrontChecks {
+  /**
+   * A class on a page that no component or style of the style guide defines: `"warning"` (the default) lists it in
+   * the report, `"error"` stops the build, `"off"` skips the check.
+   */
+  classes?: "warning" | "error" | "off";
+  /** Classes a page may carry anyway: names, or a prefix ending in `*` (`"chart-*"`). */
+  allowClasses?: string[];
 }
 
 /** storefront.tagPages and storefront.categoryPages as an object. */

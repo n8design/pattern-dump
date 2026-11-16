@@ -37,6 +37,10 @@
 
 ### Added
 
+- **The class check.** `pd build` lists each class on a site page that no component or style of the style guide
+  defines, naming the page's file and line: `about.md:12: class "hero-big-title" isn't defined by any component or
+  style`. State classes (`is-`, `has-`, `js-`) and Pattern Dump's own are allowed, and so is
+  `storefront.checks.allowClasses`. A warning; `storefront.checks.classes: "error"` stops the build, `"off"` skips it.
 - **`llms.txt`.** `pd build` writes one at the site's root (llmstxt.org): the site's title and description, then
   the top-level pages and each collection, every page with its title, link and teaser. The same pages as the sitemap;
   absolute URLs with `storefront.url`, under the site's path. On by default; `storefront.llms: false` turns it off.

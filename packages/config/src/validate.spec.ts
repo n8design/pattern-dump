@@ -271,6 +271,16 @@ describe("configProblems — storefront", () => {
     expect(storefront({ ...base, llms: "no" })).toEqual([`"storefront.llms" must be true or false`]);
   });
 
+  it("takes checks: classes warning, error or off, and a list of allowed classes", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    expect(storefront({ ...base, checks: { classes: "error", allowClasses: ["chart-*"] } })).toEqual([]);
+    expect(storefront({ ...base, checks: { classes: "strict", allowClasses: "chart-*", allowClass: [] } })).toEqual([
+      `unknown key "storefront.checks.allowClass": did you mean "storefront.checks.allowClasses"?`,
+      `"storefront.checks.classes" must be "warning" or "error" or "off"`,
+      `"storefront.checks.allowClasses" must be a list of strings`,
+    ]);
+  });
+
   it("takes tagPages and categoryPages: true, false, or { path, title }", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     for (const ok of [true, false, {}, { path: "topics" }, { title: "Topics" }, { path: "t2", title: "All tags" }]) {
