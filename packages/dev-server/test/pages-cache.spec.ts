@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPagesCache } from "../src/storefront/pages-cache.js";
+import { createPagesCache, renderError } from "../src/storefront/pages-cache.js";
 import { readPages } from "../src/storefront/pages.js";
 import { save } from "../../../test-support/save.js";
 
@@ -72,6 +72,29 @@ describe("the pages cache of pd dev", () => {
   });
 });
 
+describe("the shared model is read-only", () => {
+  // Consecutive requests get the same model: a change made while serving one page would show on every later one.
+  for (const once of [false, true]) {
+    it(`throws on a change instead of keeping it (${once ? "pd build" : "pd dev"})`, async () => {
+      const cache = createPagesCache(pages, once);
+      const model = await cache.get("a", () => readPages(pages));
+      const page = model.files.get("/about/")!;
+      expect(page).toBeDefined();
+      expect(() => { (page as { route: string }).route = "/elsewhere/"; }).toThrow(TypeError);
+      expect(() => { page.frontmatter.values["title"] = "Changed"; }).toThrow(TypeError);
+      expect(() => { (model.pages as unknown[]).push({}); }).toThrow(TypeError);
+      expect(() => { model.files.delete("/about/"); }).toThrow(TypeError);
+      expect(() => { model.entries.set("/new/", model.entries.get("/about/")!); }).toThrow(TypeError);
+      expect(() => { model.problems.push("x"); }).toThrow(TypeError);
+      // Nothing changed, and the next request gets the same, whole model.
+      const again = await cache.get("a", () => readPages(pages));
+      expect(again).toBe(model);
+      expect(again.files.get("/about/")?.route).toBe("/about/");
+      expect(titles(again)).toEqual(["About", "Home"]);
+    });
+  }
+});
+
 describe("the pages cache of pd build", () => {
   it("reads once for the build, whatever happens in the folder", async () => {
     const cache = createPagesCache(pages, true);
@@ -80,5 +103,33 @@ describe("the pages cache of pd build", () => {
     await save(join(pages, "contact.md"), "---\ntitle: Contact\n---\n");
     expect(await cache.get("a", c.read)).toBe(first);
     expect(c.readings).toBe(1);
+  });
+});
+
+describe("the message of a change to the shared model", () => {
+  /** A helper as a project writes one, in its own function, so the stack names it. */
+  function retitleHelper(page: { route: string }): void { page.route = "/elsewhere/"; }
+
+  it("says the data is shared and read-only, and names the code that changed it", async () => {
+    const model = await createPagesCache(pages, true).get("a", () => readPages(pages));
+    let thrown: unknown;
+    try { retitleHelper(model.files.get("/about/")!); } catch (e) { thrown = e; }
+    const text = renderError(thrown);
+    expect(text).toContain("Cannot assign to read only property 'route'");
+    expect(text).toContain("shared by every page, so it is read-only");
+    expect(text).toMatch(/changed at retitleHelper \(.*pages-cache\.spec\.ts:\d+:\d+\)/);
+  });
+
+  it("does the same for a map of the model", async () => {
+    const model = await createPagesCache(pages, true).get("a", () => readPages(pages));
+    let thrown: unknown;
+    try { model.files.clear(); } catch (e) { thrown = e; }
+    expect(renderError(thrown)).toMatch(/^Cannot clear in a read-only Map\. The storefront's page data is shared/);
+  });
+
+  it("leaves any other error as it was", () => {
+    expect(renderError(new Error("Missing helper: \"x\""))).toBe("Missing helper: \"x\"");
+    expect(renderError(new TypeError("x is not a function"))).toBe("x is not a function");
+    expect(renderError("text")).toBe("text");
   });
 });

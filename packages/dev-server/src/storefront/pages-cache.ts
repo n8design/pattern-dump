@@ -7,7 +7,8 @@
 //    read), so a new, changed, renamed or deleted page is seen by the next request, with or without the watcher.
 //
 // `options` names everything else the reading depends on (the day, the skin's layouts): another value is another
-// reading. One model is held at a time. Callers share it, so they read it and never change it.
+// reading. One model is held at a time. Callers share it, so it is frozen, all the way down: code that changes it
+// (a project's helper among them) throws a TypeError instead of changing every later page.
 
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -32,6 +33,48 @@ export async function pagesFingerprint(pagesDir: string): Promise<string> {
   return lines.sort().join("\n");
 }
 
+/** A Map's or Set's methods that change it: Object.freeze leaves its entries open, so these throw instead. */
+const CHANGES = ["set", "add", "delete", "clear"] as const;
+
+/** `value` frozen with everything it holds: objects, arrays, and the keys and values of maps and sets. */
+export function frozen<T>(value: T): T {
+  const seen = new Set<object>();
+  const freeze = (v: unknown): void => {
+    // A typed array's elements can't be frozen (freezing one throws); the model holds none.
+    if (v === null || typeof v !== "object" || seen.has(v) || ArrayBuffer.isView(v)) return;
+    seen.add(v);
+    if (v instanceof Map || v instanceof Set) {
+      for (const name of CHANGES) {
+        if (name in v) {
+          Object.defineProperty(v, name, {
+            value: () => { throw new TypeError(`Cannot ${name} in a read-only ${v instanceof Map ? "Map" : "Set"}`); },
+          });
+        }
+      }
+      for (const [k, item] of v.entries()) { freeze(k); freeze(item); }
+    } else {
+      for (const key of Reflect.ownKeys(v)) freeze((v as Record<PropertyKey, unknown>)[key]);
+    }
+    Object.freeze(v);
+  };
+  freeze(value);
+  return value;
+}
+
+/** A TypeError from changing something frozen: an assignment, a new or deleted property, or a frozen Map or Set. */
+const READ_ONLY = /^Cannot (?:assign to read only property|add property|delete property|define property|redefine property|set in|add in|delete in|clear in) /;
+
+/** What a render that failed says: its error's message, and for a change to something frozen (the page model, which
+ *  every page shares) why it is read-only and where the change was made, since the bare message names neither. */
+export function renderError(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  if (!(e instanceof TypeError) || !READ_ONLY.test(e.message)) return e.message;
+  // The first frame of the stack is the code that made the change (a project helper, say).
+  const at = /\n\s+at (.+)/.exec(e.stack ?? "")?.[1];
+  return `${e.message}. The storefront's page data is shared by every page, so it is read-only: copy a value before `
+    + `changing it${at ? ` (changed at ${at})` : ""}`;
+}
+
 export function createPagesCache(pagesDir: string, once: boolean): PagesCache {
   let held: { key: string; model: Promise<PageModel> } | undefined;
   return {
@@ -40,7 +83,7 @@ export function createPagesCache(pagesDir: string, once: boolean): PagesCache {
       // key, and the next request reads again. A held model is never older than its key.
       const key = once ? options : `${options}\n${await pagesFingerprint(pagesDir)}`;
       if (held?.key === key) return held.model;
-      const entry = { key, model: read() };
+      const entry = { key, model: read().then(frozen) };
       held = entry;
       // A reading that failed is not kept: the next request reads again.
       entry.model.catch(() => { if (held === entry) held = undefined; });
