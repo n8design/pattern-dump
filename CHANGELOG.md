@@ -1,126 +1,169 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
-### Changed
+Everything a documentation site needs: categories and tags with their own pages, listings with cards and views,
+queries for related and latest pages, search, regions with a table of contents, scheduled pages, `llms.txt`, and
+build checks for classes and custom properties. Upgrading a 0.4 site: see
+[Upgrading to 0.5](docs/guide/upgrading-to-0.5.md).
 
-- **A skin that reads a custom property nothing defines no longer builds:** a `var(--x)` without a fallback in the
-  project's styles needs `--x` defined in the style guide or its packages, a fallback, or `--x` listed in
-  `storefront.checks.allowProperties` (see Added).
-- `toc` is a key the build owns now (the table of contents): a layout's schema that declares it must rename it.
-- **A storefront page's "last changed" date is the author's, never git's.** Git's last commit counts a typo fix or a
-  reformat as a change, so it is no longer used for anything a reader or a search engine sees. A page sets
-  `updated: YYYY-MM-DD` for a real change instead. What changes for an existing site:
-  - JSON-LD `dateModified` (on the `WebPage` and the `Article`) is the page's `updated`, and is left out without one.
-    Before, it was the page's last commit.
-  - The sitemap's `<lastmod>` is the page's `updated`, else its own `date`, else left out. Before, it was the last
-    commit. `pd build` no longer runs git for the sitemap.
-  - `page.modified` is no longer filled. A layout that declares it fails with a message to declare `page.updated`
-    instead. `page.created` (the first commit) is unchanged.
-  - From a shallow clone, the note `pd build` gives is about `datePublished` (a page without a `date` of its own),
-    since `dateModified` and `lastmod` no longer come from git.
-- **A page dated after today stays out of `pd build`** until that day (today is the UTC date of the build's
-  clock), with every page under a folder whose `index.md` is dated so. A site with such a page builds without it
-  now. `pd dev` shows it, and the report names it: `scheduled: 1 held back (articles/launch.md until 2026-12-01)`.
-- `updated` and `categories` are now keys the build owns: a layout's schema that declares either must rename it.
-- `childLayout` and `view` are keys the build owns too, so the same holds for them.
-- **A tag is an object now, not a string:** `page.tags` and every listing entry's `tags` are
+### Breaking changes
+
+- **`page.modified` is retired.** Git's last commit counted a typo fix as a change, so Pattern Dump no longer fills
+  it. A layout that declares it fails every page that uses it:
+  `layouts/page declares "page.modified", which Pattern Dump no longer fills: git's last commit counts a typo fix as a change. Declare "page.updated" instead: the page's own updated: date, set for real changes`.
+  Fix: declare `page.updated` and set `updated: YYYY-MM-DD` on a page when it really changes. `page.created` (the
+  first commit) is unchanged.
+- **A tag is an object, not a string.** `page.tags` and every listing entry's `tags` are
   `{ key, label, description, route }`, as categories are (which gain `route` too). A template that writes a tag as
-  text (`{{#each page.tags}}{{this}}{{/each}}`) stops the page, naming the template, its line and the fix: write
-  `{{label}}`. A card whose schema declares `tags` as a list of strings stops its listing the same way. The starter's
-  layouts and cards write `{{label}}`, linked to the tag's page.
-- `article:tag` and the JSON-LD `keywords` write a tag's label, not its key (the same for an undeclared tag).
-- A skin with `layouts/tag` or `layouts/category` gets tag or category pages without asking (see Added): a page of the
-  pages folder at `/tags/` or `/categories/` then stops the build, naming the fix.
+  text stops the page, naming the template and line:
+  `layouts/page (page.hbs:8): {{#each page.tags}} writes {{this}}, but a tag is an object since 0.5.0 (key, label, description, route): write {{label}} to show it ({{key}} is its URL segment, {{route}} its page)`.
+  A card named with `x-pd-card` (or a view's card) whose schema declares `tags` as a list of strings stops its
+  listing: `components/card (...) declares tags as a list of strings, but a tag is an object since 0.5.0 (key, label, description, route): declare its items as "type": "object", or leave items out`.
+  Fix: write `{{label}}` (or `<a href="{{route}}">{{label}}</a>`), declare the items as objects, and change the tags
+  in sample data (`.json`) to objects. A component that only receives tags through an include, without `x-pd-card`,
+  is not checked: its template and sample data need the same change, or its workbench example shows empty tags.
+- **Git's last commit no longer dates anything a reader or a search engine sees.** No message; the output changes:
+  - JSON-LD `dateModified` (on the `WebPage` and the `Article`) is the page's `updated`, and left out without one.
+  - The sitemap's `<lastmod>` is the page's `updated`, else its `date`, else left out. `pd build` no longer runs git
+    for the sitemap.
+  - `page.modified` is no longer filled (see above).
+  - From a shallow clone, `pd build`'s note is about `datePublished` now:
+    `the repository is a shallow clone, so pages without a date of their own have no datePublished in their JSON-LD: build from the full history (in CI, check out with fetch-depth: 0)`.
 
-### Deprecated
+  Fix: set `updated:` on pages whose last change should show.
+- **A page dated after today stays out of `pd build`** until that day (the UTC date of the build's clock), with
+  every page under a folder whose `index.md` is dated so. The report names it:
+  `[pd build] scheduled: 1 held back (articles/launch.md until 2026-12-01)`, and `pd dev` notes
+  `articles/launch.md is scheduled for 2026-12-01: pd build leaves it out until then`. A link to it from a published
+  page is then a broken link, and a navigation entry naming it is a problem
+  (`storefront.site.navigations.footer[0]: "articles/launch.md" is not a page in the pages folder`). Fix: give the page
+  today's date or earlier, or remove the links until that day.
+- **`site.collections` is deprecated.** It keeps working, and a skin whose `partials/base` lists it gets one warning
+  per build:
+  `warning: partials/base lists site.collections (articles), which is deprecated: declare a query on the layouts that show it instead (x-pd-query on a sub-key of page, such as page.latest with { "collections": ["articles"], "sort": "date", "limit": 3 })`.
+  Fix: declare a query (see Added). It goes in a later release.
+- **New frontmatter keys belong to the build:** `updated`, `categories`, `childLayout`, `view` and `toc`. A layout
+  whose schema declares one fails every page that uses it:
+  `layout "article" declares "updated", which a page sets for the build, not for its layout: rename it in the layout's schema`.
+  Fix: rename the field in the layout's schema; show the page's values through `page.updated` and `page.categories`.
+- **A custom property nothing defines stops `pd build`.** A `var(--x)` without a fallback in the project's own styles
+  folder (the skin and the component styles), with no `--x` in any stylesheet of the style guide or its packages (or
+  a `style` attribute the build writes):
+  `pd build: the skin reads custom properties nothing defines, so nothing was written:` followed by
+  `styles/card.scss:4: var(--card-gap) reads a custom property nothing defines: define --card-gap in the skin, give it a fallback (var(--card-gap, ...)), or, if JavaScript sets it, list it in storefront.checks.allowProperties`.
+  Only a project with a storefront is checked.
+- **A skin with `layouts/tag` or `layouts/category` gets tag or category pages** (see Added), without asking. Each
+  must fit the layout:
+  - A page of the pages folder at a generated route stops the build:
+    `tags/index.md is the page at /tags/, which is the index of the tags as well: rename tags/, or give the tag pages another path (storefront.tagPages: { path: "..." })`.
+    A `redirectFrom` that claims one does too.
+  - The layout must declare `title`
+    (`layouts/tag: a tag page's title is the tag's label, so the layout declares "title"`), and a key it requires
+    that a generated page doesn't have fails it (`"subtitle" is required by layout "tag"`).
 
-- `site.collections`. It keeps working, and a skin whose `partials/base` lists it gets one warning per build, naming
-  the query to declare instead (`x-pd-query` on a sub-key of `page`). It goes in a later release.
+  Fix: adjust the layout, or set `storefront.tagPages: false` (`categoryPages: false`).
+- **Search turns on when the project has Pagefind** (`node_modules/pagefind`, also when another package brought it).
+  `pd build --browser` then uses the first `input[type="search"]` it finds, at each viewport, and stops when it shows
+  no result:
+  `/search/: searching for "..." in its search field (input[type="search"]) showed no result within 5 s, though the index has a page with it: ...`.
+  A site with a search of its own (another service): set `storefront.search: false`.
+- **`region` on a placed component's tag is Pattern Dump's.** A component whose schema declares a property `region`
+  can no longer be given one on its tag:
+  `<pd-card>: region="..." is Pattern Dump's (the layout's region the component goes into), and components/card declares a property "region" as well: rename that property to place it in a region`.
+  Fix: rename the property.
+- **Output that changes without a message:**
+  - `article:tag` and JSON-LD `keywords` write a tag's label, not its key (for an undeclared tag they are the same).
+  - `pd build` writes `/llms.txt` for an indexed site, over a file of the same path. `storefront.llms: false` turns
+    it off.
+  - Shell code (`bash`, `sh`, `shell`, `zsh`, `console`, `shell-session`) is highlighted where it was a plain `<pre>`:
+    in a component's docs, on a storefront page, and in a placed component's content.
+  - A storefront code block's copy button is no longer in the page's HTML: the page's script adds it where the
+    browser can copy, with a visually hidden status line for screen readers. A skin styles
+    `.shiki-container > button.copy-btn` as before; a test or crawler that looked for the button without JavaScript
+    finds none.
+  - `pd build` prints new report lines, among them `classes:` on every storefront build:
+    `[pd build] classes: every class on the site's pages is the style guide's`, `llms.txt: N pages`, and with
+    Pagefind `search: N pages indexed`. `pd dev` says once that search needs `pd build`.
+  - In the workbench, a layout's Relationships tab lists its pages. Its detail JSON (`pages`) is a union now: a
+    generated page has `source: "generated"` and no `path`.
 
 ### Added
 
-- **The class check.** `pd build` lists each class on a site page that no component or style of the style guide
-  defines, naming the page's file and line: `about.md:12: class "hero-big-title" isn't defined by any component or
-  style`. State classes (`is-`, `has-`, `js-`) and Pattern Dump's own are allowed, and so is
-  `storefront.checks.allowClasses`. A warning; `storefront.checks.classes: "error"` stops the build, `"off"` skips it.
-- **Custom properties nothing defines stop the build.** A `var(--x)` without a fallback in the project's own styles,
-  with no `--x` in any stylesheet of the style guide or its packages (or a `style` attribute the build writes), fails
-  `pd build`, naming the file and line. A property JavaScript sets goes in `storefront.checks.allowProperties`.
-- **`llms.txt`.** `pd build` writes one at the site's root (llmstxt.org): the site's title and description, then
-  the top-level pages and each collection, every page with its title, link and teaser. The same pages as the sitemap;
-  absolute URLs with `storefront.url`, under the site's path. On by default; `storefront.llms: false` turns it off.
-- **Regions.** A layout declares regions besides the body on `page.regions` (`"x-pd-regions": ["sidebar"]`) and writes
-  each as `{{{page.regions.sidebar}}}`, null when the page puts nothing there. A placed component goes into one with
-  `region="sidebar"` on its tag, or its schema's `"x-pd-region"`; components keep the page's order there. A region
-  another layout has is left out without a message; one no layout has stops the page with a "did you mean". `<body>`
-  names the filled regions (`data-pd-regions="sidebar"`), so a skin's grid can collapse an empty one. `header`,
-  `footer`, `nav` and `main` are the layout's own landmarks and can't be regions, and a component in a region can't
-  bring a main, banner or contentinfo.
-- **The table of contents in a region:** the skin's `components/toc`, with `items: [{ text, href, level }]`.
-  `toc: true` in a page (or `x-pd-toc` on its layout) shows it with the page's headings of level 2 and 3; `toc: false`
-  keeps it out. `<pd-toc>` places it in the markdown, with the derived items or a list of links of its own, whose
-  `#anchors` must be headings of the page. The starter has a `doc` layout with a sidebar and a `components/toc`.
-- **Search with Pagefind.** `pd build` indexes each page's own content (its markdown and placed components, never the
-  layout's header, navigation or listings) and writes the index into the site at `_pd/search/`, under the site's path,
-  with `section`, `tag` and `category` filters by label. Pagefind is the project's own
-  (`npm install --save-dev pagefind`): with `storefront.search` left out the site is indexed when the project has it;
-  `true` makes a build without it stop, `false` turns it off. The 404 page, tag and category pages and a page with
-  `index: false` are left out. `pd dev` builds no index. `pd build --browser` uses the site's search field once per
-  viewport and stops when it shows no result. The starter has a search page and a plain, accessible
-  `components/search`.
-- Tag declarations: `storefront.tags`, declared as categories are (label, description, old keys). Optional: without it
-  any tag works, labelled with its key. With it, a tag that isn't declared stops the page with a "did you mean", and an
-  old key builds with a warning. A query's `tags` are checked against the declarations.
-- Tag and category pages: a page for every tag and every category a published page has (`/tags/<key>/`,
-  `/categories/<key>/`), and an index of each (`/tags/`, `/categories/`), through the skin's `layouts/tag`,
-  `layouts/tags`, `layouts/category` and `layouts/categories`. A term page gets `page.term` and lists its pages
-  through a query; an index gets `page.terms`. Drafts and scheduled pages never count. `storefront.tagPages` and
-  `storefront.categoryPages` turn them off (`false`), ask for them (`true`: a missing layout is a problem), or set the
-  path and the index's title. An old key's route forwards to the new one. They are in the sitemap, with JSON-LD
-  `CollectionPage`. The starter has plain layouts for all four.
-- `same` for a query's `tags` and `categories`: the current page's own (on a tag page, its tag).
-- Categories in search and link previews: `article:section` (the first category's label) and the `Article`'s
-  `articleSection`.
-
-- `childLayout:` on a folder's `index.md`: the layout of the pages under it that name none. The nearest folder that
-  sets one wins, and a page's own `layout:` wins over it. A `childLayout` that names no layout fails the `index.md`
-  and each page that takes it, and every problem about a page's layout names where the layout came from. The
-  workbench lists a layout's pages in its Relationships tab, each with where its layout came from, and `/api/pages`
-  gives `layoutFrom`.
-- A listing's card: `x-pd-card` names the component each page of a listing is shown as (on a layout's
-  `page.children`, or a view's `entries`). Every page in the listing is checked against the card's schema: a field
-  the card requires that a page doesn't have fails the listing, naming the page. A card declares only fields a
-  listing's page has, and its sample data may set only those.
-- Listing views: `view: grid` on a folder's `index.md` shows its listing through `views/grid`, a component in the
-  skin's style guide (Pattern Dump has none of its own). The layout writes `{{{page.listing}}}`; the view gets the
-  pages as `entries`, and names its card, so each view's required fields are checked on their own. A view that
-  doesn't exist, a listing that names none and a view on a page with no listing are problems.
-- The website starter (`pd init --storefront`) ships four plain views with their cards: `list`, `grid`, `featured`
-  and `compact`.
-- `updated:` on a storefront page, its last real change: `page.updated`, JSON-LD `dateModified`,
-  `article:modified_time` on an article, and the sitemap's `lastmod`. Checked: a real date, not before `date`.
-- Categories, independent of folders: `storefront.categories` declares them (key, label, optional description, and
-  old keys as `aliases` after a rename), a page names them in `categories:`. An undeclared value fails the page with
-  a "did you mean"; an old key builds as the new category, with a warning naming the page. Layouts get
+- **Categories**, independent of folders: `storefront.categories` declares them (key, label, optional description,
+  and old keys as `aliases` after a rename), and a page names them in `categories:`. An undeclared value stops the page
+  with a "did you mean"; an old key builds as the new category, with a warning naming the page. Layouts get
   `page.categories`, listing entries carry them, and `site.categories` lists every one when `partials/base` lists it.
-- Listing entries carry `updated`, `categories` and `scheduled` (true in `pd dev` for a page dated after today).
-- Queries: one way to list pages anywhere but a folder's own listing, such as related pages and a home page's latest
-  articles. A layout declares one as a sub-key of `page` with `x-pd-query` and its defaults: hand-picked `pages`
-  first, then the pages of `collections` (or `same`, the page's own folder) matching `categories` and `tags`
-  (`match`: any or all), by `sort` (relevance, date or title) and `order`, to `limit`, through a `view`. The layout
-  gets `{ entries, listing }`. A page changes options in a block under the query's name, with the same option names (`related:` with
-  `limit: 5` indented under it), or turns the
-  query off with `<name>: false`. The current page, drafts and scheduled pages never appear, and a page never comes
-  twice. Every value is checked, at the page's line or in the layout, with a "did you mean" where it fits.
-- A page's frontmatter takes one level of keys indented under a key, for a query's options. Under any other key, and
-  any deeper, it is a problem with its line, as before.
-- A layout's default view for its listing: `x-pd-view` on `page.listing`. An `index.md`'s `view:` wins.
-- The website starter has an article layout, which its articles take from their folder, listing three related
-  articles in the compact view, and a home layout listing the three newest articles in the list view. Its listing
-  layout shows the list view by default, so `articles/index.md` names no view.
-- Shell code is highlighted: `bash`, `sh`, `shell` and `zsh`, and `console` or `shell-session` for a prompt with its
+  `article:section` (the first category's label) and the `Article`'s `articleSection` carry them.
+- **Tag declarations:** `storefront.tags`, declared as categories are. Optional: without it any tag works, labelled
+  with its key. With it, a tag that isn't declared stops the page with a "did you mean", and an old key builds with a
+  warning.
+- **`updated:`** on a storefront page, its last real change: `page.updated`, JSON-LD `dateModified`,
+  `article:modified_time` on an article, and the sitemap's `lastmod`. Checked: a real date, not before `date`.
+- **Scheduled pages:** a page dated after today is held back from `pd build` (see Breaking changes). `pd dev` shows it,
+  listed with `scheduled: true`.
+- **`childLayout:`** on a folder's `index.md`: the layout of the pages under it that name none. The nearest folder that
+  sets one wins, and a page's own `layout:` wins over it. A `childLayout` that names no layout fails the `index.md` and
+  each page that takes it, and every problem about a page's layout names where the layout came from. The workbench
+  lists a layout's pages in its Relationships tab, each with where its layout came from, and `/api/pages` gives
+  `layoutFrom`.
+- **A listing's card:** `x-pd-card` names the component each page of a listing is shown as (on a layout's
+  `page.children`, or a view's `entries`). Every page in the listing is checked against the card's schema: a field the
+  card requires that a page doesn't have fails the listing, naming the page.
+- **Listing views:** `view: grid` on a folder's `index.md` shows its listing through `views/grid`, a component in the
+  skin's style guide. The layout writes `{{{page.listing}}}`; the view gets the pages as `entries` and names its card.
+  `x-pd-view` on `page.listing` sets a layout's default view.
+- **Queries:** one way to list pages anywhere but a folder's own listing, such as related pages or a home page's
+  latest articles. A layout declares one as a sub-key of `page` with `x-pd-query` and its defaults: hand-picked
+  `pages` first, then the pages of `collections` (or `same`) matching `categories` and `tags` (`match`: any or all;
+  `same` for the page's own), by `sort` (relevance, date or title) and `order`, to `limit`, through a `view`. The
+  layout gets `{ entries, listing }`. A page changes options in a block under the query's name (`related:` with
+  `limit: 5` indented under it), or turns it off with `related: false`. The current page, drafts and scheduled pages
+  never appear, and a page never comes twice. Every value is checked, with a "did you mean" where it fits.
+- **Tag and category pages:** a page for every tag and category a published page has (`/tags/<key>/`,
+  `/categories/<key>/`), and an index of each, through the skin's `layouts/tag`, `layouts/tags`, `layouts/category`
+  and `layouts/categories`. A term page gets `page.term` and lists its pages through a query; an index gets
+  `page.terms`. `storefront.tagPages` and `storefront.categoryPages` turn them off, ask for them, or set the path and
+  the index's title. An old key's route forwards to the new one. They are in the sitemap, with JSON-LD
+  `CollectionPage`, and the workbench lists them under their layout.
+- **Search with Pagefind** (`npm install --save-dev pagefind`): `pd build` indexes each page's own content (never the
+  layout's header, navigation or listings) into `_pd/search/`, under the site's path, with `section`, `tag` and
+  `category` filters. `storefront.search`: left out, on when the project has Pagefind; `true` makes a build without it
+  stop; `false` turns it off. `pd build --browser` uses the site's search field once per viewport.
+- **Regions:** a layout declares regions besides the body on `page.regions` (`"x-pd-regions": ["sidebar"]`) and writes
+  each as `{{{page.regions.sidebar}}}`, null when empty. A placed component goes into one with `region="sidebar"` on
+  its tag or `"x-pd-region"` in its schema. `<body data-pd-regions="sidebar">` names the filled ones.
+- **The table of contents:** the skin's `components/toc`, with `items: [{ text, href, level }]`. `toc: true` in a page
+  (or `x-pd-toc` on its layout) shows it with the page's headings of level 2 and 3; `<pd-toc>` places it in the
+  markdown, with the derived items or links of its own.
+- **`llms.txt`** (llmstxt.org): the site's title and description, then the top-level pages and each collection, every
+  page with its title, link and teaser. The same pages as the sitemap; absolute URLs with `storefront.url`, under the
+  site's path. On by default; `storefront.llms: false` turns it off.
+- **The class check:** `pd build` lists each class on a site page that no component or style of the style guide
+  defines, naming the page's file and line:
+  `about.md:12: class "hero-big-title" isn't defined by any component or style`. State classes (`is-`, `has-`, `js-`)
+  and Pattern Dump's own are allowed, and so is `storefront.checks.allowClasses`. A warning;
+  `storefront.checks.classes: "error"` stops the build, `"off"` skips it.
+- **The custom property check** (see Breaking changes), with `storefront.checks.allowProperties` for properties
+  JavaScript sets.
+- **Shell highlighting:** `bash`, `sh`, `shell` and `zsh`, and `console` or `shell-session` for a prompt with its
   output. `text` stays plain.
+- A page's frontmatter takes one level of keys indented under a key, for a query's options.
+- Listing entries carry `updated`, `categories` and `scheduled`.
+- The website starter (`pd init --storefront`) has `doc`, `article`, `home`, `tag`, `tags`, `category` and
+  `categories` layouts, four views with their cards (`list`, `grid`, `featured`, `compact`), related and latest
+  articles as queries, a search page with an accessible `components/search`, and a `components/toc`.
+
+### Changed
+
+- `pd init`'s last line suggests `npm install --save-dev pagefind` for the site's search.
+- The message for an unknown `x-pd-*` key in a schema lists the new ones (`x-pd-card`, `x-pd-query`, `x-pd-region`,
+  `x-pd-regions`, `x-pd-toc`, `x-pd-view`).
+
+### Fixed
+
+- A storefront code block's copy button tells screen readers too: "Copied" or "Not copied" in a status line, besides
+  the button's own text.
 
 ## 0.4.2
 
