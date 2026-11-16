@@ -1,0 +1,11 @@
+{
+  "title": "Getting started",
+  "description": "What a page with a sidebar looks like.",
+  "body": "<h2 id=\"install\">Install</h2><p>Text of the page.</p><h2 id=\"configure\">Configure</h2><p>More text.</p>",
+  "page": {
+    "next": null,
+    "regions": {
+      "sidebar": "<nav class=\"toc\" aria-label=\"On this page\"><ul class=\"toc-list\"><li class=\"toc-level-2\"><a href=\"#install\">Install</a></li><li class=\"toc-level-2\"><a href=\"#configure\">Configure</a></li></ul></nav>"
+    }
+  }
+}

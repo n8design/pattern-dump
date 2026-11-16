@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Table of contents",
+  "description": "The page's table of contents, in the sidebar: toc: true in a page's frontmatter, or <pd-toc> in its markdown.",
+  "type": "object",
+  "x-pd-region": "sidebar",
+  "properties": {
+    "items": {
+      "type": "array",
+      "description": "Filled by Pattern Dump: the page's headings of level 2 and 3, or the links a <pd-toc> lists",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" },
+          "href": { "type": "string" },
+          "level": { "type": "integer", "description": "2 for a top item, 3 for one under it" }
+        }
+      }
+    }
+  }
+}

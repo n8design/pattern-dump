@@ -174,8 +174,8 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const { graph } = await runDiagnosticsAudit(config, siteDir);
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
-      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"], ["components/search", "ok"],
-        ["layouts/article", "ok"], ["layouts/categories", "ok"], ["layouts/category", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"],
+      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"], ["components/search", "ok"], ["components/toc", "ok"],
+        ["layouts/article", "ok"], ["layouts/categories", "ok"], ["layouts/category", "ok"], ["layouts/doc", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"],
         ["layouts/tag", "ok"], ["layouts/tags", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
         ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
   }, 120_000);
@@ -207,9 +207,22 @@ describe("the starter project with a website (--storefront, no examples)", () =>
       // Each tag by its label, linked to its tag page.
       expect(hello.body).toContain(`<ul class="page-tags" aria-label="Tags"><li><a href="/tags/getting-started/">getting-started</a></li><li><a href="/tags/notes/">notes</a></li></ul>`);
       // The tag and category pages, and their indexes, through the starter's plain layouts.
+      // Regions: the doc layout's sidebar. About asks for the derived table of contents; the guide lists its own links
+      // and places a note there; the search page has neither, so it has no sidebar.
+      const about = await onHost(server.port, "live.localhost", "/about/");
+      expect(about.body).toContain(`<body data-pd-regions="sidebar">`);
+      expect(about.body).toMatch(/<div class="doc-sidebar"><nav class="toc" aria-label="On this page">\s*<ul class="toc-list">\s*<li class="toc-level-2"><a href="#what-is-where">What is where<\/a><\/li>\s*<li class="toc-level-2"><a href="#settings">Settings<\/a><\/li>/);
+      const guide = await onHost(server.port, "live.localhost", "/guide/");
+      expect(guide.status).toBe(200);
+      expect([...guide.body.matchAll(/<li class="toc-level-(\d)"><a href="([^"]+)">/g)].map(m => `${m[1]} ${m[2]}`))
+        .toEqual(["2 #write-a-page", "2 #place-a-component", "3 #in-the-sidebar", "2 /about/"]);
+      expect(guide.body).toMatch(/<div class="doc-sidebar"><nav class="toc"[\s\S]*<\/nav>\s*<aside class="note"[^>]*>[\s\S]*This note is in the sidebar/);
+      expect(guide.body).not.toMatch(/<div class="page-body">[\s\S]*This note is in the sidebar[\s\S]*<\/article>/);
       // The search page: the search component, its script, and a link to it in the navigation.
       const search = await onHost(server.port, "live.localhost", "/search/");
       expect(search.status).toBe(200);
+      expect(search.body).toContain(`<body data-pd-regions="">`);
+      expect(search.body).not.toContain(`class="doc-sidebar"`);
       expect(search.body).toMatch(/<search class="search" data-search>\s*<form class="search-form" method="get">\s*<label class="search-label" for="search-field">Search this site<\/label>/);
       expect(search.body).toMatch(/<script type="module" src="\/_pd\/scripts\/site-search\.js[^"]*"><\/script>/);
       expect(home.body).toContain(`<a href="/search/">Search</a>`);

@@ -1,0 +1,6 @@
+@use "../base/tokens";
+
+.toc { position: sticky; top: tokens.$space-md; font-size: 0.875rem; }
+.toc-list { margin: 0; padding: 0; list-style: none; }
+.toc-list li { margin-block: tokens.$space-xs; }
+.toc-level-3 { padding-inline-start: tokens.$space-md; }
