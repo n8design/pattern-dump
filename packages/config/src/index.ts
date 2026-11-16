@@ -261,6 +261,28 @@ export interface StorefrontConfig {
    * `true`: on, and a build without Pagefind stops. `false`: off. The search UI is a component of the skin's.
    */
   search?: boolean;
+  /**
+   * llms.txt (llmstxt.org): pd build writes one at the site's root, with the site's title and description and each
+   * page's title, link and teaser, by collection; the same pages as the sitemap. Left out: on, unless `index` is
+   * false. `false`: none.
+   */
+  llms?: boolean;
+  /** pd build's checks of the site against its style guide. */
+  checks?: StorefrontChecks;
+}
+
+/** storefront.checks: what pd build checks the site's classes and custom properties against. */
+export interface StorefrontChecks {
+  /**
+   * A class on a page that no component or style of the style guide defines: `"warning"` (the default) lists it in
+   * the report, `"error"` stops the build, `"off"` skips the check.
+   */
+  classes?: "warning" | "error" | "off";
+  /** Classes a page may carry anyway: names, or a prefix ending in `*` (`"chart-*"`). */
+  allowClasses?: string[];
+  /** Custom properties JavaScript sets, which a skin's var() may read without a definition in CSS: names, or a prefix
+   *  ending in `*` (`"--chart-*"`). */
+  allowProperties?: string[];
 }
 
 /** storefront.tagPages and storefront.categoryPages as an object. */

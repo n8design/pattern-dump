@@ -147,9 +147,16 @@ export async function renderPanel(): Promise<void> {
     appendComponentGroup("Used by", relAvail.usedBy, section);
     // A layout of a project with a website: the pages that render with it, and where each got its layout.
     if (relAvail.pages) {
-      appendPlainGroup("Pages", relAvail.pages.map(p => `${p.path} (${
-        p.source === "own" ? "its own layout" : p.source === "default" ? "the default layout" : `childLayout of ${p.from ?? "its folder"}`
-      })`), section);
+      appendPlainGroup("Pages", relAvail.pages.map(p => {
+        if (p.source === "generated") {
+          const kind = p.generated.kind;
+          const what = p.generated.term !== undefined ? `the page of the ${kind} "${p.generated.term}"` : `the index of the ${kind === "tag" ? "tags" : "categories"}`;
+          return `${p.route} (${what}, from storefront.${kind}Pages)`;
+        }
+        return `${p.path} (${
+          p.source === "own" ? "its own layout" : p.source === "default" ? "the default layout" : `childLayout of ${p.from ?? "its folder"}`
+        })`;
+      }), section);
     }
 
     // Style umbrella: groups Style uses + Style modules under a shared heading.

@@ -483,8 +483,12 @@ export interface RelationshipsAvailable {
   pages?: LayoutPageUse[];
 }
 
-/** A storefront page that renders with a layout, and where its layout came from. */
-export interface LayoutPageUse {
+/** A storefront page that renders with a layout, and where its layout came from: a page file, or a page Pattern Dump
+ *  generated. */
+export type LayoutPageUse = LayoutFilePageUse | LayoutGeneratedPageUse;
+
+/** A page of the pages folder that renders with a layout. */
+export interface LayoutFilePageUse {
   route: string;
   /** The page file, relative to the pages folder ("articles/one.md"). */
   path: string;
@@ -493,6 +497,17 @@ export interface LayoutPageUse {
   source: "own" | "folder" | "default";
   /** With source "folder": the index.md whose childLayout the page took ("articles/index.md"). */
   from?: string;
+}
+
+/** A page Pattern Dump generated (a tag's or category's page, or the index of them: storefront.tagPages,
+ *  storefront.categoryPages), which has no file. Its layout is the one of its kind (layouts/tag, tags, category,
+ *  categories). */
+export interface LayoutGeneratedPageUse {
+  route: string;
+  source: "generated";
+  /** What generated it: the tag or category whose page it is (`term`, its key), or without `term` the index of
+   *  that kind. */
+  generated: { kind: "tag" | "category"; term?: string };
 }
 
 export type Relationships = RelationshipsAvailable;

@@ -481,7 +481,8 @@ async function routeRequest(
         // 200 + RENDER_ERROR, not 404.
         // A layout of a project with a website: the pages that render with it, and where each got it.
         if (cfg.storefront && /^layouts\/[^/~]+$/.test(componentId)) {
-          detail.relationships.pages = layoutPages(await readStorefrontPages(ctx, cfg.storefront), componentId.slice("layouts/".length));
+          // With the discovery map, so the tag and category pages its layouts generate are in the model too.
+          detail.relationships.pages = layoutPages(await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap), componentId.slice("layouts/".length));
         }
         const quarantineEntry = discovery.quarantineMap.get(componentId);
         const { previewHtml, diagnostics } = await checkComponent(componentId, variant, render, quarantineEntry);

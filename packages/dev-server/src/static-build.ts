@@ -10,7 +10,7 @@
 //     is included — its <link>/<script>/url() references are root-relative too.
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
-import { cp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createImageCache } from "@pattern-dump/build";
 import { sameHostWorkbenchPath, type PatternDumpConfig } from "@pattern-dump/config";
@@ -31,7 +31,9 @@ import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
 import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule } from "./storefront/browser-checks.js";
 import { runPageA11y, type PageA11yFinding } from "@pattern-dump/a11y";
-import { workbenchRobotsTxt } from "./storefront/site-files.js";
+import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
+import { checkClasses } from "./storefront/class-check.js";
+import { checkProperties } from "./storefront/property-check.js";
 import { withNoindex } from "./storefront/base-path.js";
 import { buildSearchIndex, SEARCH_PATH, searchPagefind, type PagefindModule, type SearchRecord } from "./storefront/search.js";
 
@@ -84,6 +86,11 @@ export interface StaticBuildReport {
   /** The storefront's search index (search.ts), written to its _pd/search/: the pages in it, and its files. Absent
    *  when the site has no search. */
   search?: { pages: number; files: number; bytes: number };
+  /** The class check (storefront.checks.classes): with "warning", one line per class a page carries that the style
+   *  guide doesn't define; with "error" a class stops the build, so `warnings` is empty. Absent with "off". */
+  classes?: { severity: "warning" | "error"; warnings: string[] };
+  /** llms.txt, at the site's root: how many pages it lists. Absent when none is written (storefront.llms). */
+  llms?: { pages: number };
   /** `--browser`: one line per image whose chosen variant doesn't fit the box it is laid out in. */
   images?: { warnings: string[] };
   /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
@@ -202,6 +209,8 @@ export async function buildStaticSite(
   // its 404 page; not the previews and redirect stubs it writes) resolves to what this build writes, a link into the
   // workbench to a component and variant the workbench snapshot has. Other hosts are listed in the notes.
   let linkSummary: StaticBuildReport["links"];
+  let classSummary: StaticBuildReport["classes"];
+  let pageModel: Awaited<ReturnType<typeof readPages>> | undefined;
   let a11ySummary: StaticBuildReport["accessibility"];
   let imageSummary: StaticBuildReport["images"];
   const externalNotes: string[] = [];
@@ -236,6 +245,39 @@ export async function buildStaticSite(
     for (const [url, on] of links.external) externalNotes.push(`an external link, not checked: ${url} (on ${on.join(", ")})`);
     linkSummary = { pages: pages.length, references: links.references, external: links.external.size };
     log(`… links checked: ${links.references} references on ${pages.length} pages`);
+
+    // The style checks, also before anything is written (class-check.ts, property-check.ts): every class a site page
+    // carries is defined by the style guide (a warning unless storefront.checks.classes says otherwise), and every
+    // var() the skin's own styles read without a fallback has a definition somewhere (an error).
+    pageModel = await readPages(storefront.pagesDir, {
+      drafts: "leave-out", scheduled: "leave-out", today, categories: storefront.categories, tags: storefront.tags,
+    });
+    const guide = await server.styleGuide();
+    const stylesheets = [...guide.stylesheets, ...sfCrawl.stylesheets.values()];
+    const fail = async (what: string, lines: string[]): Promise<never> => {
+      await server.close();
+      throw new Error(`pd build: ${what}, so nothing was written:\n${lines.map(l => `  - ${l}`).join("\n")}`);
+    };
+    const properties = checkProperties({
+      sources: await styleSources(cfg.stylesDir, project), stylesheets, documents: [...sfCrawl.documents.values()],
+      allow: storefront.checks.allowProperties,
+    });
+    if (properties.length) await fail("the skin reads custom properties nothing defines", properties);
+    if (storefront.checks.classes !== "off") {
+      const model = pageModel;
+      const checkPages = await Promise.all(pages.flatMap(route => {
+        const html = sfCrawl.documents.get(route);
+        if (html === undefined) return [];
+        const f = route === PD_ROUTES.notFound ? model.notFound : model.files.get(route);
+        return [(async () => ({ route, html, ...(f ? { file: { path: f.path, text: await readFile(f.file, "utf8") } } : {}) }))()];
+      }));
+      const classes = checkClasses({ pages: checkPages, stylesheets, templates: guide.templates, allow: storefront.checks.allowClasses });
+      if (storefront.checks.classes === "error" && classes.length) {
+        await fail("the storefront uses classes outside the design system (storefront.checks.classes is \"error\")", classes);
+      }
+      classSummary = { severity: storefront.checks.classes, warnings: storefront.checks.classes === "warning" ? classes : [] };
+    }
+    log(`… styles checked against the style guide`);
 
     // Accessibility (step 6b), also before anything is written: one main landmark and one <h1> per site page, and
     // axe's rules that jsdom decides (@pattern-dump/a11y). A critical or serious WCAG finding, and a page without
@@ -429,6 +471,17 @@ export async function buildStaticSite(
         counts.bytes += bytes;
         report.search = { pages: searchRecords.size, files: searchFiles.size, bytes };
       }
+      // The pages as this build has them (no draft, no scheduled page): llms.txt, and the report's drafts and scheduled.
+      const model = pageModel!;
+      if (storefront.llms) {
+        const siteTitle = typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined;
+        const llms = llmsTxt(model, { title: siteTitle, siteUrl: storefront.url });
+        const bytes = Buffer.from(llms.text, "utf8");
+        await writeFile(join(sfOut, "llms.txt"), bytes);
+        counts.files++;
+        counts.bytes += bytes.byteLength;
+        report.llms = { pages: llms.pages };
+      }
       const stubs = new Set((await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse).pages.flatMap(p => p.redirectFrom ?? []));
       const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u) && !stubs.has(u)).length;
       report.storefront = { outDir: sfOut, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };
@@ -448,9 +501,10 @@ export async function buildStaticSite(
       }
       report.notes.push(...storefrontNotes, ...externalNotes);
       if (linkSummary) report.links = linkSummary;
+      if (classSummary) report.classes = classSummary;
       if (a11ySummary) report.accessibility = a11ySummary;
       if (imageSummary) report.images = imageSummary;
-      const { drafts, scheduled } = await readPages(storefront.pagesDir, { drafts: "leave-out", scheduled: "leave-out", today });
+      const { drafts, scheduled } = model;
       if (drafts.length) report.drafts = drafts;
       if (scheduled.length) report.scheduled = scheduled;
       log(`… storefront: ${pages} pages, ${counts.files} files`);
@@ -475,4 +529,20 @@ export async function buildStaticSite(
 
   report.ms = Math.round(performance.now() - started);
   return report;
+}
+
+/** The project's own style sources (SCSS and CSS) under `stylesDir`, each by its path from the project's root. */
+async function styleSources(stylesDir: string, project: string): Promise<{ path: string; text: string }[]> {
+  const out: { path: string; text: string }[] = [];
+  const walk = async (dir: string): Promise<void> => {
+    let entries;
+    try { entries = await readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries.sort((a, b) => a.name < b.name ? -1 : 1)) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) await walk(p);
+      else if (/\.(?:scss|css)$/.test(e.name)) out.push({ path: relative(project, p).split(sep).join("/"), text: await readFile(p, "utf8") });
+    }
+  };
+  await walk(stylesDir);
+  return out;
 }

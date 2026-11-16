@@ -118,12 +118,16 @@ export interface PageModel extends StorefrontPagesResponse {
 
 /** The pages that render with the layout `name`, by path, each with where it got it (the workbench's Relationships). */
 export function layoutPages(model: PageModel, name: string): LayoutPageUse[] {
-  // A generated tag or category page has no file: not listed yet (contracts' LayoutPageUse has no source for it).
-  return model.pages.filter(p => p.layout === name && model.files.has(p.route)).map(p => {
+  const files = model.pages.filter(p => p.layout === name && model.files.has(p.route)).map(p => {
     const f = model.files.get(p.route)!;
     const source = p.layoutFrom !== undefined ? "folder" : f.frontmatter.values["layout"] !== undefined ? "own" : "default";
     return { route: p.route, path: f.path, source, ...(p.layoutFrom !== undefined ? { from: p.layoutFrom } : {}) } satisfies LayoutPageUse;
   }).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  // A tag or category page, or an index of them, has no file: after the files, by route, with what generated it.
+  const generated = [...model.generated.values()].filter(g => g.layout === name)
+    .map(g => ({ route: g.route, source: "generated", generated: { kind: g.kind, ...(g.term ? { term: g.term.key } : {}) } }) satisfies LayoutPageUse)
+    .sort((a, b) => a.route < b.route ? -1 : a.route > b.route ? 1 : 0);
+  return [...files, ...generated];
 }
 
 /** "guides/setup.md" -> "/guides/setup/", "index.md" -> "/", "guides/index.md" -> "/guides/". */

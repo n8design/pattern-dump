@@ -999,6 +999,15 @@ redirect pages, each with a `lastmod` of its `updated`, else its `date`, else no
 shallow clone, a `datePublished` git would give is left out of the JSON-LD and the build notes it once (in CI,
 check out with `fetch-depth: 0`). A layout that shows `page.created` still fails the build there.
 
+**`llms.txt`** ([llmstxt.org](https://llmstxt.org/)) gives a language model the site in one file: the site's title
+(`storefront.site.title`, else the home page's) and the home page's description as a quote, then a `## Pages` section
+with the top-level pages and one section per collection (a folder with an `index.md`, headed by its title and led by
+it), in nav order. Each page is a line `- [title](url): teaser`, its description else its first paragraph. It lists
+the same pages as the sitemap (no draft, no scheduled page, none with `index: false`); tag and category pages are left
+out, since their pages are listed. URLs are absolute with `storefront.url`, else paths from the site's root. `pd
+build` writes it to the site's root (under a path, at `<path>llms.txt`); `pd dev` has none. On unless the site has
+`index: false`; `storefront.llms: false` turns it off.
+
 **`robots.txt`.** Both output roots get one. The storefront's keeps crawlers out of `/preview/` (the live
 examples: component demos, not pages) and names the sitemap. The workbench's keeps them out of its
 previews only; the workbench itself stays searchable. A workbench on the storefront's own host
@@ -1097,6 +1106,7 @@ site/
   404.html                                          the 404 page
   setup/index.html  start/index.html                pages that forward from old routes
   robots.txt  sitemap.xml                           for crawlers (the sitemap with storefront.url)
+  llms.txt                                          the site for language models
   preview/components/callout/index.html            the previews the pages show
   _pd/  assets/                                    what pages and previews reference
   .nojekyll
@@ -1182,6 +1192,49 @@ pd build: the storefront has broken links, so nothing was written:
 
 Code examples are text, so a link written in one is not checked. In `pd dev`, a page's links to pages that don't
 exist and to anchors it doesn't have are warnings in the terminal; the full check runs in `pd build`.
+
+### The class check
+
+Before it writes anything, `pd build` looks at every class on every page of the site (its pages and its 404 page)
+and lists each one the style guide doesn't define, so a class improvised outside the design system shows, whether a
+person or an agent wrote it.
+
+- **Defined:** a class a stylesheet of the style guide names in a selector (the project's and its packages', and each
+  stylesheet the site loads), and a class a component's template writes, styled or not. A word a template builds
+  from a value, such as `doc-toc-h{{level}}`, defines every class that starts that way. A page's own `<style>` counts
+  too.
+- **Allowed:** state classes JavaScript adds (`is-`, `has-`, `js-`), the classes Pattern Dump writes itself (code
+  highlighting, the copy button, pattern links, live examples), and the names in `storefront.checks.allowClasses`
+  (a trailing `*` for a prefix).
+- A page's markdown can't write HTML, so what the check finds is a value a component writes into a `class`
+  attribute (`<pd-components-badge look="hero-big-title">`, a template with `class="{{look}}"`). It names the page's
+  file and the line that gives the value.
+
+```
+[pd build] classes: 1 outside the design system:
+[pd build]   warning: about.md:12: class "hero-big-title" isn't defined by any component or style
+```
+
+A warning by default; with `storefront.checks.classes: "error"` it stops the build, and `"off"` skips the check.
+
+### Custom properties nothing defines
+
+A `var(--x)` in the project's own styles (its styles folder, SCSS or CSS) with no `--x` defined anywhere stops the
+build, naming the file and line. Without the check it falls back to nothing, and a colour just goes missing on screen.
+
+- **Defined:** `--x:` or `@property --x` in any compiled stylesheet of the style guide (the project's and its
+  packages', the base layer and the themes) or one the site loads, and `--x:` in a `style` attribute of a page or
+  preview the build writes (`style="--cols: {{cols}}"` in a template).
+- `var(--x, fallback)` is fine: it says what to show without `--x`. A name Sass builds (`var(--#{$name})`) and a
+  `var()` in a comment are not checked. A package's own stylesheets are not checked: they are not the project's to fix.
+- A property JavaScript sets goes in `storefront.checks.allowProperties` (a trailing `*` for a prefix).
+
+```
+pd build: the skin reads custom properties nothing defines, so nothing was written:
+  - src/styles/components/card.scss:42: var(--card-gap) reads a custom property nothing defines: define --card-gap
+    in the skin, give it a fallback (var(--card-gap, ...)), or, if JavaScript sets it, list it in
+    storefront.checks.allowProperties
+```
 
 ### The accessibility check
 

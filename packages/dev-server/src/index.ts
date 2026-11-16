@@ -42,7 +42,7 @@ const SILENT_RELOADER: HotReloader = {
   close: async () => { /* nothing opened */ },
 };
 import { createServer } from "node:http";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 // HTTP/HTML leaf helpers. Kept in their own module because `escapeHtml` is shared by the Markdown
@@ -72,7 +72,7 @@ export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // All mutable server state in one typed object — the seam that lets routes and the watcher
 // stop sharing lexical scope. Its header documents the three hazards.
 import { reportUnresolvableScripts } from "./requires.js";
-import { applyStyleData, cachedDiscovery, compositionFor, createServerState, setDiscovery } from "./server-state.js";
+import { applyStyleData, cachedDiscovery, compositionFor, createServerState, currentDiscovery, setDiscovery } from "./server-state.js";
 // Resolved paths + flags, derived once from PatternDumpConfig against the ONE resolution base.
 import { resolveServerConfig } from "./server-config.js";
 import { createImageService } from "./image-service.js";
@@ -154,6 +154,15 @@ export interface DevServerOptions {
 export interface DevServer {
   port: number;
   close(): Promise<void>;
+  /** For pd build's style checks (class-check.ts, property-check.ts), not part of the HTTP contract: every compiled
+   *  stylesheet of the style guide (each component's, the base layer, each theme; project and packages) and every
+   *  component template's source. */
+  styleGuide(): Promise<StyleGuideSources>;
+}
+
+export interface StyleGuideSources {
+  stylesheets: string[];
+  templates: string[];
 }
 
 const devUiDist = resolveDevUiDist(import.meta.url);
@@ -391,6 +400,13 @@ export async function startDevServer(
 
   return {
     port: actualPort,
+    async styleGuide() {
+      const discovery = await currentDiscovery(state, patternRoots);
+      await state.style.get(() => buildAllStyleData(styleRoots, baseComponentIds(discovery)));
+      const templates = await Promise.all([...discovery.discoveryMap.values()].filter(e => e.hbsPath !== "")
+        .map(e => readFile(e.hbsPath, "utf8").catch(() => "")));
+      return { stylesheets: [...state.perComponentCss.values(), state.baseCss, ...state.themeCss.values()], templates };
+    },
     async close() {
       await watcher?.close();
       await hotreloader.close();

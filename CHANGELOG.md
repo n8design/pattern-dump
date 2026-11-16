@@ -4,6 +4,9 @@
 
 ### Changed
 
+- **A skin that reads a custom property nothing defines no longer builds:** a `var(--x)` without a fallback in the
+  project's styles needs `--x` defined in the style guide or its packages, a fallback, or `--x` listed in
+  `storefront.checks.allowProperties` (see Added).
 - `toc` is a key the build owns now (the table of contents): a layout's schema that declares it must rename it.
 - **A storefront page's "last changed" date is the author's, never git's.** Git's last commit counts a typo fix or a
   reformat as a change, so it is no longer used for anything a reader or a search engine sees. A page sets
@@ -37,6 +40,16 @@
 
 ### Added
 
+- **The class check.** `pd build` lists each class on a site page that no component or style of the style guide
+  defines, naming the page's file and line: `about.md:12: class "hero-big-title" isn't defined by any component or
+  style`. State classes (`is-`, `has-`, `js-`) and Pattern Dump's own are allowed, and so is
+  `storefront.checks.allowClasses`. A warning; `storefront.checks.classes: "error"` stops the build, `"off"` skips it.
+- **Custom properties nothing defines stop the build.** A `var(--x)` without a fallback in the project's own styles,
+  with no `--x` in any stylesheet of the style guide or its packages (or a `style` attribute the build writes), fails
+  `pd build`, naming the file and line. A property JavaScript sets goes in `storefront.checks.allowProperties`.
+- **`llms.txt`.** `pd build` writes one at the site's root (llmstxt.org): the site's title and description, then
+  the top-level pages and each collection, every page with its title, link and teaser. The same pages as the sitemap;
+  absolute URLs with `storefront.url`, under the site's path. On by default; `storefront.llms: false` turns it off.
 - **Regions.** A layout declares regions besides the body on `page.regions` (`"x-pd-regions": ["sidebar"]`) and writes
   each as `{{{page.regions.sidebar}}}`, null when the page puts nothing there. A placed component goes into one with
   `region="sidebar"` on its tag, or its schema's `"x-pd-region"`; components keep the page's order there. A region
