@@ -1,0 +1,14 @@
+{
+  "title": "Categories",
+  "page": {
+    "terms": [
+      {
+        "key": "guides",
+        "label": "Guides",
+        "description": null,
+        "route": "/categories/guides/",
+        "count": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tag layout",
+  "description": "The page of one tag, generated for each tag with a published page: its title is the tag's label.",
+  "type": "object",
+  "required": [
+    "title"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "The tag's label"
+    },
+    "description": {
+      "type": "string",
+      "description": "The tag's description, when the config gives one"
+    },
+    "page": {
+      "type": "object",
+      "description": "Derived by the storefront for the page",
+      "properties": {
+        "term": {
+          "description": "The tag: key, label, description, route and its count of pages"
+        },
+        "pages": {
+          "description": "Every page with the tag, newest first, through the compact view",
+          "x-pd-query": {
+            "tags": "same",
+            "sort": "date",
+            "view": "compact"
+          }
+        }
+      }
+    }
+  }
+}

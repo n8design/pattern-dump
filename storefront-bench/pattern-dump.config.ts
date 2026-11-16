@@ -25,6 +25,12 @@ export default defineConfig({
       "design-systems": { label: "Design systems", description: "How a design system is built and kept", aliases: ["ds"] },
       guides: { label: "Guides" },
     },
+    // The tags a page can have: declared, so a typo fails the build. "pictures" is an old key of "images".
+    tags: {
+      design: { label: "Design" },
+      images: { label: "Images", description: "Pictures, and how pages show them", aliases: ["pictures"] },
+      layout: { label: "Layout" },
+    },
     // The link-preview image of every page that names none of its own.
     image: "/assets/images/share.png",
     site: {

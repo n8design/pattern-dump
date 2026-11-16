@@ -1,0 +1,8 @@
+{{#> partials-base }}
+<article class="page term">
+  <h1 class="page-title">{{title}}</h1>
+  {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
+  <p class="term-count">{{page.term.count}} {{#if (eq page.term.count 1)}}page{{else}}pages{{/if}}</p>
+  {{{page.pages.listing}}}
+</article>
+{{/partials-base}}

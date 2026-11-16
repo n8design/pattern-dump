@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tags layout",
+  "description": "The index of the tags: every tag with a published page, by label.",
+  "type": "object",
+  "required": [
+    "title"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "The index's title"
+    },
+    "page": {
+      "type": "object",
+      "description": "Derived by the storefront for the page",
+      "properties": {
+        "terms": {
+          "description": "Every tag with a page: key, label, description, route and count"
+        }
+      }
+    }
+  }
+}

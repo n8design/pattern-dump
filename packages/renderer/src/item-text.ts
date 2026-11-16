@@ -4,7 +4,7 @@
 import Handlebars from "handlebars";
 
 /** One place an item is written whole: the list's path as the template writes it, and where. */
-export interface ItemAsText { list: string; line: number; column: number }
+export interface ItemAsText { list: string; item: "this" | "."; line: number; column: number }
 
 type Node = { type: string; loc?: { start: { line: number; column: number } } } & Record<string, unknown>;
 type PathNode = { type: string; original?: unknown; parts?: unknown };
@@ -28,7 +28,7 @@ export function itemsWrittenAsText(template: string, name: string): ItemAsText[]
         const params = (s["params"] as unknown[] | undefined) ?? [];
         if (params.length === 0 && isItem(s["path"] as PathNode)) {
           const loc = s.loc?.start ?? { line: 1, column: 0 };
-          out.push({ list, line: loc.line, column: loc.column + 1 });
+          out.push({ list, item: (s["path"] as PathNode).original === "." ? "." : "this", line: loc.line, column: loc.column + 1 });
         }
       } else if (s.type === "BlockStatement" && SAME_CONTEXT.has(String((s["path"] as PathNode).original))) {
         inEach(((s["program"] as Node | undefined)?.["body"] as unknown[]) ?? [], list);

@@ -5,8 +5,8 @@ describe("itemsWrittenAsText: a list's items written as text in an #each over it
   it("finds {{this}} and {{.}} in an #each over a path ending in the name, with its line and the list's path", () => {
     const t = `<ul>\n{{#each page.tags}}<li>{{this}}</li>{{/each}}\n{{#each tags}}{{.}}{{/each}}\n</ul>`;
     expect(itemsWrittenAsText(t, "tags")).toEqual([
-      { list: "page.tags", line: 2, column: 24 },
-      { list: "tags", line: 3, column: 15 },
+      { list: "page.tags", item: "this", line: 2, column: 24 },
+      { list: "tags", item: ".", line: 3, column: 15 },
     ]);
   });
 
