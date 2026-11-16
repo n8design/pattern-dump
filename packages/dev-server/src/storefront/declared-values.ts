@@ -11,6 +11,8 @@
 
 import { readFile } from "node:fs/promises";
 import { suggest } from "@pattern-dump/config";
+import type { DiscoveryMap } from "@pattern-dump/contracts";
+import { parseJson } from "@pattern-dump/renderer";
 import type { FrontmatterValue } from "../frontmatter.js";
 
 export type JsonType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
@@ -142,14 +144,41 @@ export interface ObjectSchema {
 }
 
 /** A component's schema file, parsed: `schema` is absent when there is no file; `error` says why one
- *  cannot be read. The one place a storefront check reads a schema. */
+ *  cannot be read (for a file that isn't JSON, the parser's reason and where). The one place a storefront check
+ *  reads a schema. */
 export async function readSchema(schemaPath: string | undefined): Promise<{ schema?: ObjectSchema; error?: string }> {
   if (!schemaPath) return {};
+  let text: string;
   try {
-    return { schema: JSON.parse(await readFile(schemaPath, "utf8")) as ObjectSchema };
+    text = await readFile(schemaPath, "utf8");
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
+  const parsed = parseJson(text);
+  if (parsed.ok) return { schema: parsed.value as ObjectSchema };
+  return { error: `not valid JSON (${parsed.reason})${parsed.line !== undefined ? ` at line ${parsed.line}, column ${parsed.column}` : ""}` };
+}
+
+/**
+ * Every component schema (the project's and its packages') that isn't valid JSON, one problem each: its file, line
+ * and column, and that its component isn't checked until it's fixed. The site's checks read schemas in many places;
+ * a broken one is the whole site's problem, so none of them can quietly read it as "no schema".
+ */
+export async function unreadableSchemas(discoveryMap: DiscoveryMap, shown: (path: string) => string): Promise<string[]> {
+  const byFile = new Map<string, string>();
+  for (const [id, entry] of discoveryMap) {
+    if (entry.schemaPath && !byFile.has(entry.schemaPath)) byFile.set(entry.schemaPath, id.split("~")[0]!);
+  }
+  const problems: string[] = [];
+  for (const [file, id] of [...byFile].sort(([a], [b]) => a.localeCompare(b))) {
+    const text = await readFile(file, "utf8").catch(() => undefined);
+    if (text === undefined) continue;
+    const parsed = parseJson(text);
+    if (parsed.ok) continue;
+    const at = parsed.line !== undefined ? `:${parsed.line}:${parsed.column}` : "";
+    problems.push(`${shown(file)}${at}: not valid JSON (${parsed.reason}), so ${id} isn't checked against its schema until it's fixed`);
+  }
+  return problems;
 }
 
 // ─── Placed components ───────────────────────────────────────────────────────────────────────────────

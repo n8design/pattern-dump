@@ -27,6 +27,25 @@ import { aggregateRequires } from "./requires.js";
 import type { CompositionRegistry } from "./composition.js";
 import type { ScssModuleGraph, ClassOwnerIndex, BaseProvenanceIndex } from "./style-index.js";
 
+/** A component's title as the Inspector shows it: its .md `title:`, else `name` (the last segment of its id). */
+export function titleFromMd(rawMd: string, name: string): string {
+  return rawMd.match(/^title:\s*(.+)$/m)?.[1]?.trim() ?? name;
+}
+
+/**
+ * A preview document's title: the component's title, a variant's name after it, then the workbench's name, separated
+ * by " · " ("Button · secondary · Acme DS"). `componentId` may name the variant itself (`atoms/button~secondary`).
+ */
+export async function previewTitle(componentId: string, variant: string | undefined, discoveryMap: DiscoveryMap, workbench: string): Promise<string> {
+  const tilde = componentId.indexOf("~");
+  const baseId = tilde > 0 ? componentId.slice(0, tilde) : componentId;
+  const shownVariant = variant ?? (tilde > 0 ? componentId.slice(tilde + 1) : undefined);
+  const mdPath = discoveryMap.get(baseId)?.mdPath;
+  const rawMd = mdPath ? await readFile(mdPath, "utf-8").catch(() => "") : "";
+  const title = titleFromMd(rawMd, baseId.split("/").at(-1)!);
+  return [title, ...(shownVariant ? [shownVariant] : []), workbench].join(" · ");
+}
+
 export async function buildComponentDetail(
   componentId: string,
   patternsDir: PatternDirs,
@@ -54,11 +73,10 @@ export async function buildComponentDetail(
   if (entry?.mdPath) {
     try {
       rawMd = await readFile(entry.mdPath, "utf-8");
-      const t = rawMd.match(/^title:\s*(.+)$/m);
       const d = rawMd.match(/^description:\s*(.+)$/m);
       const s = rawMd.match(/^status:\s*(.+)$/m);
       const u = rawMd.match(/^deprecated-use:\s*(.+)$/m);
-      if (t) title       = t[1].trim();
+      title = titleFromMd(rawMd, name);
       if (d) description = d[1].trim();
       if (s) {
         const sv = s[1].trim();

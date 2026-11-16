@@ -23,7 +23,7 @@ import { placeTocItems, type PlacementDeps } from "./placed.js";
 import { isHelperNameProblem, itemsWrittenAsText, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
 import { basename } from "node:path";
 import { renderDoc, type DocRegions, type ProseImages } from "../markdown.js";
-import { readSchema, type PlacedProblem } from "./declared-values.js";
+import { readSchema, unreadableSchemas, type ObjectSchema, type PlacedProblem } from "./declared-values.js";
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
@@ -334,11 +334,21 @@ async function generatedFile(g: GeneratedPage, discoveryMap: DiscoveryMap): Prom
   return { page: { route: g.route, file: "", path: `${g.route.slice(1, -1)} (generated)`, frontmatter: { values, maps: {}, errors: [], lines: {} } }, problems };
 }
 
-/** Every template among `ids` (with what each includes) that writes a tag as text, which an object can't be shown as. */
+/** Every template among `ids` (with what each includes) that writes a tag as text, which an object can't be shown as;
+ *  and every schema among them that declares tags as strings, which a page's tags no longer are. */
 async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promise<string[]> {
   const problems: string[] = [];
   for (const id of [...new Set(ids.flatMap(id => includeTree(id, a.composition)))]) {
-    const hbs = a.discoveryMap.get(id)?.hbsPath;
+    const entry = a.discoveryMap.get(id);
+    const schema = (await readSchema(entry?.schemaPath)).schema;
+    const tags = (schema?.properties?.["tags"] ?? (schema?.properties?.["page"] as ObjectSchema | undefined)?.properties?.["tags"]) as
+      { items?: { type?: unknown } } | undefined;
+    const itemType = tags?.items?.type;
+    if (itemType === "string" || (Array.isArray(itemType) && itemType.includes("string") && !itemType.includes("object"))) {
+      problems.push(`${id} (${basename(entry!.schemaPath!)}) declares tags as a list of strings, but a tag is an object since 0.5.0 `
+        + `(key, label, description, route): declare its items as "type": "object", or leave items out`);
+    }
+    const hbs = entry?.hbsPath;
     if (!hbs) continue;
     const source = await readFile(hbs, "utf8").catch(() => "");
     for (const f of itemsWrittenAsText(source, "tags")) {
@@ -392,6 +402,11 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       throw e;
     }
   }
+
+  // A component schema that isn't JSON: every check that reads it would be off, so it is every page's problem (an
+  // address with no page is still a 404, above: it has nothing to check).
+  const brokenSchemas = await unreadableSchemas(a.discoveryMap, a.shown);
+  if (brokenSchemas.length) { siteWide = brokenSchemas; return fail(brokenSchemas); }
 
   const problems: string[] = [...generatedProblems];
   const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags);
@@ -616,8 +631,11 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     problems.push(...headSample);
   }
   // Tags are objects since 0.5.0: a template that still writes one as text fails, naming what to write.
-  problems.push(...await tagsWrittenAsText([checked.layoutId, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view ? [q.view.id] : [])]
-    .filter(id => a.discoveryMap.has(id)), a));
+  // A card's string tags are its check's problem already (cards.ts, naming the listing): not said twice.
+  const STRING_TAGS = " declares tags as a list of strings";
+  const named = new Set(problems.filter(p => p.includes(STRING_TAGS)).map(p => p.slice(0, p.indexOf(" ("))));
+  problems.push(...(await tagsWrittenAsText([checked.layoutId, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view ? [q.view.id] : [])]
+    .filter(id => a.discoveryMap.has(id)), a)).filter(p => !(p.includes(STRING_TAGS) && named.has(p.slice(0, p.indexOf(" ("))))));
   if (problems.length) return fail(problems);
   if (view) {
     try {

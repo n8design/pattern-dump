@@ -11,7 +11,10 @@ export { itemsWrittenAsText, type ItemAsText } from "./item-text";
 export { checkSchemaExtensions, QUERY_OPTIONS, readExampleHeight, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
 export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
 export { helperShadows, type HelperShadow } from "./helper-shadow";
+export { parseJson, type ParsedJson } from "./json";
 import { helperShadows } from "./helper-shadow";
+import { parseJson } from "./json";
+import { tagShapeProblems } from "./tag-shape";
 import { checkSchemaExtensions } from "./schema-extensions";
 import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
@@ -68,16 +71,6 @@ export function deepMerge(
 
 const safePart = (n: string) => n.replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase();
 
-/** Line and column of a JSON parse error, from the parser's message (best-effort). */
-function jsonErrorPosition(reason: string, text: string): { line?: number; column?: number } {
-  const lineColumn = /line (\d+) column (\d+)/.exec(reason);
-  if (lineColumn) return { line: Number(lineColumn[1]), column: Number(lineColumn[2]) };
-  const position = /position (\d+)/.exec(reason);
-  if (!position) return {};
-  const lines = text.slice(0, Number(position[1])).split("\n");
-  return { line: lines.length, column: lines[lines.length - 1].length + 1 };
-}
-
 /**
  * Read a component or variant data file. A file that cannot be read is no data. A file that does
  * not parse is no data plus a DATA_INVALID diagnostic, so the dropped data shows up on the Console
@@ -86,18 +79,15 @@ function jsonErrorPosition(reason: string, text: string): { line?: number; colum
 async function readDataFile(path: string, display: (absPath: string) => string): Promise<{ data?: Record<string, unknown>; diagnostic?: Diagnostic }> {
   let text: string;
   try { text = await readFile(path, "utf-8"); } catch { return {}; }
-  try {
-    return { data: JSON.parse(text) as Record<string, unknown> };
-  } catch (e) {
-    const reason = e instanceof Error ? e.message : String(e);
-    return {
-      diagnostic: {
-        kind: "DATA_INVALID", source: "render", severity: "error",
-        message: `${basename(path)} is not valid JSON (${reason}); its data was not used`,
-        location: { file: display(path), ...jsonErrorPosition(reason, text) },
-      },
-    };
-  }
+  const parsed = parseJson(text);
+  if (parsed.ok) return { data: parsed.value as Record<string, unknown> };
+  return {
+    diagnostic: {
+      kind: "DATA_INVALID", source: "render", severity: "error",
+      message: `${basename(path)} is not valid JSON (${parsed.reason}); its data was not used`,
+      location: { file: display(path), ...(parsed.line !== undefined ? { line: parsed.line, column: parsed.column } : {}) },
+    },
+  };
 }
 
 /**
@@ -529,10 +519,21 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     }
 
     // Schema validation (M4.9). schemaPath comes from the discovery entry — no reconstruction.
+    // A schema that doesn't parse is an error, never "no schema": that would turn every check below off unsaid.
+    const schemaText = entry.schemaPath ? await readFile(entry.schemaPath, "utf-8").catch(() => undefined) : undefined;
+    const parsedSchema = schemaText === undefined ? undefined : parseJson(schemaText);
+    if (parsedSchema && !parsedSchema.ok) {
+      diagnostics.push({
+        kind: "SCHEMA_INVALID",
+        severity: "error",
+        source: "schema",
+        message: `${basename(entry.schemaPath!)} is not valid JSON (${parsedSchema.reason}), so ${componentId} isn't checked against its schema until it's fixed`,
+        location: { file: display(entry.schemaPath!), ...(parsedSchema.line !== undefined ? { line: parsedSchema.line, column: parsedSchema.column } : {}) },
+      });
+    }
     try {
-      if (!entry.schemaPath) throw new Error("no schema");
-      const schemaText = await readFile(entry.schemaPath, "utf-8");
-      const schema = JSON.parse(schemaText) as {
+      if (!parsedSchema?.ok) throw new Error("no schema");
+      const schema = parsedSchema.value as {
         required?: string[];
         properties?: Record<string, { type?: string | string[] }>;
       };
@@ -548,7 +549,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
           source: "schema",
           message: p.message,
           path: p.path,
-          location: { file: display(entry.schemaPath) },
+          location: { file: display(entry.schemaPath!) },
         });
       }
 
@@ -560,7 +561,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
           source: "schema",
           message: p.message,
           path: p.path,
-          location: { file: display(entry.schemaPath) },
+          location: { file: display(entry.schemaPath!) },
         });
       }
 
@@ -593,7 +594,17 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
           });
         }
       }
-    } catch { /* no schema file — skip */ }
+    } catch { /* no schema, or one that doesn't parse (reported above) */ }
+
+    // Tags read as objects while the sample data or the schema gives strings, or the reverse (tag-shape.ts).
+    if (templateHbsPath) {
+      diagnostics.push(...tagShapeProblems({
+        template: templateSrc, templateFile: display(templateHbsPath), data,
+        ...(entry.jsonPath ? { dataPath: entry.jsonPath } : {}),
+        ...(parsedSchema?.ok && entry.schemaPath
+          ? { schema: parsedSchema.value as object, schemaPath: entry.schemaPath, schemaFile: display(entry.schemaPath) } : {}),
+      }));
+    }
 
     // A data field a bare {{name}} never reads, since a helper of that name answers (helper-shadow.ts). A field the
     // schema declares is the schema check's error already (SCHEMA_INVALID), and not said twice.

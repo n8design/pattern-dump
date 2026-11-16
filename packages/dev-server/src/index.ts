@@ -80,10 +80,11 @@ import { createImageService } from "./image-service.js";
 import { handleRequest, type RouteContext, type BootStamp } from "./routes.js";
 import { createSiteValues } from "./storefront/site-values.js";
 import { resolveDevUiDist } from "./assets.js";
-import { describeBindError } from "./ports.js";
+import { assertPortFree, describeBindError } from "./ports.js";
 export { PortInUseError } from "./ports.js";
 import { loadPatternPackages } from "./packages.js";
 import { createDisplayPath } from "./display-path.js";
+import { unreadableSchemas } from "./storefront/declared-values.js";
 import { createRenderingHandle, type BuildRenderer } from "./rendering.js";
 import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
@@ -158,6 +159,9 @@ export interface DevServer {
    *  stylesheet of the style guide (each component's, the base layer, each theme; project and packages) and every
    *  component template's source. */
   styleGuide(): Promise<StyleGuideSources>;
+  /** For pd build, not part of the HTTP contract: every component schema that isn't valid JSON, as a problem naming
+   *  its file, line and column (unreadableSchemas). */
+  schemaProblems(): Promise<string[]>;
 }
 
 export interface StyleGuideSources {
@@ -248,12 +252,15 @@ export async function startDevServer(
   // hosts, at its HTTP port (known once it listens; until then no page of it exists).
   let httpPort = -1;
   const hosts = ownHosts(cfg.storefront?.host);
+  // Before binding anything: a port another server holds on IPv4 or IPv6 stops pd dev (ports.ts, assertPortFree).
+  const wsPortChosen = opts.wsPort !== undefined || process.env["PD_WS_PORT"] !== undefined;
+  if (live) await assertPortFree(wsPort, "live reload", { http: port, wsChosen: wsPortChosen });
+  await assertPortFree(port, "workbench", { http: port, wsChosen: wsPortChosen });
   const hotreloader: HotReloader = live
     ? createHotReloader(wsPort, { acceptOrigin: origin => isOwnOrigin(origin, hosts, httpPort) })
     : SILENT_RELOADER;
   if (live) generationNow = () => hotreloader.generation();
   // Fail here, before compiling anything, if live reload's port is taken.
-  const wsPortChosen = opts.wsPort !== undefined || process.env["PD_WS_PORT"] !== undefined;
   await hotreloader.listening.catch((e: unknown) => {
     throw describeBindError(e, wsPort, "live reload", { http: port, wsChosen: wsPortChosen });
   });
@@ -406,6 +413,9 @@ export async function startDevServer(
       const templates = await Promise.all([...discovery.discoveryMap.values()].filter(e => e.hbsPath !== "")
         .map(e => readFile(e.hbsPath, "utf8").catch(() => "")));
       return { stylesheets: [...state.perComponentCss.values(), state.baseCss, ...state.themeCss.values()], templates };
+    },
+    async schemaProblems() {
+      return unreadableSchemas((await currentDiscovery(state, patternRoots)).discoveryMap, displayPath);
     },
     async close() {
       await watcher?.close();

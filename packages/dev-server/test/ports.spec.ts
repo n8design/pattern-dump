@@ -68,4 +68,20 @@ describe("startDevServer on a taken port", () => {
     await new Promise<void>((resolve, reject) => { probe.once("error", reject); probe.listen(ws, "127.0.0.1", resolve); });
     await new Promise<void>(r => probe.close(() => r()));
   }, 60_000);
+
+  // Another server can hold the port on IPv6 only. Binding 127.0.0.1 beside it succeeds (on macOS even beside the
+  // IPv6 wildcard), and a browser resolving *.localhost to ::1 then reaches the other server, with no message.
+  for (const host of ["::1", "::"]) {
+    it(`rejects with PortInUseError when the workbench port is taken on ${host}`, async () => {
+      const taken = await occupy(host);
+      await expect(startDevServer(config, testBench, { port: taken, wsPort: 0 }))
+        .rejects.toMatchObject({ name: "PortInUseError", port: taken, message: expect.stringContaining("the workbench cannot start") });
+    }, 60_000);
+
+    it(`rejects with PortInUseError when the live-reload port is taken on ${host}`, async () => {
+      const taken = await occupy(host);
+      await expect(startDevServer(config, testBench, { port: 0, wsPort: taken }))
+        .rejects.toMatchObject({ name: "PortInUseError", port: taken, message: expect.stringContaining("live reload cannot start") });
+    }, 60_000);
+  }
 });
