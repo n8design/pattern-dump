@@ -104,7 +104,9 @@ export async function runBuild(
  * `[pd audit]` meta lines go to stderr for the `json` format (stdout stays pure JSON); `md`/`text` keep
  * their meta on stdout as before.
  */
-export async function runAudit(root: string, configPath?: string, format: AuditFormat = "md"): Promise<void> {
+export async function runAudit(
+  root: string, configPath?: string, format: AuditFormat = "md", opts: { strict?: boolean } = {},
+): Promise<{ failed: boolean }> {
   const config = await loadConfig(root, configPath);
   const { graph, reaudited, reused, artifactPath, imageWarning } = await runDiagnosticsAudit(config, root);
   const report = formatAudit(graph, format);
@@ -116,7 +118,21 @@ export async function runAudit(root: string, configPath?: string, format: AuditF
   // Meta lines: stderr for json (so stdout is pure JSON for CI), stdout otherwise.
   const meta = format === "json" ? console.error : console.log;
   const lines = auditSummaryLines({ graph, reaudited: reaudited.length, reused, artifactPath, reportPath, ...(imageWarning ? { imageWarning } : {}) });
-  meta(`${format === "json" ? "" : "\n"}${lines.join("\n")}`);
+  const verdict = auditVerdict(graph.occurrences, opts.strict === true);
+  meta(`${format === "json" ? "" : "\n"}${[...lines, ...(verdict ? [verdict] : [])].join("\n")}`);
+  return { failed: verdict !== undefined };
+}
+
+/** Why `pd audit` fails, as its last line, or undefined when it passes: it fails on an error, as pd build fails on its
+ *  checks' errors, and with `strict` on any finding. */
+export function auditVerdict(occurrences: ReadonlyArray<{ severity: string }>, strict: boolean): string | undefined {
+  if (strict) {
+    if (!occurrences.length) return undefined;
+    return `[pd audit] failed: ${occurrences.length} defect${occurrences.length === 1 ? "" : "s"} found, with --strict (a warning fails it too).`;
+  }
+  const errors = occurrences.filter(o => o.severity === "error").length;
+  if (!errors) return undefined;
+  return `[pd audit] failed: ${errors} error${errors === 1 ? "" : "s"} found (warnings alone don't fail it; --strict makes them fail it too).`;
 }
 
 /** The audit's summary, after its report: what was re-audited, where the files are, the defects, and the image

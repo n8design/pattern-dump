@@ -27,7 +27,9 @@ function runPiped(args: string[]): Promise<{ code: number | null; stdout: string
 describe.skipIf(process.platform === "win32")("pd audit --format json over a pipe", () => {
   it("writes the complete report, which parses", async () => {
     const { code, stdout } = await runPiped(["audit", "--root", testBench, "--format", "json"]);
-    expect(code).toBe(0);
+    // test-bench carries errors on purpose, so pd audit fails (exit code 1; audit-exit.spec.ts): the report is
+    // still written whole.
+    expect(code).toBe(1);
     expect(stdout.length).toBeGreaterThan(512);
     const report = JSON.parse(stdout) as { headline: string; totals: { components: number } };
     expect(report.totals.components).toBeGreaterThan(0);

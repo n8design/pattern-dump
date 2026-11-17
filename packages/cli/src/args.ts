@@ -12,7 +12,7 @@ export type AuditFormat = "md" | "text" | "json";
 
 export type Command =
   | { kind: "dev"; root: string; configPath?: string; port?: number; wsPort?: number }
-  | { kind: "audit"; root: string; configPath?: string; format: AuditFormat }
+  | { kind: "audit"; root: string; configPath?: string; format: AuditFormat; strict?: boolean }
   | { kind: "export"; root: string; configPath?: string; out?: string }
   | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean; browser?: boolean; checkWorkers?: number; skipChecks?: string[] }
   | { kind: "init"; target: string; yes: boolean; name?: string; brand?: string; examples?: boolean;
@@ -70,14 +70,14 @@ export function parseCommand(argv: string[], cwd: string): Command {
     if (cmd === "audit") {
       const { values } = parseArgs({
         args: rest, strict: true, allowPositionals: false,
-        options: { ...rootAndConfig, format: { type: "string" } },
+        options: { ...rootAndConfig, format: { type: "string" }, strict: { type: "boolean" } },
       });
       if (values.help) return { kind: "help", topic: cmd };
       const format = values.format ?? "md";
       if (format !== "md" && format !== "text" && format !== "json") {
         return { kind: "error", message: `--format must be one of md|text|json (got "${format}")` };
       }
-      return { kind: "audit", ...base(values, cwd), format };
+      return { kind: "audit", ...base(values, cwd), format, ...(values.strict ? { strict: true } : {}) };
     }
 
     if (cmd === "build") {
@@ -198,6 +198,8 @@ export const USAGE = `Usage: pd <command> [options]
     --root <path>      Audit a specific project root
     --config <path>    Use a config file outside the root
     --format <fmt>     Report format: md (default) | text | json (json → stdout only)
+    --strict           Fail on any finding: by default pd audit fails (exit code 1) on an error,
+                       not on warnings alone
 
   build    Write a static snapshot of the workbench: plain files for any static host
     --root <path>      Build a specific project root

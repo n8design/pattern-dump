@@ -98,6 +98,7 @@ Renders every component and variant and reports defects across the whole design 
 | Option | Description |
 |---|---|
 | `--format <fmt>` | `md` (default), `text` or `json` |
+| `--strict` | Fail on any finding, warnings too |
 
 The report is printed and also written to a file; the last lines give its path and the path of the full
 serialized graph. With `--format json`, standard output is only the JSON report and the status lines go
@@ -107,8 +108,16 @@ to standard error, so it can be piped:
 npx pd audit --format json | jq '.totals'
 ```
 
-Results are cached per component and reused when nothing changed. `pd audit` exits with `0` when it ran,
-whatever the number of defects.
+Results are cached per component and reused when nothing changed, or when nothing a component includes
+changed.
+
+`pd audit` fails (exit code `1`) when it finds an error, as `pd build` fails on its checks' errors, so a CI
+step that runs it stops there. Warnings alone leave it at `0`; with `--strict`, any finding fails it. The
+last line says why it failed:
+
+```
+[pd audit] failed: 2 errors found (warnings alone don't fail it; --strict makes them fail it too).
+```
 
 The workbench's **Audit** tab shows the same results. Rendered-page accessibility checks that need layout
 (such as colour contrast) run in the browser, in the Console's **Diagnostics** tab.
