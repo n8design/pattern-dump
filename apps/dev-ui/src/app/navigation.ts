@@ -26,6 +26,7 @@ import { fetchAndShowData, fetchAndShowHtml, switchDockTab } from "../dock/tabs.
 import { renderPanel } from "../inspector/panel.js";
 import { setActiveTreeItem } from "../rail/tree.js";
 import { applyViewport, isDiscoRunning, stopDisco } from "../stage/viewport.js";
+import { applyLayout, hideLayoutToggle } from "../stage/layout-toggle.js";
 import { buildVariantsGallery, renderOverview } from "./galleries.js";
 
 // Wrap an srcdoc swap in a View Transition crossfade when supported and motion is ok.
@@ -58,7 +59,7 @@ export async function applyComponent(detail: ComponentDetail, variant?: string, 
   dom.singlePreview.hidden = false;
   dom.categoryOverview.hidden = true;
   dom.variantsGalleryEl.hidden = true;
-  dom.stageView.dataset.layout = detail.layout;
+  applyLayout();
   dom.previewCaption.textContent = detail.id;
 
   populateVariantSelect(detail.variants);
@@ -265,6 +266,7 @@ function showFolderArea(activePath: string): void {
   dom.categoryOverview.hidden = false;
   dom.variantsGalleryEl.hidden = true;
   dom.stageView.removeAttribute("data-layout");
+  hideLayoutToggle();
 
   // Overview: hide source tabs, switch to console.
   dom.dockEl.dataset.mode = "overview";
@@ -339,7 +341,7 @@ export async function navigateVariants(componentId: string): Promise<void> {
     dom.singlePreview.hidden = true;
     dom.categoryOverview.hidden = true;
     dom.variantsGalleryEl.hidden = false;
-    dom.stageView.dataset.layout = session.current.layout;
+    applyLayout();
 
     populateVariantSelect(session.current.variants);
     dom.variantSelect.value = "__all__";

@@ -29,6 +29,7 @@ import { applyPackageFilter, mountSidebar, restoreNavOpenState, syncPackageContr
 import { initFullpage, openFullpage } from "../stage/fullpage.js";
 import { initSplitters } from "../stage/splitters.js";
 import { initDprTracking, initViewport } from "../stage/viewport.js";
+import { initLayoutToggle } from "../stage/layout-toggle.js";
 import { connectHmr } from "./hmr.js";
 import { auditAvailable, installStaticFetch, runtime } from "../core/runtime.js";
 import { routeFromCurrentLocation } from "./router.js";
@@ -172,6 +173,7 @@ export async function init(): Promise<void> {
   // Splitter persistence must come after mount (DOM refs are set).
   initSplitters();
   initViewport(() => { void openFullpage(); });
+  initLayoutToggle();
   // One-shot: if CVD is active on arrival, open the panel so controls are immediately visible.
   // After hydrate the user owns the disclosure — we never force-open again during navigation.
   if (store.url.cvd.type !== "none" && store.url.cvd.severity > 0) {

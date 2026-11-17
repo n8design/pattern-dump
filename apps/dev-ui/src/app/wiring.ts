@@ -29,6 +29,7 @@ import { renderPanel } from "../inspector/panel.js";
 import { applyThemeToIframe } from "../rail/theme.js";
 import { applyPackageFilter, filterTree } from "../rail/tree.js";
 import { currentVpParam } from "../stage/viewport.js";
+import { withLayoutParam } from "../stage/layout-toggle.js";
 import { listenForPreviewMessages } from "../stage/preview-messages.js";
 import { navigateVariants, swapVariant } from "./navigation.js";
 import { routeFromCurrentLocation } from "./router.js";
@@ -99,7 +100,7 @@ export function mount(): void {
     const value = dom.variantSelect.value;
 
     if (value === "__all__") {
-      history.pushState({}, "", routeHref(`/${session.current.id}/variants`) + currentVpParam());
+      history.pushState({}, "", routeHref(`/${session.current.id}/variants`) + withLayoutParam(currentVpParam()));
       void navigateVariants(session.current.id);
       return;
     }
@@ -114,7 +115,7 @@ export function mount(): void {
     const variantParam = value || undefined;
     // Push hash for variant — Back steps through variants (intended).
     const hash = variantParam ? `#${encodeURIComponent(variantParam)}` : "";
-    history.pushState({}, "", routeHref(`/${session.current.id}`) + `${currentVpParam()}${hash}`);
+    history.pushState({}, "", routeHref(`/${session.current.id}`) + `${withLayoutParam(currentVpParam())}${hash}`);
     await swapVariant(session.current.id, variantParam ?? null);
   });
 
@@ -294,7 +295,8 @@ export function mount(): void {
     e.preventDefault();
     const href = link.getAttribute("href") ?? "/";
     const url = new URL(href, window.location.href);
-    history.pushState({}, "", url.pathname + (url.search || currentVpParam()) + url.hash);
+    // A gallery label names a variant of the pattern on stage, so the layout override goes with it.
+    history.pushState({}, "", url.pathname + (url.search || withLayoutParam(currentVpParam())) + url.hash);
     void routeFromCurrentLocation();
   });
 }

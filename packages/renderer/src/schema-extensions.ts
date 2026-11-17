@@ -5,7 +5,7 @@
 //   x-pd-content       at a schema's top: the property a tag's content fills; it must be a declared string.
 //   contentMediaType   only "text/markdown", only on a string: rendered as markdown, HTML escaped.
 //
-// And five that are not about placement, so they don't switch on the template check below:
+// And seven that are not about placement, so they don't switch on the template check below:
 //
 //   x-pd-card            on a list property (a layout's `page.children`, a view's `entries`): the card each page of
 //                        the listing is shown as. It names a component with a schema; the storefront checks every page
@@ -23,6 +23,9 @@
 //                        short: the frame can grow to its content but never shrink below this. One value
 //                        covers every variant, so it is the height at the widest column and no taller than
 //                        the shortest variant.
+//   x-pd-preview         at a schema's top: how the workbench previews the component, "full" (the frame fills the stage)
+//                        or "centered" (sized to its content). Above the folder defaults, below the component's .md
+//                        `preview:` (layout-mode.ts in the dev-server).
 //   x-pd-regions         on a layout's `page.regions`: its regions, a list of names; with x-pd-toc (true: its pages show
 //                        the table of contents). The storefront checks both (regions.ts in the dev-server).
 //   x-pd-region          at a component's top: the layout region it goes into when a page places it (regions.ts).
@@ -50,8 +53,8 @@ export interface SchemaExtensionContext {
 
 type Prop = Record<string, unknown>;
 const KNOWN_PROPERTY_KEYS = new Set(["x-pd-card", "x-pd-component", "x-pd-image", "x-pd-query", "x-pd-regions", "x-pd-toc", "x-pd-view"]);
-const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-prose-images", "x-pd-region"]);
-const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-prose-images, x-pd-query, x-pd-region, "
+const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-preview", "x-pd-prose-images", "x-pd-region"]);
+const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, "
   + "x-pd-regions, x-pd-toc, x-pd-view";
 /** The options of a query (x-pd-query), in the order the docs list them. Their values are checked by the storefront,
  *  against the site's pages, folders and categories (query.ts in the dev-server). */
@@ -67,6 +70,15 @@ export function readExampleHeight(schema: unknown): { height?: number; problem?:
   if (typeof value === "number" && Number.isInteger(value) && value > 0) return { height: value };
   return { problem: `x-pd-example-height must be a whole number of pixels above 0 (got ${JSON.stringify(value)}): `
     + `the live example's height at the widest column, no taller than its shortest variant` };
+}
+
+/** A schema's x-pd-preview: the preview mode when it declares a valid one, the problem when it is invalid, nothing
+ *  when it declares none. The schema check and the workbench's layout resolution both read it here. */
+export function readPreviewMode(schema: unknown): { mode?: "full" | "centered"; problem?: string } {
+  if (!isObject(schema) || !("x-pd-preview" in schema)) return {};
+  const value = schema["x-pd-preview"];
+  if (value === "full" || value === "centered") return { mode: value };
+  return { problem: `x-pd-preview must be "full" or "centered" (got ${JSON.stringify(value)})` };
 }
 
 /** A layout's slot for the images in its pages' prose: its widths and sizes, and how many of a page's first images
@@ -173,6 +185,8 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
 
   const exampleHeight = readExampleHeight(schema).problem;
   if (exampleHeight) problems.push({ path: "#/x-pd-example-height", message: exampleHeight });
+  const preview = readPreviewMode(schema).problem;
+  if (preview) problems.push({ path: "#/x-pd-preview", message: preview });
   const proseImages = readProseSlot(schema).problem;
   if (proseImages) problems.push({ path: "#/x-pd-prose-images", message: proseImages });
 

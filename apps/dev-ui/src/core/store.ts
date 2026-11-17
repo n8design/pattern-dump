@@ -11,12 +11,16 @@
 
 // ─── URL-canonical types ──────────────────────────────────────────────────
 
+import type { LayoutMode } from "@pattern-dump/contracts";
 import { routeFromPathname } from "./runtime.js";
 
 /** Known ?vp= tokens. Absent or unrecognised → "fit". "fullscreen" opens the full-page dialog. */
 export type VpMode = "fit" | "content" | "mobile" | "tablet" | "desktop" | "fullscreen";
 
 export const KNOWN_VP_MODES = new Set<string>(["fit", "content", "mobile", "tablet", "desktop", "fullscreen"]);
+
+/** Known ?layout= values: the preview modes. Absent or unrecognised → the pattern's stored mode. */
+export const KNOWN_LAYOUT_MODES = new Set<string>(["full", "centered"]);
 
 /** Colour-vision deficiency type. "none" = no filter. */
 export type CvdType = "none" | "protanopia" | "deuteranopia" | "tritanopia" | "achromatopsia";
@@ -51,6 +55,12 @@ export interface UrlState {
   readonly variant: string | null;
   /** ?vp= token. Absent or unrecognised → "fit" (reconcile rule 3). */
   readonly viewport: VpMode;
+  /**
+   * ?layout= (the toolbar's "Full height" toggle): the preview mode for the pattern on stage, overriding
+   * its stored mode for this view. null = the stored mode. Never stored; dropped on navigating to
+   * another pattern (reconcile rule 6, and app links carry only ?vp=).
+   */
+  readonly layout: LayoutMode | null;
   /** ?cvd=type:severity. Session only — never written to localStorage. */
   readonly cvd: CvdState;
 }
@@ -158,6 +168,7 @@ export const DEFAULT_URL_STATE: UrlState = {
   pattern:  null,
   variant:  null,
   viewport: "fit",
+  layout:   null,
   cvd:      DEFAULT_CVD_STATE,
 };
 
@@ -279,8 +290,10 @@ export function parseUrlState(location: Pick<Location, "pathname" | "hash" | "se
   const params  = new URLSearchParams(location.search);
   const vpRaw   = params.get("vp");
   const viewport: VpMode = (vpRaw !== null && KNOWN_VP_MODES.has(vpRaw)) ? (vpRaw as VpMode) : "fit";
+  const layoutRaw = params.get("layout");
+  const layout = layoutRaw !== null && KNOWN_LAYOUT_MODES.has(layoutRaw) ? layoutRaw as LayoutMode : null;
   const cvd = parseCvd(params.get("cvd"));
-  return { pattern, variant, viewport, cvd };
+  return { pattern, variant, viewport, layout, cvd };
 }
 
 // ─── Reconcile — THE SINGLE RULE ─────────────────────────────────────────
@@ -296,6 +309,8 @@ export function parseUrlState(location: Pick<Location, "pathname" | "hash" | "se
  *   3. unknown ?vp= → "fit"  (also: fullscreen without a pattern → "fit")
  *   4. vanished navOpenPaths → dropped
  *   5. unknown navFilter flags → off  (handled by deserializeLocalState; not re-checked here)
+ *   6. ?layout= without a pattern → null  (unknown values are null already, from parseUrlState; one
+ *      equal to the pattern's stored mode is dropped once the pattern is loaded, stage/layout-toggle.ts)
  *
  * themeOverride is a hydrate-time input (from ?theme= on the SPA URL), never part of UrlState.
  * If present and valid: written through to local.theme; stripThemeParam signals the caller to
@@ -317,6 +332,9 @@ export function reconcile(
   let viewport: VpMode = KNOWN_VP_MODES.has(url.viewport) ? url.viewport : "fit";
   if (viewport === "fullscreen" && url.pattern === null) viewport = "fit";
 
+  // Rule 6: ?layout= without a pattern → null
+  const layout = url.pattern === null ? null : url.layout;
+
   // Rule 4: vanished navOpenPaths → dropped
   const navOpenPaths = new Set<string>(
     [...local.navOpenPaths].filter(p => ctx.knownFolderPaths.has(p))
@@ -331,7 +349,7 @@ export function reconcile(
   }
 
   return {
-    url:   { ...url, variant, viewport },
+    url:   { ...url, variant, viewport, layout },
     local: { ...local, theme, navOpenPaths },
     stripThemeParam,
   };

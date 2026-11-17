@@ -214,9 +214,21 @@ its page off, or `overviews: false` in the config to turn them all off.
   content scrolls inside it; the Console says when that happens.
 - **`full`**: the component fills the Stage, for pages and layouts.
 
-Components in `pages/` and `templates/` default to `full`, everything else to `centered`. The folder's
-number does not matter, so `05-pages` counts as `pages`. A top-level folder's `index.md` overrides the
-default for every component in it; a component's own `.md` overrides both.
+Components in `pages/`, `templates/` and `layouts/` default to `full`, everything else to `centered`. The
+folder's number does not matter, so `05-pages` counts as `pages`. Each of these overrides the one before it:
+
+1. the folder default above;
+2. `preview:` in a top-level folder's `index.md`, for every component in it;
+3. `"x-pd-preview": "full"` or `"centered"` at the top of the component's schema, the mode stored with the
+   component, so it travels with it in a package. Any other value is a problem on the component and is
+   ignored;
+4. `preview:` in the component's own `.md`.
+
+The **Full height** button in the Nav Rail's viewport controls flips the preview of the component on the
+Stage, for this view only. It is on when the frame fills the Stage. Turned off, a full component is as
+tall as its content and keeps the full width; turned on, any component fills the Stage. The choice is in
+the address as `?layout=full` or `?layout=centered`, so a link shows the same view, and it is dropped when
+you open another component. Nothing is saved.
 
 ## Styles
 

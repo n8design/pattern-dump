@@ -9,19 +9,22 @@ import { join } from "node:path";
 import { readFolderFile, type PatternDirs } from "./pattern-dirs.js";
 import type { DiscoveryMap, LayoutMode } from "@pattern-dump/contracts";
 import { stripOrderPrefixes } from "@pattern-dump/discovery";
+import { parseJson, readPreviewMode } from "@pattern-dump/renderer";
 
 /**
- * Categories that default to `full` preview layout. A page or template is a whole document, so it
- * fills the stage; everything else is centered content. Overridable per-category and per-component.
+ * Categories that default to `full` preview layout. A page, a template or a layout is a whole
+ * document, so it fills the stage; everything else is centered content. Overridable per-category and per-component.
  * Matched without ordering prefixes, so a PatternLab tree's `05-pages` counts (see stripOrderPrefixes).
  */
-export const FULL_CATEGORIES = new Set(["pages", "templates"]);
+export const FULL_CATEGORIES = new Set(["pages", "templates", "layouts"]);
 
 /**
  * Resolve a component's preview layout, most-specific-wins:
- *   category default (FULL_CATEGORIES) → category index.md → the component's own .md
+ *   category default (FULL_CATEGORIES), then the category index.md `preview:`, then the schema's
+ *   `x-pd-preview`, then the component's own .md `preview:`
  *
- * A missing or unreadable .md is not an error — it just leaves the broader default in place.
+ * A missing or unreadable .md or schema is not an error here: it just leaves the broader default in
+ * place. An invalid `x-pd-preview` is reported by the schema check (checkSchemaExtensions) and ignored.
  */
 export async function resolveLayoutMode(
   componentId: string,
@@ -38,6 +41,15 @@ export async function resolveLayoutMode(
   if (categoryIndex !== null) {
     const m = categoryIndex.match(/^preview:\s*(centered|full)$/m);
     if (m) layout = m[1] as LayoutMode;
+  }
+
+  const schemaPath = discoveryMap?.get(componentId)?.schemaPath;
+  if (schemaPath) {
+    try {
+      const parsed = parseJson(await readFile(schemaPath, "utf-8"));
+      const mode = parsed.ok ? readPreviewMode(parsed.value).mode : undefined;
+      if (mode) layout = mode;
+    } catch { /* unreadable schema */ }
   }
 
   const mdPath = discoveryMap?.get(componentId)?.mdPath;

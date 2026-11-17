@@ -31,6 +31,7 @@ const NUMBERED = {
   "01-atoms/badge.hbs": "<span>b</span>",
   "04-templates/sample-article.hbs": "<article>a</article>",
   "05-pages/home.hbs": "<div>h</div>",
+  "03-layouts/article.hbs": "<main>{{{body}}}</main>",
 };
 
 describe("stripOrderPrefixes", () => {
@@ -48,9 +49,10 @@ describe("stripOrderPrefixes", () => {
 });
 
 describe("resolveLayoutMode — category default", () => {
-  it("pages and templates are full, with or without an ordering prefix", async () => {
+  it("pages, templates and layouts are full, with or without an ordering prefix", async () => {
     const dir = await patterns(NUMBERED);
     const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("03-layouts/article", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("04-templates/sample-article", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("05-pages/home", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("01-atoms/badge", dir, discoveryMap)).toBe("centered");
@@ -61,8 +63,10 @@ describe("resolveLayoutMode — category default", () => {
       "atoms/badge.hbs": "<span>b</span>",
       "templates/sample.hbs": "<article>a</article>",
       "pages/home.hbs": "<div>h</div>",
+      "layouts/doc.hbs": "<main>{{{body}}}</main>",
     });
     const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("layouts/doc", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("templates/sample", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("pages/home", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("atoms/badge", dir, discoveryMap)).toBe("centered");
@@ -89,6 +93,45 @@ describe("resolveLayoutMode — overrides above the default", () => {
     });
     const { discoveryMap } = await buildDiscoveryMap(dir);
     expect(await resolveLayoutMode("04-templates/sample-article", dir, discoveryMap)).toBe("full");
+  });
+});
+
+describe("resolveLayoutMode: the schema's x-pd-preview", () => {
+  it("sets a centered component to full, and a page or layout to centered", async () => {
+    const dir = await patterns({
+      ...NUMBERED,
+      "01-atoms/badge.schema.json": JSON.stringify({ "x-pd-preview": "full" }),
+      "03-layouts/article.schema.json": JSON.stringify({ "x-pd-preview": "centered" }),
+    });
+    const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("01-atoms/badge", dir, discoveryMap)).toBe("full");
+    expect(await resolveLayoutMode("03-layouts/article", dir, discoveryMap)).toBe("centered");
+  });
+
+  it("wins over the category index.md and loses to the component's own .md", async () => {
+    const dir = await patterns({
+      ...NUMBERED,
+      "01-atoms/index.md": "---\npreview: centered\n---\n",
+      "01-atoms/badge.schema.json": JSON.stringify({ "x-pd-preview": "full" }),
+      "05-pages/home.schema.json": JSON.stringify({ "x-pd-preview": "centered" }),
+      "05-pages/home.md": "---\npreview: full\n---\n",
+    });
+    const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("01-atoms/badge", dir, discoveryMap)).toBe("full");
+    expect(await resolveLayoutMode("05-pages/home", dir, discoveryMap)).toBe("full");
+  });
+
+  it("an invalid value, a schema without it, or broken JSON leaves the default", async () => {
+    const dir = await patterns({
+      ...NUMBERED,
+      "01-atoms/badge.schema.json": JSON.stringify({ "x-pd-preview": "fullscreen" }),
+      "05-pages/home.schema.json": JSON.stringify({ properties: {} }),
+      "03-layouts/article.schema.json": "{ not json",
+    });
+    const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("01-atoms/badge", dir, discoveryMap)).toBe("centered");
+    expect(await resolveLayoutMode("05-pages/home", dir, discoveryMap)).toBe("full");
+    expect(await resolveLayoutMode("03-layouts/article", dir, discoveryMap)).toBe("full");
   });
 });
 

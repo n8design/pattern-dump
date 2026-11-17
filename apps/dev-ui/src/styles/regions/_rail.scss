@@ -401,7 +401,9 @@
 }
 
 // ---- Viewport cluster ----
-// 7-col grid: row 1 = icons auto-placed, row 2 = readout (3 cols) + mode-label (4 cols).
+// 7-col grid: row 1 = icons auto-placed, row 2 = readout (3 cols) + mode-label (3 cols) + the
+// "Full height" toggle (1 col, under Full page). The toggle sits on row 2 because the rail's minimum
+// width (--pd-rail-min) holds exactly seven icon columns.
 // Fixed 2rem (32px) columns + justify-content:start packs the grid left; free space trails right.
 
 .rail-vp-cluster {
@@ -410,7 +412,7 @@
   justify-content: start;
   grid-template-areas:
     ". . . . . . ."
-    "readout readout readout label label label label";
+    "readout readout readout label label label height";
   gap: 0.375rem;
   align-items: center;
   padding: 0.25rem 0.5rem;
@@ -465,6 +467,18 @@
   &[aria-checked="true"],
   &[aria-pressed="true"] {
     opacity: 1;
+  }
+}
+
+// The "Full height" toggle (stage/layout-toggle.ts): row 2, last column. On/off reads from the glyph
+// weight and the opacity rule above, not the accent: the cluster keeps one accent (active viewport or
+// Disco).
+.rail-vp-btn.layout-toggle-btn {
+  grid-row: auto;
+  grid-area: height;
+
+  &[hidden] {
+    display: none;
   }
 }
 

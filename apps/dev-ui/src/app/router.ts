@@ -47,6 +47,8 @@ export async function routeFromCurrentLocation(): Promise<void> {
     store.setUrl({ viewport: parsedUrl.viewport });
     applyViewport();
   }
+  // ?layout= is applied when the pattern is shown (navigation → applyLayout), against its stored mode.
+  if (parsedUrl.layout !== store.url.layout) store.setUrl({ layout: parsedUrl.layout });
   const parsedCvd = parsedUrl.cvd;
   if (parsedCvd.type !== store.url.cvd.type || parsedCvd.severity !== store.url.cvd.severity) {
     store.setUrl({ cvd: parsedCvd });
