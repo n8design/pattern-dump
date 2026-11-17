@@ -113,8 +113,10 @@ export type DiagnosticKind =
   | "SCHEMA_INVALID"     // a schema misuses a schema extension (x-pd-card, x-pd-component, x-pd-content, contentMediaType),
                          // names an unknown x-pd- key, or its template outputs a non-markdown value unescaped;
                          // or a property, at any depth, is named like a registered helper
-  | "HELPER_SHADOW";     // a warning: the template's bare {{name}} calls a registered helper, so the data field of that
+  | "HELPER_SHADOW"      // a warning: the template's bare {{name}} calls a registered helper, so the data field of that
                          // name (at any depth) is never read there
+  | "STYLE_BORROWED";    // info: the template uses a class another component owns, without including that component,
+                         // so that component's stylesheet is linked too (one per borrowed owner)
 
 /** Fields every diagnostic carries, whichever engine produced it. */
 interface DiagnosticBase {
