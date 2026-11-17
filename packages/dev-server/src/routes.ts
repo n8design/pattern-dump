@@ -728,6 +728,7 @@ async function routeRequest(
         ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
+        themes: { names: themesDir ? [...state.themeCss.keys()] : [], switch: cfg.themeSwitch },
       });
       if (page.search && ctx.onSearchRecord) ctx.onSearchRecord(page.search);
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);

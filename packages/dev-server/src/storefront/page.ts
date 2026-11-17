@@ -13,7 +13,8 @@
 // never show on a real page. A layout that declares `page` gets what is derived for the page (derived.ts),
 // each declared sub-key present and null where nothing is.
 
-import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem } from "@pattern-dump/contracts";
+import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem, type ThemeSwitch } from "@pattern-dump/contracts";
+import { themeSyncScript } from "./theme-sync.js";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
 import type { SearchRecord } from "./search.js";
@@ -94,6 +95,9 @@ export interface PageAssembly {
   /** The image index, ready for this render: a page's images from the assets are written with their variants
    *  (markdown.ts, ProseImages). Without it, a page's images are written as markdown writes them. */
   images?: () => Promise<ImageLookup>;
+  /** The project's preview themes and how they switch: a page carries its own data-theme into the previews it
+   *  embeds (theme-sync.ts). Without it, or with no themes, the page gets no such script. */
+  themes?: { names: readonly string[]; switch: ThemeSwitch };
 }
 
 export interface AssembledPage {
@@ -120,6 +124,12 @@ export function fitterScript(): string {
     + `frames().forEach(function(f){if(!f.hasAttribute("height"))f.style.height="1px";});`
     + `addEventListener("message",function(e){var m=fitter.fromMessage(e,frames());if(m)fitter.accept(m.frame,m.height);});`
     + `})();</script>`;
+}
+
+/** The theme sync for a page's embedded previews (theme-sync.ts), on its own line; empty when it has none. */
+function themeSync(a: PageAssembly, html: string): string {
+  const script = a.themes ? themeSyncScript(a.themes.names, a.themes.switch, html) : "";
+  return script ? `\n${script}` : "";
 }
 
 /** The copy buttons' script, on a page that has a code block (code-blocks.ts writes it without a button). Only where the
@@ -890,7 +900,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     route, title, body: finalBody, section: collectionOf(route, model), tags: (entry?.tags ?? []).map(t => t.label),
     categories: (entry?.categories ?? []).map(c => c.label), teaser: entry?.description ?? null, lang: a.lang ?? "en",
   };
-  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/",
+  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${themeSync(a, html)}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/",
     regionDecl.regions.length ? regionDecl.regions.filter(r => currentRegions.get(r)?.length) : undefined), problems: [], notes,
     ...(search ? { search } : {}) };
 }

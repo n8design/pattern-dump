@@ -1,0 +1,5 @@
+// The dark theme of the bench's previews: a page whose data-theme is "dark" carries it into its embedded
+// previews (theme-sync.ts in the dev-server).
+[data-theme="dark"] {
+  color-scheme: dark;
+}
