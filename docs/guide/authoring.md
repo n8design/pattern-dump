@@ -257,8 +257,13 @@ components by name alone, such as `atoms/_badge.scss` next to both `00-atoms/bad
 - **Load an installed package by name:** `@use '@scope/pkg/sass/tokens'` is found in the `node_modules`
   folders from the stylesheet upward, as in Node, and `@use 'pkg:@scope/pkg'` uses the package's own
   Sass entry. No `SASS_PATH` or load-path setting is needed.
-- A template that uses a class owned by another component shows up in **Relationships** as a borrowed
-  class.
+- A template that uses a class owned by another component, without including that component,
+  **borrows** it: the owner's stylesheet is linked too, so the class is styled. It shows up in
+  **Relationships** as a borrowed class, and as an info on the component's **Diagnostics** tab
+  (`STYLE_BORROWED`), one per owner. A design system can borrow on purpose; when two components merely use
+  the same class name for different things, rename one. `pd build` counts the borrowed stylesheets in its
+  summary, and a website page that renders a borrower warns (see
+  [storefront.md](storefront.md#a-pages-stylesheets)).
 
 Theme values belong in themes, see [themes.md](themes.md).
 
