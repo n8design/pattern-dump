@@ -13,6 +13,13 @@
   `services/web.md (from the childDefaults of services/index.md, line 9): limit "two" is not a number of pages: a whole number from 1, such as 3`.
   A draft default is said per folder by `pd build`, so it can't hide a section silently:
   `[pd build]   12 pages are drafts via the childDefaults of services/index.md`.
+- **Page and template patterns as layouts.** `"x-pd-layout": "<name>"` in the schema of a pattern in `pages/` or
+  `templates/` makes it the layout `<name>`, with no copy under `layouts/`; a page names it as any layout. The page's
+  markdown goes into the property `x-pd-content` names (a `text/markdown` string), else `body`. A marker anywhere
+  else, a marker on a `layouts/` component, and one name for two layouts are errors that name the files, on the
+  components and on every page that asks for the name. Keys a page sets for the build stay refused in a layout's
+  schema. A tag or category page can use a marked layout too; the message when the skin has none now says so:
+  `storefront.tagPages asks for tag pages, but the skin has no layout "tags" (the index of the tags): add layouts/tags, or mark a page or template pattern with "x-pd-layout": "tags", or set tagPages to false`.
 - **`/api/pages` gives each page `defaultsFrom`** (an additive change to the pages response): the keys it took from a
   folder's `childDefaults`, each with that `index.md`, a query's options one by one (`"related.limit"`).
 

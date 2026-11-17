@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
-import { checkSchemaExtensions, createRenderer, readExampleHeight, readPreviewMode, readProseSlot } from "../src/index";
+import { checkSchemaExtensions, createRenderer, readExampleHeight, readLayoutMarker, readPreviewMode, readProseSlot } from "../src/index";
 import { save } from "../../../test-support/save.js";
 
 const ctx = {
@@ -57,9 +57,21 @@ describe("the placement schema extensions", () => {
 
   it("an unknown x-pd- key is an error, at the top and in a property", () => {
     expect(check({ "x-pd-contnet": "caption", properties: { caption: { type: "string", "x-pd-componnet": "atoms/slide" } } })).toEqual([
-      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, x-pd-regions, x-pd-toc, x-pd-view)`,
-      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, x-pd-regions, x-pd-toc, x-pd-view)`,
+      `#/x-pd-contnet: "x-pd-contnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-layout, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, x-pd-regions, x-pd-toc, x-pd-view)`,
+      `#/properties/caption/x-pd-componnet: "x-pd-componnet" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-layout, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, x-pd-regions, x-pd-toc, x-pd-view)`,
     ]);
+  });
+
+  it("x-pd-layout: a layout name, at a schema's top", () => {
+    expect(check({ "x-pd-layout": "article" })).toEqual([]);
+    expect(check({ "x-pd-layout": "case-study-2" })).toEqual([]);
+    expect(readLayoutMarker({ "x-pd-layout": "article" })).toEqual({ name: "article" });
+    expect(readLayoutMarker({ properties: {} })).toEqual({});
+    for (const [value, got] of [["Article", `"Article"`], ["templates/article", `"templates/article"`], ["a b", `"a b"`], ["-a", `"-a"`], [true, "true"], ["", `""`]] as const) {
+      const message = `x-pd-layout must be a layout name: lowercase letters, digits and hyphens, such as "article" (got ${got})`;
+      expect(check({ "x-pd-layout": value })).toEqual([`#/x-pd-layout: ${message}`]);
+      expect(readLayoutMarker({ "x-pd-layout": value })).toEqual({ problem: message });
+    }
   });
 
   it("x-pd-preview: \"full\" or \"centered\", at a schema's top", () => {
@@ -89,7 +101,7 @@ describe("the placement schema extensions", () => {
     }
     // In a property it is not a known key.
     expect(check({ properties: { a: { type: "string", "x-pd-example-height": 10 } } })).toEqual([
-      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, x-pd-regions, x-pd-toc, x-pd-view)`,
+      `#/properties/a/x-pd-example-height: "x-pd-example-height" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-layout, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, x-pd-regions, x-pd-toc, x-pd-view)`,
     ]);
   });
 
@@ -113,7 +125,7 @@ describe("the placement schema extensions", () => {
     }
     // In a property it is not a known key.
     expect(check({ properties: { body: { type: "string", "x-pd-prose-images": slot } } })).toEqual([
-      `#/properties/body/x-pd-prose-images: "x-pd-prose-images" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, x-pd-regions, x-pd-toc, x-pd-view)`,
+      `#/properties/body/x-pd-prose-images: "x-pd-prose-images" is not a schema extension Pattern Dump knows (x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-layout, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, x-pd-regions, x-pd-toc, x-pd-view)`,
     ]);
   });
 

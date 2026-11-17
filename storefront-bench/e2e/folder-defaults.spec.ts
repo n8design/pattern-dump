@@ -14,10 +14,18 @@ const index = (lede: string) => [
   "---", "", "A folder whose pages take its defaults.", "",
 ].join("\n");
 
-test.beforeEach(async () => {
+/** The server has handled every change made so far (fixtures.ts settles before each test, which is before this file's
+ *  beforeEach writes its fixture): without this a test can ask while the watcher is still reading the new files. */
+async function settled(request: import("@playwright/test").APIRequestContext): Promise<void> {
+  const res = await request.post("/_pd/__test/settle");
+  if (res.status() !== 204) throw new Error(`settle answered ${res.status()}: ${await res.text()}`);
+}
+
+test.beforeEach(async ({ request }) => {
   await save(`${folder}index.md`, index("From the folder"));
   await save(`${folder}a.md`, "---\ntitle: Page A\n---\n\nIt names no layout and no lede.\n");
   await save(`${folder}b.md`, "---\ntitle: Page B\nlede: Its own\n---\n\nIt has a lede of its own.\n");
+  await settled(request);
 });
 test.afterEach(async () => { await rm(folder, { recursive: true, force: true }); });
 

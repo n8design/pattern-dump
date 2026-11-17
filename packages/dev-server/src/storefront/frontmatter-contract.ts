@@ -25,6 +25,7 @@ import { readChildLayout, readDate, readDraft, readSort, readTerms, readUpdated,
 import { categoryIndex, termIndex, TERM_WORDS, type CategoryIndex, type TermIndex, type TermKind } from "./categories.js";
 import { declaredQueries } from "./query.js";
 import { checkChildDefaults, NOT_DEFAULTABLE, originOf, placeOf } from "./folder-defaults.js";
+import { layoutIndex } from "./layout-index.js";
 import { CHILD_DEFAULTS } from "../frontmatter.js";
 import { designFiles } from "./design-files.js";
 
@@ -119,8 +120,13 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
 }
 
 export interface CheckedPage {
-  /** The layout component, e.g. "layouts/article". Set even when it does not exist. */
+  /** The layout component, e.g. "layouts/article" or "templates/article" (layout-index.ts). Set even when it does
+   *  not exist ("layouts/<name>" then). */
   layoutId: string;
+  /** The layout's name, as a page names it ("article"). */
+  layoutName: string;
+  /** The key the page's rendered markdown is given to the layout under: its schema's x-pd-content, else "body". */
+  bodySlot: string;
   /** The frontmatter for the layout: declared keys only, coerced to their declared types. */
   values: Record<string, unknown>;
   /** The page's search and link-preview keys, for the build (never passed to the layout). */
@@ -132,17 +138,14 @@ export interface CheckedPage {
 
 interface LayoutSchema { required?: string[]; properties?: Record<string, PropertySchema> }
 
-/** The layouts a page can choose: base components directly under layouts/. */
-export function layoutNames(discoveryMap: DiscoveryMap): string[] {
-  return [...discoveryMap.keys()]
-    .filter(id => /^layouts\/[^/~]+$/.test(id))
-    .map(id => id.slice("layouts/".length))
-    .sort();
+/** The layouts a page can choose, by name (layout-index.ts): layouts/ components and marked page and template patterns. */
+export async function layoutNames(discoveryMap: DiscoveryMap): Promise<string[]> {
+  return [...(await layoutIndex(discoveryMap)).names];
 }
 
 /** `categories` and `tags`: the declared ones (the page model's); no categories and any tag when left out. */
 export async function checkPageFrontmatter(page: PageFile, discoveryMap: DiscoveryMap, categories: CategoryIndex = categoryIndex(undefined),
-  tags: TermIndex = termIndex("tag", undefined)): Promise<CheckedPage> {
+  tags: TermIndex = termIndex("tag", undefined), shownPath: (path: string) => string = p => p): Promise<CheckedPage> {
   const { values, errors, lines } = page.frontmatter;
   const problems: PageProblem[] = errors.map(e => ({ file: page.path, line: e.line, message: e.message }));
   // A value a folder set (folder-defaults.ts) is named with the index.md and line it came from, in place of a line.
@@ -159,11 +162,17 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   const buildKeys = () => checkBuildKeys(values, page.path, at, { categories, tags }, renamed);
 
   // ---- layout: its own, else its folder's childLayout (pages.ts), else the default ----
-  const known = layoutNames(discoveryMap);
-  const isLayout = (name: string) => /^[^/~]+$/.test(name) && discoveryMap.has(`layouts/${name}`);
-  const notALayout = (subject: string) => known.length
-    ? `${subject} is not a layout: the layouts are ${known.map(n => `"${n}"`).join(", ")}`
-    : `${subject} is not a layout: the project has no layouts (components in a layouts/ folder of its patterns)`;
+  const index = await layoutIndex(discoveryMap);
+  const known = index.names;
+  const isLayout = (name: string) => index.has(name);
+  const notALayout = (subject: string, name?: string) => {
+    const clash = name !== undefined ? index.clash(name, shownPath) : undefined;
+    if (clash) return `${subject} is not a layout: ${clash}`;
+    return known.length
+      ? `${subject} is not a layout: the layouts are ${known.map(n => `"${n}"`).join(", ")}`
+      : `${subject} is not a layout: the project has no layouts (components in a layouts/ folder of its patterns, or `
+        + `page and template patterns marked with x-pd-layout)`;
+  };
   // This index.md's childDefaults (folder-defaults.ts): keys that can't be defaulted, and the build keys' values,
   // checked once here, so a folder with no pages yet is checked too. The rest is checked on each page that takes it.
   const block = page.frontmatter.childDefaults;
@@ -179,7 +188,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     if (childLayout !== undefined) {
       const r = readChildLayout(childLayout, page.path);
       if (!r.ok) defaultsAt("layout", `layout: ${r.message.replace(/^childLayout/, "layout")}`);
-      else if (!isLayout(r.value)) defaultsAt("layout", `layout: ${notALayout(`"${r.value}"`)}`);
+      else if (!isLayout(r.value)) defaultsAt("layout", `layout: ${notALayout(`"${r.value}"`, r.value)}`);
     }
   }
   // The default layout this index.md gives its folder's pages: checked here, once, whether or not a page takes it.
@@ -187,31 +196,31 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   if (rawChild !== undefined) {
     const r = readChildLayout(rawChild, page.path);
     if (!r.ok) at("childLayout", r.message);
-    else if (!isLayout(r.value)) at("childLayout", notALayout(`childLayout "${r.value}"`));
+    else if (!isLayout(r.value)) at("childLayout", notALayout(`childLayout "${r.value}"`, r.value));
   }
   const rawLayout = values["layout"];
   const inherited = rawLayout === undefined ? page.inherited : undefined;
   let layout = inherited?.layout ?? DEFAULT_LAYOUT;
   if (Array.isArray(rawLayout)) at("layout", "layout must be one layout name, not a list");
   else if (rawLayout !== undefined) layout = rawLayout;
-  const layoutId = `layouts/${layout}`;
+  const layoutId = index.idOf(layout) ?? `layouts/${layout}`;
   /** The layout as messages name it: with where it came from, when the page took it from its folder. */
   const named = `layout "${layout}"${inherited ? ` (the childLayout of ${inherited.from})` : ""}`;
   const entry = isLayout(layout) ? discoveryMap.get(layoutId) : undefined;
   if (!entry || Array.isArray(rawLayout)) {
     if (!Array.isArray(rawLayout)) {
-      const problem = notALayout(named);
+      const problem = notALayout(named, layout);
       if (inherited) problems.push({ file: page.path, message: problem });
       else at("layout", problem);
     }
-    return { layoutId, values: {}, build: buildKeys(), problems, notes };
+    return { layoutId, layoutName: layout, bodySlot: "body", values: {}, build: buildKeys(), problems, notes };
   }
 
   // ---- the layout's schema: what a page may set ----
   const read = await readSchema(entry.schemaPath, designFiles(discoveryMap));
   if (read.error !== undefined) {
     problems.push({ file: page.path, message: `the schema of ${named} cannot be read: ${read.error}` });
-    return { layoutId, values: {}, build: buildKeys(), problems, notes };
+    return { layoutId, layoutName: layout, bodySlot: "body", values: {}, build: buildKeys(), problems, notes };
   }
   const schema: LayoutSchema = read.schema ?? {};
   const hasSchema = read.schema !== undefined;
@@ -224,6 +233,11 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     }
   }
   const build = buildKeys();
+  // ---- the body slot: where the page's rendered markdown goes (x-pd-content, else body) ----
+  const slot = bodySlotOf(schema);
+  if (slot.problem) problems.push({ file: page.path, message: `${named} ${slot.problem}` });
+  const bodySlot = slot.name;
+  const filled = (key: string) => (ASSEMBLY_KEYS as readonly string[]).includes(key) || key === bodySlot;
   // The keys that set the layout's queries (query.ts reads and checks them): the build's, like the reserved keys.
   const forQueries = declaredQueries(read.schema).map(q => q.name);
 
@@ -231,7 +245,12 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     if ((RESERVED_KEYS as readonly string[]).includes(key) || forQueries.includes(key)) continue;
-    if ((ASSEMBLY_KEYS as readonly string[]).includes(key)) { at(key, `"${key}" is filled by the storefront, not by a page`); continue; }
+    if (filled(key)) {
+      at(key, key === bodySlot && key !== "body"
+        ? `"${key}" is filled by the storefront with the page's markdown (x-pd-content of ${named}), not by a page`
+        : `"${key}" is filled by the storefront, not by a page`);
+      continue;
+    }
     const prop = Object.hasOwn(declared, key) ? declared[key] : undefined;
     if (!prop) {
       if (!hasSchema) { at(key, `"${key}" is not declared by ${named}, which has no schema`); continue; }
@@ -255,9 +274,24 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
 
   // ---- what the layout requires ----
   for (const key of schema.required ?? []) {
-    if ((ASSEMBLY_KEYS as readonly string[]).includes(key)) continue;
+    if (filled(key)) continue;
     if (!(key in values) && !(key in (page.frontmatter.maps ?? {}))) problems.push({ file: page.path, message: `"${key}" is required by ${named}` });
   }
 
-  return { layoutId, values: out, build, problems, notes };
+  return { layoutId, layoutName: layout, bodySlot, values: out, build, problems, notes };
+}
+
+/** The body slot of a layout's schema: the property `x-pd-content` names, which must be a declared string with
+ *  `"contentMediaType": "text/markdown"` (the page's markdown, rendered, goes into it unescaped); else "body". A
+ *  problem names what is wrong, and the slot is then "body". */
+export function bodySlotOf(schema: LayoutSchema): { name: string; problem?: string } {
+  const named = (schema as Record<string, unknown>)["x-pd-content"];
+  if (named === undefined) return { name: "body" };
+  const prop = typeof named === "string" && Object.hasOwn(schema.properties ?? {}, named) ? schema.properties![named] as Record<string, unknown> : undefined;
+  if (!prop) return { name: "body", problem: `puts the page's markdown into ${JSON.stringify(named)} (x-pd-content), which it does not declare` };
+  const types = prop["type"] === undefined ? [] : Array.isArray(prop["type"]) ? prop["type"] : [prop["type"]];
+  if (!types.includes("string") || prop["contentMediaType"] !== "text/markdown") {
+    return { name: "body", problem: `puts the page's markdown into "${named}" (x-pd-content), which must be a string with "contentMediaType": "text/markdown"` };
+  }
+  return { name: named as string };
 }

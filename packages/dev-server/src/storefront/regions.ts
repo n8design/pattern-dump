@@ -16,6 +16,7 @@ import { suggest } from "@pattern-dump/config";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { readSchema } from "./declared-values.js";
 import { designFiles } from "./design-files.js";
+import { layoutIndex } from "./layout-index.js";
 
 /** The layout's own landmarks: never a region a page can fill. One list, to be opened up deliberately. */
 export const RESERVED_REGIONS: readonly string[] = ["header", "footer", "nav", "main"];
@@ -69,9 +70,10 @@ export async function skinRegions(discoveryMap: DiscoveryMap): Promise<ReadonlyM
   const files = designFiles(discoveryMap);
   return files.derived("skin regions", async () => {
     const out = new Map<string, string[]>();
-    for (const [id, entry] of [...discoveryMap].sort(([a], [b]) => a < b ? -1 : 1)) {
-      if (!/^layouts\/[^/~]+$/.test(id)) continue;
-      for (const r of layoutRegions((await readSchema(entry.schemaPath, files)).schema, id).regions) out.set(r, [...out.get(r) ?? [], id]);
+    // Every layout (layout-index.ts): layouts/ components and marked page and template patterns.
+    for (const { id } of [...(await layoutIndex(discoveryMap)).entries()].sort((a, b) => a.id < b.id ? -1 : 1)) {
+      const entry = discoveryMap.get(id);
+      for (const r of layoutRegions((await readSchema(entry?.schemaPath, files)).schema, id).regions) out.set(r, [...out.get(r) ?? [], id]);
     }
     return out;
   });

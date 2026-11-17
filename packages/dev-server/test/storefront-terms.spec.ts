@@ -229,7 +229,7 @@ describe("tag pages", () => {
   it("asked for with tagPages: true, a missing layout is a problem naming it", async () => {
     const s = await site(files, { layouts: ["tag"], tagPages: true });
     expect(s.model.problems).toEqual([
-      `storefront.tagPages asks for tag pages, but the skin has no layouts/tags (the index of the tags): add it, or set tagPages to false`,
+      `storefront.tagPages asks for tag pages, but the skin has no layout "tags" (the index of the tags): add layouts/tags, or mark a page or template pattern with "x-pd-layout": "tags", or set tagPages to false`,
     ]);
   });
 
