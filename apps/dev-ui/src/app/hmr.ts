@@ -19,7 +19,7 @@
 import type { ComponentTree, HmrMessage, TreeNode } from "@pattern-dump/contracts";
 import { PD_ROUTES, previewUrl } from "@pattern-dump/contracts";
 import { dom } from "../core/dom.js";
-import { fetchDetail, heard, loadDocument } from "../core/generation.js";
+import { behindHeard, fetchDetail, generationOf, heard, loadDocument } from "../core/generation.js";
 import { extractHighlightedPre } from "../core/html-util.js";
 import { reconcilePdLinks } from "../core/pd-links.js";
 import { protocolMismatch } from "../core/protocol.js";
@@ -33,7 +33,7 @@ import { refreshAudit } from "../inspector/audit.js";
 import { renderPanel } from "../inspector/panel.js";
 import { extractFolderPaths } from "../rail/tree-util.js";
 import { filterTree, mountSidebar, restoreNavOpenState, setActiveTreeItem, syncPackageControl } from "../rail/tree.js";
-import { navigateOverview } from "./navigation.js";
+import { navigate, navigateOverview } from "./navigation.js";
 import { resetContentHeight } from "../stage/content-height.js";
 import { remeasureAll } from "../stage/content-width.js";
 
@@ -141,6 +141,12 @@ export function connectHmr(): void {
           .catch(() => { /* ignore — stale current is better than a crash */ });
       }
     } else if (msg.type === "hello") {
+      // A change the server made after the shell loaded its tree, but before this socket opened, was announced
+      // to no one: the hello's generation is newer than the tree's. Load what the change could have changed.
+      if (behindHeard(session.treeGeneration)) {
+        void refreshTree();
+        if (session.current) void navigate(session.current.id, session.currentVariant ?? undefined);
+      }
       const mismatch = protocolMismatch(msg.protocol);
       if (mismatch) {
         dom.railStatus.dataset.state = "disconnected";
@@ -223,62 +229,7 @@ export function connectHmr(): void {
           .catch(() => {});
       }
     } else if (msg.type === "tree-changed") {
-      // A .hbs was added or removed — re-fetch the tree and rebuild the nav.
-      void fetch(PD_ROUTES.tree)
-        .then(r => r.ok ? r.json() as Promise<ComponentTree> : Promise.reject())
-        .then(freshTree => {
-          session.tree = freshTree;
-          session.componentRegistry.clear();
-          (function populate(nodes: TreeNode[]): void {
-            for (const n of nodes) {
-              if (n.kind === "component") session.componentRegistry.set(n.path, { title: n.title, category: n.path.split("/")[0], visibility: n.visibility as "public" | "private" | undefined, ...(n.source ? { source: n.source } : {}) });
-              if (n.children) populate(n.children);
-            }
-          })(session.tree.roots);
-          session.navCategoryOrder = new Map(session.tree.roots.map((r, i) => [r.path, i]));
-
-          // Reconcile stored navOpenPaths against the new tree — drop vanished paths.
-          // The store already holds current open-state (toggle listener writes on every open/close).
-          const newFolderPaths = extractFolderPaths(session.tree.roots);
-          const reconciledPaths = new Set([...store.local.navOpenPaths].filter(p => newFolderPaths.has(p)));
-          store.setLocal({ navOpenPaths: reconciledPaths });
-
-          mountSidebar();
-          syncPackageControl(session.tree);
-
-          // Restore open state from the reconciled store.
-          restoreNavOpenState(store.local.navOpenPaths);
-
-          // Re-open and highlight the active component's nav entry.
-          if (session.current?.id) {
-            if (session.componentRegistry.has(session.current.id)) {
-              setActiveTreeItem(session.current.id);
-            } else {
-              // Active component was deleted — clear it and return to empty state.
-              session.current = null;
-              dom.iframe.srcdoc = "";
-              dom.singlePreview.hidden = true;
-              dom.panel.hidden = true;
-            }
-          }
-          // Re-apply any active search filter to the new tree.
-          if (session.searchQuery) filterTree(session.searchQuery);
-
-          // A folder page shows its index.md and a gallery in tree order — both may have changed.
-          if (!dom.categoryOverview.hidden && !session.current) {
-            const folderPath = routeFromPathname(window.location.pathname).slice(1);
-            if (folderPath) void navigateOverview(folderPath);
-          }
-
-          // Re-render the relationships facet: usedBy edges may have changed when a
-          // component was added or removed. Re-fetch to get the fresh registry, then paint.
-          if (session.current?.id && session.componentRegistry.has(session.current.id) && store.local.panelTab === "relationships") {
-            void fetchDetail(session.current.id)
-              .then(d => { if (d) { session.current = d; return renderPanel(); } })
-              .catch(() => {});
-          }
-        })
-        .catch(() => {});
+      void refreshTree();
     } else if (msg.type === "collision") {
       // A quarantined component is excluded from the tree, so without this line the author sees a
       // component silently vanish. Name both paths — renaming or moving one of them resolves it.
@@ -306,4 +257,65 @@ function pdLinksLoaded(): Promise<void> {
     link.addEventListener("error", () => resolve(), { once: true });
     setTimeout(resolve, 1000);
   }))).then(() => undefined);
+}
+
+/** The tree, fetched again, and what shows it: the Nav Rail, the open state, the active entry, a search, the open
+ *  folder page and the relationships facet. On tree-changed, and on a hello newer than the tree. */
+async function refreshTree(): Promise<void> {
+  // Re-fetch the tree and rebuild the nav, keeping the generation it was taken at.
+  await fetch(PD_ROUTES.tree)
+    .then(r => { if (!r.ok) return Promise.reject(); session.treeGeneration = generationOf(r); return r.json() as Promise<ComponentTree>; })
+    .then(freshTree => {
+      session.tree = freshTree;
+      session.componentRegistry.clear();
+      (function populate(nodes: TreeNode[]): void {
+        for (const n of nodes) {
+          if (n.kind === "component") session.componentRegistry.set(n.path, { title: n.title, category: n.path.split("/")[0], visibility: n.visibility as "public" | "private" | undefined, ...(n.source ? { source: n.source } : {}) });
+          if (n.children) populate(n.children);
+        }
+      })(session.tree.roots);
+      session.navCategoryOrder = new Map(session.tree.roots.map((r, i) => [r.path, i]));
+
+      // Reconcile stored navOpenPaths against the new tree — drop vanished paths.
+      // The store already holds current open-state (toggle listener writes on every open/close).
+      const newFolderPaths = extractFolderPaths(session.tree.roots);
+      const reconciledPaths = new Set([...store.local.navOpenPaths].filter(p => newFolderPaths.has(p)));
+      store.setLocal({ navOpenPaths: reconciledPaths });
+
+      mountSidebar();
+      syncPackageControl(session.tree);
+
+      // Restore open state from the reconciled store.
+      restoreNavOpenState(store.local.navOpenPaths);
+
+      // Re-open and highlight the active component's nav entry.
+      if (session.current?.id) {
+        if (session.componentRegistry.has(session.current.id)) {
+          setActiveTreeItem(session.current.id);
+        } else {
+          // Active component was deleted — clear it and return to empty state.
+          session.current = null;
+          dom.iframe.srcdoc = "";
+          dom.singlePreview.hidden = true;
+          dom.panel.hidden = true;
+        }
+      }
+      // Re-apply any active search filter to the new tree.
+      if (session.searchQuery) filterTree(session.searchQuery);
+
+      // A folder page shows its index.md and a gallery in tree order — both may have changed.
+      if (!dom.categoryOverview.hidden && !session.current) {
+        const folderPath = routeFromPathname(window.location.pathname).slice(1);
+        if (folderPath) void navigateOverview(folderPath);
+      }
+
+      // Re-render the relationships facet: usedBy edges may have changed when a
+      // component was added or removed. Re-fetch to get the fresh registry, then paint.
+      if (session.current?.id && session.componentRegistry.has(session.current.id) && store.local.panelTab === "relationships") {
+        void fetchDetail(session.current.id)
+          .then(d => { if (d) { session.current = d; return renderPanel(); } })
+          .catch(() => {});
+      }
+    })
+    .catch(() => {});
 }

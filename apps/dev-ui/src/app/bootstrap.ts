@@ -31,6 +31,7 @@ import { initSplitters } from "../stage/splitters.js";
 import { initDprTracking, initViewport } from "../stage/viewport.js";
 import { initLayoutToggle } from "../stage/layout-toggle.js";
 import { connectHmr } from "./hmr.js";
+import { generationOf } from "../core/generation.js";
 import { auditAvailable, installStaticFetch, runtime } from "../core/runtime.js";
 import { routeFromCurrentLocation } from "./router.js";
 import { applyConsoleDockDom, applyRightPanelDom, mount } from "./wiring.js";
@@ -83,6 +84,7 @@ export async function init(): Promise<void> {
   ]);
 
   session.tree = await treeRes.json() as ComponentTree;
+  session.treeGeneration = generationOf(treeRes);
   session.themes = await themeRes.json() as ThemeSummary[];
 
   const shellConfig = await configRes.json() as ShellClientConfig;
