@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.5.3
+
+`pd build` of a site is up to twice as fast again: 2,000 pages in 8.2 s instead of 16.4 s with the checks left out.
+`pd audit` no longer reports a component clean when a partial it includes has a defect, and it now fails when it
+finds an error.
+
+### Performance
+
+Measured on a generated documentation site, main and 0.5.3 back to back (median of 5):
+
+| | 0.5.2 | 0.5.3 |
+|---|---:|---:|
+| 500 pages, every check | 15.6 s | 13.2 s |
+| 500 pages, `--skip-checks=a11y,html` | 5.5 s | 3.6 s |
+| 2,000 pages, every check | 55.1 s | 46.0 s |
+| 2,000 pages, `--skip-checks=a11y,html` | 16.4 s | 8.2 s |
+| hTWOo workbench | 19.1 s | 17.5 s |
+
+- **A site page reads the design system's files once.** Its checks read the same templates, schemas and sample data
+  about 22 times per page; they are now read once per build (and in `pd dev`, again only after an edit).
+- **A page's work no longer grows with the size of the site.** The nav, the page's position in it, and the site's
+  page list were gone through in full for every page.
+- **A template's own checks are worked out once per template**, and a page's HTML is parsed once for its classes
+  and its images.
+
+### Changed
+
+- **`pd audit` fails when it finds an error** (exit code 1), as `pd build` fails on its checks' errors. It used to
+  exit 0 whatever it found, so a CI step that runs it now fails where it passed before. Warnings alone leave it at
+  0; `--strict` makes any finding fail it. The last line says why:
+  `[pd audit] failed: 2 errors found (warnings alone don't fail it; --strict makes them fail it too).`
+  Fix: correct the errors, or run `pd audit` without failing the step (`pd audit || true`) if it should only report.
+- **The navigation a layout gets is read-only.** Every page now shares the site's nav entries; only the current page's
+  entry and its parent are new for each page. A helper that changes a nav entry it is given stops the render, with
+  0.5.2's message naming the component and the code that made the change:
+  `Cannot assign to read only property 'title' of object '#<Object>', while rendering layouts/page. A render's data (...) is shared by every render, so it is read-only: copy a value before changing it (changed at ...)`.
+  Fix: copy the entry in the helper before changing it (`{ ...item, title: "..." }`).
+
+### Fixed
+
+- **`pd audit` and the workbench's Audit tab no longer report a component clean when something it includes has a
+  defect.** A component's cached audit was reused while its own files were unchanged, so a defect put into a partial
+  left every component that includes it clean. The cache now covers every partial a component includes, at any depth,
+  and its sample data and schema; a partial a project helper includes by name (such as a `dynamicPartial` helper);
+  a dynamic partial (`{{> (expr)}}`); and the project helpers' source. In `pd dev`, an edit to a partial re-audits
+  every component that includes it. The cache written by 0.5.2 is not used.
+- **`--check-workers 1` no longer runs out of memory.** With one worker (and the default on a machine with two cores
+  or little memory) every page was checked in the build's own thread, and a 2,000-page build stopped with a heap out
+  of memory. One worker now runs the same pool as several, replaced every 16 pages.
+
 ## 0.5.2
 
 A performance release: `pd build` of a 500-page site takes 14.8 s instead of 114.9 s in 0.5.0, with every check on.
