@@ -530,7 +530,8 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // HTML content-model validation (fragment-scoped — no doctype/shell noise).
     // Validated once per distinct markup for the store (a component's markup is rendered for its detail, its preview
     // and its source view alike); each render gets diagnostics of its own.
-    const htmlMessages = store.once(`html ${html}`, () => htmlValidator.validateStringSync(html).results
+    // `validateHtml: false` (pd build --skip-checks=html) leaves it out.
+    const htmlMessages = options.validateHtml === false ? [] : store.once(`html ${html}`, () => htmlValidator.validateStringSync(html).results
       .flatMap(result => result.messages.map(msg => ({ message: msg.message, ruleId: msg.ruleId, line: msg.line, column: msg.column }))));
     for (const msg of htmlMessages) {
       diagnostics.push({

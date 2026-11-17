@@ -18,14 +18,14 @@ beforeAll(async () => { tmp = await mkdtemp(join(tmpdir(), "pd-source-store-"));
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
 /** A fresh patterns folder with `files`, and a renderer given its maps. */
-async function renderer(files: Record<string, string>, helpers?: (env: typeof Handlebars) => void) {
+async function renderer(files: Record<string, string>, helpers?: (env: typeof Handlebars) => void, extra: { validateHtml?: boolean } = {}) {
   const dir = join(tmp, `p-${n++}`);
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(dir, rel)), { recursive: true });
     await save(join(dir, rel), text);
   }
   const { discoveryMap, handleMap } = await buildDiscoveryMap(dir);
-  return createRenderer({ patternsDir: dir, discoveryMap, handleMap, ...(helpers ? { helperRegistrars: [helpers] } : {}) });
+  return createRenderer({ patternsDir: dir, discoveryMap, handleMap, ...(helpers ? { helperRegistrars: [helpers] } : {}), ...extra });
 }
 
 describe("mergeData", () => {
@@ -131,6 +131,22 @@ describe("a renderer given its maps", () => {
       expect(html(second)).toEqual(html(first));
       expect(html(second)[0]).not.toBe(html(first)[0]);
       expect(validate).toHaveBeenCalledTimes(1);
+    } finally { validate.mockRestore(); }
+  });
+
+  it("leaves HTML validation out when told to (validateHtml: false), and only then", async () => {
+    const files = { "atoms/odd/odd.hbs": "<span><div>odd</div></span>\n" };
+    const validate = vi.spyOn(HtmlValidate.prototype, "validateStringSync");
+    try {
+      const html = (r: Awaited<ReturnType<Awaited<ReturnType<typeof renderer>>>>) => (r.meta?.diagnostics ?? []).filter(d => d.kind === "HTML_INVALID");
+      const off = await (await renderer(files, undefined, { validateHtml: false }))({ component: "atoms/odd" });
+      expect(html(off)).toEqual([]);
+      expect(off.html).toContain("<div>odd</div>");
+      expect(validate).not.toHaveBeenCalled();
+      const on = await (await renderer(files, undefined, { validateHtml: true }))({ component: "atoms/odd" });
+      const byDefault = await (await renderer(files))({ component: "atoms/odd" });
+      expect(html(on).length).toBeGreaterThan(0);
+      expect(html(byDefault)).toEqual(html(on));
     } finally { validate.mockRestore(); }
   });
 });

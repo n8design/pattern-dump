@@ -203,6 +203,12 @@ export interface RendererOptions {
    * renderer names the file relative to its pattern root. A diagnostic never carries an absolute path.
    */
   displayPath?: (absPath: string) => string;
+  /**
+   * Whether a render checks its markup against HTML's content model (html-validate) and gives each problem as an
+   * `HTML_INVALID` diagnostic. Default `true`. `pd build --skip-checks=html` passes `false` for a quicker build;
+   * the build report then says the HTML was not checked.
+   */
+  validateHtml?: boolean;
 }
 
 /** Factory: a configured renderer closes over its source root, keeping `render()` pure. */
