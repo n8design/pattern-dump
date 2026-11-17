@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.5.2
+
+A performance release: `pd build` of a 500-page site takes 14.8 s instead of 114.9 s in 0.5.0, with every check on.
+Two checks can now be left out for a quick local build.
+
+### Performance
+
+Measured on a generated 500-page documentation site, with every check on (median of 3 runs):
+
+| | 0.5.0 | 0.5.2 |
+|---|---:|---:|
+| 500 pages, every check | 114.9 s | 14.8 s |
+| 500 pages, `--skip-checks=a11y` | | 6.9 s |
+
+- **The storefront's pages are read once per build**, and each page is assembled once: the build writes the pages as
+  its crawl read them instead of asking for each one again. A build no longer slows down faster than the site
+  grows: at 2,000 pages it takes the same time per page as at 500 (about 0.1 s before the accessibility check moved
+  to worker threads, 5.4x faster than 0.5.0 then).
+- **The renderer reads, parses and compiles each file once**, and compiles a template only when a render uses it. The
+  hTWOo workbench builds in about 20 s instead of 60 s (3x faster). `pd dev` re-reads a file only when it changes.
+- **The site's pages are checked for accessibility on worker threads**: by default the cores less one, at most 8,
+  within a quarter of the memory. The findings, and their order in the report, are the same with any number.
+- **The same markup is validated once.** A component's markup is shown in its detail, its preview and its source view;
+  html-validate now checks it once (hTWOo: 323 validations instead of 931).
+
+### Added
+
+- **`--skip-checks` and `build.skipChecks`** leave a check out of `pd build`, for a quick local build: `a11y` (the
+  accessibility of the storefront's pages) and `html` (each component's markup against HTML's content model). Every
+  check runs by default; `--skip-checks=` runs every check for one build. A name pd build doesn't know stops it:
+  `pd build: "links" is not a check pd build can skip; it can skip "a11y", "html"`. `--browser` with `a11y` skipped is
+  refused, since it checks accessibility in Chromium.
+- **The "NOT CHECKED" line.** A build that left a check out says so as its last line:
+  `[pd build] NOT CHECKED: the accessibility of the site's pages (a11y), as asked (--skip-checks or build.skipChecks)`.
+- **`--check-workers <n>`**: the number of threads that check the site's pages for accessibility; `1` checks them
+  in one.
+
+### Changed
+
+- **The page model and a component's data are read-only.** Every page and every render now shares one copy, so a
+  helper that changes a value it is given stops the render, naming the component and the code that made the change:
+  `Cannot assign to read only property 'tone' of object '#<Object>', while rendering atoms/card. A render's data (the component's data files, the global data, a site page's data) is shared by every render, so it is read-only: copy a value before changing it (changed at shout (helpers/shout.js:3:12))`.
+  On a site page, a change to the page model (`site`, the pages and their listings) says
+  `... The storefront's page data is shared by every page, so it is read-only: copy a value before changing it (changed at ...)`.
+  Fix: copy the value in the helper before changing it (`{ ...value, tone: "loud" }`), or return a new one.
+- **`pd build` stops when the project changes while it runs.** The sizes and time stamps of every input (patterns,
+  styles, data, helpers, scripts, themes, assets, the site's pages and head) are taken when the build starts and
+  compared before anything is written and after each part. A change stops the build, naming the files:
+  `pd build: the project changed while it was being built, so nothing was written. Run pd build again once the files are saved:`
+  followed by `  - pages/guide.md (changed)`. Fix: save the files, then build again. A build that is stopped later says
+  what may be part old, part new.
+
+### Fixed
+
+- **A stylesheet saved before its template moves to the component in `pd dev`** when the template arrives, even when a
+  request reached the new template before the file watcher did. The stylesheet could stay in the base layer until the
+  next change.
+
 ## 0.5.1
 
 A patch release: two live-reload fixes for site pages, and four problems that showed a wrong page or wrong output with
