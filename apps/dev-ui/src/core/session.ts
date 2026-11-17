@@ -47,6 +47,9 @@ interface ComponentMeta {
 export interface Session {
   // ---- Corpus: loaded at boot, replaced on a tree-changed HMR broadcast ----
   tree: ComponentTree;
+  /** The live-reload generation the tree was fetched at (core/generation.ts), null before or without one. A
+   *  `hello` newer than it means a change landed before the socket opened, and the tree is fetched again. */
+  treeGeneration: string | null;
   /** id -> metadata. MUTATED IN PLACE (cleared and refilled), never reassigned — hence readonly.
    *  Copying it instead of sharing the reference would leave regions reading a stale corpus. */
   readonly componentRegistry: Map<string, ComponentMeta>;
@@ -89,6 +92,7 @@ export interface Session {
 /** The single shell session. One page, one object. */
 export const session: Session = {
   tree: { roots: [] },
+  treeGeneration: null,
   componentRegistry: new Map<string, ComponentMeta>(),
   navCategoryOrder: new Map<string, number>(),
   themes: [],
