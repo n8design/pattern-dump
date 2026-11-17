@@ -1033,12 +1033,14 @@ async function handleConfig(filePath: string): Promise<boolean> {
 const inPages = (p: string): boolean => pagesDir !== null && within(pagesDir, p);
 
 /** What every page shows of the others: the nav, each page's route, title and layout, what a listing shows of it
- *  (its description or first paragraph, date, image, tags, categories, draft) and each folder's listing. Null without a
- *  storefront. Compared, never parsed. */
+ *  (its description or first paragraph, date, image, tags, categories, draft), each folder's listing, and each
+ *  folder's childDefaults (what the pages under it take). Null without a storefront. Compared, never parsed. */
 async function pagesFingerprint(): Promise<string | null> {
   if (!pagesDir) return null;
   const model = await readPages(pagesDir, { workbenchPath, categories, tags });
-  return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems, entries: [...model.entries], folders: [...model.folders] });
+  // A folder's childDefaults (folder-defaults.ts) is part of every page under it: a change to it changes them all.
+  const defaults = [...model.files].flatMap(([route, f]) => f.frontmatter.childDefaults ? [[route, f.frontmatter.childDefaults]] : []);
+  return JSON.stringify({ nav: model.nav, pages: model.pages, problems: model.problems, entries: [...model.entries], folders: [...model.folders], defaults });
 }
 
 async function handlePages(filePath: string, event: "change" | "add" | "unlink" | "addDir" | "unlinkDir"): Promise<boolean> {
