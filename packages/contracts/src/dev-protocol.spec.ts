@@ -446,3 +446,13 @@ describe("RendererOptions.displayPath", () => {
     expect([without.displayPath, withIt.displayPath?.("/p/x.json"), typeof wrong]).toEqual([undefined, "x.json", "object"]);
   });
 });
+
+describe("RendererOptions.validateHtml", () => {
+  it("is optional, and a boolean", () => {
+    const without: RendererOptions = { patternsDir: "/p" };
+    const off: RendererOptions = { patternsDir: "/p", validateHtml: false };
+    // @ts-expect-error: on or off, not a list of rules
+    const wrong: RendererOptions = { patternsDir: "/p", validateHtml: ["element-permitted-content"] };
+    expect([without.validateHtml, off.validateHtml, typeof wrong]).toEqual([undefined, false, "object"]);
+  });
+});

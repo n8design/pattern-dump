@@ -211,8 +211,9 @@ export const USAGE = `Usage: pd <command> [options]
                        (default: build.audit in the config; --audit forces it back in)
     --check-workers <n>  Threads that check the storefront's pages for accessibility; 1 checks them in
                        one (default: the cores less one, at most 8, within a quarter of the memory)
-    --skip-checks=a11y   Leave the accessibility check of the storefront's pages out, for a quick local
-                       build; the report says so. Default: every check runs (build.skipChecks)
+    --skip-checks=a11y,html  Leave checks out, for a quick local build: a11y, the storefront pages'
+                       accessibility; html, the components' markup against HTML's content model.
+                       The report says so. Default: every check runs (build.skipChecks)
 
   export   Write the subject's flattened families back out in corrected form
     --root <path>      Export a specific project root (read-only)

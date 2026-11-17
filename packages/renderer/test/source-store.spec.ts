@@ -18,14 +18,14 @@ beforeAll(async () => { tmp = await mkdtemp(join(tmpdir(), "pd-source-store-"));
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
 /** A fresh patterns folder with `files`, and a renderer given its maps. */
-async function renderer(files: Record<string, string>, helpers?: (env: typeof Handlebars) => void) {
+async function renderer(files: Record<string, string>, helpers?: (env: typeof Handlebars) => void, extra: { validateHtml?: boolean } = {}) {
   const dir = join(tmp, `p-${n++}`);
   for (const [rel, text] of Object.entries(files)) {
     await mkdir(dirname(join(dir, rel)), { recursive: true });
     await save(join(dir, rel), text);
   }
   const { discoveryMap, handleMap } = await buildDiscoveryMap(dir);
-  return createRenderer({ patternsDir: dir, discoveryMap, handleMap, ...(helpers ? { helperRegistrars: [helpers] } : {}) });
+  return createRenderer({ patternsDir: dir, discoveryMap, handleMap, ...(helpers ? { helperRegistrars: [helpers] } : {}), ...extra });
 }
 
 describe("mergeData", () => {
@@ -99,7 +99,13 @@ describe("a renderer given its maps", () => {
     }, env => {
       env.registerHelper("shout", function (meta: { tone: string }) { meta.tone = "LOUD"; return ""; });
     });
-    await expect(render({ component: "atoms/card" })).rejects.toThrow(TypeError);
+    const thrown = await render({ component: "atoms/card" }).then(() => undefined, (e: unknown) => e);
+    expect(thrown).toBeInstanceOf(TypeError);
+    // Which render, why the data is read-only, and the code that changed it (the helper's own frame).
+    const message = (thrown as Error).message;
+    expect(message).toMatch(/^Cannot assign to read only property 'tone' of object .*, while rendering atoms\/card\. /);
+    expect(message).toContain("is shared by every render, so it is read-only: copy a value before changing it");
+    expect(message).toMatch(/\(changed at .* \(.*source-store\.spec\.ts:\d+:\d+\)\)$/);
     // The data file's values are unchanged for the next render (a template without the helper shows them).
     const plain = await renderer({
       "atoms/card/card.hbs": "<p>{{title}} {{meta.tone}}</p>\n",
@@ -131,6 +137,22 @@ describe("a renderer given its maps", () => {
       expect(html(second)).toEqual(html(first));
       expect(html(second)[0]).not.toBe(html(first)[0]);
       expect(validate).toHaveBeenCalledTimes(1);
+    } finally { validate.mockRestore(); }
+  });
+
+  it("leaves HTML validation out when told to (validateHtml: false), and only then", async () => {
+    const files = { "atoms/odd/odd.hbs": "<span><div>odd</div></span>\n" };
+    const validate = vi.spyOn(HtmlValidate.prototype, "validateStringSync");
+    try {
+      const html = (r: Awaited<ReturnType<Awaited<ReturnType<typeof renderer>>>>) => (r.meta?.diagnostics ?? []).filter(d => d.kind === "HTML_INVALID");
+      const off = await (await renderer(files, undefined, { validateHtml: false }))({ component: "atoms/odd" });
+      expect(html(off)).toEqual([]);
+      expect(off.html).toContain("<div>odd</div>");
+      expect(validate).not.toHaveBeenCalled();
+      const on = await (await renderer(files, undefined, { validateHtml: true }))({ component: "atoms/odd" });
+      const byDefault = await (await renderer(files))({ component: "atoms/odd" });
+      expect(html(on).length).toBeGreaterThan(0);
+      expect(html(byDefault)).toEqual(html(on));
     } finally { validate.mockRestore(); }
   });
 });

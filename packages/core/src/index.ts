@@ -86,7 +86,10 @@ export async function runBuild(
   for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
   // Last, so it is the line a reader sees: what this build did not check.
   if (report.skippedChecks) {
-    const what: Record<string, string> = { a11y: "the accessibility of the site's pages (a11y)" };
+    const what: Record<string, string> = {
+      a11y: "the accessibility of the site's pages (a11y)",
+      html: "the components' markup against HTML's content model (html)",
+    };
     console.log(`[pd build] NOT CHECKED: ${report.skippedChecks.map(c => what[c] ?? c).join(", ")}, as asked (--skip-checks or build.skipChecks)`);
   }
 }

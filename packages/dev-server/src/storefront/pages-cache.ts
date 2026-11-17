@@ -68,7 +68,8 @@ const READ_ONLY = /^Cannot (?:assign to read only property|add property|delete p
  *  every page shares) why it is read-only and where the change was made, since the bare message names neither. */
 export function renderError(e: unknown): string {
   if (!(e instanceof Error)) return String(e);
-  if (!(e instanceof TypeError) || !READ_ONLY.test(e.message)) return e.message;
+  // The renderer explains a write to a render's data itself (it names the component); said once is enough.
+  if (!(e instanceof TypeError) || !READ_ONLY.test(e.message) || e.message.includes(", so it is read-only:")) return e.message;
   // The first frame of the stack is the code that made the change (a project helper, say).
   const at = /\n\s+at (.+)/.exec(e.stack ?? "")?.[1];
   return `${e.message}. The storefront's page data is shared by every page, so it is read-only: copy a value before `

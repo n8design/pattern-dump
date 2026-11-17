@@ -30,8 +30,9 @@ describe("configProblems", () => {
   it("build.skipChecks: a list of the checks pd build may skip", () => {
     const build = (skipChecks: unknown) => configProblems({ ...valid, build: { skipChecks } });
     expect(build([])).toEqual([]);
-    const said = `"build.skipChecks" must be a list of the checks pd build may skip: "a11y"`;
-    expect(build(["html"])).toEqual([said]);
+    expect(build(["a11y", "html"])).toEqual([]);
+    const said = `"build.skipChecks" must be a list of the checks pd build may skip: "a11y", "html"`;
+    expect(build(["links"])).toEqual([said]);
     expect(build("a11y")).toEqual([said]);
   });
 

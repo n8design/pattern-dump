@@ -3,7 +3,7 @@
 // accessibility check skipped, stop the build before anything is built.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
@@ -24,6 +24,28 @@ async function failingSite(): Promise<string> {
     "pages/index.md": "---\ntitle: Home\n---\n\nSee [](/) for more.\n",
   })) await save(join(root, rel), text);
   return root;
+}
+/** A site that passes every check, with one component whose markup isn't valid HTML (a <div> in a <span>). */
+async function oddMarkupSite(): Promise<string> {
+  const root = join(tmp, `site-${n++}`);
+  for (const [rel, text] of Object.entries({
+    "src/patterns/layouts/page/page.hbs": `<header><p>Site</p></header><main><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n`,
+    "src/patterns/layouts/page/page.schema.json": JSON.stringify({ type: "object", required: ["title"], properties: { title: { type: "string" } } }),
+    "src/patterns/atoms/odd/odd.hbs": "<span><div>odd</div></span>\n",
+    "pages/index.md": "---\ntitle: Home\n---\n\nSee [the home page](/) for more.\n",
+  })) await save(join(root, rel), text);
+  return root;
+}
+/** Every file the build wrote under `dir` that names an HTML finding. */
+async function htmlFindings(dir: string): Promise<string[]> {
+  const names = await readdir(dir, { recursive: true, withFileTypes: true });
+  const found: string[] = [];
+  for (const e of names) {
+    if (!e.isFile()) continue;
+    const path = join(e.parentPath, e.name);
+    if ((await readFile(path, "utf8")).includes("HTML_INVALID")) found.push(path);
+  }
+  return found;
 }
 const config = (build?: PatternDumpConfig["build"]): PatternDumpConfig => validateConfig(defineConfig({
   sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
@@ -58,9 +80,23 @@ describe("skipChecks", () => {
   it("names a check it can't skip, and refuses --browser with the accessibility check skipped", async () => {
     const root = await failingSite();
     await expect(buildStaticSite(config(), root, { ...opts(root), skipChecks: ["links"] }))
-      .rejects.toThrow(`pd build: "links" is not a check pd build can skip; it can skip "a11y"`);
+      .rejects.toThrow(`pd build: "links" is not a check pd build can skip; it can skip "a11y", "html"`);
     await expect(buildStaticSite(config(), root, { ...opts(root), skipChecks: ["a11y"], browser: true }))
       .rejects.toThrow("pd build: --browser checks the pages' accessibility in Chromium, so it can't be combined with skipping the accessibility check");
     expect(existsSync(join(root, ".out"))).toBe(false);
+  }, 60_000);
+
+  it("validates the components' HTML by default, and leaves it out when asked", async () => {
+    const checked = await oddMarkupSite();
+    const full = await buildStaticSite(config(), checked, opts(checked));
+    expect(full.skippedChecks).toBeUndefined();
+    expect(await htmlFindings(join(checked, ".out"))).not.toEqual([]);
+
+    const quick = await oddMarkupSite();
+    const report = await buildStaticSite(config(), quick, { ...opts(quick), skipChecks: ["html"] });
+    expect(report.skippedChecks).toEqual(["html"]);
+    expect(report.accessibility).toBeDefined();
+    expect(await htmlFindings(join(quick, ".out"))).toEqual([]);
+    expect(existsSync(join(quick, "site", "index.html"))).toBe(true);
   }, 60_000);
 });

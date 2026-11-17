@@ -53,7 +53,7 @@ The command line wins.
 | `--base <path>` | `build.basePath` | `/` | Where the site will be hosted: `/` at a domain root, or a subpath such as `/docs/htwoo/` |
 | `--no-audit` / `--audit` | `build.audit` | `true` | Include the corpus audit |
 | `--check-workers <n>` | (none) | cores less one, at most 8 | Threads that check the storefront's pages for accessibility |
-| `--skip-checks=a11y` | `build.skipChecks` | none | [Leave a check out](#leaving-a-check-out) |
+| `--skip-checks=a11y,html` | `build.skipChecks` | none | [Leave a check out](#leaving-a-check-out) |
 | `--root <path>` | (none) | current folder | Build another project |
 | `--config <path>` | (none) | `pattern-dump.config.ts` in the root | Use a config file outside the root |
 
@@ -100,14 +100,18 @@ build.
 unchecked because a flag was forgotten. For a quick local build, a check can be left out by name:
 
 ```bash
-npx pd build --skip-checks=a11y
+npx pd build --skip-checks=a11y,html
 ```
 
-`a11y` is the accessibility check of the storefront's pages (axe's rules that jsdom decides, and one main landmark and
-one `<h1>` per page). The build's last line names what it did not check:
+| Name | The check |
+|---|---|
+| `a11y` | The accessibility of the storefront's pages: axe's rules that jsdom decides, and one main landmark and one `<h1>` per page |
+| `html` | Each component's markup against HTML's content model (html-validate). Skipped, the workbench's Diagnostics tab and the Audit tab show no HTML findings |
+
+The build's last line names what it did not check:
 
 ```
-[pd build] NOT CHECKED: the accessibility of the site's pages (a11y), as asked (--skip-checks or build.skipChecks)
+[pd build] NOT CHECKED: the accessibility of the site's pages (a11y), the components' markup against HTML's content model (html), as asked (--skip-checks or build.skipChecks)
 ```
 
 `build: { skipChecks: ["a11y"] }` sets it for the project; `--skip-checks=` (empty) runs every check for one build.

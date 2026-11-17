@@ -127,6 +127,13 @@ describe("the message of a change to the shared model", () => {
     expect(renderError(thrown)).toMatch(/^Cannot clear in a read-only Map\. The storefront's page data is shared/);
   });
 
+  it("adds nothing to a message the renderer has explained already", () => {
+    const explained = new TypeError("Cannot assign to read only property 'tone' of object '#<Object>', while rendering atoms/card. "
+      + "A render's data (the component's data files, the global data, a site page's data) is shared by every render, so it is "
+      + "read-only: copy a value before changing it (changed at shout (helpers.js:1:2))");
+    expect(renderError(explained)).toBe(explained.message);
+  });
+
   it("leaves any other error as it was", () => {
     expect(renderError(new Error("Missing helper: \"x\""))).toBe("Missing helper: \"x\"");
     expect(renderError(new TypeError("x is not a function"))).toBe("x is not a function");
