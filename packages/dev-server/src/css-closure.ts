@@ -18,7 +18,7 @@ import postcss from "postcss";
 import * as sass from "sass";
 import { SourceMapConsumer } from "source-map";
 import { sassPackageOptions } from "@pattern-dump/build";
-import { parse as parseHtml } from "node-html-parser";
+import { parsedHtml } from "./parsed-html.js";
 import type { DiscoveryMap, RelationshipsAvailable } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "./composition.js";
 import {
@@ -138,7 +138,7 @@ export function withRenderedClassOwners(
  *  Drops tokens that contain {{ or }} (dynamic). Keeps static base of e.g.
  *  "hoo-button" from class="hoo-button hoo-button--{{variant}}". */
 export function extractUsedClasses(hbsSource: string): string[] {
-  const root = parseHtml(hbsSource);
+  const root = parsedHtml(hbsSource);
   const classes = new Set<string>();
   for (const el of root.querySelectorAll("[class]")) {
     const raw = el.getAttribute("class") ?? "";
