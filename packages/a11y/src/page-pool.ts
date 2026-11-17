@@ -1,7 +1,8 @@
 // The page check (page.ts) over many pages, spread over worker threads: each worker loads jsdom and axe once and
 // checks the pages it is sent, one at a time, each in a window of its own as before. The results come back in the
 // order of the pages given, whatever order the workers finish in, so a report built from them is the same on every
-// run. One worker (or one page) checks in this thread, exactly as page.ts alone does.
+// run. One worker is a pool of one, replaced like the others: checked in this thread, the pages' windows filled the
+// heap until it ran out (2,000 pages: an 8.4 GB heap). A single page is checked in this thread, as page.ts alone does.
 //
 // A worker costs about 300 MB, and past 8 there was no gain (measured on 16 cores, PLAN-PERF-a11y.md), so the
 // default is the cores less one, at most 8, and no more than a quarter of the memory allows.
@@ -47,9 +48,9 @@ type Reply = { i: number; findings: PageA11yFinding[] } | { i: number; error: st
 export async function runPagesA11y(
   pages: readonly string[], opts: { workers?: number; pagesPerWorker?: number } = {},
 ): Promise<PageA11yFinding[][]> {
-  const count = Math.min(opts.workers ?? defaultCheckWorkers(), pages.length);
+  const count = Math.max(1, Math.min(opts.workers ?? defaultCheckWorkers(), pages.length));
   const results: PageA11yFinding[][] = new Array(pages.length);
-  if (count <= 1) {
+  if (pages.length <= 1) {
     for (let i = 0; i < pages.length; i++) {
       try { results[i] = await runPageA11y(pages[i]!); } catch (e) { throw new PageCheckError(i, e instanceof Error ? e.message : String(e)); }
     }
