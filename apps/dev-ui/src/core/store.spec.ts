@@ -248,7 +248,7 @@ describe("reconcile: fullscreen without pattern → fit", () => {
   });
 });
 
-// ─── ?layout= — the "Full height" toggle (rule 6) ─────────────────────────────
+// ─── ?layout=: the "Full height" toggle (rule 6) ──────────────────────────────
 
 describe("parseUrlState + reconcile: ?layout=", () => {
   const ctx: ReconcileContext = { availableVariants: null, knownFolderPaths: new Set(), knownThemes: new Set() };

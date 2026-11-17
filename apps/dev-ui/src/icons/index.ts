@@ -24,8 +24,8 @@ export type IconName =
   | "vp-disco"         // Phosphor DiscoBall    — regular  (disco mode off)
   | "vp-disco-fill"    // Phosphor DiscoBall    — fill     (disco mode on)
   | "vp-fullpage"      // Phosphor CornersOut   — regular  (full-page action)
-  | "vp-height"        // Phosphor ArrowsVertical — regular  (full height off)
-  | "vp-height-fill"   // Phosphor ArrowsVertical — fill     (full height on)
+  | "vp-height"        // Phosphor ArrowsVertical, regular  (full height off)
+  | "vp-height-fill"   // Phosphor ArrowsVertical, fill     (full height on)
   // A11y CVD picker — signal carrier in collapsed summary.
   | "a11y"             // Phosphor PersonArmsSpread — regular  (UniversalAccess; primary signal carrier)
   // Custom icons (non-Phosphor) — stroke-based, currentColor, viewBox differs from Phosphor 256x256.
