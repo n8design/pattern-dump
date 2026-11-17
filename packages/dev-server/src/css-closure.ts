@@ -12,7 +12,6 @@
 // registry type — the arrow points one way, neither imports this module back.
 
 import type { PatternDirs } from "./pattern-dirs.js";
-import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import postcss from "postcss";
@@ -26,6 +25,7 @@ import {
   resolveScssToComponent, cssNodeText, joinCssChunks, addLastOccurrence,
   type ClassOwnerIndex, type BaseProvenanceIndex,
 } from "./style-index.js";
+import { designFiles } from "./storefront/design-files.js";
 
 /** Recompile a single SCSS entry file with source map and return the updated own-origin CSS
  *  for the given component id. Used by the HMR watcher to update perComponentCssCache.
@@ -91,7 +91,7 @@ export async function computeCssClosure(
 
     const hbsPath = discoveryMap.get(id)?.hbsPath ?? "";
     let hbs = "";
-    try { hbs = hbsPath ? await readFile(hbsPath, "utf-8") : ""; } catch { /* unreadable or missing .hbs — treat as empty markup, not a hard failure */ }
+    try { hbs = hbsPath ? await designFiles(discoveryMap).text(hbsPath) : ""; } catch { /* unreadable or missing .hbs — treat as empty markup, not a hard failure */ }
     const { styleUses } = deriveClassBorrowingFields(hbs, id, classOwnerIndex);
 
     // Recurse into all deps first (pre-DFS); push self after all deps (post-order).

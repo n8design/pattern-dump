@@ -27,6 +27,7 @@ import { readSchema, unreadableSchemas, type ObjectSchema, type PlacedProblem } 
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
 import { renderError } from "./pages-cache.js";
+import { designFiles } from "./design-files.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { resolveNavigations } from "./navigations.js";
 import { checkSampleData, includeTree } from "./sample-data.js";
@@ -325,7 +326,7 @@ const defaultView = (schema: { properties?: Record<string, unknown> } | undefine
 /** A generated page (terms.ts) as a page file: its layout, its title and description as its frontmatter would give
  *  them (only what the layout declares; a layout that doesn't declare a title is a problem), and no body. */
 async function generatedFile(g: GeneratedPage, discoveryMap: DiscoveryMap): Promise<{ page: PageFile; problems: string[] }> {
-  const declared = (await readSchema(discoveryMap.get(`layouts/${g.layout}`)?.schemaPath)).schema?.properties ?? {};
+  const declared = (await readSchema(discoveryMap.get(`layouts/${g.layout}`)?.schemaPath, designFiles(discoveryMap))).schema?.properties ?? {};
   const problems: string[] = [];
   const values: Record<string, string> = { layout: g.layout };
   const whose = g.role === "index" ? `the index of the ${g.kind === "tag" ? "tags" : "categories"}` : `a ${g.kind} page`;
@@ -341,7 +342,7 @@ async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promi
   const problems: string[] = [];
   for (const id of [...new Set(ids.flatMap(id => includeTree(id, a.composition)))]) {
     const entry = a.discoveryMap.get(id);
-    const schema = (await readSchema(entry?.schemaPath)).schema;
+    const schema = (await readSchema(entry?.schemaPath, designFiles(a.discoveryMap))).schema;
     const tags = (schema?.properties?.["tags"] ?? (schema?.properties?.["page"] as ObjectSchema | undefined)?.properties?.["tags"]) as
       { items?: { type?: unknown } } | undefined;
     const itemType = tags?.items?.type;
@@ -351,7 +352,7 @@ async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promi
     }
     const hbs = entry?.hbsPath;
     if (!hbs) continue;
-    const source = await readFile(hbs, "utf8").catch(() => "");
+    const source = await designFiles(a.discoveryMap).text(hbs).catch(() => "");
     for (const f of itemsWrittenAsText(source, "tags")) {
       problems.push(`${id} (${basename(hbs)}:${f.line}): {{#each ${f.list}}} writes {{${f.item}}}, but a tag is an object since 0.5.0 `
         + `(key, label, description, route): write {{label}} to show it ({{key}} is its URL segment, {{route}} its page)`);
@@ -388,7 +389,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       return { status: 404, html: document(`<title>Page not found</title>`, BUILT_IN_NOT_FOUND_DOCUMENT, a.live, a.lang, a.basePath ?? "/"), problems: [],
         notes: [`there is no ${NOT_FOUND_FILE} and no ${layoutId}, so the 404 page is a plain one of Pattern Dump's`] };
     }
-    const declared = (await readSchema(a.discoveryMap.get(layoutId)?.schemaPath)).schema?.properties ?? {};
+    const declared = (await readSchema(a.discoveryMap.get(layoutId)?.schemaPath, designFiles(a.discoveryMap))).schema?.properties ?? {};
     source = builtInNotFound(Object.hasOwn(declared, "title"));
     page = { route, file: "", path: `${NOT_FOUND_FILE} (built in)`, frontmatter: readFrontmatterStrict(source) };
   }
@@ -436,7 +437,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
 
   // The layout's slot for the page's images (x-pd-prose-images), and the image index they are looked up in.
-  const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath)).schema;
+  const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath, designFiles(a.discoveryMap))).schema;
   const proseSlot = readProseSlot(layoutSchema);
   const imageLookup = a.images ? await a.images() : undefined;
 
@@ -466,7 +467,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition,
       // Each component rendered for a placement: the page loads its behaviour scripts (page-head.ts).
       render: input => { placedIds.add(input.component.split("~")[0]!); return a.render(input); },
-      schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath)).schema,
+      schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath, designFiles(a.discoveryMap))).schema,
       shown: a.shown,
     };
     const body = await renderDoc(
@@ -506,7 +507,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   problems.push(...first.imageProblems.map(p => `${page.path}:${p.line}: ${p.message}`));
 
   // The layout's sample data, and that of every partial it includes, must stay out of real pages.
-  const siteSchema = (await readSchema(a.discoveryMap.get(SITE_SCHEMA_OWNER)?.schemaPath)).schema;
+  const siteSchema = (await readSchema(a.discoveryMap.get(SITE_SCHEMA_OWNER)?.schemaPath, designFiles(a.discoveryMap))).schema;
   const layoutDeclared = Object.keys(layoutSchema?.properties ?? {});
   const siteDeclared = Object.keys(siteSchema?.properties?.site?.properties ?? {});
   const pageDeclaration = checkPageDeclaration(layoutSchema, checked.layoutId);

@@ -10,13 +10,13 @@
 //   - Checked: a view that isn't one, a listing page that names none, a view on a page whose layout shows no listing,
 //     a view that names no card. Its sample data, and its card's, may hold only the fields of a page in a listing.
 
-import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { suggest } from "@pattern-dump/config";
 import { readSchema } from "./declared-values.js";
 import { cardOf, readCard, type Card } from "./cards.js";
 import { ENTRY, outsideShape } from "./derived.js";
+import { designFiles } from "./design-files.js";
 
 const VIEW_ID = /^views\/[^/~]+$/;
 /** The data a view is rendered with: the pages of its listing. */
@@ -43,7 +43,7 @@ export async function viewOf(name: string, at: string, discoveryMap: DiscoveryMa
     const near = suggest(name, names);
     return { problems: [`${at}: view "${name}" is not a view: ${near ? `did you mean "${near}"? (${list})` : list}`] };
   }
-  const read = await readSchema(discoveryMap.get(id)?.schemaPath);
+  const read = await readSchema(discoveryMap.get(id)?.schemaPath, designFiles(discoveryMap));
   if (read.error !== undefined) return { problems: [`${id}: its schema cannot be read: ${read.error}`] };
   const cardId = cardOf(read.schema?.properties?.[VIEW_KEY]);
   if (cardId === undefined) {
@@ -93,7 +93,7 @@ export async function checkViewSampleData(view: ResolvedView, discoveryMap: Disc
     const jsonPath = discoveryMap.get(id)?.jsonPath;
     if (!jsonPath) return undefined;
     const where = `the sample data of ${id} (${basename(jsonPath)})`;
-    try { return { data: JSON.parse(await readFile(jsonPath, "utf8")) as unknown, where }; }
+    try { return { data: await designFiles(discoveryMap).data(jsonPath), where }; }
     catch (e) { problems.push(`${where} cannot be read: ${e instanceof Error ? e.message : String(e)}`); return undefined; }
   };
   const own = await read(view.id);

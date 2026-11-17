@@ -16,6 +16,7 @@ import { checkDeclared, readSchema, type ObjectSchema, type PropertySchema } fro
 import { ENTRY } from "./derived.js";
 import type { Entry } from "./collections.js";
 import type { PageModel } from "./pages.js";
+import { designFiles } from "./design-files.js";
 
 export const CARD_KEY = "x-pd-card";
 /** The fields of a page in a listing, in the entry's order. */
@@ -44,7 +45,7 @@ export interface Card {
 export async function readCard(id: string, owner: string, role: string, discoveryMap: DiscoveryMap): Promise<{ card?: Card; problems: string[] }> {
   const entry = discoveryMap.get(id);
   if (!entry) return { problems: [`${owner}: ${CARD_KEY} names "${id}", which is not a component`] };
-  const read = await readSchema(entry.schemaPath);
+  const read = await readSchema(entry.schemaPath, designFiles(discoveryMap));
   if (read.error !== undefined) return { problems: [`${owner}: the schema of its card ${id} cannot be read: ${read.error}`] };
   if (!read.schema) return { problems: [`${owner}: ${CARD_KEY} names "${id}", which has no schema, so a listing's pages can't be checked against it`] };
   const declared = [...Object.keys(read.schema.properties ?? {}), ...(read.schema.required ?? [])];

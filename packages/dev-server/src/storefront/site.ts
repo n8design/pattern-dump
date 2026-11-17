@@ -16,6 +16,7 @@ import { checkJsonKeys, readSchema, type PropertySchema } from "./declared-value
 import { checkNavigations, NAVIGATIONS_KEY } from "./navigations.js";
 import { checkCollections, COLLECTIONS_KEY } from "./collections.js";
 import { CATEGORIES_KEY, checkSiteCategories } from "./categories.js";
+import { designFiles } from "./design-files.js";
 
 /** The component whose schema declares `site`. */
 export const SITE_SCHEMA_OWNER = "partials/base";
@@ -53,7 +54,7 @@ export async function checkSite(
     return none(problems);
   }
 
-  const read = await readSchema(entry.schemaPath);
+  const read = await readSchema(entry.schemaPath, designFiles(discoveryMap));
   if (read.error !== undefined) return none([`the schema of ${SITE_SCHEMA_OWNER} cannot be read: ${read.error}`]);
   const schema = read.schema ?? {};
   const declared = schema.properties?.site;

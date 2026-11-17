@@ -16,6 +16,7 @@ import { existsSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { parsePartialsFromHbs } from "./hbs-partials.js";
+import { designFiles } from "./storefront/design-files.js";
 
 // ---- requireScript / requireAssets aggregation ----
 
@@ -73,7 +74,7 @@ export async function aggregateRequires(
   // Recurse into HBS partials.
   const hbsPath = entry?.hbsPath ?? "";
   let hbs = "";
-  try { hbs = hbsPath ? await readFile(hbsPath, "utf-8") : ""; } catch { /* unreadable or missing .hbs — treat as empty markup, not a hard failure */ }
+  try { hbs = hbsPath ? await designFiles(discoveryMap).text(hbsPath) : ""; } catch { /* unreadable or missing .hbs — treat as empty markup, not a hard failure */ }
 
   for (const flatName of parsePartialsFromHbs(hbs)) {
     const childPath = flatNameToPath.get(flatName);
