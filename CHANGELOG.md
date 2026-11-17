@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **A new diagnostic kind, `STYLE_BORROWED`** (info). A template that uses a class another component owns, without
+  including that component, borrows it: the owner's stylesheet is linked too, so the class is styled. That stays,
+  since a design system can borrow on purpose, and is now said, once per borrowed owner on the component's
+  Diagnostics tab:
+  `organisms/search uses class "search-field" from molecules/search-field, so molecules/search-field's stylesheet is linked too: include molecules/search-field if it belongs here, or rename the class`.
+  A website page that renders a borrower gets the same line as a warning, naming the page file, and `pd build`
+  counts the borrowed stylesheets in its summary
+  (`[pd build] styles: 3 stylesheets linked by a borrowed class (STYLE_BORROWED on the component's Diagnostics tab)`). Two components that merely use the same class
+  name for different things are the usual cause: rename one. It is on the component's detail, not in `pd audit`.
+
 ## 0.5.3
 
 `pd build` of a site is up to twice as fast again: 2,000 pages in 8.2 s instead of 16.4 s with the checks left out.
