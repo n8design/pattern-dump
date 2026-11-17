@@ -215,6 +215,18 @@ function registerHelpers(
  * it: the innermost template the error passes through stamps itself on it, so a helper missing in a
  * partial is reported against the partial, not the page that included it. `location` is a diagnostic's.
  */
+/** V8's messages for a write to a frozen object. */
+const READ_ONLY = /^Cannot (?:assign to read only property|add property|delete property|define property|redefine property) /;
+/** Says, on a write to the data a render shares (frozen: source-store.ts), which render it was, why the data is read-only
+ *  and the code that wrote to it, since the bare message names none of them. The error stays the same TypeError. */
+function explainReadOnly(e: unknown, component: string): void {
+  if (!(e instanceof TypeError) || !READ_ONLY.test(e.message) || e.message.includes(", so it is read-only:")) return;
+  // The first frame of the stack is the code that made the change (a project helper, say).
+  const at = /\n\s+at (.+)/.exec(e.stack ?? "")?.[1];
+  e.message = `${e.message}, while rendering ${component}. A render's data (the component's data files, the global data, `
+    + `a site page's data) is shared by every render, so it is read-only: copy a value before changing it${at ? ` (changed at ${at})` : ""}`;
+}
+
 export class MissingHelperError extends Error {
   template?: string;
   file?: string;
@@ -521,6 +533,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
       });
     } catch (e) {
       if (e instanceof MissingHelperError) e.stamp(input.component, templateHbsPath ? display(templateHbsPath) : undefined);
+      explainReadOnly(e, input.component);
       throw e;
     }
 

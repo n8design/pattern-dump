@@ -99,7 +99,13 @@ describe("a renderer given its maps", () => {
     }, env => {
       env.registerHelper("shout", function (meta: { tone: string }) { meta.tone = "LOUD"; return ""; });
     });
-    await expect(render({ component: "atoms/card" })).rejects.toThrow(TypeError);
+    const thrown = await render({ component: "atoms/card" }).then(() => undefined, (e: unknown) => e);
+    expect(thrown).toBeInstanceOf(TypeError);
+    // Which render, why the data is read-only, and the code that changed it (the helper's own frame).
+    const message = (thrown as Error).message;
+    expect(message).toMatch(/^Cannot assign to read only property 'tone' of object .*, while rendering atoms\/card\. /);
+    expect(message).toContain("is shared by every render, so it is read-only: copy a value before changing it");
+    expect(message).toMatch(/\(changed at .* \(.*source-store\.spec\.ts:\d+:\d+\)\)$/);
     // The data file's values are unchanged for the next render (a template without the helper shows them).
     const plain = await renderer({
       "atoms/card/card.hbs": "<p>{{title}} {{meta.tone}}</p>\n",
