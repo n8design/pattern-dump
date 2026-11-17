@@ -310,11 +310,49 @@ const withDeclaredAbsentAsNull = (values: Record<string, unknown>, declared: str
   return { ...out, ...values };
 };
 
-const markCurrent = (nav: StorefrontNavItem[], route: string): unknown[] => nav.map(item => ({
-  ...item,
-  ...(item.route === route ? { current: true } : {}),
-  ...(item.children ? { children: item.children.map(c => ({ ...c, ...(c.route === route ? { current: true } : {}) })) } : {}),
-}));
+/** Where each route is in a nav: its entries' indexes and, for a child, its index among its parent's children. Worked
+ *  out once per nav (the page model is shared by every page and never changed). */
+const navPlaces = new WeakMap<readonly StorefrontNavItem[], Map<string, Array<[number, number | undefined]>>>();
+function placesIn(nav: readonly StorefrontNavItem[]): Map<string, Array<[number, number | undefined]>> {
+  let places = navPlaces.get(nav);
+  if (!places) {
+    places = new Map();
+    const add = (route: string, at: [number, number | undefined]): void => { places!.set(route, [...places!.get(route) ?? [], at]); };
+    nav.forEach((item, i) => { add(item.route, [i, undefined]); item.children?.forEach((c, j) => add(c.route, [i, j])); });
+    navPlaces.set(nav, places);
+  }
+  return places;
+}
+
+/** The nav with `current: true` on the entries at `route`. Only those, and the entries holding them, are new objects;
+ *  the rest are the model's own, shared by every page (frozen in the server). */
+const markCurrent = (nav: readonly StorefrontNavItem[], route: string): unknown[] => {
+  const out: unknown[] = [...nav];
+  const children = new Map<number, unknown[]>();
+  for (const [i, j] of placesIn(nav).get(route) ?? []) {
+    const item = nav[i]!;
+    if (j === undefined) { out[i] = { ...(out[i] as StorefrontNavItem), current: true }; continue; }
+    const list = children.get(i) ?? [...item.children!];
+    list[j] = { ...item.children![j]!, current: true };
+    children.set(i, list);
+  }
+  for (const [i, list] of children) out[i] = { ...(out[i] as StorefrontNavItem), children: list };
+  return out;
+};
+
+/** The paths of a site's pages and its folders, for checkSite: the same for every page, so worked out once per model. */
+const sitePaths = new WeakMap<PageModel, { pages: Set<string>; folders: Set<string> }>();
+function pathsOf(model: PageModel): { pages: Set<string>; folders: Set<string> } {
+  let paths = sitePaths.get(model);
+  if (!paths) {
+    paths = {
+      pages: new Set([...model.files.values()].map(f => f.path)),
+      folders: new Set([...model.folders.keys()].filter(r => r !== "/").map(r => r.slice(1, -1))),
+    };
+    sitePaths.set(model, paths);
+  }
+  return paths;
+}
 
 /** A layout's default view for its listing: x-pd-view on page.listing, when it names one. */
 const defaultView = (schema: { properties?: Record<string, unknown> } | undefined): string | undefined => {
@@ -417,9 +455,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const line = page.frontmatter.lines["redirectFrom"];
     problems.push(`${page.path}${line !== undefined ? `:${line}` : ""}: the 404 page can't have redirectFrom: it is served for every address that has no page`);
   }
-  const site = await checkSite(a.site, a.discoveryMap, new Set([...model.files.values()].map(f => f.path)), {
-    folders: new Set([...model.folders.keys()].filter(r => r !== "/").map(r => r.slice(1, -1))), leftOut: model.drafts,
-  });
+  const paths = pathsOf(model);
+  const site = await checkSite(a.site, a.discoveryMap, paths.pages, { folders: paths.folders, leftOut: model.drafts });
   siteWide = site.problems;
   problems.push(...site.problems);
 
