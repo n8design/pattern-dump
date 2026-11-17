@@ -5,7 +5,10 @@
 // that happens to start with `title:` is read as metadata, and no list can be expressed at all. This
 // reader looks only inside the leading block and understands the two list spellings authors
 // actually write, and one level of keys under a key (`related:` with `  limit: 5` indented under it). It
-// is deliberately not YAML: scalars stay strings, no deeper nesting, no anchors.
+// is deliberately not YAML: scalars stay strings, no deeper nesting, no anchors. One key reads a block deeper:
+// `childDefaults:` on a folder's index.md holds frontmatter for the pages under it, written as a page writes it
+// (its own keys, lists and one level of map), indented under the key; it is read by the same rules (folder
+// defaults, pages.ts).
 //
 // One scanner, two readings:
 //   - readFrontmatter (lenient): the values, nothing else. A line it cannot read is dropped without a
@@ -36,7 +39,14 @@ export interface FrontmatterReading {
   /** The 1-based line each key is set on; for a duplicate key, the line whose value counts (the last). A key in a
    *  map is named with its parent: "related.limit". */
   lines: Record<string, number>;
+  /** `childDefaults:` (a folder's defaults for its pages): its block, read as a page's frontmatter. Its keys are
+   *  never in `values` or `maps`; its lines are in `lines` too, named under it ("childDefaults.related.limit").
+   *  Absent when the file sets none. */
+  childDefaults?: { values: Record<string, FrontmatterValue>; maps: Record<string, FrontmatterMap> };
 }
+
+/** The key whose block is read as a page's frontmatter, one level deeper than every other key. */
+export const CHILD_DEFAULTS = "childDefaults";
 
 const BOM = "﻿";
 
@@ -60,7 +70,8 @@ function block(md: string): { text: string; lines: string[]; end: number | null 
   return { text, lines, end: lines.findIndex((l, i) => i > 0 && l.trim() === "---") };
 }
 
-function scan(md: string): FrontmatterReading {
+/** `nested`: false while reading `childDefaults`'s own block, which can't hold another. */
+function scan(md: string, nested = true): FrontmatterReading {
   const errors: FrontmatterError[] = [];
   const err = (line: number, message: string): void => { errors.push({ line, message }); };
   const { text, lines, end: blockEnd } = block(md);
@@ -80,6 +91,7 @@ function scan(md: string): FrontmatterReading {
   const out: Record<string, FrontmatterValue> = {};
   const maps: Record<string, FrontmatterMap> = {};
   const keyLines: Record<string, number> = {};
+  let childDefaults: FrontmatterReading["childDefaults"];
   /** The key whose block (`key:` with nothing after it) the next lines fill: a list (`- a`) or a map (`  sub: v`). */
   let openKey: string | null = null;
   /** In a map: its indentation, and the sub-key whose own block list (`    - a`) the next lines fill. */
@@ -147,6 +159,33 @@ function scan(md: string): FrontmatterReading {
       continue;
     }
     const [, key, raw] = kv;
+    if (key === CHILD_DEFAULTS && nested && raw.trim() === "") {
+      // Its block: the indented lines (and blank ones) under it, up to the next line that isn't.
+      let last = i;
+      while (last + 1 < end && (lines[last + 1].trim() === "" || /^\s/.test(lines[last + 1]))) last++;
+      const body = lines.slice(i + 1, last + 1);
+      const first = body.find(l => l.trim() !== "");
+      const indent = first ? /^\s*/.exec(first)![0].length : 0;
+      const inner: string[] = [];
+      body.forEach((l, k) => {
+        if (l.trim() !== "" && /^\s*/.exec(l)![0].length < indent) {
+          err(i + 2 + k, `"${key}": every line of its block is indented at least as far as the first`);
+          inner.push("");
+        } else inner.push(l.slice(indent));
+      });
+      if (childDefaults !== undefined) lineErr(`duplicate key "${key}"`);
+      if (first && /^\s*-\s/.test(first)) lineErr(`"${key}" holds keys, indented under it, not a list`);
+      // Read as a page's frontmatter: its line n is line i + 1 + n - 1 of the file.
+      const read = scan(["---", ...inner, "---"].join("\n"), false);
+      for (const e of read.errors) err(e.line + i - 1 + 1, e.message);
+      for (const [k, l] of Object.entries(read.lines)) keyLines[`${key}.${k}`] = l + i;
+      keyLines[key] = n;
+      childDefaults = { values: read.values, maps: read.maps };
+      openKey = null;
+      subListKey = null;
+      i = last;
+      continue;
+    }
     if (key in out || key in maps) lineErr(`duplicate key "${key}"`);
     delete maps[key];
     keyLines[key] = n;
@@ -161,7 +200,7 @@ function scan(md: string): FrontmatterReading {
       openKey = null;
     }
   }
-  return { values: out, maps, errors, lines: keyLines };
+  return { values: out, maps, errors, lines: keyLines, ...(childDefaults ? { childDefaults } : {}) };
 }
 
 /** Parse the leading `---` block. Returns an empty object when the file has none. Lenient: a line it
