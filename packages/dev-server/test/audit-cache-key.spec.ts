@@ -10,8 +10,9 @@ import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
 import { checkCodeDigest } from "../src/check-code.js";
 import {
-  componentContentHash, globalDataDigest, graphArtifactPath, refreshDiagnosticsGraph, type CheckRenderer,
+  auditInputs, componentContentHash, graphArtifactPath, refreshDiagnosticsGraph, type CheckRenderer,
 } from "../src/diagnostics.js";
+import { buildCompositionRegistry } from "../src/composition.js";
 import { pdScratchDir } from "../src/scratch.js";
 import { save } from "../../../test-support/save.js";
 
@@ -33,7 +34,10 @@ afterAll(async () => {
 const refresh = async () => {
   const discovery = await buildDiscoveryMap(root);
   const render = createRenderer({ patternsDir: root, discoveryMap: discovery.discoveryMap, handleMap: discovery.handleMap }) as CheckRenderer;
-  return { ...await refreshDiagnosticsGraph(root, [ID], render, discovery.quarantineMap, discovery.discoveryMap, undefined), discovery };
+  const inputs = await auditInputs({
+    discoveryMap: discovery.discoveryMap, handleMap: discovery.handleMap, composition: await buildCompositionRegistry(root, discovery.handleMap, discovery.discoveryMap), globalData: undefined,
+  });
+  return { ...await refreshDiagnosticsGraph(root, [ID], render, discovery.quarantineMap, inputs), inputs };
 };
 
 /** The artifact on disk, with the component's cached verdict replaced by a stale one, filed under `hash`. */
@@ -52,11 +56,10 @@ const messages = (graph: { occurrences: Array<{ component: string; message: stri
 
 describe("the audit's cache key", () => {
   it("includes the check code: the same component, judged by other code, has another key", async () => {
-    const { discovery } = await refresh();
-    const digest = globalDataDigest(undefined);
-    const now = await componentContentHash(ID, discovery.discoveryMap, digest);
-    expect(now).toBe(await componentContentHash(ID, discovery.discoveryMap, digest, checkCodeDigest()));
-    expect(await componentContentHash(ID, discovery.discoveryMap, digest, "other check code")).not.toBe(now);
+    const { inputs } = await refresh();
+    const now = await componentContentHash(ID, inputs);
+    expect(now).toBe(await componentContentHash(ID, inputs, checkCodeDigest()));
+    expect(await componentContentHash(ID, inputs, "other check code")).not.toBe(now);
     expect(checkCodeDigest()).toMatch(/^[0-9a-f]{40}$/);
   });
 
@@ -69,8 +72,8 @@ describe("the audit's cache key", () => {
   });
 
   it("does not reuse a verdict cached by other check code: the component is audited again", async () => {
-    const { discovery } = await refresh();
-    await plantStaleVerdict(() => componentContentHash(ID, discovery.discoveryMap, globalDataDigest(undefined), "the check code before an upgrade"));
+    const { inputs } = await refresh();
+    await plantStaleVerdict(() => componentContentHash(ID, inputs, "the check code before an upgrade"));
     const r = await refresh();
     expect(r.reaudited).toEqual([ID]);
     expect(messages(r.graph)).not.toContain(STALE);

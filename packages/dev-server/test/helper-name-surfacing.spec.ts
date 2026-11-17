@@ -8,7 +8,8 @@ import { join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
-import { componentContentHash } from "../src/diagnostics.js";
+import { auditInputs, componentContentHash } from "../src/diagnostics.js";
+import { buildCompositionRegistry } from "../src/composition.js";
 import { save } from "../../../test-support/save.js";
 
 let root = "";
@@ -38,7 +39,13 @@ describe("a schema field named like a helper", () => {
   });
 
   it("changes the component's audit hash when only its schema changes", async () => {
-    const hash = async () => componentContentHash("atoms/badge", (await buildDiscoveryMap(join(root, "src/patterns"))).discoveryMap, "g");
+    const hash = async () => {
+      const patterns = join(root, "src/patterns");
+      const d = await buildDiscoveryMap(patterns);
+      return componentContentHash("atoms/badge", await auditInputs({
+        discoveryMap: d.discoveryMap, handleMap: d.handleMap, composition: await buildCompositionRegistry(patterns, d.handleMap, d.discoveryMap), globalData: undefined,
+      }));
+    };
     const before = await hash();
     await save(join(root, SCHEMA), schema(["label"]));
     expect(await hash()).not.toBe(before);
