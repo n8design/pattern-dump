@@ -1,4 +1,7 @@
-@use "../base/tokens";
+@use "tokens";
+
+// The page furniture every layout shares: a page's title, description, tags, body and next link. In the base layer
+// (documentBase), linked on every page and preview, so no layout borrows another layout's stylesheet for them.
 
 .page-title { margin-block: 0 tokens.$space-sm; line-height: 1.2; }
 .page-description { margin-block: 0 tokens.$space-lg; color: var(--color-text-muted, #4b5563); }
