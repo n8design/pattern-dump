@@ -11,7 +11,14 @@ import { WORKBENCH } from "./helpers.js";
 const template = fileURLToPath(new URL("../src/patterns/templates/", import.meta.url));
 const page = fileURLToPath(new URL("../pages/zz-case.md", import.meta.url));
 
-test.beforeEach(async () => {
+/** The server has handled every change made so far (fixtures.ts settles before each test, which is before this file's
+ *  beforeEach writes its fixture): without this a test can ask while the watcher is still reading the new files. */
+async function settled(request: import("@playwright/test").APIRequestContext): Promise<void> {
+  const res = await request.post("/_pd/__test/settle");
+  if (res.status() !== 204) throw new Error(`settle answered ${res.status()}: ${await res.text()}`);
+}
+
+test.beforeEach(async ({ request }) => {
   await save(`${template}case-study/case-study.hbs`, [
     "{{#> partials-base }}",
     `<article class="case-study"><h1>{{title}}</h1><p class="case-client">{{client}}</p><div class="case-content">{{{content}}}</div></article>`,
@@ -26,6 +33,7 @@ test.beforeEach(async () => {
   }, null, 2));
   await save(`${template}case-study/case-study.json`, JSON.stringify({ title: "A case", client: "A client", content: "<p>Sample</p>" }));
   await save(page, "---\nlayout: case-study\ntitle: A case study\nclient: example.com\norder: 9\n---\n\nThe **work**, written in markdown.\n");
+  await settled(request);
 });
 test.afterEach(async () => {
   await rm(page, { force: true });
