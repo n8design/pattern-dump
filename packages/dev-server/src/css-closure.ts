@@ -151,6 +151,20 @@ export function extractUsedClasses(hbsSource: string): string[] {
   return [...classes];
 }
 
+/** A template's static classes (extractUsedClasses), kept by its text: every site page asks for those of its layout's
+ *  whole include tree, and parsing the templates as HTML each time was a share of every page. Kept for up to 10,000
+ *  texts, then started again; an edited template is a new text. */
+const keptClasses = new Map<string, readonly string[]>();
+function templateClasses(hbsSource: string): readonly string[] {
+  let classes = keptClasses.get(hbsSource);
+  if (!classes) {
+    if (keptClasses.size >= 10_000) keptClasses.clear();
+    classes = Object.freeze(extractUsedClasses(hbsSource));
+    keptClasses.set(hbsSource, classes);
+  }
+  return classes;
+}
+
 /** Parse a raw .hbs source and derive the class-borrowing relationships fields:
  *  styleUses (other components whose classes appear here), inlineStyles flag,
  *  utilityClasses flag, and unattributedClasses (owned by nothing recognised). */
@@ -160,7 +174,7 @@ export function deriveClassBorrowingFields(
   classOwnerIndex: ClassOwnerIndex,
   baseProvenance?: BaseProvenanceIndex
 ): Pick<RelationshipsAvailable, "styleUses" | "styleModules" | "inlineStyles" | "utilityClasses" | "unattributedClasses"> {
-  const usedClasses = extractUsedClasses(hbsSource);
+  const usedClasses = templateClasses(hbsSource);
 
   const styleUses = [...new Set(
     usedClasses

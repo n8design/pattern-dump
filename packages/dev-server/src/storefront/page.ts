@@ -376,7 +376,11 @@ async function generatedFile(g: GeneratedPage, discoveryMap: DiscoveryMap): Prom
 
 /** Every template among `ids` (with what each includes) that writes a tag as text, which an object can't be shown as;
  *  and every schema among them that declares tags as strings, which a page's tags no longer are. */
-async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promise<string[]> {
+async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promise<readonly string[]> {
+  // From the design system's files alone: once per discovery for the same components (design-files.ts).
+  return designFiles(a.discoveryMap).derived(`tags as text ${JSON.stringify(ids)}`, () => tagsAsTextIn(ids, a));
+}
+async function tagsAsTextIn(ids: readonly string[], a: PageAssembly): Promise<string[]> {
   const problems: string[] = [];
   for (const id of [...new Set(ids.flatMap(id => includeTree(id, a.composition)))]) {
     const entry = a.discoveryMap.get(id);

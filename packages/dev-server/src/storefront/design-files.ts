@@ -18,7 +18,7 @@ import { parseJson } from "@pattern-dump/renderer";
 export interface SchemaReading<T> { schema?: T; error?: string }
 
 export interface DesignFiles {
-  /** The file's text; rejects as readFile does (an error is kept too, until the discovery is dropped). */
+  /** The file's text; rejects as readFile does (and is read again on the next call). */
   text(path: string): Promise<string>;
   /** The file parsed with JSON.parse, frozen; rejects with readFile's or JSON.parse's error. */
   data(path: string): Promise<unknown>;
@@ -56,13 +56,18 @@ export function createDesignFiles(): DesignFiles {
   };
   const text = async (path: string): Promise<string> => {
     const at = await realOf(path);
-    return once(texts, at, () => readFile(at, "utf8"));
+    const read = once(texts, at, () => readFile(at, "utf8"));
+    // A read that failed is tried again next time, as the renderer's store does.
+    read.catch(() => { if (texts.get(at) === read) texts.delete(at); });
+    return read;
   };
   return {
     text,
     async data(path) {
       const at = await realOf(path);
-      return once(datas, at, async () => deepFreeze(JSON.parse(await text(at)) as unknown));
+      const parsed = once(datas, at, async () => deepFreeze(JSON.parse(await text(at)) as unknown));
+      parsed.catch(() => { if (datas.get(at) === parsed) datas.delete(at); });
+      return parsed;
     },
     async schema<T>(path: string | undefined): Promise<SchemaReading<T>> {
       if (!path) return {};

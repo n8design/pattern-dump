@@ -2,6 +2,7 @@
 // AST. A storefront check uses it where a list's items changed from strings to objects (tags in 0.5.0): written as
 // text, an object prints "[object Object]", so the page fails and names the field to write instead.
 import Handlebars from "handlebars";
+import { byTemplate } from "./template-memo";
 
 /** One place an item is written whole: the list's path as the template writes it, and where. */
 export interface ItemAsText { list: string; item: "this" | "."; line: number; column: number }
@@ -50,7 +51,10 @@ function eachMustache(template: string, name: string, visitMustache: (list: stri
  * Every `{{this}}` / `{{.}}` (escaped or not) written directly in an `{{#each <path>}}` whose path's last segment is
  * `name`, as eachMustache walks it; not as a helper's argument.
  */
-export function itemsWrittenAsText(template: string, name: string): ItemAsText[] {
+export function itemsWrittenAsText(template: string, name: string): readonly ItemAsText[] {
+  return byTemplate(`items as text ${name}`, template, () => itemsAsTextIn(template, name));
+}
+function itemsAsTextIn(template: string, name: string): ItemAsText[] {
   const out: ItemAsText[] = [];
   const isItem = (p: PathNode | undefined) => p?.type === "PathExpression" && (p.original === "this" || p.original === ".");
   eachMustache(template, name, (list, s) => {
@@ -65,7 +69,10 @@ export function itemsWrittenAsText(template: string, name: string): ItemAsText[]
 
 /** Every read of one of `fields` of the item (`{{label}}`, `{{this.label}}`, escaped or not, not a helper call) in an
  *  `{{#each <path>}}` whose path's last segment is `name`, as eachMustache walks it. */
-export function itemFieldsRead(template: string, name: string, fields: readonly string[]): ItemFieldRead[] {
+export function itemFieldsRead(template: string, name: string, fields: readonly string[]): readonly ItemFieldRead[] {
+  return byTemplate(`item fields ${name} ${fields.join(",")}`, template, () => fieldsReadIn(template, name, fields));
+}
+function fieldsReadIn(template: string, name: string, fields: readonly string[]): ItemFieldRead[] {
   const out: ItemFieldRead[] = [];
   eachMustache(template, name, (list, s) => {
     const params = (s["params"] as unknown[] | undefined) ?? [];

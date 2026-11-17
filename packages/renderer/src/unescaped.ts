@@ -2,6 +2,7 @@
 // page writes reaches the page as HTML only through one of these, so a check on placed components can ask
 // which names a template outputs this way, and refuse those it may not.
 import Handlebars from "handlebars";
+import { byTemplate } from "./template-memo";
 
 /** One unescaped output: the name it outputs (a helper call is named with its arguments), and where. */
 export interface UnescapedOutput { name: string; line: number; column: number; helper: boolean }
@@ -10,7 +11,10 @@ type Node = { type: string; loc?: { start: { line: number; column: number } } } 
 
 /** Every unescaped output of a template, in source order. A template that does not parse has none here
  *  (rendering it reports why). */
-export function unescapedOutputs(template: string): UnescapedOutput[] {
+export function unescapedOutputs(template: string): readonly UnescapedOutput[] {
+  return byTemplate("unescaped", template, () => unescapedIn(template));
+}
+function unescapedIn(template: string): UnescapedOutput[] {
   let ast: Node;
   try { ast = Handlebars.parse(template) as unknown as Node; } catch { return []; }
   const out: UnescapedOutput[] = [];

@@ -562,7 +562,9 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
     // Schema validation (M4.9). schemaPath comes from the discovery entry — no reconstruction.
     // A schema that doesn't parse is an error, never "no schema": that would turn every check below off unsaid.
     const schemaText = entry.schemaPath ? await store.textOr(entry.schemaPath, undefined) : undefined;
-    const parsedSchema = schemaText === undefined ? undefined : parseJson(schemaText);
+    // Parsed once for the store, and frozen: every render of the component shares it.
+    const parsedSchema = schemaText === undefined ? undefined
+      : store.once(`schema json ${entry.schemaPath}`, () => { const p = parseJson(schemaText); return p.ok ? { ...p, value: deepFreeze(p.value) } : p; });
     if (parsedSchema && !parsedSchema.ok) {
       diagnostics.push({
         kind: "SCHEMA_INVALID",
