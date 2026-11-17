@@ -96,6 +96,9 @@ describe("pd build — the storefront root", () => {
       // The behaviour scripts of the header (every layout's) and of the slider the guides page places.
       "_pd/scripts/header-ready.js",
       "_pd/scripts/slider-ready.js",
+      // The bench's two preview themes, linked by the previews the pages embed (never by a page).
+      "_pd/themes/dark.css",
+      "_pd/themes/light.css",
       "about/index.html",
       "articles/harbour/index.html",
       "articles/index.html",
@@ -130,7 +133,7 @@ describe("pd build — the storefront root", () => {
       "tags/layout/index.html",
       "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 51, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 53, bytes: expect.any(Number) });
     // llms.txt lists six pages: every page of the folder but the home page, whose title and description head it.
     expect(report.llms).toEqual({ pages: 6 });
   });
