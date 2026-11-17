@@ -78,7 +78,7 @@ export function termPages(input: TermPagesInput): { pages: GeneratedPage[]; prob
     const hasTerm = input.layouts.has(k.term), hasIndex = input.layouts.has(k.index);
     if (asked) {
       for (const [has, layout, what] of [[hasTerm, k.term, `the page of each ${k.term}`], [hasIndex, k.index, `the index of the ${k.many}`]] as const) {
-        if (!has) problems.push(`${k.config} asks for ${k.term} pages, but the skin has no layouts/${layout} (${what}): add it, or set ${k.config.split(".")[1]} to false`);
+        if (!has) problems.push(`${k.config} asks for ${k.term} pages, but the skin has no layout "${layout}" (${what}): add layouts/${layout}, or mark a page or template pattern with "x-pd-layout": "${layout}", or set ${k.config.split(".")[1]} to false`);
       }
     }
     if (!hasTerm) continue;

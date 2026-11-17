@@ -16,6 +16,7 @@
 import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem, type ThemeSwitch } from "@pattern-dump/contracts";
 import { themeSyncScript } from "./theme-sync.js";
 import { defaultsNote, originOf, placeOf } from "./folder-defaults.js";
+import { layoutIndex } from "./layout-index.js";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
 import type { SearchRecord } from "./search.js";
@@ -378,12 +379,13 @@ const defaultView = (schema: { properties?: Record<string, unknown> } | undefine
 /** A generated page (terms.ts) as a page file: its layout, its title and description as its frontmatter would give
  *  them (only what the layout declares; a layout that doesn't declare a title is a problem), and no body. */
 async function generatedFile(g: GeneratedPage, discoveryMap: DiscoveryMap): Promise<{ page: PageFile; problems: string[] }> {
-  const declared = (await readSchema(discoveryMap.get(`layouts/${g.layout}`)?.schemaPath, designFiles(discoveryMap))).schema?.properties ?? {};
+  const layoutId = (await layoutIndex(discoveryMap)).idOf(g.layout) ?? `layouts/${g.layout}`;
+  const declared = (await readSchema(discoveryMap.get(layoutId)?.schemaPath, designFiles(discoveryMap))).schema?.properties ?? {};
   const problems: string[] = [];
   const values: Record<string, string> = { layout: g.layout };
   const whose = g.role === "index" ? `the index of the ${g.kind === "tag" ? "tags" : "categories"}` : `a ${g.kind} page`;
   if (Object.hasOwn(declared, "title")) values["title"] = g.title;
-  else problems.push(`layouts/${g.layout}: ${whose}'s title is ${g.role === "index" ? "its title" : `the ${g.kind}'s label`}, so the layout declares "title"`);
+  else problems.push(`${layoutId}: ${whose}'s title is ${g.role === "index" ? "its title" : `the ${g.kind}'s label`}, so the layout declares "title"`);
   if (g.description !== null && Object.hasOwn(declared, "description")) values["description"] = g.description;
   return { page: { route: g.route, file: "", path: `${g.route.slice(1, -1)} (generated)`, frontmatter: { values, maps: {}, errors: [], lines: {} } }, problems };
 }
@@ -440,7 +442,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     generatedProblems.push(...g.problems);
   }
   if (isNotFound && !page) {
-    const layoutId = `layouts/${DEFAULT_LAYOUT}`;
+    const layoutId = (await layoutIndex(a.discoveryMap)).idOf(DEFAULT_LAYOUT) ?? `layouts/${DEFAULT_LAYOUT}`;
     if (!a.discoveryMap.has(layoutId)) {
       return { status: 404, html: document(`<title>Page not found</title>`, BUILT_IN_NOT_FOUND_DOCUMENT, a.live, a.lang, a.basePath ?? "/"), problems: [],
         notes: [`there is no ${NOT_FOUND_FILE} and no ${layoutId}, so the 404 page is a plain one of Pattern Dump's`] };
@@ -467,7 +469,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (brokenSchemas.length) { siteWide = brokenSchemas; return fail(brokenSchemas); }
 
   const problems: string[] = [...generatedProblems];
-  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags);
+  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags, a.shown);
   problems.push(...checked.problems.map(p => `${p.file}${p.line !== undefined ? `:${p.line}` : ""}: ${p.message}`));
   if (isNotFound && checked.build.redirectFrom) {
     const line = page.frontmatter.lines["redirectFrom"];
@@ -611,7 +613,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (!isNotFound) {
     const resolved = await resolveView({
       view: checked.build.view, line: page.frontmatter.lines["view"], path: page.path,
-      layout: checked.layoutId.slice("layouts/".length), shows: declares("listing"), discoveryMap: a.discoveryMap,
+      layout: checked.layoutName, layoutId: checked.layoutId, shows: declares("listing"), discoveryMap: a.discoveryMap,
       fallback: defaultView(layoutSchema),
     });
     problems.push(...resolved.problems);
@@ -732,9 +734,10 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const regionsOf = (filled: ReadonlyMap<string, string[]>): Record<string, string | null> =>
     Object.fromEntries(regionDecl.regions.map(r => [r, filled.get(r)?.length ? filled.get(r)!.join("\n") : null]));
   let currentRegions = first.regions.filled;
+  // The page's rendered markdown goes into the layout's body slot: `body`, or the property its x-pd-content names.
   const dataFor = (body: string, headings: PageHeading[]) => ({
-    ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page"]),
-    body,
+    ...withDeclaredAbsentAsNull(checked.values, layoutDeclared, ["body", "nav", "site", "page", checked.bodySlot]),
+    [checked.bodySlot]: body,
     nav: markCurrent(model.nav, route),
     site: siteData,
     ...(pageDeclaration.declared ? { page: pageValue(pageDeclaration.declared, { headings, ...positionOf(route, model), ...dates, ...listing, ...queryValues, regions: regionsOf(currentRegions) } as Partial<DerivedPage>) } : {}),

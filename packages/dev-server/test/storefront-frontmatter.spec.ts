@@ -75,15 +75,15 @@ const check = (md: string, discovery: DiscoveryMap = map) => checkPageFrontmatte
 const P = (line: number | undefined, message: string) => ({ file: "guides/setup.md", ...(line !== undefined ? { line } : {}), message });
 
 describe("layoutNames", () => {
-  it("lists the base components directly under layouts/, not variants or partials", () => {
-    expect(layoutNames(map)).toEqual(["bare", "broken", "claims", "listing", "page", "typed"]);
+  it("lists the base components directly under layouts/, not variants or partials", async () => {
+    expect(await layoutNames(map)).toEqual(["bare", "broken", "claims", "listing", "page", "typed"]);
   });
 });
 
 describe("checkPageFrontmatter — a valid page", () => {
   it("uses the page layout when none is named, and passes the declared values on, without layout or order", async () => {
     expect(await check("---\ntitle: Setup\ndescription: How\norder: 2\n---\n")).toEqual({
-      layoutId: "layouts/page", values: { title: "Setup", description: "How" }, build: {}, problems: [], notes: [],
+      layoutId: "layouts/page", layoutName: "page", bodySlot: "body", values: { title: "Setup", description: "How" }, build: {}, problems: [], notes: [],
     });
   });
 
@@ -108,7 +108,8 @@ describe("checkPageFrontmatter — the layout", () => {
 
   it("says so when the project has no layouts at all", async () => {
     expect((await check("---\ntitle: T\n---\n", new Map())).problems).toEqual([
-      P(undefined, `layout "page" is not a layout: the project has no layouts (components in a layouts/ folder of its patterns)`),
+      P(undefined, `layout "page" is not a layout: the project has no layouts (components in a layouts/ folder of its patterns, or `
+        + `page and template patterns marked with x-pd-layout)`),
     ]);
   });
 
@@ -150,7 +151,7 @@ describe("checkPageFrontmatter — keys", () => {
 
   it("declares nothing for a layout with no schema", async () => {
     expect((await check("---\nlayout: bare\ntitle: T\n---\n")).problems).toEqual([P(3, `"title" is not declared by layout "bare", which has no schema`)]);
-    expect(await check("---\nlayout: bare\norder: 3\n---\n")).toEqual({ layoutId: "layouts/bare", values: {}, build: {}, problems: [], notes: [] });
+    expect(await check("---\nlayout: bare\norder: 3\n---\n")).toEqual({ layoutId: "layouts/bare", layoutName: "bare", bodySlot: "body", values: {}, build: {}, problems: [], notes: [] });
   });
 });
 
@@ -158,7 +159,7 @@ describe("checkPageFrontmatter — declared types", () => {
   it("coerces each value to its declared type", async () => {
     const md = "---\nlayout: typed\ntitle: T\ncount: 2.5\nn: -4\npinned: true\nlabels: [a, b]\nscores:\n  - 1\n  - 2.5\ntone: info\neither: 7\nfree: anything\n---\n";
     expect(await check(md)).toEqual({
-      layoutId: "layouts/typed",
+      layoutId: "layouts/typed", layoutName: "typed", bodySlot: "body",
       values: { title: "T", count: 2.5, n: -4, pinned: true, labels: ["a", "b"], scores: [1, 2.5], tone: "info", either: 7, free: "anything" },
       build: {},
       problems: [],

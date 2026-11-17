@@ -44,6 +44,7 @@ import { compiledScript, ScriptMissing } from "./scripts.js";
 import { contentHash } from "./content-hash.js";
 import { serveImageVariant } from "./image-route.js";
 import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
+import { layoutIndex } from "./storefront/layout-index.js";
 import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.js";
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
@@ -80,12 +81,10 @@ const pagesCaches = new WeakMap<RouteContext, PagesCache>();
 
 /** The website's pages as this server serves them: pd dev shows drafts and scheduled pages; pd build leaves them out,
  *  as if their files weren't there. */
-function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>, discoveryMap?: DiscoveryMap): ReturnType<typeof readPages> {
+async function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>, discoveryMap?: DiscoveryMap): ReturnType<typeof readPages> {
   const today = ctx.today ?? todayOf(ctx.now());
-  // The skin's layouts: tag and category pages are generated through them (terms.ts).
-  const layouts = discoveryMap
-    ? [...discoveryMap.keys()].filter(id => /^layouts\/[^/~]+$/.test(id)).map(id => id.slice("layouts/".length)).sort()
-    : undefined;
+  // The skin's layouts, by name (layout-index.ts): tag and category pages are generated through them (terms.ts).
+  const layouts = discoveryMap ? [...(await layoutIndex(discoveryMap)).names] : undefined;
   // Not read again for every request (pages-cache.ts): once in pd build, and in pd dev until the folder changes.
   let cache = pagesCaches.get(ctx);
   if (!cache) { cache = createPagesCache(sf.pagesDir, ctx.pagesOnce === true); pagesCaches.set(ctx, cache); }
@@ -507,9 +506,11 @@ async function routeRequest(
         // the corpus sweep). Quarantined → 200 + HANDLE_COLLISION (no render); render failure →
         // 200 + RENDER_ERROR, not 404.
         // A layout of a project with a website: the pages that render with it, and where each got it.
-        if (cfg.storefront && /^layouts\/[^/~]+$/.test(componentId)) {
+        const layouts = await layoutIndex(discovery.discoveryMap);
+        const layoutName = layouts.nameOf(componentId);
+        if (cfg.storefront && layoutName !== undefined) {
           // With the discovery map, so the tag and category pages its layouts generate are in the model too.
-          detail.relationships.pages = layoutPages(await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap), componentId.slice("layouts/".length));
+          detail.relationships.pages = layoutPages(await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap), layoutName);
         }
         const quarantineEntry = discovery.quarantineMap.get(componentId);
         const checked = await checkComponent(componentId, variant, render, quarantineEntry);
@@ -517,6 +518,12 @@ async function routeRequest(
         // The stylesheets it links by borrowing a class (info, the detail only: diagnostics.ts).
         const diagnostics = quarantineEntry || !state.classOwnerIndex ? checked.diagnostics : [...checked.diagnostics,
           ...await styleBorrowedDiagnostics(componentId, variant, discovery.discoveryMap, compReg, state.classOwnerIndex)];
+        // Its layout problems (layout-index.ts): a misplaced x-pd-layout, or a layout name it shares with another.
+        if (!quarantineEntry) {
+          for (const message of layouts.problemsOf(componentId, createDisplayPath(cwd, cfg.packages))) {
+            diagnostics.push({ kind: "SCHEMA_INVALID", severity: "error", source: "schema", path: "#/x-pd-layout", message });
+          }
+        }
 
         const themeNames = themesDir ? [...state.themeCss.keys()] : [];
         const assets = await resolveDocumentAssets(cfg, state, {

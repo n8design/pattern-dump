@@ -64,6 +64,8 @@ export const DEFAULT_VIEW_KEY = "x-pd-view";
  */
 export async function resolveView(o: {
   view: string | undefined; line: number | undefined; path: string; layout: string; shows: boolean; discoveryMap: DiscoveryMap;
+  /** The layout's component (layout-index.ts), which a problem about its default view names. Default: layouts/<layout>. */
+  layoutId?: string;
   fallback?: string | undefined;
 }): Promise<{ view?: ResolvedView; problems: string[] }> {
   const at = `${o.path}${o.line !== undefined ? `:${o.line}` : ""}`;
@@ -71,7 +73,7 @@ export async function resolveView(o: {
   const list = names.length ? `the views are ${names.map(n => `"${n}"`).join(", ")}` : undefined;
   if (o.view === undefined) {
     if (!o.shows) return { problems: [] };
-    if (o.fallback !== undefined) return viewOf(o.fallback, `layouts/${o.layout} (${DEFAULT_VIEW_KEY} on page.listing)`, o.discoveryMap);
+    if (o.fallback !== undefined) return viewOf(o.fallback, `${o.layoutId ?? `layouts/${o.layout}`} (${DEFAULT_VIEW_KEY} on page.listing)`, o.discoveryMap);
     return { problems: [`${o.path}: layout "${o.layout}" shows a listing (page.listing), so name its view: view: <name> `
       + `(${list ?? "the skin has no views yet: components in a views/ folder of its patterns"}), or give the layout a default `
       + `("${DEFAULT_VIEW_KEY}" on page.listing)`] };
