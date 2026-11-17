@@ -376,7 +376,7 @@ watched.
 
 | Component | Role |
 |---|---|
-| `layouts/<name>` | A layout a page can choose with `layout: <name>`. Its schema is the frontmatter contract |
+| `layouts/<name>` | A layout a page can choose with `layout: <name>`. Its schema is the frontmatter contract. A page or template pattern can be a layout too ([below](#a-page-or-template-as-a-layout)) |
 | `partials/base` | The frame every layout is built on. Its schema's `site` property declares what `storefront.site` may hold |
 | `partials/head` | Optional: what the skin adds to every page's `<head>`, see below |
 | `partials/…` | Anything else the layouts include: header, navigation, footer |
@@ -423,7 +423,7 @@ A layout receives:
 | Value | |
 |---|---|
 | each declared key | The page's value, or `null` when the page does not set it |
-| `body` | The page's markdown, rendered. Include it unescaped, `{{{body}}}`: it is the only value safe to, because the markdown renderer escapes everything an author writes. Every other value is included escaped, `{{…}}` |
+| `body` | The page's markdown, rendered. Include it unescaped, `{{{body}}}`: it is the only value safe to, because the markdown renderer escapes everything an author writes. Every other value is included escaped, `{{…}}`. A layout can name another key for it ([below](#a-page-or-template-as-a-layout)) |
 | `nav` | The navigation: `{ route, title, description?, current?, children? }` per entry, `current: true` on the page's own entry |
 | `site` | The values of `storefront.site` |
 | `page` | What the storefront derives for the page, when the layout declares it (below) |
@@ -443,6 +443,48 @@ layout declares plus `body`, `nav` and `site`, and the storefront reports any ot
 
 In the workbench a layout fills the Stage, like a page or a template, so its `index.md` needs no
 `preview: full`. See [Preview layout](authoring.md#preview-layout) for overriding it.
+
+### A page or template as a layout
+
+A design system's page and template patterns are often what a site's layouts should be. Instead of a copy under
+`layouts/`, mark the pattern as a layout in its schema:
+
+```json
+{
+  "x-pd-layout": "case-study",
+  "x-pd-content": "content",
+  "required": ["title"],
+  "properties": {
+    "title": { "type": "string" },
+    "client": { "type": "string" },
+    "content": { "type": "string", "contentMediaType": "text/markdown" }
+  }
+}
+```
+
+A page then names it as any layout, `layout: case-study` (or through `childLayout` and `childDefaults`), and its
+schema is the page's frontmatter contract.
+
+- **Only in `pages/` and `templates/`** (numbered folders count: `04-templates`). `x-pd-layout` on any other
+  pattern is an error on that pattern, and it makes no layout. A `layouts/` component is already a layout by its
+  folder; `x-pd-layout` there is an error too.
+- **The name** is lowercase letters, digits and hyphens, as a `layouts/` folder's.
+- **One name, one layout.** Two patterns marked with the same name, or a marked pattern and a `layouts/` component
+  of that name, are an error that names both files, on both and on every page that asks for the name; the name is
+  no layout until one is renamed.
+- **Where the markdown goes:** into the property `x-pd-content` names, which must be a string with
+  `"contentMediaType": "text/markdown"`. Write it unescaped in the template (`{{{content}}}`). Without `x-pd-content`
+  it is `body`, as for any layout. A page can't set that property, and the layout's `required` doesn't ask it of the
+  page. `x-pd-content` works the same on a `layouts/` layout.
+- **The keys a page sets for the build** (`image`, `date`, `tags` and the rest) can't be the layout's own, as for any
+  layout: a template that declares one is refused until it renames it.
+- Its sample data (`<name>.json`) stays its workbench render, and the checks above for a layout's sample data apply
+  to it from then on.
+
+**A read-only design system** (one read through `--root`, or a package you don't edit) can't be marked. There, a
+`layouts/` (or your own `templates/`) pattern that includes it stays the way: `{{> templates-article }}`, with a
+schema that declares what the template takes. Resolving `$ref` and `allOf` in schemas, so such a wrapper's schema
+could refer to the original instead of repeating it, is not supported yet.
 
 ### What the storefront derives for a page
 
