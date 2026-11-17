@@ -96,6 +96,45 @@ describe("resolveLayoutMode — overrides above the default", () => {
   });
 });
 
+describe("resolveLayoutMode: the schema's x-pd-preview", () => {
+  it("sets a centered component to full, and a page or layout to centered", async () => {
+    const dir = await patterns({
+      ...NUMBERED,
+      "01-atoms/badge.schema.json": JSON.stringify({ "x-pd-preview": "full" }),
+      "03-layouts/article.schema.json": JSON.stringify({ "x-pd-preview": "centered" }),
+    });
+    const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("01-atoms/badge", dir, discoveryMap)).toBe("full");
+    expect(await resolveLayoutMode("03-layouts/article", dir, discoveryMap)).toBe("centered");
+  });
+
+  it("wins over the category index.md and loses to the component's own .md", async () => {
+    const dir = await patterns({
+      ...NUMBERED,
+      "01-atoms/index.md": "---\npreview: centered\n---\n",
+      "01-atoms/badge.schema.json": JSON.stringify({ "x-pd-preview": "full" }),
+      "05-pages/home.schema.json": JSON.stringify({ "x-pd-preview": "centered" }),
+      "05-pages/home.md": "---\npreview: full\n---\n",
+    });
+    const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("01-atoms/badge", dir, discoveryMap)).toBe("full");
+    expect(await resolveLayoutMode("05-pages/home", dir, discoveryMap)).toBe("full");
+  });
+
+  it("an invalid value, a schema without it, or broken JSON leaves the default", async () => {
+    const dir = await patterns({
+      ...NUMBERED,
+      "01-atoms/badge.schema.json": JSON.stringify({ "x-pd-preview": "fullscreen" }),
+      "05-pages/home.schema.json": JSON.stringify({ properties: {} }),
+      "03-layouts/article.schema.json": "{ not json",
+    });
+    const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("01-atoms/badge", dir, discoveryMap)).toBe("centered");
+    expect(await resolveLayoutMode("05-pages/home", dir, discoveryMap)).toBe("full");
+    expect(await resolveLayoutMode("03-layouts/article", dir, discoveryMap)).toBe("full");
+  });
+});
+
 describe("a numbered folder elsewhere", () => {
   it("the folder page carries the same layout as its components", async () => {
     const dir = await patterns(NUMBERED);

@@ -26,10 +26,11 @@ export type ComponentStatus = "draft" | "stable" | "deprecated";
  * in both — the markup directly in <body>, no wrapper — only the frame around it differs:
  *  - "centered": the frame is sized to what the content needs (pd-width, measured at the full width
  *                available) and to its height (pd-height), and the stage centres it (atoms/molecules/organisms)
- *  - "full":     the frame fills the stage width AND height, top-aligned (pages/templates, with or
- *                without an ordering prefix: `05-pages` counts)
- * This is the RESOLVED mode (category default ← category index.md frontmatter ← component override),
- * so the shell renders directly without re-deriving precedence.
+ *  - "full":     the frame fills the stage width AND height, top-aligned (pages, templates and layouts,
+ *                with or without an ordering prefix: `05-pages` counts)
+ * This is the RESOLVED mode, most specific wins: category default, category index.md `preview:`, the
+ * schema's `x-pd-preview`, the component's own .md `preview:`. The shell renders it directly without
+ * re-deriving precedence; its toolbar can flip it for the current view (`?layout=`), which stores nothing.
  */
 export type LayoutMode = "centered" | "full";
 
