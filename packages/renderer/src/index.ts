@@ -8,7 +8,7 @@
 export { initHighlighter, highlight, getShikiCSS, wrapWithCopyButton } from "./highlight";
 export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
 export { itemsWrittenAsText, type ItemAsText } from "./item-text";
-export { checkSchemaExtensions, QUERY_OPTIONS, readExampleHeight, readPreviewMode, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
+export { checkSchemaExtensions, QUERY_OPTIONS, readExampleHeight, readLayoutMarker, readPreviewMode, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
 export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
 export { helperShadows, type HelperShadow } from "./helper-shadow";
 export { parseJson, type ParsedJson } from "./json";

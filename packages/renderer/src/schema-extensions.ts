@@ -5,7 +5,7 @@
 //   x-pd-content       at a schema's top: the property a tag's content fills; it must be a declared string.
 //   contentMediaType   only "text/markdown", only on a string: rendered as markdown, HTML escaped.
 //
-// And seven that are not about placement, so they don't switch on the template check below:
+// And eight that are not about placement, so they don't switch on the template check below:
 //
 //   x-pd-card            on a list property (a layout's `page.children`, a view's `entries`): the card each page of
 //                        the listing is shown as. It names a component with a schema; the storefront checks every page
@@ -23,6 +23,10 @@
 //                        short: the frame can grow to its content but never shrink below this. One value
 //                        covers every variant, so it is the height at the widest column and no taller than
 //                        the shortest variant.
+//   x-pd-layout          at a schema's top: the storefront layout this pattern is, by name (`layout: <name>` on a
+//                        page). Only for patterns in pages/ and templates/, which the dev-server checks (it knows the
+//                        folder: storefront/layout-index.ts); here only its value: a name of lowercase letters,
+//                        digits and hyphens.
 //   x-pd-preview         at a schema's top: how the workbench previews the component, "full" (the frame fills the stage)
 //                        or "centered" (sized to its content). Above the folder defaults, below the component's .md
 //                        `preview:` (layout-mode.ts in the dev-server).
@@ -53,8 +57,8 @@ export interface SchemaExtensionContext {
 
 type Prop = Record<string, unknown>;
 const KNOWN_PROPERTY_KEYS = new Set(["x-pd-card", "x-pd-component", "x-pd-image", "x-pd-query", "x-pd-regions", "x-pd-toc", "x-pd-view"]);
-const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-preview", "x-pd-prose-images", "x-pd-region"]);
-const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, "
+const KNOWN_TOP_KEYS = new Set(["x-pd-content", "x-pd-example-height", "x-pd-layout", "x-pd-preview", "x-pd-prose-images", "x-pd-region"]);
+const KNOWN_LIST = "x-pd-card, x-pd-component, x-pd-content, x-pd-example-height, x-pd-image, x-pd-layout, x-pd-preview, x-pd-prose-images, x-pd-query, x-pd-region, "
   + "x-pd-regions, x-pd-toc, x-pd-view";
 /** The options of a query (x-pd-query), in the order the docs list them. Their values are checked by the storefront,
  *  against the site's pages, folders and categories (query.ts in the dev-server). */
@@ -70,6 +74,15 @@ export function readExampleHeight(schema: unknown): { height?: number; problem?:
   if (typeof value === "number" && Number.isInteger(value) && value > 0) return { height: value };
   return { problem: `x-pd-example-height must be a whole number of pixels above 0 (got ${JSON.stringify(value)}): `
     + `the live example's height at the widest column, no taller than its shortest variant` };
+}
+
+/** A schema's x-pd-layout: the layout name when it declares a valid one, the problem when it is invalid, nothing
+ *  when it declares none. The schema check and the storefront's layout index both read it here. */
+export function readLayoutMarker(schema: unknown): { name?: string; problem?: string } {
+  if (!isObject(schema) || !("x-pd-layout" in schema)) return {};
+  const value = schema["x-pd-layout"];
+  if (typeof value === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(value)) return { name: value };
+  return { problem: `x-pd-layout must be a layout name: lowercase letters, digits and hyphens, such as "article" (got ${JSON.stringify(value)})` };
 }
 
 /** A schema's x-pd-preview: the preview mode when it declares a valid one, the problem when it is invalid, nothing
@@ -185,6 +198,8 @@ export function checkSchemaExtensions(schema: unknown, template: string | undefi
 
   const exampleHeight = readExampleHeight(schema).problem;
   if (exampleHeight) problems.push({ path: "#/x-pd-example-height", message: exampleHeight });
+  const layoutMarker = readLayoutMarker(schema).problem;
+  if (layoutMarker) problems.push({ path: "#/x-pd-layout", message: layoutMarker });
   const preview = readPreviewMode(schema).problem;
   if (preview) problems.push({ path: "#/x-pd-preview", message: preview });
   const proseImages = readProseSlot(schema).problem;
