@@ -66,6 +66,9 @@ export interface PageAssembly {
   /** The stylesheet links for a page rendered with `layoutId` whose markup is `html`. */
   /** The page's stylesheets and scripts: of its layout, and of the components it places (`placed`, by id). */
   head(layoutId: string, html: string, placed: readonly string[]): Promise<string>;
+  /** The stylesheets the page links only by a borrowed class, as messages (page-head.ts, pageBorrowedStyles), for
+   *  the components it renders: its layout and what it places. Each becomes a warning on the page. */
+  borrowed?(roots: readonly string[]): Promise<string[]>;
   /** storefront.site from the config. */
   site: Record<string, unknown> | undefined;
   /** Where links into the workbench start, ending with "/". */
@@ -824,6 +827,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
   const article = isNotFound ? undefined : articleOf(route, model, checked.build.date, checked.build.updated);
+  // The components the page renders besides its layout: what it places, its listing's view, its queries' views.
+  const pageComponents = [...placedIds, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view && queryValues[q.name]?.listing ? [q.view.id] : [])];
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} · ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
@@ -839,8 +844,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       : []),
     ...(headExtra ? [headExtra] : []),
     ...(siteHead ? [siteHead] : []),
-    await a.head(checked.layoutId, html, [...placedIds, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view && queryValues[q.name]?.listing ? [q.view.id] : [])]),
+    await a.head(checked.layoutId, html, pageComponents),
   ].join("\n");
+  if (a.borrowed) notes.push(...(await a.borrowed([checked.layoutId, ...pageComponents])).map(m => `warning: ${page?.path ?? route}: ${m}`));
   // The 404 page is served at any depth, so every URL in it (its body's, its layout's, the head's) must be
   // root-relative or absolute: a relative one points somewhere else on every address.
   if (isNotFound) {

@@ -133,6 +133,39 @@ export function withRenderedClassOwners(
   return [...closureIds.slice(0, -1), ...[...extra].sort(), self];
 }
 
+/** A stylesheet linked by borrowing: `owner`'s, because the template uses `classes` it owns. */
+export interface BorrowedStyle { owner: string; classes: string[] }
+
+/**
+ * The owners whose stylesheets a template links only by borrowing: it uses a class they own, and its render does
+ * not include them (`included`, its include closure). Read from the template, not the rendered markup: a component
+ * a helper includes at render time (hTWOo's dynamicPartial) brings its own classes, and is not a borrow. Sorted by
+ * owner, each owner's classes sorted.
+ */
+export function borrowedStyles(
+  hbsSource: string,
+  componentId: string,
+  classOwnerIndex: ClassOwnerIndex,
+  included: ReadonlySet<string>,
+): BorrowedStyle[] {
+  const byOwner = new Map<string, Set<string>>();
+  for (const cls of templateClasses(hbsSource)) {
+    const owner = classOwnerIndex.get(cls);
+    if (!owner || owner === "__base__" || owner === componentId || included.has(owner)) continue;
+    let set = byOwner.get(owner);
+    if (!set) byOwner.set(owner, set = new Set());
+    set.add(cls);
+  }
+  return [...byOwner].sort(([a], [b]) => a.localeCompare(b)).map(([owner, cls]) => ({ owner, classes: [...cls].sort() }));
+}
+
+/** How a borrow is said, on a component and on a site page: the first class, how many more, and what it costs. */
+export function borrowedStyleMessage(componentId: string, b: BorrowedStyle): string {
+  const more = b.classes.length > 1 ? ` (and ${b.classes.length - 1} more)` : "";
+  return `${componentId} uses class "${b.classes[0]}"${more} from ${b.owner}, so ${b.owner}'s stylesheet is linked too: `
+    + `include ${b.owner} if it belongs here, or rename the class`;
+}
+
 /** Extract static CSS class names from a raw .hbs source.
  *  Uses node-html-parser; Handlebars expressions parse as harmless text nodes.
  *  Drops tokens that contain {{ or }} (dynamic). Keeps static base of e.g.
