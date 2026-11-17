@@ -80,6 +80,7 @@ export interface Dom {
   vpReadout: HTMLElement;
   vpModeLabelEl: HTMLElement;
   vpDiscoBtn: HTMLButtonElement;
+  layoutToggleBtn: HTMLButtonElement;
   cvdFeMatrix: SVGFEColorMatrixElement | null;
   a11yDetails: HTMLDetailsElement;
   cvdTypeGroup: HTMLElement;
@@ -151,6 +152,7 @@ export function initDom(app: HTMLElement): void {
   dom.vpReadout          = app.querySelector(".vp-readout") as HTMLElement;
   dom.vpModeLabelEl      = app.querySelector(".vp-mode-label") as HTMLElement;
   dom.vpDiscoBtn         = app.querySelector(".vp-disco-btn") as HTMLButtonElement;
+  dom.layoutToggleBtn    = app.querySelector(".layout-toggle-btn") as HTMLButtonElement;
   dom.cvdFeMatrix        = document.getElementById("cvd-matrix-vals") as SVGFEColorMatrixElement | null;
   dom.a11yDetails        = app.querySelector(".a11y-picker") as HTMLDetailsElement;
   dom.cvdTypeGroup       = app.querySelector(".cvd-type-group") as HTMLElement;

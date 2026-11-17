@@ -28,6 +28,7 @@
 
 import { dom } from "../core/dom.js";
 import { store } from "../core/store.js";
+import { session } from "../core/session.js";
 import { setVpProp } from "./preview-sizing.js";
 
 /** Frames measuring right now → the full width they are being measured at. */
@@ -39,7 +40,10 @@ const fitted = new WeakMap<HTMLIFrameElement, "measured" | "widened">();
 function fitsContent(frame: HTMLIFrameElement): boolean {
   if (frame === dom.iframe) {
     const vp = store.url.viewport;
-    return (vp === "fit" || vp === "content") && dom.stageView.dataset.layout !== "full";
+    // Only a centered document measures its width: a full one turned to content height by the toolbar
+    // (stage/layout-toggle.ts) keeps the full width.
+    return (vp === "fit" || vp === "content") && dom.stageView.dataset.layout !== "full"
+      && session.current?.layout !== "full";
   }
   return frame.closest(".gallery-item") !== null;
 }

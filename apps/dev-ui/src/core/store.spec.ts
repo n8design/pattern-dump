@@ -248,6 +248,32 @@ describe("reconcile: fullscreen without pattern → fit", () => {
   });
 });
 
+// ─── ?layout= — the "Full height" toggle (rule 6) ─────────────────────────────
+
+describe("parseUrlState + reconcile: ?layout=", () => {
+  const ctx: ReconcileContext = { availableVariants: null, knownFolderPaths: new Set(), knownThemes: new Set() };
+  const parse = (search: string, pathname = "/atoms/button") => parseUrlState({ pathname, hash: "", search });
+
+  it("reads full and centered, alongside ?vp=", () => {
+    expect(parse("?layout=full").layout).toBe("full");
+    expect(parse("?vp=mobile&layout=centered")).toMatchObject({ viewport: "mobile", layout: "centered" });
+  });
+
+  it("absent or unknown is null: the pattern's stored mode", () => {
+    expect(parse("").layout).toBeNull();
+    for (const v of ["", "Full", "fullscreen", "1", "<b>"]) expect(parse(`?layout=${encodeURIComponent(v)}`).layout).toBeNull();
+  });
+
+  it("rule 6: without a pattern it is dropped; with one it is kept", () => {
+    expect(reconcile(parse("?layout=full", "/"), DEFAULT_LOCAL_STATE, ctx).url.layout).toBeNull();
+    expect(reconcile(parse("?layout=full"), DEFAULT_LOCAL_STATE, ctx).url.layout).toBe("full");
+  });
+
+  it("is URL-only: never written to localStorage", () => {
+    expect(toJSON(DEFAULT_LOCAL_STATE)).not.toContain("layout");
+  });
+});
+
 // ─── reconcile — themeOverride one-shot ──────────────────────────────────────
 
 describe("reconcile: themeOverride write-through", () => {
