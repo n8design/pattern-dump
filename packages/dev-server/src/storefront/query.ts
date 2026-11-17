@@ -25,7 +25,8 @@ import { QUERY_OPTIONS } from "@pattern-dump/renderer";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import type { FrontmatterReading, FrontmatterValue } from "../frontmatter.js";
 import type { DatesMode, GitDates } from "./git-dates.js";
-import type { PageModel } from "./pages.js";
+import type { PageFile, PageModel } from "./pages.js";
+import { placeOf } from "./folder-defaults.js";
 import { entryOf, type Entry } from "./collections.js";
 import { checkEntries, readCard, cardOf, type Card } from "./cards.js";
 import { checkViewSampleData, viewOf, type ResolvedView } from "./views.js";
@@ -106,6 +107,8 @@ export interface QueryContext {
   /** The page's path in the pages folder. */
   path: string;
   frontmatter: FrontmatterReading;
+  /** What the page took from folders above it (folder-defaults.ts): a problem about it names that index.md. */
+  defaults?: PageFile["defaults"];
   layoutId: string;
   model: PageModel;
   discoveryMap: DiscoveryMap;
@@ -133,8 +136,8 @@ const folderOf = (route: string): string => route === "/" ? "/" : route.replace(
  *  the pages it lists. A page that turns it off gets none. */
 export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise<ResolvedQuery> {
   const problems: string[] = [], notes: string[] = [];
-  const { values, maps, lines } = ctx.frontmatter;
-  const pageAt = (key: string) => `${ctx.path}${lines[key] !== undefined ? `:${lines[key]}` : ""}`;
+  const { values, maps } = ctx.frontmatter;
+  const pageAt = (key: string) => placeOf({ path: ctx.path, frontmatter: ctx.frontmatter, ...(ctx.defaults ? { defaults: ctx.defaults } : {}) }, key);
   const layoutAt = `${ctx.layoutId} (${QUERY_KEY} of page.${q.name})`;
   const none = (): ResolvedQuery => ({ name: q.name, entries: [], problems, notes });
 

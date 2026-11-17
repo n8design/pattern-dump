@@ -82,6 +82,10 @@ export async function runBuild(
   }
   if (report.drafts) {
     console.log(`[pd build] drafts: ${report.drafts.length} left out (${report.drafts.join(", ")})`);
+    // A folder's draft default hides every page under it: said per folder, so a forgotten line can't do it silently.
+    for (const d of report.draftsByDefaults ?? []) {
+      console.log(`[pd build]   ${d.pages} page${d.pages === 1 ? " is a draft" : "s are drafts"} via the childDefaults of ${d.from}`);
+    }
   }
   if (report.scheduled) {
     console.log(`[pd build] scheduled: ${report.scheduled.length} held back (${report.scheduled.map(s => `${s.path} until ${s.until}`).join(", ")})`);

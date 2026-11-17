@@ -33,6 +33,7 @@ import { readChildLayout, readDate, readDraft, readSort, readTerms, readUpdated,
 import { termIndex, termOf, type Category, type CategoryIndex, type Term, type TermIndex } from "./categories.js";
 import type { StorefrontCategory, StorefrontTermPages } from "@pattern-dump/config";
 import { termPages, type GeneratedPage } from "./terms.js";
+import { applyFolderDefaults, type DefaultOrigin } from "./folder-defaults.js";
 import { teaserOf } from "./teaser.js";
 
 /** The layout a page uses when its frontmatter names none. */
@@ -51,6 +52,9 @@ export interface PageFile {
   /** The layout the page takes when it names none: the `childLayout` of the nearest folder above it that sets one
    *  (`from`: that folder's index.md). Absent when no folder above it does. */
   inherited?: InheritedLayout;
+  /** The frontmatter it took from folders above it (folder-defaults.ts), by key ("tags", "related.limit"), each with
+   *  the index.md and line it came from. Already merged into `frontmatter`. Absent when it took none. */
+  defaults?: Record<string, DefaultOrigin>;
 }
 
 /** A default layout from a folder: the name its index.md's `childLayout` gives, and that index.md's path. */
@@ -99,6 +103,9 @@ export interface PageModel extends StorefrontPagesResponse {
   /** Drafts, by their path in the pages folder: shown ones with `drafts: "show"`; with "leave-out", every page left
    *  out (a draft, and each page under a folder whose index.md is one). */
   drafts: string[];
+  /** The drafts whose `draft` came from a folder's childDefaults, each with that index.md: pd build names them, so a
+   *  forgotten line can't hide a section without a word. */
+  draftsByDefaults: { path: string; from: string }[];
   /** Pages whose date is after today, by path: shown ones (their own date only) with `scheduled: "show"`; with
    *  "leave-out", every page held back (a scheduled page, and each page under a folder whose index.md is one, until
    *  the later of the dates). Drafts are never in it. */
@@ -194,7 +201,7 @@ export async function readPages(pagesDir: string, opts: {
   const files = new Map<string, PageFile>();
   let notFound: PageFile | undefined;
   if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
-    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], scheduled: [], categories, tags, generated, problems: [`the pages folder ${pagesDir} does not exist`] };
+    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], draftsByDefaults: [], scheduled: [], categories, tags, generated, problems: [`the pages folder ${pagesDir} does not exist`] };
   }
   const bodies = new Map<string, string>();
   for (const path of (await markdownFiles(pagesDir, pagesDir, problems)).sort()) {
@@ -210,17 +217,24 @@ export async function readPages(pagesDir: string, opts: {
     bodies.set(route, text);
   }
 
+  // Folder defaults (folder-defaults.ts): merged into every page before anything reads its frontmatter, so a
+  // folder's draft, tags or query options count as the page's own.
+  applyFolderDefaults(files);
+
   // Drafts: shown, or left out with every page under a draft folder's index.md (the top's index.md is only itself).
   const isDraft = (f: PageFile | undefined): boolean => {
     const v = f?.frontmatter.values["draft"];
     return v !== undefined && (() => { const r = readDraft(v); return r.ok && r.value; })();
   };
   const drafts: string[] = [];
+  const draftsByDefaults: { path: string; from: string }[] = [];
   for (const [route, f] of [...files]) {
     const segments = route.split("/").filter(Boolean);
     const folderDraft = segments.slice(0, -1).some((_, i) => isDraft(files.get(`/${segments.slice(0, i + 1).join("/")}/`)));
     if (!isDraft(f) && !(opts.drafts === "leave-out" && folderDraft)) continue;
     drafts.push(f.path);
+    const viaDefaults = isDraft(f) ? f.defaults?.["draft"] : undefined;
+    if (viaDefaults) draftsByDefaults.push({ path: f.path, from: viaDefaults.from });
     if (opts.drafts === "leave-out") { files.delete(route); bodies.delete(route); }
   }
   drafts.sort();
@@ -258,7 +272,8 @@ export async function readPages(pagesDir: string, opts: {
   // one. A folder's index.md is a page of its parent folder, so its own childLayout is for the pages under it.
   const childLayoutOf = (folder: string): string | undefined => {
     const index = files.get(folder);
-    const v = index?.frontmatter.values["childLayout"];
+    // childDefaults.layout is the long form of childLayout (both set is the index.md's problem: folder-defaults.ts).
+    const v = index?.frontmatter.values["childLayout"] ?? index?.frontmatter.childDefaults?.values["layout"];
     if (!index || v === undefined) return undefined;
     const r = readChildLayout(v, index.path);
     return r.ok ? r.value : undefined;
@@ -282,6 +297,7 @@ export async function readPages(pagesDir: string, opts: {
       title: scalar(f.frontmatter.values["title"]) ?? f.route,
       layout: scalar(own) ?? inherited?.layout ?? DEFAULT_LAYOUT,
       ...(inherited ? { layoutFrom: inherited.from } : {}),
+      ...(f.defaults ? { defaultsFrom: Object.fromEntries(Object.entries(f.defaults).sort(([a], [b]) => a < b ? -1 : 1).map(([k, o]) => [k, o.from])) } : {}),
       ...(redirectFrom.length ? { redirectFrom } : {}),
     };
   };
@@ -428,6 +444,6 @@ export async function readPages(pagesDir: string, opts: {
   for (const g of generated.values()) {
     pages.push({ route: g.route, title: g.title, layout: g.layout, ...(g.redirectFrom.length ? { redirectFrom: g.redirectFrom } : {}) });
   }
-  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, scheduled, categories, tags, generated,
+  return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, draftsByDefaults, scheduled, categories, tags, generated,
     problems, ...(notFound ? { notFound } : {}) };
 }

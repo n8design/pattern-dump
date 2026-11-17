@@ -283,10 +283,65 @@ childLayout: article
   takes it. Each page is checked against the schema of the layout it ends up with, and a problem about that layout
   names where it came from: `"subtitle" is required by layout "article" (the childLayout of articles/index.md)`.
 - `404.md` is not a page of the site, so it takes no `childLayout`.
+- For any other key, see [A folder's defaults](#a-folders-defaults); `childLayout` is its short form for the layout.
 
 **Which layout a page got:** in the workbench, a layout's Relationships tab lists its **Pages**, each with where its
 layout came from ("its own layout", "childLayout of articles/index.md", "the default layout"). `/api/pages` on the
 website's host gives each page's `layout`, and `layoutFrom` when it came from a folder.
+
+### A folder's defaults
+
+`childLayout` sets one key for a folder's pages. `childDefaults` sets any of them, written as a page writes its
+frontmatter, indented under the key:
+
+```md
+---
+title: Services
+childDefaults:
+  layout: service
+  audience: business
+  tags: [consulting]
+  related:
+    collections: [episodes]
+    limit: 2
+---
+```
+
+Every page under `services/` now has the `service` layout, `audience: business`, the tag `consulting` and those two
+options for its `related` query, without writing them.
+
+- **A page's own value always wins**, key by key, and option by option for a query: a page that writes
+  `related:` with `  limit: 4` gets `limit: 4` and the folder's `collections`.
+- **The nearest folder wins**, key by key. `services/europe/index.md` can set `related:` with `  limit: 3`; its
+  pages then get `limit: 3` from it and `collections` from `services/`.
+- **A list is replaced, never joined.** With `tags: [guide]` in the folder and `tags: [setup]` on the page, the
+  page's tags are `[setup]` only. Write every tag a page should have on the page when it differs from its folder's.
+- **For the pages under the folder:** its own `index.md` takes its parent's defaults, as with `childLayout`.
+  `404.md` and the tag and category pages take none.
+- `layout` in `childDefaults` is `childLayout` written the long way. Use one: both on one `index.md` is a problem.
+- **What can't be a default:** what names one page (`title`, `order`, `redirectFrom`, `date`, `updated`), what
+  belongs to a folder's own `index.md` (`sort`, `view`, `childLayout`, `childDefaults`), and what the storefront
+  fills (`body`, `nav`, `site`, `page`). Each is a problem on the `index.md`, at its line.
+- **Checked as if the page had written it.** Each page is checked against the layout it ends up with, its folder's
+  values included, so a default its layout doesn't declare is a problem on that page. A problem about a value a
+  folder set names the page and where the value came from:
+
+  ```
+  services/web.md (from the childDefaults of services/index.md, line 9): limit "two" is not a number of pages: a whole number from 1, such as 3
+  ```
+
+  The values that can be checked without a page (`tags`, `categories`, `draft`, `index`, `toc`, `image`, `layout`)
+  are also checked on the `index.md`, so a folder with no pages yet is checked too.
+- **`draft: true` as a default** keeps every page under the folder out of `pd build`. So that a forgotten line can't
+  hide a section without a word, the build says so per folder:
+
+  ```
+  [pd build] drafts: 12 left out (...)
+  [pd build]   12 pages are drafts via the childDefaults of services/index.md
+  ```
+
+`/api/pages` on the website's host gives each page `defaultsFrom`: the keys it took from a folder, each with that
+folder's `index.md` (a query's options one by one, `"related.limit"`).
 
 ### Problems
 

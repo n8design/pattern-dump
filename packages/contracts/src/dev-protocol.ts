@@ -763,9 +763,14 @@ export interface StorefrontPage {
   title: string;
   /** The layout it renders with: the component `layouts/<layout>`. */
   layout: string;
-  /** Where the layout came from when the page names none: the folder's index.md whose `childLayout` it took
-   *  ("articles/index.md", relative to the pages folder). Absent for the page's own `layout:` and for the default. */
+  /** Where the layout came from when the page names none: the folder's index.md whose `childLayout` (or
+   *  `childDefaults.layout`) it took ("articles/index.md", relative to the pages folder). Absent for the page's own
+   *  `layout:` and for the default. */
   layoutFrom?: string;
+  /** The frontmatter it took from folders above it (`childDefaults` on their index.md), by key, each with the
+   *  index.md it came from: `{ "tags": "services/index.md", "related.limit": "services/europe/index.md" }`. A
+   *  query's options are named one by one. Absent when it took none (its layout is in `layoutFrom`). */
+  defaultsFrom?: Record<string, string>;
   /** Old routes that forward to this page (frontmatter `redirectFrom`), each root-relative and slash-wrapped.
    *  `pd build` writes a forwarding page at each. Absent when the page has none. */
   redirectFrom?: string[];

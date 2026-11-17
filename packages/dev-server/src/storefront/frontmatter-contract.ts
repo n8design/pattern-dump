@@ -24,6 +24,8 @@ import type { FrontmatterValue } from "../frontmatter.js";
 import { readChildLayout, readDate, readDraft, readSort, readTerms, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
 import { categoryIndex, termIndex, TERM_WORDS, type CategoryIndex, type TermIndex, type TermKind } from "./categories.js";
 import { declaredQueries } from "./query.js";
+import { checkChildDefaults, NOT_DEFAULTABLE, originOf, placeOf } from "./folder-defaults.js";
+import { CHILD_DEFAULTS } from "../frontmatter.js";
 import { designFiles } from "./design-files.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
@@ -143,11 +145,13 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   tags: TermIndex = termIndex("tag", undefined)): Promise<CheckedPage> {
   const { values, errors, lines } = page.frontmatter;
   const problems: PageProblem[] = errors.map(e => ({ file: page.path, line: e.line, message: e.message }));
+  // A value a folder set (folder-defaults.ts) is named with the index.md and line it came from, in place of a line.
   const at = (key: string, message: string): void => {
+    if (originOf(page, key)) { problems.push({ file: placeOf(page, key), message }); return; }
     problems.push({ file: page.path, ...(lines[key] !== undefined ? { line: lines[key] } : {}), message });
   };
   const notes: string[] = [];
-  const where = (key: string) => `${page.path}${lines[key] !== undefined ? `:${lines[key]}` : ""}`;
+  const where = (key: string) => placeOf(page, key);
   const renamed = (kind: TermKind, from: string, to: string): void => {
     const w = TERM_WORDS[kind];
     notes.push(`warning: ${where(w.many)}: ${w.one} "${from}" is now "${to}" (renamed in ${w.config}): write "${to}"`);
@@ -160,6 +164,24 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   const notALayout = (subject: string) => known.length
     ? `${subject} is not a layout: the layouts are ${known.map(n => `"${n}"`).join(", ")}`
     : `${subject} is not a layout: the project has no layouts (components in a layouts/ folder of its patterns)`;
+  // This index.md's childDefaults (folder-defaults.ts): keys that can't be defaulted, and the build keys' values,
+  // checked once here, so a folder with no pages yet is checked too. The rest is checked on each page that takes it.
+  const block = page.frontmatter.childDefaults;
+  if (block) {
+    for (const p of checkChildDefaults(page)) problems.push({ file: page.path, ...(p.line !== undefined ? { line: p.line } : {}), message: p.message });
+    const defaultsAt = (key: string, message: string): void => {
+      const line = lines[`${CHILD_DEFAULTS}.${key}`];
+      problems.push({ file: page.path, ...(line !== undefined ? { line } : {}), message: `${CHILD_DEFAULTS}.${message}` });
+    };
+    const defaultable = Object.fromEntries(Object.entries(block.values).filter(([k]) => !(NOT_DEFAULTABLE as readonly string[]).includes(k)));
+    checkBuildKeys(defaultable, page.path, defaultsAt, { categories, tags }, () => {});
+    const childLayout = block.values["layout"];
+    if (childLayout !== undefined) {
+      const r = readChildLayout(childLayout, page.path);
+      if (!r.ok) defaultsAt("layout", `layout: ${r.message.replace(/^childLayout/, "layout")}`);
+      else if (!isLayout(r.value)) defaultsAt("layout", `layout: ${notALayout(`"${r.value}"`)}`);
+    }
+  }
   // The default layout this index.md gives its folder's pages: checked here, once, whether or not a page takes it.
   const rawChild = values["childLayout"];
   if (rawChild !== undefined) {

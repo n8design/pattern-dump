@@ -15,6 +15,7 @@
 
 import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem, type ThemeSwitch } from "@pattern-dump/contracts";
 import { themeSyncScript } from "./theme-sync.js";
+import { defaultsNote, originOf, placeOf } from "./folder-defaults.js";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
 import type { SearchRecord } from "./search.js";
@@ -478,11 +479,10 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   problems.push(...site.problems);
 
   // The link-preview image: the page's own, else the site's. A bad site image is the whole site's problem.
-  const imageLine = page.frontmatter.lines["image"];
   const imageCheck = checked.build.image !== undefined ? await a.image(checked.build.image)
     : a.siteImage !== undefined ? await a.image(a.siteImage) : undefined;
   if (imageCheck && !imageCheck.ok) {
-    if (checked.build.image !== undefined) problems.push(`${page.path}${imageLine !== undefined ? `:${imageLine}` : ""}: ${imageCheck.message}`);
+    if (checked.build.image !== undefined) problems.push(`${placeOf(page, "image")}: ${imageCheck.message}`);
     else {
       const p = `storefront.image: ${imageCheck.message}`;
       siteWide = [...siteWide, p];
@@ -501,7 +501,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const skin = await skinRegions(a.discoveryMap);
   const wantsToc = checked.build.toc ?? regionDecl.toc;
   const tocAt = page.frontmatter.lines["toc"];
-  const tocWhat = checked.build.toc === true ? `toc: true` : `${checked.layoutId} (page.regions, x-pd-toc)`;
+  const tocOrigin = originOf(page, "toc");
+  const tocWhat = checked.build.toc === true ? `toc: true${tocOrigin ? defaultsNote(tocOrigin) : ""}` : `${checked.layoutId} (page.regions, x-pd-toc)`;
   /** The page's markdown, rendered; its headings' anchors never take one of `takenIds`. */
   /** The components the page's pd- tags placed (the last rendering of its body). */
   const placedIds = new Set<string>();
@@ -638,7 +639,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     if (!queryProblems.length) {
       for (const q of declaredQs) {
         if (isNotFound) { queries.push({ name: q.name, entries: [], problems: [], notes: [] }); continue; }
-        const r = await resolveQuery(q, { route, path: page.path, frontmatter: page.frontmatter, layoutId: checked.layoutId, model,
+        const r = await resolveQuery(q, { route, path: page.path, frontmatter: page.frontmatter, ...(page.defaults ? { defaults: page.defaults } : {}), layoutId: checked.layoutId, model,
           discoveryMap: a.discoveryMap, dates: a.dates, mode,
           ...(generated ? { own: {
             tags: generated.kind === "tag" && generated.term ? [generated.term.key] : [],

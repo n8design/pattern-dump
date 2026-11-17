@@ -107,6 +107,8 @@ export interface StaticBuildReport {
   /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
    *  their path in the pages folder. Absent when there are none. */
   drafts?: string[];
+  /** Of the drafts, how many took `draft` from a folder's childDefaults, by that index.md, sorted by it. */
+  draftsByDefaults?: { from: string; pages: number }[];
   /** The storefront's pages held back until a later day (a page dated after the build's day, and each page under a
    *  scheduled folder's index.md), each with the first day it is built. Absent when there are none. */
   scheduled?: ScheduledPage[];
@@ -613,6 +615,11 @@ async function buildOnce(
       if (imageSummary) report.images = imageSummary;
       const { drafts, scheduled } = model;
       if (drafts.length) report.drafts = drafts;
+      if (model.draftsByDefaults.length) {
+        const by = new Map<string, number>();
+        for (const d of model.draftsByDefaults) by.set(d.from, (by.get(d.from) ?? 0) + 1);
+        report.draftsByDefaults = [...by].sort(([a], [b]) => a < b ? -1 : 1).map(([from, pages]) => ({ from, pages }));
+      }
       if (scheduled.length) report.scheduled = scheduled;
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }

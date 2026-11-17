@@ -152,3 +152,59 @@ describe("readFrontmatterStrict reads the same values as the lenient reading", (
     }
   });
 });
+
+describe("readFrontmatterStrict: childDefaults, a folder's defaults for its pages", () => {
+  const md = [
+    "---",                          // 1
+    "title: Services",              // 2
+    "childDefaults:",               // 3
+    "  layout: service",            // 4
+    "  tags: [consulting, web]",    // 5
+    "  related:",                   // 6
+    "    collections:",             // 7
+    "      - episodes",             // 8
+    "    limit: 2",                 // 9
+    "order: 3",                     // 10
+    "---",
+    "Body",
+  ].join("\n");
+
+  it("reads its block as a page's frontmatter: keys, lists and one level of map", () => {
+    const r = readFrontmatterStrict(md);
+    expect(r.errors).toEqual([]);
+    expect(r.values).toEqual({ title: "Services", order: "3" });
+    expect(r.maps).toEqual({});
+    expect(r.childDefaults).toEqual({
+      values: { layout: "service", tags: ["consulting", "web"] },
+      maps: { related: { collections: ["episodes"], limit: "2" } },
+    });
+  });
+
+  it("names the line of every key in it", () => {
+    const { lines } = readFrontmatterStrict(md);
+    expect(lines).toMatchObject({
+      childDefaults: 3, "childDefaults.layout": 4, "childDefaults.tags": 5, "childDefaults.related": 6,
+      "childDefaults.related.collections": 7, "childDefaults.related.limit": 9, order: 10,
+    });
+  });
+
+  it("reports a problem in it at the file's line", () => {
+    const r = readFrontmatterStrict(["---", "childDefaults:", "  layout: service", "  tags: [a", "---"].join("\n"));
+    expect(r.errors).toEqual([{ line: 4, message: `"tags": the list opened with [ is never closed with ]` }]);
+  });
+
+  it("a line indented less than the block's first is an error, at its line", () => {
+    const r = readFrontmatterStrict(["---", "childDefaults:", "    layout: service", "  draft: true", "---"].join("\n"));
+    expect(r.errors).toEqual([{ line: 4, message: `"childDefaults": every line of its block is indented at least as far as the first` }]);
+  });
+
+  it("is a block of keys, not a list", () => {
+    const r = readFrontmatterStrict(["---", "childDefaults:", "  - a", "---"].join("\n"));
+    expect(r.errors.map(e => e.line)).toContain(2);
+  });
+
+  it("is absent from a file that sets none, and from the lenient reading's values", () => {
+    expect(readFrontmatterStrict("---\ntitle: A\n---\n").childDefaults).toBeUndefined();
+    expect(readFrontmatter(md)).toEqual({ title: "Services", order: "3" });
+  });
+});
