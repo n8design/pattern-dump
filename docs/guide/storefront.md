@@ -359,6 +359,9 @@ A layout's sample data (`<name>.json`) is what its workbench preview shows. It n
 page gets only its own values and the ones above. To keep that true, a sample may only use the keys its
 layout declares plus `body`, `nav` and `site`, and the storefront reports any other as a problem.
 
+In the workbench a layout fills the Stage, like a page or a template, so its `index.md` needs no
+`preview: full`. See [Preview layout](authoring.md#preview-layout) for overriding it.
+
 ### What the storefront derives for a page
 
 A layout that declares a `page` property in its schema, with sub-properties, gets those sub-keys of what
