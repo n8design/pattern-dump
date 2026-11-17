@@ -11,7 +11,6 @@
 // `text/markdown`; anything else is a named error, and nothing is rendered. Strict on purpose: a partial
 // included with the current context sees the placement's values too.
 
-import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { createMarkdown } from "../code-blocks.js";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
@@ -23,6 +22,7 @@ import { defaultRegion } from "./regions.js";
 import { TOC_ID, TOC_TAG, tocItems, type TocAnchor, type TocItem } from "./toc.js";
 import { checkPlaced, type ObjectSchema, type PlacedProblem, type PropertySchema } from "./declared-values.js";
 import { includeTree } from "./sample-data.js";
+import { designFiles } from "./design-files.js";
 
 /** Content markdown: block markdown, HTML escaped (html: false), markdown-it's link check. */
 const contentMd = createMarkdown({ html: false, linkify: false });
@@ -82,7 +82,7 @@ async function unsafeOutputs(id: string, at: PlacedProblem["at"], deps: Placemen
   for (const componentId of [...templates].sort()) {
     const file = deps.discoveryMap.get(componentId)?.hbsPath;
     if (!file) continue;
-    const source = await readFile(file, "utf8").catch(() => "");
+    const source = await designFiles(deps.discoveryMap).text(file).catch(() => "");
     for (const o of unescapedOutputs(source)) {
       if (!o.helper && allowed.has(o.name)) continue;
       const what = o.helper ? `a helper's result unescaped ({{{${o.name}}}})` : `"${o.name}" unescaped ({{{${o.name}}}})`;
@@ -121,7 +121,7 @@ async function sampleDataProblems(id: string, at: PlacedProblem["at"], deps: Pla
       const jsonPath = deps.discoveryMap.get(template)?.jsonPath;
       if (!jsonPath) continue;
       let sample: unknown;
-      try { sample = JSON.parse(await readFile(jsonPath, "utf8")); } catch { continue; } // reported as DATA_INVALID
+      try { sample = await designFiles(deps.discoveryMap).data(jsonPath); } catch { continue; } // reported as DATA_INVALID
       if (!isObject(sample)) continue;
       for (const key of undeclaredSampleKeys(sample, declared, "")) {
         problems.push({ at, message: `the sample data of ${template} (${basename(jsonPath)}) sets "${key}", which ${owner} does not declare, so it would show wherever ${owner} is placed` });
@@ -138,7 +138,7 @@ async function schemaProblems(id: string, at: PlacedProblem["at"], deps: Placeme
   for (const component of await placementComponents(id, deps)) {
     const entry = deps.discoveryMap.get(component);
     if (!entry?.schemaPath) continue; // no schema: checkPlaced says it cannot be placed with values
-    const template = entry.hbsPath ? await readFile(entry.hbsPath, "utf8").catch(() => undefined) : undefined;
+    const template = entry.hbsPath ? await designFiles(deps.discoveryMap).text(entry.hbsPath).catch(() => undefined) : undefined;
     for (const p of checkSchemaExtensions(await deps.schemaOf(component), template, {
       componentExists: c => deps.discoveryMap.has(c),
       hasSchema: c => deps.discoveryMap.get(c)?.schemaPath !== undefined,

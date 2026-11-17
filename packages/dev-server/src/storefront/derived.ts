@@ -98,6 +98,22 @@ export const RETIRED: Readonly<Record<string, string>> = {
 /** A page's place in the site. */
 export type Position = Pick<DerivedPage, "section" | "breadcrumbs" | "prev" | "next">;
 
+/** What positionOf looks pages up in: the same for every page of a site, so worked out once per site (the page
+ *  model is shared by every page and never changed). */
+interface NavIndex { titles: Map<string, string>; flat: StorefrontNavItem[]; flatAt: Map<string, number> }
+const navIndexes = new WeakMap<object, NavIndex>();
+function navIndex(site: Pick<StorefrontPagesResponse, "pages" | "nav">): NavIndex {
+  let index = navIndexes.get(site);
+  if (!index) {
+    const flat: StorefrontNavItem[] = site.nav.flatMap(n => [n, ...(n.children ?? [])]);
+    const flatAt = new Map<string, number>();
+    flat.forEach((n, i) => { if (!flatAt.has(n.route)) flatAt.set(n.route, i); });
+    index = { titles: new Map(site.pages.map(p => [p.route, p.title])), flat, flatAt };
+    navIndexes.set(site, index);
+  }
+  return index;
+}
+
 /**
  * Where `route` sits, from the pages and the nav alone (the inputs the watcher's pages fingerprint covers,
  * so a change to any of them reloads every page):
@@ -110,7 +126,7 @@ export type Position = Pick<DerivedPage, "section" | "breadcrumbs" | "prev" | "n
  *    sections. Null at either end, and for a page the nav does not list.
  */
 export function positionOf(route: string, site: Pick<StorefrontPagesResponse, "pages" | "nav">): Position {
-  const titles = new Map(site.pages.map(p => [p.route, p.title]));
+  const { titles, flat, flatAt } = navIndex(site);
   const link = (r: string): PageLink | null => titles.has(r) ? { route: r, title: titles.get(r)! } : null;
 
   const segments = route.split("/").filter(Boolean);
@@ -121,8 +137,7 @@ export function positionOf(route: string, site: Pick<StorefrontPagesResponse, "p
   const top = segments.length ? `/${segments[0]}/` : "/";
   const entry = site.nav.find(n => n.route === top) ?? null;
 
-  const flat: StorefrontNavItem[] = site.nav.flatMap(n => [n, ...(n.children ?? [])]);
-  const at = flat.findIndex(n => n.route === route);
+  const at = flatAt.get(route) ?? -1;
   const linkOf = (n: StorefrontNavItem | undefined): PageLink | null => n ? { route: n.route, title: n.title } : null;
   return {
     section: entry ? { route: entry.route, title: entry.title } : null,

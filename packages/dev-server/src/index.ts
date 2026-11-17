@@ -72,7 +72,7 @@ export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 // All mutable server state in one typed object — the seam that lets routes and the watcher
 // stop sharing lexical scope. Its header documents the three hazards.
 import { reportUnresolvableScripts } from "./requires.js";
-import { applyStyleData, cachedDiscovery, compositionFor, createServerState, currentDiscovery, setDiscovery } from "./server-state.js";
+import { applyStyleData, cachedDiscovery, compositionFor, createServerState, currentDiscovery, invalidateDiscovery, setDiscovery } from "./server-state.js";
 // Resolved paths + flags, derived once from PatternDumpConfig against the ONE resolution base.
 import { resolveServerConfig } from "./server-config.js";
 import { createImageService } from "./image-service.js";
@@ -419,6 +419,9 @@ export async function startDevServer(
         ...(opts.configPath && opts.reloadConfig ? { configFile: { path: opts.configPath, reload: opts.reloadConfig } } : {}),
       });
       settleWatcher = watcher.settle;
+      // What was read before the watcher could see an edit is not kept: the discovery, and with it every renderer
+      // and file store made for it (design-files.ts), is made again on the next request.
+      invalidateDiscovery(state);
     } catch (e) {
       await hotreloader.close().catch(() => {});
       await new Promise<void>(res => httpServer.close(() => res()));

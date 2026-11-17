@@ -24,6 +24,7 @@ import type { FrontmatterValue } from "../frontmatter.js";
 import { readChildLayout, readDate, readDraft, readSort, readTerms, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
 import { categoryIndex, termIndex, TERM_WORDS, type CategoryIndex, type TermIndex, type TermKind } from "./categories.js";
 import { declaredQueries } from "./query.js";
+import { designFiles } from "./design-files.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
 export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view", "toc"] as const;
@@ -185,7 +186,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   }
 
   // ---- the layout's schema: what a page may set ----
-  const read = await readSchema(entry.schemaPath);
+  const read = await readSchema(entry.schemaPath, designFiles(discoveryMap));
   if (read.error !== undefined) {
     problems.push({ file: page.path, message: `the schema of ${named} cannot be read: ${read.error}` });
     return { layoutId, values: {}, build: buildKeys(), problems, notes };

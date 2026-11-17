@@ -12,20 +12,20 @@
 // registry type — the arrow points one way, neither imports this module back.
 
 import type { PatternDirs } from "./pattern-dirs.js";
-import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import postcss from "postcss";
 import * as sass from "sass";
 import { SourceMapConsumer } from "source-map";
 import { sassPackageOptions } from "@pattern-dump/build";
-import { parse as parseHtml } from "node-html-parser";
+import { parsedHtml } from "./parsed-html.js";
 import type { DiscoveryMap, RelationshipsAvailable } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "./composition.js";
 import {
   resolveScssToComponent, cssNodeText, joinCssChunks, addLastOccurrence,
   type ClassOwnerIndex, type BaseProvenanceIndex,
 } from "./style-index.js";
+import { designFiles } from "./storefront/design-files.js";
 
 /** Recompile a single SCSS entry file with source map and return the updated own-origin CSS
  *  for the given component id. Used by the HMR watcher to update perComponentCssCache.
@@ -91,7 +91,7 @@ export async function computeCssClosure(
 
     const hbsPath = discoveryMap.get(id)?.hbsPath ?? "";
     let hbs = "";
-    try { hbs = hbsPath ? await readFile(hbsPath, "utf-8") : ""; } catch { /* unreadable or missing .hbs — treat as empty markup, not a hard failure */ }
+    try { hbs = hbsPath ? await designFiles(discoveryMap).text(hbsPath) : ""; } catch { /* unreadable or missing .hbs — treat as empty markup, not a hard failure */ }
     const { styleUses } = deriveClassBorrowingFields(hbs, id, classOwnerIndex);
 
     // Recurse into all deps first (pre-DFS); push self after all deps (post-order).
@@ -138,7 +138,7 @@ export function withRenderedClassOwners(
  *  Drops tokens that contain {{ or }} (dynamic). Keeps static base of e.g.
  *  "hoo-button" from class="hoo-button hoo-button--{{variant}}". */
 export function extractUsedClasses(hbsSource: string): string[] {
-  const root = parseHtml(hbsSource);
+  const root = parsedHtml(hbsSource);
   const classes = new Set<string>();
   for (const el of root.querySelectorAll("[class]")) {
     const raw = el.getAttribute("class") ?? "";
@@ -151,6 +151,20 @@ export function extractUsedClasses(hbsSource: string): string[] {
   return [...classes];
 }
 
+/** A template's static classes (extractUsedClasses), kept by its text: every site page asks for those of its layout's
+ *  whole include tree, and parsing the templates as HTML each time was a share of every page. Kept for up to 10,000
+ *  texts, then started again; an edited template is a new text. */
+const keptClasses = new Map<string, readonly string[]>();
+function templateClasses(hbsSource: string): readonly string[] {
+  let classes = keptClasses.get(hbsSource);
+  if (!classes) {
+    if (keptClasses.size >= 10_000) keptClasses.clear();
+    classes = Object.freeze(extractUsedClasses(hbsSource));
+    keptClasses.set(hbsSource, classes);
+  }
+  return classes;
+}
+
 /** Parse a raw .hbs source and derive the class-borrowing relationships fields:
  *  styleUses (other components whose classes appear here), inlineStyles flag,
  *  utilityClasses flag, and unattributedClasses (owned by nothing recognised). */
@@ -160,7 +174,7 @@ export function deriveClassBorrowingFields(
   classOwnerIndex: ClassOwnerIndex,
   baseProvenance?: BaseProvenanceIndex
 ): Pick<RelationshipsAvailable, "styleUses" | "styleModules" | "inlineStyles" | "utilityClasses" | "unattributedClasses"> {
-  const usedClasses = extractUsedClasses(hbsSource);
+  const usedClasses = templateClasses(hbsSource);
 
   const styleUses = [...new Set(
     usedClasses

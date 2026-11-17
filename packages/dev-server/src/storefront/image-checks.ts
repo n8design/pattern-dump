@@ -10,7 +10,7 @@
 // <img> only: og:image and twitter:image stay the original file (decided), an icon is a <link>, and a stylesheet's
 // url() has no variant mechanism, so there is no fix an error there could name. page.ts turns the findings into page
 // problems in pd build and into warnings in pd dev.
-import { parse } from "node-html-parser";
+import { parsedHtml } from "../parsed-html.js";
 import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
 
 export interface ImageFinding { kind: "size" | "raster" | "external"; src: string }
@@ -31,7 +31,9 @@ function srcsetUrls(srcset: string): string[] {
 /** Every finding about the <img> elements of `html`, in document order. */
 export function checkImages(html: string): ImageFinding[] {
   const findings: ImageFinding[] = [];
-  for (const img of parse(html).querySelectorAll("img")) {
+  // No "<img" in the text, no <img> element: nothing to parse.
+  if (!/<img\b/i.test(html)) return findings;
+  for (const img of parsedHtml(html).querySelectorAll("img")) {
     const src = img.getAttribute("src") ?? "";
     const width = img.getAttribute("width")?.trim();
     const height = img.getAttribute("height")?.trim();

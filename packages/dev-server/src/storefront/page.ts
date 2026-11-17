@@ -27,6 +27,7 @@ import { readSchema, unreadableSchemas, type ObjectSchema, type PlacedProblem } 
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
 import { renderError } from "./pages-cache.js";
+import { designFiles } from "./design-files.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { resolveNavigations } from "./navigations.js";
 import { checkSampleData, includeTree } from "./sample-data.js";
@@ -309,11 +310,49 @@ const withDeclaredAbsentAsNull = (values: Record<string, unknown>, declared: str
   return { ...out, ...values };
 };
 
-const markCurrent = (nav: StorefrontNavItem[], route: string): unknown[] => nav.map(item => ({
-  ...item,
-  ...(item.route === route ? { current: true } : {}),
-  ...(item.children ? { children: item.children.map(c => ({ ...c, ...(c.route === route ? { current: true } : {}) })) } : {}),
-}));
+/** Where each route is in a nav: its entries' indexes and, for a child, its index among its parent's children. Worked
+ *  out once per nav (the page model is shared by every page and never changed). */
+const navPlaces = new WeakMap<readonly StorefrontNavItem[], Map<string, Array<[number, number | undefined]>>>();
+function placesIn(nav: readonly StorefrontNavItem[]): Map<string, Array<[number, number | undefined]>> {
+  let places = navPlaces.get(nav);
+  if (!places) {
+    places = new Map();
+    const add = (route: string, at: [number, number | undefined]): void => { places!.set(route, [...places!.get(route) ?? [], at]); };
+    nav.forEach((item, i) => { add(item.route, [i, undefined]); item.children?.forEach((c, j) => add(c.route, [i, j])); });
+    navPlaces.set(nav, places);
+  }
+  return places;
+}
+
+/** The nav with `current: true` on the entries at `route`. Only those, and the entries holding them, are new objects;
+ *  the rest are the model's own, shared by every page (frozen in the server). */
+const markCurrent = (nav: readonly StorefrontNavItem[], route: string): unknown[] => {
+  const out: unknown[] = [...nav];
+  const children = new Map<number, unknown[]>();
+  for (const [i, j] of placesIn(nav).get(route) ?? []) {
+    const item = nav[i]!;
+    if (j === undefined) { out[i] = { ...(out[i] as StorefrontNavItem), current: true }; continue; }
+    const list = children.get(i) ?? [...item.children!];
+    list[j] = { ...item.children![j]!, current: true };
+    children.set(i, list);
+  }
+  for (const [i, list] of children) out[i] = { ...(out[i] as StorefrontNavItem), children: list };
+  return out;
+};
+
+/** The paths of a site's pages and its folders, for checkSite: the same for every page, so worked out once per model. */
+const sitePaths = new WeakMap<PageModel, { pages: Set<string>; folders: Set<string> }>();
+function pathsOf(model: PageModel): { pages: Set<string>; folders: Set<string> } {
+  let paths = sitePaths.get(model);
+  if (!paths) {
+    paths = {
+      pages: new Set([...model.files.values()].map(f => f.path)),
+      folders: new Set([...model.folders.keys()].filter(r => r !== "/").map(r => r.slice(1, -1))),
+    };
+    sitePaths.set(model, paths);
+  }
+  return paths;
+}
 
 /** A layout's default view for its listing: x-pd-view on page.listing, when it names one. */
 const defaultView = (schema: { properties?: Record<string, unknown> } | undefined): string | undefined => {
@@ -325,7 +364,7 @@ const defaultView = (schema: { properties?: Record<string, unknown> } | undefine
 /** A generated page (terms.ts) as a page file: its layout, its title and description as its frontmatter would give
  *  them (only what the layout declares; a layout that doesn't declare a title is a problem), and no body. */
 async function generatedFile(g: GeneratedPage, discoveryMap: DiscoveryMap): Promise<{ page: PageFile; problems: string[] }> {
-  const declared = (await readSchema(discoveryMap.get(`layouts/${g.layout}`)?.schemaPath)).schema?.properties ?? {};
+  const declared = (await readSchema(discoveryMap.get(`layouts/${g.layout}`)?.schemaPath, designFiles(discoveryMap))).schema?.properties ?? {};
   const problems: string[] = [];
   const values: Record<string, string> = { layout: g.layout };
   const whose = g.role === "index" ? `the index of the ${g.kind === "tag" ? "tags" : "categories"}` : `a ${g.kind} page`;
@@ -337,11 +376,15 @@ async function generatedFile(g: GeneratedPage, discoveryMap: DiscoveryMap): Prom
 
 /** Every template among `ids` (with what each includes) that writes a tag as text, which an object can't be shown as;
  *  and every schema among them that declares tags as strings, which a page's tags no longer are. */
-async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promise<string[]> {
+async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promise<readonly string[]> {
+  // From the design system's files alone: once per discovery for the same components (design-files.ts).
+  return designFiles(a.discoveryMap).derived(`tags as text ${JSON.stringify(ids)}`, () => tagsAsTextIn(ids, a));
+}
+async function tagsAsTextIn(ids: readonly string[], a: PageAssembly): Promise<string[]> {
   const problems: string[] = [];
   for (const id of [...new Set(ids.flatMap(id => includeTree(id, a.composition)))]) {
     const entry = a.discoveryMap.get(id);
-    const schema = (await readSchema(entry?.schemaPath)).schema;
+    const schema = (await readSchema(entry?.schemaPath, designFiles(a.discoveryMap))).schema;
     const tags = (schema?.properties?.["tags"] ?? (schema?.properties?.["page"] as ObjectSchema | undefined)?.properties?.["tags"]) as
       { items?: { type?: unknown } } | undefined;
     const itemType = tags?.items?.type;
@@ -351,7 +394,7 @@ async function tagsWrittenAsText(ids: readonly string[], a: PageAssembly): Promi
     }
     const hbs = entry?.hbsPath;
     if (!hbs) continue;
-    const source = await readFile(hbs, "utf8").catch(() => "");
+    const source = await designFiles(a.discoveryMap).text(hbs).catch(() => "");
     for (const f of itemsWrittenAsText(source, "tags")) {
       problems.push(`${id} (${basename(hbs)}:${f.line}): {{#each ${f.list}}} writes {{${f.item}}}, but a tag is an object since 0.5.0 `
         + `(key, label, description, route): write {{label}} to show it ({{key}} is its URL segment, {{route}} its page)`);
@@ -388,7 +431,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       return { status: 404, html: document(`<title>Page not found</title>`, BUILT_IN_NOT_FOUND_DOCUMENT, a.live, a.lang, a.basePath ?? "/"), problems: [],
         notes: [`there is no ${NOT_FOUND_FILE} and no ${layoutId}, so the 404 page is a plain one of Pattern Dump's`] };
     }
-    const declared = (await readSchema(a.discoveryMap.get(layoutId)?.schemaPath)).schema?.properties ?? {};
+    const declared = (await readSchema(a.discoveryMap.get(layoutId)?.schemaPath, designFiles(a.discoveryMap))).schema?.properties ?? {};
     source = builtInNotFound(Object.hasOwn(declared, "title"));
     page = { route, file: "", path: `${NOT_FOUND_FILE} (built in)`, frontmatter: readFrontmatterStrict(source) };
   }
@@ -416,9 +459,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const line = page.frontmatter.lines["redirectFrom"];
     problems.push(`${page.path}${line !== undefined ? `:${line}` : ""}: the 404 page can't have redirectFrom: it is served for every address that has no page`);
   }
-  const site = await checkSite(a.site, a.discoveryMap, new Set([...model.files.values()].map(f => f.path)), {
-    folders: new Set([...model.folders.keys()].filter(r => r !== "/").map(r => r.slice(1, -1))), leftOut: model.drafts,
-  });
+  const paths = pathsOf(model);
+  const site = await checkSite(a.site, a.discoveryMap, paths.pages, { folders: paths.folders, leftOut: model.drafts });
   siteWide = site.problems;
   problems.push(...site.problems);
 
@@ -436,7 +478,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
 
   // The layout's slot for the page's images (x-pd-prose-images), and the image index they are looked up in.
-  const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath)).schema;
+  const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath, designFiles(a.discoveryMap))).schema;
   const proseSlot = readProseSlot(layoutSchema);
   const imageLookup = a.images ? await a.images() : undefined;
 
@@ -466,7 +508,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition,
       // Each component rendered for a placement: the page loads its behaviour scripts (page-head.ts).
       render: input => { placedIds.add(input.component.split("~")[0]!); return a.render(input); },
-      schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath)).schema,
+      schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath, designFiles(a.discoveryMap))).schema,
       shown: a.shown,
     };
     const body = await renderDoc(
@@ -506,7 +548,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   problems.push(...first.imageProblems.map(p => `${page.path}:${p.line}: ${p.message}`));
 
   // The layout's sample data, and that of every partial it includes, must stay out of real pages.
-  const siteSchema = (await readSchema(a.discoveryMap.get(SITE_SCHEMA_OWNER)?.schemaPath)).schema;
+  const siteSchema = (await readSchema(a.discoveryMap.get(SITE_SCHEMA_OWNER)?.schemaPath, designFiles(a.discoveryMap))).schema;
   const layoutDeclared = Object.keys(layoutSchema?.properties ?? {});
   const siteDeclared = Object.keys(siteSchema?.properties?.site?.properties ?? {});
   const pageDeclaration = checkPageDeclaration(layoutSchema, checked.layoutId);

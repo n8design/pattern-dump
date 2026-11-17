@@ -14,7 +14,6 @@
 // however deep — may only use those keys. Anything else is a problem, fatal to every page using the
 // layout. (A variant's data is not checked: a page renders a layout's base, never a variant.)
 
-import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "../composition.js";
@@ -24,6 +23,7 @@ import { ENTRY, outsideShape, PAGE_SHAPE, type Shape } from "./derived.js";
 /** What a layout gets for a query: its pages, and the same through its view. */
 const QUERY_SHAPE: Shape = { fields: { entries: { items: ENTRY }, listing: "value" } };
 import { SITE_SCHEMA_OWNER } from "./site.js";
+import { designFiles } from "./design-files.js";
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -65,7 +65,7 @@ export async function checkSampleData(
     if (!jsonPath) continue;
     const where = `the sample data of ${id} (${basename(jsonPath)})`;
     let data: unknown;
-    try { data = JSON.parse(await readFile(jsonPath, "utf8")); }
+    try { data = await designFiles(discoveryMap).data(jsonPath); }
     catch (e) { problems.push(`${where} cannot be read: ${e instanceof Error ? e.message : String(e)}`); continue; }
     if (!isPlainObject(data)) continue;
     if (cards.includes(id)) {

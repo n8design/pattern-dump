@@ -18,7 +18,7 @@ import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile } from "node:fs/promises";
-import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap } from "@pattern-dump/contracts";
+import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap, type StorefrontPage } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
@@ -136,6 +136,19 @@ export interface RouteContext {
 
 /** What the running process knows about itself, frozen at startup. The wire shape adds `protocol`. */
 export type BootStamp = Readonly<Omit<VersionInfo, "protocol">>;
+
+/** Each old route a page lists in redirectFrom, with the first page that lists it: once per page model (shared by every
+ *  request until the pages change), not a search of every page on every request. */
+const redirectMaps = new WeakMap<object, Map<string, StorefrontPage>>();
+function redirectsOf(model: { pages: readonly StorefrontPage[] }): Map<string, StorefrontPage> {
+  let map = redirectMaps.get(model);
+  if (!map) {
+    map = new Map();
+    for (const p of model.pages) for (const from of p.redirectFrom ?? []) if (!map.has(from)) map.set(from, p);
+    redirectMaps.set(model, map);
+  }
+  return map;
+}
 
 export async function handleRequest(
   req: IncomingMessage,
@@ -688,7 +701,7 @@ async function routeRequest(
       // A page route is a folder path; /about is /about/, as a static host serves it.
       const route = /\.[a-z0-9]+$/i.test(pathname) ? null : pathname.endsWith("/") ? pathname : `${pathname}/`;
       // An old route a page lists in redirectFrom: the page that forwards to it, as pd build writes it.
-      const movedTo = route === null ? undefined : model.pages.find(p => p.redirectFrom?.includes(route));
+      const movedTo = route === null ? undefined : redirectsOf(model).get(route);
       if (movedTo && !model.problems.length) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(redirectStub({ route: movedTo.route, title: movedTo.title, siteUrl, lang: cfg.storefront.lang }));

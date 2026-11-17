@@ -13,6 +13,7 @@ import { readFile } from "node:fs/promises";
 import { suggest } from "@pattern-dump/config";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { parseJson } from "@pattern-dump/renderer";
+import { designFiles, type DesignFiles } from "./design-files.js";
 import type { FrontmatterValue } from "../frontmatter.js";
 
 export type JsonType = "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
@@ -146,7 +147,8 @@ export interface ObjectSchema {
 /** A component's schema file, parsed: `schema` is absent when there is no file; `error` says why one
  *  cannot be read (for a file that isn't JSON, the parser's reason and where). The one place a storefront check
  *  reads a schema. */
-export async function readSchema(schemaPath: string | undefined): Promise<{ schema?: ObjectSchema; error?: string }> {
+export async function readSchema(schemaPath: string | undefined, files?: DesignFiles): Promise<{ schema?: ObjectSchema; error?: string }> {
+  if (files) return files.schema<ObjectSchema>(schemaPath);
   if (!schemaPath) return {};
   let text: string;
   try {
@@ -169,16 +171,20 @@ export async function unreadableSchemas(discoveryMap: DiscoveryMap, shown: (path
   for (const [id, entry] of discoveryMap) {
     if (entry.schemaPath && !byFile.has(entry.schemaPath)) byFile.set(entry.schemaPath, id.split("~")[0]!);
   }
-  const problems: string[] = [];
-  for (const [file, id] of [...byFile].sort(([a], [b]) => a.localeCompare(b))) {
-    const text = await readFile(file, "utf8").catch(() => undefined);
-    if (text === undefined) continue;
-    const parsed = parseJson(text);
-    if (parsed.ok) continue;
-    const at = parsed.line !== undefined ? `:${parsed.line}:${parsed.column}` : "";
-    problems.push(`${shown(file)}${at}: not valid JSON (${parsed.reason}), so ${id} isn't checked against its schema until it's fixed`);
-  }
-  return problems;
+  // Which schemas don't parse depends on the files alone: worked out once per discovery (design-files.ts).
+  const files = designFiles(discoveryMap);
+  const broken = await files.derived("unreadable schemas", async () => {
+    const out: Array<{ file: string; at: string; reason: string; id: string }> = [];
+    for (const [file, id] of [...byFile].sort(([a], [b]) => a.localeCompare(b))) {
+      const text = await files.text(file).catch(() => undefined);
+      if (text === undefined) continue;
+      const parsed = parseJson(text);
+      if (parsed.ok) continue;
+      out.push({ file, at: parsed.line !== undefined ? `:${parsed.line}:${parsed.column}` : "", reason: parsed.reason, id });
+    }
+    return out;
+  });
+  return broken.map(b => `${shown(b.file)}${b.at}: not valid JSON (${b.reason}), so ${b.id} isn't checked against its schema until it's fixed`);
 }
 
 // ─── Placed components ───────────────────────────────────────────────────────────────────────────────
