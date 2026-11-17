@@ -14,6 +14,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { deepMerge } from "@pattern-dump/renderer";
+import { recordingPartials } from "./partial-lookups.js";
 
 /**
  * Load project Handlebars helper modules from a config-declared path (dir or single file).
@@ -73,17 +74,17 @@ export async function readHelperRegistrars(helpersPath: string, opts: { bust?: n
       const mod = await import(href) as Record<string, unknown>;
       const def = (mod["default"] ?? mod) as unknown;
       if (typeof def === "function") {
-        registrars.push(def as (hb: unknown) => void);
+        registrars.push(recordingPartials(def as (hb: unknown) => void));
         sources.push(file);
       } else if (def && typeof def === "object") {
         const named = Object.entries(def as Record<string, unknown>)
           .filter(([, v]) => typeof v === "function") as Array<[string, (...a: unknown[]) => unknown]>;
         if (named.length) {
           sources.push(file);
-          registrars.push((hb: unknown) => {
+          registrars.push(recordingPartials((hb: unknown) => {
             const h = hb as { registerHelper(n: string, f: (...a: unknown[]) => unknown): void };
             for (const [name, fn] of named) h.registerHelper(name, fn);
-          });
+          }));
         }
       }
     } catch (e) {

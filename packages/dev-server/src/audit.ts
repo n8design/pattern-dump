@@ -20,7 +20,7 @@ import { baseComponentIds } from "./discovery-index.js";
 import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 import { buildCompositionRegistry } from "./composition.js";
 import { surfaceFlattening } from "./surfacing.js";
-import { refreshDiagnosticsGraph, graphArtifactPath, type CheckRenderer } from "./diagnostics.js";
+import { auditInputs, refreshDiagnosticsGraph, graphArtifactPath, type CheckRenderer } from "./diagnostics.js";
 import { resolveServerConfig } from "./server-config.js";
 import { loadPatternPackages } from "./packages.js";
 import { createDisplayPath } from "./display-path.js";
@@ -55,12 +55,13 @@ export async function runDiagnosticsAudit(
   }) as CheckRenderer;
 
   const discovery = await buildDiscoveryMap(patternRoots);
-  const { graph, reaudited, reused } = await refreshDiagnosticsGraph(
-    cwd, baseComponentIds(discovery), render, discovery.quarantineMap, discovery.discoveryMap, globalData,
-  );
-  // Headless one-shot also emits the flattening side artifact. This path builds neither collisions
-  // nor the composition registry, so build the registry here for the pass.
+  // The composition registry: what each component includes, for the audit's cache keys, and the flattening pass.
   const registry = await buildCompositionRegistry(patternDirs, discovery.handleMap, discovery.discoveryMap);
+  const inputs = await auditInputs({
+    discoveryMap: discovery.discoveryMap, handleMap: discovery.handleMap, composition: registry, globalData, helperPaths: cfg.helperPaths,
+  });
+  const { graph, reaudited, reused } = await refreshDiagnosticsGraph(cwd, baseComponentIds(discovery), render, discovery.quarantineMap, inputs);
+  // Headless one-shot also emits the flattening side artifact.
   await surfaceFlattening(discovery.discoveryMap, registry, cwd);
   return { graph, reaudited, reused, artifactPath: graphArtifactPath(cwd), ...(imageWarning ? { imageWarning } : {}) };
 }

@@ -20,8 +20,10 @@
 
 import { checkCodeDigest } from "./check-code.js";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
+import { readdir, readFile, writeFile, mkdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
+import type { CompositionRegistry } from "./composition.js";
+import { recordPartialLookups } from "./partial-lookups.js";
 import { runA11yProducer } from "@pattern-dump/a11y";
 import type {
   CollisionEntry, Diagnostic, DiagnosticEngine, DiagnosticTag,
@@ -194,7 +196,8 @@ export async function buildDiagnosticsGraph(
 
 // ---- Persistence + per-component hash (section 4) ----
 
-export const GRAPH_ARTIFACT_VERSION = 1;
+// 2: a component's hash covers what it includes (AuditInputs), so a cache keyed on its own files alone is dropped.
+export const GRAPH_ARTIFACT_VERSION = 2;
 
 /** The on-disk artifact: the graph plus the per-component content hashes it was derived from. Lives at
  *  a PD-owned path OUTSIDE the project root (the root may be read-only). The disk copy is cacheable and
@@ -203,6 +206,8 @@ export const GRAPH_ARTIFACT_VERSION = 1;
 interface PersistedDiagnostics {
   version: number;
   hashes: Record<string, string>;
+  /** What each component's render included by name through a project helper (AuditedSlice.includes). */
+  includes?: Record<string, string[]>;
   graph: DiagnosticsGraph;
 }
 
@@ -234,29 +239,109 @@ async function writeDiagnosticsArtifact(root: string, art: PersistedDiagnostics)
 }
 
 /**
- * Per-component content hash = hash(id + template source + own data + own schema + global-data digest +
- * check-code digest). The schema is the input of the schema checks (a field named like a helper among them). A matching hash means the static findings cannot have changed: the same input, judged by the
- * same check code (renderer, a11y, contracts; check-code.ts).
+ * What a component's audit depends on besides its own files, read once for an audit pass: the design system (to
+ * follow what a component includes), the composition graph, and the digest of everything every render shares (the
+ * global data, the project helpers' source). Made by auditInputs; the same for `pd audit`, the workbench's seed and
+ * pd dev's live re-audits.
+ */
+export interface AuditInputs {
+  readonly discoveryMap: DiscoveryMap;
+  /** Handle to component id: a partial a helper looked up is named by its handle. */
+  readonly handleMap: ReadonlyMap<string, string>;
+  readonly composition: CompositionRegistry;
+  /** The global data and the project helpers' source, digested: in every component's hash. */
+  readonly digest: string;
+  /** A file's text for this pass ("" when it can't be read). */
+  text(path: string): Promise<string>;
+  /** Every template, data and schema file of the design system, digested once for this pass. */
+  everything(): Promise<string>;
+}
+
+/** Every file under `path` (a file, or a folder read through), sorted. */
+async function filesUnder(path: string): Promise<string[]> {
+  const s = await stat(path).catch(() => undefined);
+  if (!s) return [];
+  if (!s.isDirectory()) return [path];
+  const entries = await readdir(path, { recursive: true, withFileTypes: true });
+  return entries.filter(e => e.isFile()).map(e => join(e.parentPath, e.name)).sort();
+}
+
+export async function auditInputs(o: {
+  discoveryMap: DiscoveryMap; handleMap: ReadonlyMap<string, string>; composition: CompositionRegistry;
+  globalData: Record<string, unknown> | undefined; helperPaths?: readonly string[];
+}): Promise<AuditInputs> {
+  const texts = new Map<string, Promise<string>>();
+  const text = (path: string): Promise<string> => {
+    let t = texts.get(path);
+    if (!t) { t = readFile(path, "utf-8").catch(() => ""); texts.set(path, t); }
+    return t;
+  };
+  const helpers = createHash("sha1");
+  for (const file of (await Promise.all((o.helperPaths ?? []).map(filesUnder))).flat()) {
+    helpers.update(file).update(" ").update(await readFile(file).catch(() => Buffer.alloc(0))).update(" ");
+  }
+  let all: Promise<string> | undefined;
+  const everything = (): Promise<string> => all ??= (async () => {
+    const h = createHash("sha1");
+    const paths = [...new Set([...o.discoveryMap.values()].flatMap(e => [e.hbsPath, e.jsonPath, e.schemaPath]).filter((p): p is string => !!p))].sort();
+    for (const p of paths) h.update(p).update(" ").update(await text(p)).update(" ");
+    return h.digest("hex");
+  })();
+  return {
+    discoveryMap: o.discoveryMap, handleMap: o.handleMap, composition: o.composition,
+    digest: createHash("sha1").update(globalDataDigest(o.globalData)).update(" ").update(helpers.digest("hex")).digest("hex"),
+    text, everything,
+  };
+}
+
+/** `id` and everything its render can include: what its templates include, through every level (the composition
+ *  graph), a variant's base, and `also` (what a helper included by name) with what those include. In a stable order. */
+export function includeClosure(id: string, composition: CompositionRegistry, also: readonly string[] = []): string[] {
+  const seen = new Set<string>();
+  const queue = [id, ...also];
+  while (queue.length) {
+    const next = queue.shift()!;
+    if (seen.has(next)) continue;
+    seen.add(next);
+    if (next.includes("~")) queue.push(next.split("~")[0]!);
+    queue.push(...composition.uses.get(next) ?? []);
+  }
+  return [id, ...[...seen].filter(x => x !== id).sort()];
+}
+
+/** Whether `template` has a dynamic partial (`{{> (expr)}}`): Handlebars resolves its name at render time, where a
+ *  project helper's lookups are noted (partial-lookups.ts) but this one is not, so it can include any template. */
+const mayIncludeAnything = (template: string): boolean => /\{\{~?#?>\s*\(/.test(template);
+
+/**
+ * A component's content hash: everything its audit depends on, so a matching hash means its static findings can't
+ * have changed. Its own template, data and schema, and those of every component its render can include (the include
+ * closure: partials at any depth, a variant's base, and `includes`, what a project helper included by name when it
+ * was audited); when one of those templates has a dynamic partial, every file of the design system; the global data and the project
+ * helpers' source (`inputs.digest`); and the check code (check-code.ts), since a verdict cached by other code is not
+ * this code's verdict.
  *
  * NOTE (recon corrects section 4): the spec's hash includes "relevant CSS", but the covered static
  * engines - structural axe (alwaysOn, jsdom, no CSS), html-validate, schema, render - do NOT read CSS.
  * Contrast (the only CSS-dependent rule) is the excluded needsRendering tier. So CSS is deliberately
  * OUT of the hash: including it would over-invalidate on style edits that cannot change any static
- * finding. A `_data` edit changes the global-data digest -> every hash changes -> full re-audit (the
- * coarse behaviour section 3/4 intend, falling out of the hash for free).
+ * finding.
  */
 export async function componentContentHash(
-  id: string, discoveryMap: DiscoveryMap, globalDataDigest: string, checkCode: string = checkCodeDigest(),
+  id: string, inputs: AuditInputs, checkCode: string = checkCodeDigest(), includes: readonly string[] = [],
 ): Promise<string> {
-  const entry = discoveryMap.get(id);
-  const hbs = entry?.hbsPath ? await readFile(entry.hbsPath, "utf-8").catch(() => "") : "";
-  const json = entry?.jsonPath ? await readFile(entry.jsonPath, "utf-8").catch(() => "") : "";
-  const schema = entry?.schemaPath ? await readFile(entry.schemaPath, "utf-8").catch(() => "") : "";
-  // The check code too (check-code.ts): a verdict cached by other code is not this code's verdict.
-  return createHash("sha1")
-    .update(id).update(" ").update(hbs).update(" ").update(json).update(" ").update(schema).update(" ").update(globalDataDigest)
-    .update(" ").update(checkCode)
-    .digest("hex");
+  const h = createHash("sha1").update(id);
+  let open = false;
+  for (const member of includeClosure(id, inputs.composition, includes)) {
+    const entry = inputs.discoveryMap.get(member);
+    const hbs = entry?.hbsPath ? await inputs.text(entry.hbsPath) : "";
+    const json = entry?.jsonPath ? await inputs.text(entry.jsonPath) : "";
+    const schema = entry?.schemaPath ? await inputs.text(entry.schemaPath) : "";
+    h.update(" ").update(member).update(" ").update(hbs).update(" ").update(json).update(" ").update(schema);
+    if (!open && mayIncludeAnything(hbs)) open = true;
+  }
+  if (open) h.update(" everything ").update(await inputs.everything());
+  return h.update(" ").update(inputs.digest).update(" ").update(checkCode).digest("hex");
 }
 
 /** The digest of the global data, part of every component's hash. */
@@ -268,6 +353,8 @@ export function globalDataDigest(globalData: Record<string, unknown> | undefined
 export interface AuditedSlice {
   readonly audit: ComponentAudit;
   readonly hash: string;
+  /** The components a project helper included by name while it was audited (partial-lookups.ts): in its hash. */
+  readonly includes: readonly string[];
 }
 
 /**
@@ -276,12 +363,22 @@ export interface AuditedSlice {
  * therefore never one read later (at persist time) for content the audit did not see.
  */
 export async function auditWithHash(
-  id: string, render: CheckRenderer, quarantine: CollisionEntry | undefined, discoveryMap: DiscoveryMap, digest: string,
+  id: string, render: CheckRenderer, quarantine: CollisionEntry | undefined, inputs: AuditInputs, known: readonly string[] = [],
 ): Promise<AuditedSlice> {
-  for (;;) {
-    const before = await componentContentHash(id, discoveryMap, digest);
-    const audit = await auditComponent(id, render, quarantine);
-    if (await componentContentHash(id, discoveryMap, digest) === before) return { audit, hash: before };
+  // The component's files and what it includes read fresh before and after, not from the pass's reading. The hash
+  // before an audit covers what the last audit saw included; when this one saw other partials looked up by name, it
+  // runs again with those, so the hash kept always covers what the audit it belongs to included.
+  const fresh: AuditInputs = { ...inputs, text: path => readFile(path, "utf-8").catch(() => "") };
+  let includes = [...known].sort();
+  for (let tries = 0; ; tries++) {
+    const before = await componentContentHash(id, fresh, undefined, includes);
+    const { value: audit, names } = await recordPartialLookups(() => auditComponent(id, render, quarantine));
+    const seen = [...new Set([...names].map(n => inputs.handleMap.get(n)).filter((x): x is string => !!x && x !== id))].sort();
+    const same = seen.length === includes.length && seen.every((x, i) => x === includes[i]);
+    if (same && await componentContentHash(id, fresh, undefined, includes) === before) return { audit, hash: before, includes };
+    includes = seen;
+    // What it includes keeps changing (a helper that picks at random): a hash nothing matches, so it is never reused.
+    if (tries >= 4) return { audit, hash: `unstable ${randomUUID()}`, includes };
   }
 }
 
@@ -296,11 +393,9 @@ export async function refreshDiagnosticsGraph(
   componentIds: Iterable<string>,
   render: CheckRenderer,
   quarantineMap: Map<string, CollisionEntry>,
-  discoveryMap: DiscoveryMap,
-  globalData: Record<string, unknown> | undefined,
+  inputs: AuditInputs,
 ): Promise<{ graph: DiagnosticsGraph; audited: Map<string, AuditedSlice>; reaudited: string[]; reused: number }> {
   const prior = await readDiagnosticsArtifact(root);
-  const digest = globalDataDigest(globalData);
 
   const priorNodes = new Map((prior?.graph.components ?? []).map(c => [c.id, c] as const));
   const priorOcc = new Map<string, DiagnosticOccurrence[]>();
@@ -312,12 +407,13 @@ export async function refreshDiagnosticsGraph(
   const audited = new Map<string, AuditedSlice>();
   const reaudited: string[] = [];
   for (const id of [...componentIds].sort()) {
-    const h = await componentContentHash(id, discoveryMap, digest);
+    const includes = prior?.includes?.[id] ?? [];
+    const h = await componentContentHash(id, inputs, undefined, includes);
     const priorNode = priorNodes.get(id);
     if (prior && prior.hashes[id] === h && priorNode) {
-      audited.set(id, { audit: { node: priorNode, occurrences: priorOcc.get(id) ?? [] }, hash: h }); // hash-validated reuse
+      audited.set(id, { audit: { node: priorNode, occurrences: priorOcc.get(id) ?? [] }, hash: h, includes }); // hash-validated reuse
     } else {
-      audited.set(id, await auditWithHash(id, render, quarantineMap.get(id), discoveryMap, digest));
+      audited.set(id, await auditWithHash(id, render, quarantineMap.get(id), inputs, includes));
       reaudited.push(id);
     }
   }
@@ -331,6 +427,12 @@ export async function refreshDiagnosticsGraph(
  *  a hash read now could be of content saved after the audit, and would validate a stale slice. */
 export async function persistSlices(root: string, slices: Map<string, AuditedSlice>): Promise<void> {
   const hashes: Record<string, string> = {};
-  for (const [id, slice] of slices) hashes[id] = slice.hash;
-  await writeDiagnosticsArtifact(root, { version: GRAPH_ARTIFACT_VERSION, hashes, graph: assembleGraph([...slices.values()].map(s => s.audit)) });
+  const includes: Record<string, string[]> = {};
+  for (const [id, slice] of slices) {
+    hashes[id] = slice.hash;
+    if (slice.includes.length) includes[id] = [...slice.includes];
+  }
+  await writeDiagnosticsArtifact(root, {
+    version: GRAPH_ARTIFACT_VERSION, hashes, includes, graph: assembleGraph([...slices.values()].map(s => s.audit)),
+  });
 }

@@ -9,8 +9,8 @@
 // server-state.ts. That is why a second concurrent client silently redirects the first client's
 // HMR, and part of why the Playwright suite runs workers:1.
 //
-// INCREMENTAL BY DESIGN, and there is a tripwire on it: a .hbs/.json edit re-audits exactly that
-// one component; a .scss edit re-audits NOTHING, because every engine currently covered is
+// INCREMENTAL BY DESIGN, and there is a tripwire on it: a .hbs/.json edit re-audits that component and
+// every component whose audit depends on it (what includes it, at any depth); a .scss edit re-audits NOTHING, because every engine currently covered is
 // CSS-invariant. Adding a CSS-sensitive rule must break diagnostics-graph.spec's asymmetry test —
 // that failure is the signal to revisit this, not a flake.
 //
@@ -37,7 +37,7 @@ import {
 } from "./css-closure.js";
 import { buildAllStyleData, patchClassOwnerIndex } from "./style-index.js";
 import { rootMatchers, watchedRoots, within, type WatchedRoots } from "./watch-roots.js";
-import { auditWithHash, globalDataDigest } from "./diagnostics.js";
+import { auditInputs, auditWithHash, componentContentHash } from "./diagnostics.js";
 import { extractThemeTokens } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
@@ -1140,11 +1140,23 @@ on("change", async (filePath) => {
         const slices = await state.audit.peek();
         if (slices) {
           await testOnlyReaudit()?.(componentId);
-          slices.set(componentId, await auditWithHash(
-            componentId, render, undefined, discovery.discoveryMap, globalDataDigest(rendering.current.globalData),
-          ));
-          state.liveReauditCount += 1;
-          if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (1 component; total ${state.liveReauditCount})`);
+          // This component, and every other one whose audit depends on the file: what includes it, at any depth
+          // (its hash covers what it includes, diagnostics.ts), so a partial's defect shows on every page with it.
+          const current = await currentDiscovery(state, patternRoots);
+          const inputs = await auditInputs({
+            discoveryMap: current.discoveryMap, handleMap: current.handleMap, composition: await compositionFor(state, current, patternDirs),
+            globalData: rendering.current.globalData, helperPaths: cfg.helperPaths,
+          });
+          const stale: string[] = [];
+          for (const [id, slice] of slices) {
+            if (id !== componentId && await componentContentHash(id, inputs, undefined, slice.includes) !== slice.hash) stale.push(id);
+          }
+          for (const id of [componentId, ...stale.sort()]) {
+            // The edited component renders, so it is not quarantined (collisions come via add/rebuild).
+            slices.set(id, await auditWithHash(id, render, id === componentId ? undefined : current.quarantineMap.get(id), inputs, slices.get(id)?.includes));
+            state.liveReauditCount += 1;
+          }
+          if (verboseTiming) console.log(`[dev-server:timing] diagnostics: live re-audit ${componentId} (${1 + stale.length} components; total ${state.liveReauditCount})`);
         }
       }
     } catch (e) {

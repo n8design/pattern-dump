@@ -48,7 +48,7 @@ import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.j
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
-  assembleGraph, auditWithHash, checkComponent, globalDataDigest, persistSlices, refreshDiagnosticsGraph,
+  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, refreshDiagnosticsGraph,
 } from "./diagnostics.js";
 import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
@@ -437,22 +437,23 @@ async function routeRequest(
           state.auditSeeding = editedDuringSeed;
           try {
             if (verboseTiming) console.time("[dev-server:timing] diagnostics seed");
-            const r = await refreshDiagnosticsGraph(
-              cwd, baseComponentIds(discovery), render, discovery.quarantineMap, discoveryMap, globalData,
-            );
+            const inputs = await auditInputs({
+              discoveryMap, handleMap: discovery.handleMap, composition: await compositionFor(state, discovery, patternDirs), globalData,
+              helperPaths: cfg.helperPaths,
+            });
+            const r = await refreshDiagnosticsGraph(cwd, baseComponentIds(discovery), render, discovery.quarantineMap, inputs);
             await testHook()?.("audit-seed", "built", () => {});
             // The deviation from lazy.ts's rule that a value an invalidation overtook is never stored: a
             // seed is long on a large corpus, and a save during every seed would otherwise repeat the whole
             // sweep. Edits during it do not invalidate it; they are recorded, and those components are
             // audited again here, each with the hash of what it audited, before the seed is stored.
             // A structural change (a component added or removed) still invalidates it as usual.
-            const digest = globalDataDigest(globalData);
             while (editedDuringSeed.size > 0) {
               const ids = [...editedDuringSeed];
               editedDuringSeed.clear();
               for (const id of ids) {
                 if (!r.audited.has(id)) continue;
-                r.audited.set(id, await auditWithHash(id, render, discovery.quarantineMap.get(id), discoveryMap, digest));
+                r.audited.set(id, await auditWithHash(id, render, discovery.quarantineMap.get(id), inputs, r.audited.get(id)!.includes));
                 state.liveReauditCount += 1;
               }
             }
