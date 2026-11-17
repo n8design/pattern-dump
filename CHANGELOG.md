@@ -14,6 +14,15 @@
   (`[pd build] styles: 3 stylesheets linked by a borrowed class (STYLE_BORROWED on the component's Diagnostics tab)`). Two components that merely use the same class
   name for different things are the usual cause: rename one. It is on the component's detail, not in `pd audit`.
 
+  **Upgrading a site made with an earlier `pd init --storefront`:** its layouts share the page classes
+  (`page-title`, `page-description`, `page-tags`, `page-body`, `page-next`, `page-meta`) that `layouts/page` owns,
+  so after the upgrade every page that uses another layout (article, doc, home, listing, tag and category pages)
+  warns that it borrows them, and those layouts show `STYLE_BORROWED`. Nothing looks different; the warning says
+  the styling depends on another layout's stylesheet. Fix: move those rules out of
+  `src/styles/layouts/page.scss` (and the three `.doc-content .page-*` rules out of `src/styles/layouts/doc.scss`)
+  into a new `src/styles/base/page.scss`, which the base layer (`documentBase: ["base"]`) links on every page, as
+  the starter now does. Start it with `@use "tokens";` for the spacing tokens.
+
 ## 0.5.3
 
 `pd build` of a site is up to twice as fast again: 2,000 pages in 8.2 s instead of 16.4 s with the checks left out.
