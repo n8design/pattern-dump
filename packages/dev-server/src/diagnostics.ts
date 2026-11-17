@@ -23,6 +23,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { readdir, readFile, writeFile, mkdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { CompositionRegistry } from "./composition.js";
+import { borrowedStyleMessage, borrowedStyles } from "./css-closure.js";
+import type { ClassOwnerIndex } from "./style-index.js";
 import { recordPartialLookups } from "./partial-lookups.js";
 import { runA11yProducer } from "@pattern-dump/a11y";
 import type {
@@ -93,6 +95,25 @@ export async function checkComponent(
       }],
     };
   }
+}
+
+/**
+ * STYLE_BORROWED, one info per owner a component's template borrows from (css-closure.ts, borrowedStyles): it uses a
+ * class that owner's stylesheet styles without including the owner, so the owner's stylesheet is linked into its
+ * preview too. A variant with markup of its own is read from its own template. On the component's detail only, not
+ * in the corpus audit: the audit's hash leaves CSS out by design (componentContentHash), and a borrow is CSS.
+ */
+export async function styleBorrowedDiagnostics(
+  componentId: string, variant: string | undefined, discoveryMap: DiscoveryMap, composition: CompositionRegistry,
+  classOwnerIndex: ClassOwnerIndex,
+): Promise<Diagnostic[]> {
+  const entry = (variant ? discoveryMap.get(`${componentId}~${variant}`) : undefined) ?? discoveryMap.get(componentId);
+  const hbs = entry?.hbsPath ? await readFile(entry.hbsPath, "utf-8").catch(() => "") : "";
+  const included = new Set(includeClosure(variant ? `${componentId}~${variant}` : componentId, composition));
+  return borrowedStyles(hbs, componentId, classOwnerIndex, included).map(b => ({
+    kind: "STYLE_BORROWED" as const, severity: "info" as const, source: "render" as const,
+    message: borrowedStyleMessage(componentId, b),
+  }));
 }
 
 // ---- Diagnostics graph ----

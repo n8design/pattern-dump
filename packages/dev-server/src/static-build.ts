@@ -83,6 +83,8 @@ export interface StaticBuildReport {
   /** Notes about what was built, one line each: a storefront heading whose anchor was suffixed because the
    *  layout has that id. Nothing is left out for them. */
   notes: string[];
+  /** Stylesheets linked by a borrowed class: the (component, owner) pairs, each a STYLE_BORROWED on its component. */
+  borrowedStyles: number;
   /** The storefront's own output root, when the project has a storefront. */
   storefront?: { outDir: string; basePath: string; pages: number; files: number; bytes: number };
   /** The storefront's link check: the site pages read, the references checked, the other hosts listed in the notes. */
@@ -423,7 +425,7 @@ async function buildOnce(
   await assertUnchanged("nothing was written").catch(async (e: unknown) => { await server.close(); throw e; });
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
-  const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], ms: 0 };
+  const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], borrowedStyles: 0, ms: 0 };
   if (opts.browser && !storefront) report.notes.push("--browser checks a storefront's pages in Chromium, and this project has no storefront: nothing was checked");
   const { capture, store } = createSnapshotWriter({ outDir, basePath, origin, report });
 
@@ -459,6 +461,7 @@ async function buildOnce(
       const baseText = await capture(componentUrl(id));
       if (!baseText) continue;
       const base = JSON.parse(baseText) as ComponentDetailResponse;
+      report.borrowedStyles += base.diagnostics.filter(d => d.kind === "STYLE_BORROWED").length;
       if (base.variants.length) routes.add(`/${id}/variants`);
       for (const variant of [undefined, ...base.variants.map(v => v.name)]) {
         const detailText = variant ? await capture(componentUrl(id, variant)) : baseText;

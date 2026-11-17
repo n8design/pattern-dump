@@ -1,0 +1,5 @@
+// The light theme of the bench's previews: the default. It only fixes the color scheme, so a test can read
+// which theme a preview has from its computed color-scheme.
+[data-theme="light"] {
+  color-scheme: light;
+}

@@ -127,6 +127,33 @@ The value is a whole number of pixels above 0. Anything else is an error on the 
 every page that shows it in a live example fails to build, as it does when a schema can't be read at all. A
 component without the key starts as before: small, then fitted.
 
+#### The theme of an example
+
+A site's light and dark belong to its skin, not to the workbench's themes (see [Writing a skin](#writing-a-skin)).
+An example is a preview, though, and a preview is drawn in one of the workbench's themes: the default one,
+`themes.default`. So that an example matches the page around it, the page carries its own theme into its examples:
+
+- The page's theme is the `data-theme` attribute of its `<html>`, or of its `<body>` when `<html>` has none: where
+  a skin's light and dark toggle writes it.
+- **The values must be the names of the workbench's themes.** A page with `data-theme="dark"` gives its examples
+  the theme `dark`, if the project has one. Any other value, or none, leaves each example in the default theme.
+- The examples change with the page: when the toggle changes the page's `data-theme`, every example on the page
+  follows.
+- With themes that switch by stylesheet (`themes.switch: "stylesheet"`), each example loads the page theme's
+  stylesheet instead of the default one.
+
+Without JavaScript an example stays in the default theme. For a site that follows the viewer's light or dark
+setting, make the default theme follow it too, with `color-scheme: light dark`:
+
+```scss
+// themes/system.theme.scss, with themes.default: "system"
+[data-theme="system"] {
+  color-scheme: light dark;
+}
+```
+
+Its examples then follow the viewer with or without JavaScript, as the page does.
+
 A `pattern:` link, such as `[the callout](pattern:components/callout)`, links to the component in the
 workbench.
 
@@ -818,9 +845,23 @@ folder's pages with it. The build's report names what it left out:
 [pd build] drafts: 1 left out (articles/first-post.md)
 ```
 
+### A page's stylesheets
+
 The page's `<head>` links the stylesheets of the layout and everything it includes, and the project's
-base layer (`documentBase`), which also reaches every preview. It does not link themes: a skin's colours
-belong to the skin.
+base layer (`documentBase`), which also reaches every preview. It does not link themes: a skin's colours,
+light and dark included, belong to the skin. The workbench's themes reach a page only through its live examples
+([The theme of an example](#the-theme-of-an-example)).
+
+A component whose template uses a class another component owns, without including it, links that component's
+stylesheet too (see [Styles](authoring.md#styles)). On a page that is a warning, naming the page, the component,
+the class and its owner:
+
+```
+[storefront] warning: find.md: organisms/search uses class "search-field" from molecules/search-field, so
+molecules/search-field's stylesheet is linked too: include molecules/search-field if it belongs here, or rename the class
+```
+
+Two components that use the same class name for different things are the usual cause: rename one.
 
 ---
 

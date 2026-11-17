@@ -43,7 +43,8 @@
     grid-area: tagline;
   }
 
-  .site-nav {
+  // The nav's place in the header's grid, written in context: the class is the nav's own (partials/nav).
+  .site-header .site-nav {
     grid-area: nav;
   }
 }

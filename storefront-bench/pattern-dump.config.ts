@@ -14,6 +14,9 @@ export default defineConfig({
   assets: { dir: "./src/assets" },
   // Behaviour scripts (requireScript): two test fixtures, the header's and the slider's.
   scriptsDir: "./src/scripts",
+  // Two preview themes, light by default. Pages link neither: a site's light and dark belong to its skin. A page's
+  // data-theme reaches only its embedded previews (theme-sync.spec.ts).
+  themes: { dir: "./themes", default: "light" },
   storefront: {
     pagesDir: "./pages",
     outDir: "./.out/storefront",

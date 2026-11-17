@@ -48,7 +48,7 @@ import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.j
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
-  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, refreshDiagnosticsGraph,
+  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, refreshDiagnosticsGraph, styleBorrowedDiagnostics,
 } from "./diagnostics.js";
 import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
@@ -64,7 +64,7 @@ import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } f
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import type { SearchRecord } from "./storefront/search.js";
-import { pageStylesheets } from "./storefront/page-head.js";
+import { pageBorrowedStyles, pageStylesheets } from "./storefront/page-head.js";
 import type { RenderingHandle } from "./rendering.js";
 import type { SiteValuesHandle } from "./storefront/site-values.js";
 
@@ -512,7 +512,11 @@ async function routeRequest(
           detail.relationships.pages = layoutPages(await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap), componentId.slice("layouts/".length));
         }
         const quarantineEntry = discovery.quarantineMap.get(componentId);
-        const { previewHtml, diagnostics } = await checkComponent(componentId, variant, render, quarantineEntry);
+        const checked = await checkComponent(componentId, variant, render, quarantineEntry);
+        const { previewHtml } = checked;
+        // The stylesheets it links by borrowing a class (info, the detail only: diagnostics.ts).
+        const diagnostics = quarantineEntry || !state.classOwnerIndex ? checked.diagnostics : [...checked.diagnostics,
+          ...await styleBorrowedDiagnostics(componentId, variant, discovery.discoveryMap, compReg, state.classOwnerIndex)];
 
         const themeNames = themesDir ? [...state.themeCss.keys()] : [];
         const assets = await resolveDocumentAssets(cfg, state, {
@@ -720,6 +724,7 @@ async function routeRequest(
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html, placed) => pageStylesheets(cfg, state, discovery, layoutId, html, placed),
+        borrowed: roots => pageBorrowedStyles(state, discovery, patternDirs, roots),
         ...(ctx.dates ? { dates: ctx.dates } : {}),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "", basePath: cfg.storefront.basePath } } : {}),
         image: path => checkPageImage(path, assetRoots, assetRootNames),
@@ -728,6 +733,7 @@ async function routeRequest(
         ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
+        themes: { names: themesDir ? [...state.themeCss.keys()] : [], switch: cfg.themeSwitch },
       });
       if (page.search && ctx.onSearchRecord) ctx.onSearchRecord(page.search);
       if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);

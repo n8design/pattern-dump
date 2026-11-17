@@ -1,3 +1,5 @@
+// The page's description and body, shared by the default layout and the home layout: in the base layer
+// (documentBase: site), so neither layout borrows the other's stylesheet.
 // The default layout: the hero and its meta row (site/hero.scss), the description, then the body.
 // The description as the page's lede: a large serif statement, offset to the right two-thirds of the
 // wide column.
