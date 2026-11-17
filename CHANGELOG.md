@@ -4,6 +4,18 @@
 
 ### Added
 
+- **Folder defaults.** A folder's `index.md` sets frontmatter for the pages under it once, in a `childDefaults:`
+  block written as a page writes its frontmatter: the layout, any key the layout declares, a query's options,
+  `tags`, `categories`, `draft`, `index`, `toc`, `image`. A page's own value wins, key by key and option by option;
+  the nearest folder wins; a list is replaced, never joined (`tags: [guide]` on the folder and `tags: [setup]` on the
+  page give `[setup]`). `childLayout` stays, as the short form of `childDefaults.layout`. A problem about a value a
+  folder set names where it came from:
+  `services/web.md (from the childDefaults of services/index.md, line 9): limit "two" is not a number of pages: a whole number from 1, such as 3`.
+  A draft default is said per folder by `pd build`, so it can't hide a section silently:
+  `[pd build]   12 pages are drafts via the childDefaults of services/index.md`.
+- **`/api/pages` gives each page `defaultsFrom`** (an additive change to the pages response): the keys it took from a
+  folder's `childDefaults`, each with that `index.md`, a query's options one by one (`"related.limit"`).
+
 - **A new diagnostic kind, `STYLE_BORROWED`** (info). A template that uses a class another component owns, without
   including that component, borrows it: the owner's stylesheet is linked too, so the class is styled. That stays,
   since a design system can borrow on purpose, and is now said, once per borrowed owner on the component's
