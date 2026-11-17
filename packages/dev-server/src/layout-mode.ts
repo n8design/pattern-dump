@@ -11,11 +11,11 @@ import type { DiscoveryMap, LayoutMode } from "@pattern-dump/contracts";
 import { stripOrderPrefixes } from "@pattern-dump/discovery";
 
 /**
- * Categories that default to `full` preview layout. A page or template is a whole document, so it
- * fills the stage; everything else is centered content. Overridable per-category and per-component.
+ * Categories that default to `full` preview layout. A page, a template or a layout is a whole
+ * document, so it fills the stage; everything else is centered content. Overridable per-category and per-component.
  * Matched without ordering prefixes, so a PatternLab tree's `05-pages` counts (see stripOrderPrefixes).
  */
-export const FULL_CATEGORIES = new Set(["pages", "templates"]);
+export const FULL_CATEGORIES = new Set(["pages", "templates", "layouts"]);
 
 /**
  * Resolve a component's preview layout, most-specific-wins:

@@ -31,6 +31,7 @@ const NUMBERED = {
   "01-atoms/badge.hbs": "<span>b</span>",
   "04-templates/sample-article.hbs": "<article>a</article>",
   "05-pages/home.hbs": "<div>h</div>",
+  "03-layouts/article.hbs": "<main>{{{body}}}</main>",
 };
 
 describe("stripOrderPrefixes", () => {
@@ -48,9 +49,10 @@ describe("stripOrderPrefixes", () => {
 });
 
 describe("resolveLayoutMode — category default", () => {
-  it("pages and templates are full, with or without an ordering prefix", async () => {
+  it("pages, templates and layouts are full, with or without an ordering prefix", async () => {
     const dir = await patterns(NUMBERED);
     const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("03-layouts/article", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("04-templates/sample-article", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("05-pages/home", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("01-atoms/badge", dir, discoveryMap)).toBe("centered");
@@ -61,8 +63,10 @@ describe("resolveLayoutMode — category default", () => {
       "atoms/badge.hbs": "<span>b</span>",
       "templates/sample.hbs": "<article>a</article>",
       "pages/home.hbs": "<div>h</div>",
+      "layouts/doc.hbs": "<main>{{{body}}}</main>",
     });
     const { discoveryMap } = await buildDiscoveryMap(dir);
+    expect(await resolveLayoutMode("layouts/doc", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("templates/sample", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("pages/home", dir, discoveryMap)).toBe("full");
     expect(await resolveLayoutMode("atoms/badge", dir, discoveryMap)).toBe("centered");
