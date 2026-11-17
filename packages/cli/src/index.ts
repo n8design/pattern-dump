@@ -68,8 +68,9 @@ switch (command.kind) {
     // stdout has flushed. On a pipe Node writes stdout asynchronously, and a bare process.exit(0)
     // cut `pd audit --format json | …` off at the first 512 bytes. An empty write's callback runs
     // after every write queued before it.
-    runAudit(command.root, command.configPath, command.format)
-      .then(() => process.stdout.write("", () => process.exit(0)))
+    // It fails (exit code 1) when it found an error, or with --strict any finding, as pd build fails on its checks.
+    runAudit(command.root, command.configPath, command.format, { strict: command.strict === true })
+      .then(({ failed }) => process.stdout.write("", () => process.exit(failed ? 1 : 0)))
       .catch((e) => { console.error("[pd] Error:", describeError(e)); process.exit(1); });
     break;
 
