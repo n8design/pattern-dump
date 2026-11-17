@@ -84,9 +84,10 @@ export interface ShellConfig {
  */
 export type PackageReference = string | { name: string; exclude?: string[]; styles?: boolean };
 
-/** Checks `pd build` can be told to skip: the site pages' accessibility check (axe, and one main landmark and one <h1>
- *  per page). Every check runs unless named. */
-export const SKIPPABLE_CHECKS = ["a11y"] as const;
+/** Checks `pd build` can be told to skip: `a11y`, the site pages' accessibility check (axe, and one main landmark and
+ *  one <h1> per page), and `html`, the components' markup checked against HTML's content model (html-validate). Every
+ *  check runs unless named. */
+export const SKIPPABLE_CHECKS = ["a11y", "html"] as const;
 export type SkippableCheck = (typeof SKIPPABLE_CHECKS)[number];
 
 export interface PatternDumpConfig {

@@ -221,7 +221,8 @@ async function buildOnce(
     if (changed.length) throw new InputsChangedError(written, changed);
   };
 
-  // The checks this build leaves out (skipChecks, else build.skipChecks): none unless named. --browser checks
+  // The checks this build leaves out (skipChecks, else build.skipChecks): none unless named. `html` renders without
+  // html-validate (RendererOptions.validateHtml), so the workbench and the audit carry no HTML findings. --browser checks
   // accessibility in Chromium, so it can't be asked for with the accessibility check skipped.
   const asked = opts.skipChecks ?? config.build?.skipChecks ?? [];
   const unknown = asked.filter(c => !(SKIPPABLE_CHECKS as readonly string[]).includes(c));
@@ -247,11 +248,13 @@ async function buildOnce(
   // A storefront page's notes, once each however often the page is fetched: the report's notes.
   const storefrontNotes = new Set<string>();
   const server = await startDevServer(config, root, {
-    port: 0, live: false, now, today, pagesOnce: true, ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
+    port: 0, live: false, now, today, pagesOnce: true, ...(skipped.has("html") ? { validateHtml: false } : {}),
+    ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
     onStorefrontNote: note => { storefrontNotes.add(note); },
     ...(pagefind ? { onSearchRecord: (r: SearchRecord) => { searchRecords.set(r.route, r); } } : {}),
   });
   log("… server ready");
+  if (skipped.has("html")) log("… HTML validation skipped (skipChecks: html)");
 
   // A component schema that isn't JSON would turn that component's checks off: no build, with or without a site.
   const brokenSchemas = await server.schemaProblems();

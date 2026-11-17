@@ -142,6 +142,9 @@ export interface DevServerOptions {
    *  folder doesn't change while a build runs. Without it, the reading is kept only until the folder changes (a
    *  file's size or time stamp, a new or deleted file), checked on every request. */
   pagesOnce?: boolean;
+  /** `pd build --skip-checks=html` only: false renders without checking the markup against HTML's content model
+   *  (RendererOptions.validateHtml), so no component has HTML diagnostics. Default true. */
+  validateHtml?: boolean;
   /** `pd build` only: where storefront pages link into the workbench — the built workbench's address
    *  (storefront.workbenchUrl). Without it, pages link to this process's own workbench on pd.localhost. */
   storefrontWorkbenchUrl?: string;
@@ -247,6 +250,7 @@ export async function startDevServer(
         renderWith = createRenderer({
           patternsDir, patternRoots, themesDir: themesDir ?? undefined, defaultTheme, displayPath, images: images.lookup,
           discoveryMap: discovery.discoveryMap, handleMap: discovery.handleMap,
+          ...(opts.validateHtml === false ? { validateHtml: false } : {}),
           ...(registrars.length ? { helperRegistrars: [...registrars] } : {}),
           ...(data ? { globalData: data } : {}),
         });
