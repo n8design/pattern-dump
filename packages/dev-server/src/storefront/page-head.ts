@@ -11,7 +11,7 @@ import { includeClosure } from "../diagnostics.js";
 import { resolveDocumentAssets, stylesheetLayers } from "../document-layers.js";
 import { designFiles } from "./design-files.js";
 import { escapeAttr } from "../http-utils.js";
-import { aggregateRequires } from "../requires.js";
+import { aggregateRequires, findSvgSets, type SvgSet } from "../requires.js";
 import type { ResolvedConfig } from "../server-config.js";
 import { compositionFor, type ServerState } from "../server-state.js";
 
@@ -38,6 +38,26 @@ export async function pageStylesheets(
     ? `<script type="module" src="${escapeAttr(src)}"></script>`
     : `<script type="module" src="${escapeAttr(scriptUrl(src, assets.scriptVersions?.get(src) ?? undefined))}"></script>`);
   return [layers.base, layers.assets, layers.themes, layers.closure, ...scripts].filter(Boolean).join("\n");
+}
+
+/** The symbol sets a page needs, and each set no asset folder has, with the component that needs it. */
+export interface PageSymbolSets { sets: SvgSet[]; missing: Array<{ component: string; id: string }> }
+
+/**
+ * The symbol sets (`requireAssets`) the components a page renders need, as a preview of each would load them: for its
+ * layout and each component it renders besides (`roots`), the sets of it and of everything it includes, each set once,
+ * in the order first needed. Looked up in every asset folder (findSvgSets).
+ */
+export async function pageSymbolSets(cfg: ResolvedConfig, discovery: DiscoveryResult, roots: readonly string[]): Promise<PageSymbolSets> {
+  const { discoveryMap, handleMap } = discovery;
+  const firstNeed = new Map<string, string>();
+  for (const id of roots) {
+    for (const set of (await aggregateRequires(id, cfg.patternDirs, handleMap, discoveryMap)).assets) {
+      if (!firstNeed.has(set)) firstNeed.set(set, id);
+    }
+  }
+  const { sets, missing } = await findSvgSets([...firstNeed.keys()], cfg.assetRoots);
+  return { sets, missing: missing.map(id => ({ component: firstNeed.get(id)!, id })) };
 }
 
 /**

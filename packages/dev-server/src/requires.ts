@@ -120,6 +120,25 @@ export async function loadSvgAssets(ids: string[], assetRoots: readonly string[]
   return (await findSvgSets(ids, assetRoots)).sets.map(s => hideSvg(s.svg));
 }
 
+/**
+ * A set hidden by its size, for a storefront page: zero width and height, never display:none, which keeps markers
+ * and gradients inside it from painting in Chromium and WebKit. The root's own width, height, style, aria-hidden and
+ * focusable go first, so the page's are the only ones; an XML declaration or doctype before it goes too.
+ */
+export function hideSvgBySize(svg: string): string {
+  // An XML declaration or a doctype before the root has no place in an HTML body.
+  const bare = svg.replace(/^\s*<\?xml[^>]*\?>\s*/i, "").replace(/^\s*<!DOCTYPE[^>]*>\s*/i, "");
+  return bare.replace(/<svg\b([^>]*)>/, (_, attrs: string) => {
+    const kept = attrs.replace(/\s(?:width|height|style|aria-hidden|focusable)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    return `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"${kept}>`;
+  });
+}
+
+/** Every id a set declares, in order. */
+export function svgIds(svg: string): string[] {
+  return [...svg.matchAll(/<[A-Za-z][^>]*?\sid\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map(m => m[1] ?? m[2] ?? "");
+}
+
 export function hideSvg(svg: string): string {
   // Inject display:none + aria-hidden on the root <svg> element.
   return svg.replace(/<svg(\s|>)/, '<svg$1style="display:none;position:absolute" aria-hidden="true" ');

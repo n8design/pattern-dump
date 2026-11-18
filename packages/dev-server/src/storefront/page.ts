@@ -17,6 +17,8 @@ import { placementSchemaPath } from "../discovery-index.js";
 import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem, type ThemeSwitch } from "@pattern-dump/contracts";
 import { themeSyncScript } from "./theme-sync.js";
 import { spriteMarkup, symbolId, type SymbolIndex, type SymbolSource } from "../symbols.js";
+import { hideSvgBySize, svgIds } from "../requires.js";
+import type { PageSymbolSets } from "./page-head.js";
 import { defaultsNote, originOf, placeOf } from "./folder-defaults.js";
 import { layoutIndex } from "./layout-index.js";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
@@ -105,6 +107,9 @@ export interface PageAssembly {
   /** The symbols in the asset roots' symbols/ folders (symbols.ts): a page's `![Alt](#stem)` images are drawn from them,
    *  through a hidden sprite at the top of its body. Without it, such images are written as markdown writes them. */
   symbols?: () => Promise<SymbolIndex>;
+  /** The symbol sets (`requireAssets`) of the page's layout and of the components it renders besides (`roots`), with
+   *  each set no asset folder has (page-head.ts, pageSymbolSets). Without it, a page carries no symbol sets. */
+  symbolSets?(roots: readonly string[]): Promise<PageSymbolSets>;
   /** The project's preview themes and how they switch: a page carries its own data-theme into the previews it
    *  embeds (theme-sync.ts). Without it, or with no themes, the page gets no such script. */
   themes?: { names: readonly string[]; switch: ThemeSwitch };
@@ -777,8 +782,29 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
 
   // A heading's anchor the layout has as an id too: the body again, with the layout's ids taken, so the
   // heading gets the next free suffix, and the layout again, with the anchors that now hold.
-  // The page's symbol sprite (at the top of its body, see below) holds ids too: a heading never takes one of them.
-  const spriteIds = new Set(first.symbols.flatMap(symbolIds));
+  // The components the page renders besides its layout: what it places, its listing's view, its queries' views.
+  const pageComponents = [...placedIds, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view && queryValues[q.name]?.listing ? [q.view.id] : [])];
+  // The symbol sets they need (requireAssets), as their previews load them: one the asset folders don't have fails the
+  // page, and so does an id two of them declare, or one an image symbol has: a <use> of it could draw either.
+  const iconSets = a.symbolSets ? await a.symbolSets([checked.layoutId, ...pageComponents]) : { sets: [], missing: [] };
+  if (iconSets.missing.length) {
+    return fail(iconSets.missing.map(m => `${page.path}: ${m.component} needs the symbol set "${m.id}" (requireAssets), `
+      + `and no asset folder has ${m.id}.svg or images/${m.id}.svg`));
+  }
+  const imageSymbolIds = new Set(first.symbols.flatMap(symbolIds));
+  const setOf = new Map<string, string>();
+  const clashes: string[] = [];
+  for (const set of iconSets.sets) {
+    for (const id of new Set(svgIds(set.svg))) {
+      const other = setOf.get(id);
+      if (other !== undefined) clashes.push(`the symbol sets "${other}" and "${set.id}" both declare id="${id}"`);
+      else if (imageSymbolIds.has(id)) clashes.push(`the symbol set "${set.id}" declares id="${id}", which a symbol image on the page has`);
+      else setOf.set(id, set.id);
+    }
+  }
+  if (clashes.length) return fail(clashes.map(c => `${page.path}: ${c}: a <use> of it could draw either`));
+  // The page's symbols (at the top of its body, see below) hold ids too: a heading never takes one of them.
+  const spriteIds = new Set([...imageSymbolIds, ...setOf.keys()]);
   const layoutIds = [...new Set([...idsBesides(rendered.html, first.headings), ...spriteIds])];
   const colliding = collidingHeadings(first.headings, layoutIds);
   if (colliding.length) {
@@ -798,7 +824,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     for (const [i, h] of first.headings.entries()) {
       const now = second.headings[i]!;
       if (now.anchor === h.anchor) continue;
-      notes.push(`${page.path}: heading "${h.text}" is #${now.anchor}, ` + (spriteIds.has(h.anchor)
+      notes.push(`${page.path}: heading "${h.text}" is #${now.anchor}, ` + (setOf.has(h.anchor)
+        ? `because the symbol set "${setOf.get(h.anchor)}" on the page uses id="${h.anchor}"`
+        : spriteIds.has(h.anchor)
         ? `because a symbol image on the page uses id="${h.anchor}"`
         : layoutIds.includes(h.anchor)
         ? `because the layout uses id="${h.anchor}"`
@@ -847,8 +875,6 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
   const article = isNotFound ? undefined : articleOf(route, model, checked.build.date, checked.build.updated);
-  // The components the page renders besides its layout: what it places, its listing's view, its queries' views.
-  const pageComponents = [...placedIds, ...(view ? [view.id] : []), ...queries.flatMap(q => q.view && queryValues[q.name]?.listing ? [q.view.id] : [])];
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} · ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
@@ -922,8 +948,10 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
   // The page's own content for the search index: its body, never the layout's markup (search.ts).
   const entry = model.entries.get(route);
-  // The page's symbols, once each, hidden at the top of its body: outside the body the search index reads.
-  const sprite = finalSymbols.length ? `${spriteMarkup(finalSymbols)}\n` : "";
+  // The page's symbols, once each, hidden at the top of its body: outside the body the search index reads. The image
+  // symbols first, then the symbol sets its components need, hidden by size as the image sprite is.
+  const sprite = (finalSymbols.length ? `${spriteMarkup(finalSymbols)}\n` : "")
+    + iconSets.sets.map(s => `${hideSvgBySize(s.svg.trim())}\n`).join("");
   const search: SearchRecord | undefined = isNotFound || generated || checked.build.index === false ? undefined : {
     route, title, body: finalBody, section: collectionOf(route, model), tags: (entry?.tags ?? []).map(t => t.label),
     categories: (entry?.categories ?? []).map(c => c.label), teaser: entry?.description ?? null, lang: a.lang ?? "en",
