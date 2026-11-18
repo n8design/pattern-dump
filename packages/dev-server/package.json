@@ -23,6 +23,7 @@
     "axe-core": "^4.9.0",
     "chokidar": "^3.6.0",
     "markdown-it": "^14",
+    "markdown-it-deflist": "4.0.0",
     "node-html-parser": "^7.1.0",
     "postcss": "^8.0.0",
     "postcss-selector-parser": "^7.1.1",
