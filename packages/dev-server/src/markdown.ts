@@ -34,6 +34,7 @@ import type { TocAnchor } from "./storefront/toc.js";
 import { readSchema, type PlacedProblem } from "./storefront/declared-values.js";
 import type { PageHeading } from "./storefront/derived.js";
 import { slug, Slugger } from "./storefront/slug.js";
+import { SYMBOLS_FOLDER, symbolId, type SymbolEntry, type SymbolSource } from "./symbols.js";
 
 /**
  * How a doc's live examples are embedded.
@@ -55,6 +56,9 @@ export type DocEmbed =
     prose?: ProseImages;
     /** Ids the page already has besides its headings (its layout's): a heading's anchor never takes one. */
     takenIds?: string[];
+    /** The page's symbol images (`![Alt](#stem)`, symbolImages below). Without it, `#` images are left as markdown
+     *  writes them. */
+    symbols?: SymbolImages;
   };
 
 /**
@@ -99,6 +103,20 @@ export interface ProseImages {
   /** Lines before the body in its file (the frontmatter). */
   lineOffset: number;
   problems: Array<{ line: number; message: string }>;
+}
+
+/**
+ * A storefront page's symbol images (frame mode): `![Alt](#stem)` is the symbol `stem` from an asset root's symbols/
+ * folder (symbols.ts), drawn by a <use> of the page's sprite: `<svg class="doc-image" role="img" aria-label="Alt">`
+ * at the source's size. With a title (`![Alt](#stem "Caption")`) it is a <figure> with that <figcaption>, which needs
+ * the image alone in its paragraph. An empty alt, a stem with no symbol and a symbol that can't be used are problems,
+ * with their line in the page's file. `used` receives each symbol the page draws, once, in the order first drawn.
+ */
+export interface SymbolImages {
+  lookup(stem: string): SymbolEntry | undefined;
+  lineOffset: number;
+  problems: Array<{ line: number; message: string }>;
+  used: SymbolSource[];
 }
 
 const INLINE: DocEmbed = { embed: "inline" };
@@ -220,7 +238,10 @@ export async function renderDoc(
   // Resolve pattern: cross-links synchronously (discoveryMap.has is sync).
   _resolvePatternLinks(tokens, discoveryMap, embed);
 
-  if (embed.embed === "frame" && embed.prose) proseImages(md, tokens, embed.prose);
+  // `#stem` images: symbols on a storefront page, a marked error in the workbench's docs (not supported there yet).
+  const symbols = embed.embed === "frame" ? embed.symbols : undefined;
+  if (embed.embed === "inline" || symbols) symbolImages(md, tokens, symbols);
+  if (embed.embed === "frame" && embed.prose) proseImages(md, tokens, embed.prose, symbols !== undefined);
 
   // Frame mode only (a storefront page): every heading gets its anchor as its id.
   if (embed.embed === "frame") {
@@ -266,8 +287,53 @@ export async function renderDoc(
   return md.renderer.render(tokens, md.options, { resolvedFences, resolvedPlaced, pdCodeBlocks: { storefront: embed.embed === "frame" } });
 }
 
-/** Checks a storefront page's images and resolves the markup of those from the assets (ProseImages). */
-function proseImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, prose: ProseImages): void {
+/**
+ * `#stem` images (SymbolImages): with `symbols`, a storefront page's symbols; without (the workbench's docs), each is
+ * a marked error, a paragraph of its own when the image is alone in one, else in place. Other images are left alone.
+ */
+function symbolImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, symbols: SymbolImages | undefined): void {
+  for (const [bi, block] of tokens.entries()) {
+    if (block.type !== "inline" || !block.children) continue;
+    let line = (block.map?.[0] ?? 0) + 1 + (symbols?.lineOffset ?? 0);
+    const alone = block.children.length === 1 && tokens[bi - 1]?.type === "paragraph_open" && tokens[bi + 1]?.type === "paragraph_close";
+    const standAlone = (): void => { tokens[bi - 1]!.hidden = true; tokens[bi + 1]!.hidden = true; };
+    for (const child of block.children) {
+      if (child.type === "softbreak" || child.type === "hardbreak") { line++; continue; }
+      if (child.type !== "image") continue;
+      const src = child.attrGet("src") ?? "";
+      if (!src.startsWith("#")) continue;
+      const stem = src.slice(1);
+      if (!symbols) {
+        const text = `[image ${escapeHtml(src)} · symbol images show on site pages only, not in the workbench's docs yet]`;
+        if (alone) standAlone();
+        child.meta = { pdImage: alone ? `<p class="doc-error">${text}</p>\n` : `<span class="doc-error">${text}</span>` };
+        continue;
+      }
+      const problem = (message: string) => symbols.problems.push({ line, message: `the image ${src}${message}` });
+      const alt = md.renderer.renderInlineAsText(child.children ?? [], md.options, {});
+      if (alt.trim() === "") {
+        problem(` has no alt text: write what it shows between the brackets; a decorative image goes in through a component, with alt=""`);
+        continue;
+      }
+      const entry = symbols.lookup(stem);
+      if (!entry) { problem(` is not a symbol: there is no ${stem}.svg in an asset root's ${SYMBOLS_FOLDER}/ folder`); continue; }
+      if (!entry.ok) { problem(`: ${SYMBOLS_FOLDER}/${stem}.svg can't be used: ${entry.problem.problems.join("; ")}`); continue; }
+      const title = child.attrGet("title");
+      if (title !== null && !alone) { problem(`: a caption needs the image on a line of its own`); continue; }
+      const s = entry.source;
+      if (!symbols.used.includes(s)) symbols.used.push(s);
+      const svg = `<svg class="doc-image" role="img" aria-label="${escapeAttr(alt)}" viewBox="${escapeAttr(s.viewBox)}" `
+        + `width="${s.width}" height="${s.height}"><use href="#${symbolId(s.stem)}"/></svg>`;
+      if (title === null) { child.meta = { pdImage: svg }; continue; }
+      standAlone();
+      child.meta = { pdImage: `<figure class="doc-figure">\n${svg}\n<figcaption>${escapeHtml(title)}</figcaption>\n</figure>\n` };
+    }
+  }
+}
+
+/** Checks a storefront page's images and resolves the markup of those from the assets (ProseImages). `#` images are
+ *  the symbol pass's when `symbolsOwnFragments`. */
+function proseImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, prose: ProseImages, symbolsOwnFragments = false): void {
   let eager = prose.slot?.eager ?? 0;
   for (const block of tokens) {
     if (block.type !== "inline" || !block.children) continue;
@@ -276,6 +342,7 @@ function proseImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, pr
       if (child.type === "softbreak" || child.type === "hardbreak") { line++; continue; }
       if (child.type !== "image") continue;
       const src = child.attrGet("src") ?? "";
+      if (symbolsOwnFragments && src.startsWith("#")) continue;
       const problem = (message: string) => prose.problems.push({ line, message: `the image ${src}${message}` });
       const alt = md.renderer.renderInlineAsText(child.children ?? [], md.options, {});
       if (alt.trim() === "") {
