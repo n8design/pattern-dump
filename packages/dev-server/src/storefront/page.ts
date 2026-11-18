@@ -16,6 +16,7 @@
 import { placementSchemaPath } from "../discovery-index.js";
 import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem, type ThemeSwitch } from "@pattern-dump/contracts";
 import { themeSyncScript } from "./theme-sync.js";
+import { spriteMarkup, symbolId, type SymbolIndex, type SymbolSource } from "../symbols.js";
 import { defaultsNote, originOf, placeOf } from "./folder-defaults.js";
 import { layoutIndex } from "./layout-index.js";
 import { frontmatterBody, frontmatterBodyOffset, readFrontmatterStrict } from "../frontmatter.js";
@@ -26,7 +27,7 @@ import { derivedToc, TOC_ID, tocAnchorProblems } from "./toc.js";
 import { placeTocItems, type PlacementDeps } from "./placed.js";
 import { isHelperNameProblem, itemsWrittenAsText, readProseSlot, renderPlainTemplate } from "@pattern-dump/renderer";
 import { basename } from "node:path";
-import { renderDoc, type DocRegions, type ProseImages } from "../markdown.js";
+import { renderDoc, type DocRegions, type ProseImages, type SymbolImages } from "../markdown.js";
 import { readSchema, unreadableSchemas, type ObjectSchema, type PlacedProblem } from "./declared-values.js";
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
@@ -101,6 +102,9 @@ export interface PageAssembly {
   /** The image index, ready for this render: a page's images from the assets are written with their variants
    *  (markdown.ts, ProseImages). Without it, a page's images are written as markdown writes them. */
   images?: () => Promise<ImageLookup>;
+  /** The symbols in the asset roots' symbols/ folders (symbols.ts): a page's `![Alt](#stem)` images are drawn from them,
+   *  through a hidden sprite at the top of its body. Without it, such images are written as markdown writes them. */
+  symbols?: () => Promise<SymbolIndex>;
   /** The project's preview themes and how they switch: a page carries its own data-theme into the previews it
    *  embeds (theme-sync.ts). Without it, or with no themes, the page gets no such script. */
   themes?: { names: readonly string[]; switch: ThemeSwitch };
@@ -497,6 +501,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const layoutSchema = (await readSchema(a.discoveryMap.get(checked.layoutId)?.schemaPath, designFiles(a.discoveryMap))).schema;
   const proseSlot = readProseSlot(layoutSchema);
   const imageLookup = a.images ? await a.images() : undefined;
+  const symbolIndex = a.symbols ? await a.symbols() : undefined;
 
   // The layout's regions (regions.ts), the skin's, and whether the page shows the table of contents (toc.ts).
   const regionDecl = layoutRegions(layoutSchema, checked.layoutId);
@@ -513,6 +518,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const prose: ProseImages | undefined = imageLookup ? {
       layoutId: checked.layoutId, lookup: imageLookup, lineOffset: frontmatterBodyOffset(source), problems: [],
       ...(proseSlot.slot ? { slot: proseSlot.slot } : {}), ...(proseSlot.problem ? { slotProblem: proseSlot.problem } : {}),
+    } : undefined;
+    const symbols: SymbolImages | undefined = symbolIndex ? {
+      lookup: stem => symbolIndex.entries.get(stem), lineOffset: frontmatterBodyOffset(source), problems: [], used: [],
     } : undefined;
     const docProblems: string[] = [];
     placedIds.clear();
@@ -533,7 +541,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       (id, variant) => a.render({ component: id, variant }).then(r => r.html),
       a.discoveryMap,
       {
-        embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings, takenIds, ...(prose ? { prose } : {}),
+        embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings, takenIds, ...(prose ? { prose } : {}), ...(symbols ? { symbols } : {}),
         // Components placed with values (pd- tags): checked against their schemas, rendered into the page.
         placed: { lineOffset: frontmatterBodyOffset(source), problems: placedProblems, deps, regions },
       },
@@ -557,7 +565,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
         }
       }
     }
-    return { body, headings, docProblems, placedProblems, imageProblems: prose?.problems ?? [], regions };
+    return { body, headings, docProblems, placedProblems, imageProblems: [...prose?.problems ?? [], ...symbols?.problems ?? []],
+      symbols: symbols?.used ?? [], regions };
   };
   const first = await renderBody();
   problems.push(...first.docProblems.map(p => `${page.path}: ${p}`));
@@ -757,6 +766,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   let finalBody = first.body;
   let finalHeadings = first.headings;
   let finalRegions = first.regions;
+  let finalSymbols = first.symbols;
   if (isFailed(rendered)) return rendered;
   // A layout field named like a registered helper can never be shown by its name: the page fails, as the
   // workbench shows the same SCHEMA_INVALID on the layout.
@@ -767,7 +777,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
 
   // A heading's anchor the layout has as an id too: the body again, with the layout's ids taken, so the
   // heading gets the next free suffix, and the layout again, with the anchors that now hold.
-  const layoutIds = idsBesides(rendered.html, first.headings);
+  // The page's symbol sprite (at the top of its body, see below) holds ids too: a heading never takes one of them.
+  const spriteIds = new Set(first.symbols.flatMap(symbolIds));
+  const layoutIds = [...new Set([...idsBesides(rendered.html, first.headings), ...spriteIds])];
   const colliding = collidingHeadings(first.headings, layoutIds);
   if (colliding.length) {
     const second = await renderBody(layoutIds);
@@ -776,8 +788,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     finalRegions = second.regions;
     rendered = await renderLayout(second.body, second.headings);
     finalBody = second.body;
+    finalSymbols = second.symbols;
     if (isFailed(rendered)) return rendered;
-    const still = collidingHeadings(second.headings, idsBesides(rendered.html, second.headings));
+    const still = collidingHeadings(second.headings, [...idsBesides(rendered.html, second.headings), ...spriteIds]);
     if (still.length) {
       return fail(still.map(h => `${page.path}: heading "${h.text}" is #${h.anchor}, which the layout has as an id as well, `
         + `even after the suffix: the layout must not make ids from page.headings`));
@@ -785,7 +798,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     for (const [i, h] of first.headings.entries()) {
       const now = second.headings[i]!;
       if (now.anchor === h.anchor) continue;
-      notes.push(`${page.path}: heading "${h.text}" is #${now.anchor}, ` + (layoutIds.includes(h.anchor)
+      notes.push(`${page.path}: heading "${h.text}" is #${now.anchor}, ` + (spriteIds.has(h.anchor)
+        ? `because a symbol image on the page uses id="${h.anchor}"`
+        : layoutIds.includes(h.anchor)
         ? `because the layout uses id="${h.anchor}"`
         : `because #${h.anchor} went to an earlier heading whose anchor the layout uses`));
     }
@@ -907,11 +922,13 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   }
   // The page's own content for the search index: its body, never the layout's markup (search.ts).
   const entry = model.entries.get(route);
+  // The page's symbols, once each, hidden at the top of its body: outside the body the search index reads.
+  const sprite = finalSymbols.length ? `${spriteMarkup(finalSymbols)}\n` : "";
   const search: SearchRecord | undefined = isNotFound || generated || checked.build.index === false ? undefined : {
     route, title, body: finalBody, section: collectionOf(route, model), tags: (entry?.tags ?? []).map(t => t.label),
     categories: (entry?.categories ?? []).map(c => c.label), teaser: entry?.description ?? null, lang: a.lang ?? "en",
   };
-  return { status: isNotFound ? 404 : 200, html: document(head, `${html}\n${fitterScript()}${themeSync(a, html)}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/",
+  return { status: isNotFound ? 404 : 200, html: document(head, `${sprite}${html}\n${fitterScript()}${themeSync(a, html)}${html.includes(`class="shiki-container"`) ? `\n${copyScript()}` : ""}`, a.live, a.lang, a.basePath ?? "/",
     regionDecl.regions.length ? regionDecl.regions.filter(r => currentRegions.get(r)?.length) : undefined), problems: [], notes,
     ...(search ? { search } : {}) };
 }
@@ -922,4 +939,9 @@ export function collectionOf(route: string, model: PageModel): string | null {
   const folder = route !== "/" && model.folders.has(route) ? route
     : [...model.folders].find(([r, f]) => r !== "/" && f.children.includes(route))?.[0];
   return folder === undefined ? null : model.pages.find(p => p.route === folder)?.title ?? null;
+}
+
+/** Every id a symbol brings into the page: its own and each prefixed one inside it. */
+function symbolIds(s: SymbolSource): string[] {
+  return [symbolId(s.stem), ...s.ids];
 }

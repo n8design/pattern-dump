@@ -14,6 +14,7 @@
 // watcher later reads to decide which component a theme or script edit refreshes. It is state, not
 // a cache, and it is why two concurrent clients interfere with each other.
 
+import type { SymbolService } from "./symbol-service.js";
 import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
@@ -131,6 +132,8 @@ export interface RouteContext {
   readonly site: SiteValuesHandle;
   /** The image index, ready for the current generation: a storefront page's prose images are looked up in it. */
   readonly images?: () => Promise<ImageLookup>;
+  /** The symbol images (symbol-service.ts): a storefront page's `#stem` images, and the standalone files. */
+  readonly symbols?: SymbolService;
 }
 
 /** What the running process knows about itself, frozen at startup. The wire shape adds `protocol`. */
@@ -740,6 +743,7 @@ async function routeRequest(
         ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
+        ...(ctx.symbols ? { symbols: () => ctx.symbols!.index() } : {}),
         themes: { names: themesDir ? [...state.themeCss.keys()] : [], switch: cfg.themeSwitch },
       });
       if (page.search && ctx.onSearchRecord) ctx.onSearchRecord(page.search);
