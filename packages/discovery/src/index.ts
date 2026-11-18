@@ -96,7 +96,8 @@ export async function buildDiscoveryMap(roots: string | PatternRoot[]): Promise<
           await collectFiles(full);
         } else if (e.name.endsWith(".hbs")) {
           hbs.push(full);
-        } else if (e.name.includes("~") && e.name.endsWith(".json")) {
+        } else if (e.name.includes("~") && e.name.endsWith(".json") && !e.name.endsWith(".schema.json")) {
+          // A data-overlay variant; `name~v.schema.json` is a variant's schema, a sidecar, not a variant.
           varJson.push(full);
         }
       }
@@ -246,7 +247,14 @@ export async function buildDiscoveryMap(roots: string | PatternRoot[]): Promise<
     const variantHandle = `${deriveHandle(baseId)}~${variantToken}`;
     if (!handleMap.has(variantHandle)) {
       const source = rootOf.get(jsonPath)?.root.source;
-      discoveryMap.set(variantId, { ...(source ? { source } : {}), hbsPath: baseEntry.hbsPath, jsonPath, ownMarkup: false });
+      // Its own docs and schema beside it (`chip~danger.md`, `chip~danger.schema.json`), as an own-markup variant has.
+      const fileSet = dirFileSets.get(dir) ?? new Set<string>();
+      const mdPath = fileSet.has(`${jsonStem}.md`) ? join(dir, `${jsonStem}.md`) : undefined;
+      const schemaPath = fileSet.has(`${jsonStem}.schema.json`) ? join(dir, `${jsonStem}.schema.json`) : undefined;
+      discoveryMap.set(variantId, {
+        ...(source ? { source } : {}), hbsPath: baseEntry.hbsPath, jsonPath, ownMarkup: false,
+        ...(mdPath ? { mdPath } : {}), ...(schemaPath ? { schemaPath } : {}),
+      });
       handleMap.set(variantHandle, variantId);
     }
   }
