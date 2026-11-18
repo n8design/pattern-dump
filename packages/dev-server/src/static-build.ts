@@ -15,7 +15,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createImageCache } from "@pattern-dump/build";
 import { sameHostWorkbenchPath, type PatternDumpConfig, SKIPPABLE_CHECKS, type SkippableCheck } from "@pattern-dump/config";
 import {
-  componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTES, previewUrl, renderedSourceUrl,
+  componentUrl, dataSourceUrl, normalizeBasePath, overviewUrl, PD_ROUTE_PREFIX, PD_ROUTES, previewUrl, renderedSourceUrl,
   staticPathFor, themeCssUrl,
   type ComponentDetailResponse, type ComponentTree, type ShellRuntime, type StorefrontPagesResponse, type ThemeSummary, type TreeNode,
 } from "@pattern-dump/contracts";
@@ -282,6 +282,22 @@ async function buildOnce(
     throw new Error(`pd build: a component schema isn't valid JSON, so nothing was written:\n${brokenSchemas.map(p => `  - ${p}`).join("\n")}`);
   }
 
+  // Symbol images: each one's standalone file (/_pd/symbols/<stem>.svg), read before anything is written. A source
+  // that can't be used, or that uses a token the base layer lacks, stops the build; each is written into every output.
+  const symbols = await server.symbols();
+  const symbolFiles = new Map<string, string>();
+  const symbolProblems = [...symbols.problems];
+  for (const stem of symbols.stems) {
+    const url = `${PD_ROUTE_PREFIX.symbols}${stem}.svg`;
+    const res = await fetch(`http://127.0.0.1:${server.port}${url}`);
+    if (res.status === 200) symbolFiles.set(url, await res.text());
+    else symbolProblems.push(await res.text());
+  }
+  if (symbolProblems.length) {
+    await server.close();
+    throw new Error(`pd build: a symbol image can't be used, so nothing was written:\n${symbolProblems.map(p => `  - ${p}`).join("\n")}`);
+  }
+
   // The storefront, crawled before anything is written: a problem anywhere stops the build with both
   // output roots as they were.
   // A site published under a path is asked for under it, as a browser asks: everything is checked as it is served.
@@ -446,6 +462,8 @@ async function buildOnce(
   }
   const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], borrowedStyles: 0, ms: 0,
     ...(buildWorkbench ? {} : { workbench: false as const }) };
+  report.warnings.push(...symbols.warnings);
+  report.notes.push(...symbols.infos);
   if (opts.browser && !storefront) report.notes.push("--browser checks a storefront's pages in Chromium, and this project has no storefront: nothing was checked");
   const { capture, store } = createSnapshotWriter({ outDir: wbStage, basePath, origin, report });
 
@@ -535,6 +553,9 @@ async function buildOnce(
         if (cfg.assetRoots.length === 1) await cp(rootDir, join(wbStage, "assets"), { recursive: true, force: false, filter: notABarrier });
       }
 
+      // Each symbol image's standalone file.
+      for (const [url, svg] of symbolFiles) await store(url, svg);
+
       // ---- 6. One shell page per route ----
       const runtime: ShellRuntime = {
         mode: "static", basePath, builtAt: now().toISOString(), pdVersion: opts.pdVersion,
@@ -584,6 +605,7 @@ async function buildOnce(
         if (text !== undefined) await sf.store(url, text);
         else await sf.capture(url, { fatal: true });
       }
+      for (const [url, svg] of symbolFiles) await sf.store(url, svg);
       if (sf.failures.length) {
         throw new Error(`pd build: the storefront changed while it was being written:\n${sf.failures.map(f => `  - ${f}`).join("\n")}`);
       }

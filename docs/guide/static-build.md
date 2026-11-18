@@ -193,6 +193,7 @@ dist/
   preview/<id>/~<variant>.html
   source/<id>/rendered.html           highlighted rendered HTML (and data.html, per variant)
   _pd/                                the workbench (main.js, main.css), component and theme CSS, scripts
+  _pd/symbols/<name>.svg              each symbol image as a file of its own (also in the storefront's output)
   assets/                             the project's asset folders, as served by pd dev
   .nojekyll
 ```

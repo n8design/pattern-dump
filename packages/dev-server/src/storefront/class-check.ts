@@ -19,11 +19,12 @@ import { nameMatcher, readCss } from "./css-vocabulary.js";
 export const STATE_CLASSES: readonly string[] = ["is-*", "has-*", "js-*"];
 
 /** The classes Pattern Dump writes into a site page itself: code highlighting (shiki, its themes and lines) and its
- *  copy button, pattern links, live examples and their errors, and its own problem lists. */
+ *  copy button, pattern links, live examples and their errors, symbol images and their figures, and its own problem
+ *  lists. */
 export const PD_CLASSES: readonly string[] = [
   "shiki", "shiki-*", "__shiki_*", "line", "copy-btn", "pd-*",
   "pattern-link", "pattern-link--unresolved",
-  "doc-example", "doc-example-id", "doc-example-variants", "doc-error",
+  "doc-example", "doc-example-id", "doc-example-variants", "doc-error", "doc-image", "doc-figure",
 ];
 
 /** The classes a template writes: each static word of a class="...", and the families it builds from a value, by the

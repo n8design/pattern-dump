@@ -363,3 +363,5 @@ assets: {
   `<svg><use href="#icon-name"/></svg>`. The set is inlined once per preview, including for components
   that include this one. A symbol used from the same document inherits `currentColor` and the theme's
   custom properties; one referenced from an external file does not reliably.
+- **Symbol images** (`![Alt](#name)`, one SVG per symbol in `assets/symbols/`) are for site pages (see the
+  storefront guide). In a component's docs they show an error until a later release.

@@ -66,6 +66,8 @@ export interface ResolvedConfig {
   /** The first asset root, for single-root consumers. */
   readonly assetsDir: string | null;
   readonly assetsCss: string[];
+  /** The colour token `currentColor` becomes in a symbol's standalone file (assets.symbols.currentColor). */
+  readonly symbolsCurrentColor: string;
 
   readonly scriptsDir: string | null;
   /** Bare ids/URLs loaded into every preview (the project behaviour layer). */
@@ -235,6 +237,7 @@ export function resolveServerConfig(
     assetRootNames: assetRoots.map(r => basename(r)),
     assetsDir:      assetRoots[0] ?? null,
     assetsCss:      config.assets?.css ?? [],
+    symbolsCurrentColor: config.assets?.symbols?.currentColor ?? "--color-text",
     scriptsDir:     scriptsDirs[0] ?? null,
     globalScripts,
     withGlobalScripts: (own) => [...new Set([...globalScripts, ...(own ?? [])])],

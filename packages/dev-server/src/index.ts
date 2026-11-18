@@ -17,6 +17,7 @@
 //   /source/:id/rendered         — Shiki-highlighted rendered HTML fragment
 //   /source/:id/data             — Shiki-highlighted JSON data fragment
 //   *                            — SPA shell
+import { createSymbolService, type SymbolReport } from "./symbol-service.js";
 import type { PatternDumpConfig } from "@pattern-dump/config";
 import { PD_HOSTS, type Diagnostic, type DiscoveryResult, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
@@ -169,6 +170,8 @@ export interface DevServer {
   /** For pd build, not part of the HTTP contract: every component schema that isn't valid JSON, as a problem naming
    *  its file, line and column (unreadableSchemas). */
   schemaProblems(): Promise<string[]>;
+  /** For pd build, not part of the HTTP contract: every symbol image, what can't be used, and what to say about it. */
+  symbols(): Promise<SymbolReport>;
 }
 
 export interface StyleGuideSources {
@@ -226,6 +229,8 @@ export async function startDevServer(
     ...(cfg.storefront ? { siteImages: cfg.storefront.images } : {}),
     build: opts.live === false, warn: message => console.warn(`[dev-server] ${message}`),
   });
+  // The symbol images in the asset roots' symbols/ folders (symbol-service.ts), for storefront pages.
+  const symbols = createSymbolService({ assetRoots: cfg.assetRoots, live: opts.live !== false, shown: displayPath });
   // A schema field named like a registered helper is an error the template can never show: said in the terminal,
   // once per field for this server, the first time a render finds it (the workbench shows it on the component,
   // a storefront page that uses the component fails, pd audit counts it).
@@ -375,6 +380,7 @@ export async function startDevServer(
     cfg, state, rendering, tracker, devUiDist, boot, now, live, site, ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
     ...(opts.pagesOnce ? { pagesOnce: true } : {}),
     images: async () => { await images.ready(generationNow()); return images.lookup; },
+    symbols,
     ...(testHooks ? { settle: () => settleWatcher ? settleWatcher() : Promise.reject(new Error("settle: the watcher is not running yet")) } : {}),
     ...(live ? { generation: () => hotreloader.generation() } : {}),
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
@@ -438,6 +444,7 @@ export async function startDevServer(
         .map(e => readFile(e.hbsPath, "utf8").catch(() => "")));
       return { stylesheets: [...state.perComponentCss.values(), state.baseCss, ...state.themeCss.values()], templates };
     },
+    symbols: () => symbols.report(),
     async schemaProblems() {
       return unreadableSchemas((await currentDiscovery(state, patternRoots)).discoveryMap, displayPath);
     },

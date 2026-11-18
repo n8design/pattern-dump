@@ -687,6 +687,10 @@ export const PD_ROUTE_PREFIX = {
   script: "/_pd/scripts/",
   assets: "/assets/",
   images: "/_pd/images/",
+  /** A symbol image's standalone file: GET /_pd/symbols/<stem>.svg → image/svg+xml, the symbol with the base layer's
+   *  token values written in (light, then dark by prefers-color-scheme), for an <img> outside the site, such as a
+   *  README. pd build writes it at the same path in each output. */
+  symbols: "/_pd/symbols/",
 } as const;
 
 /**

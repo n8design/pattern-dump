@@ -12,3 +12,9 @@ img {
   max-inline-size: 100%;
   block-size: auto;
 }
+
+// A symbol image (`![Alt](#stem)`) likewise: Pattern Dump writes its width and height, this keeps it in the column.
+.doc-image {
+  max-inline-size: 100%;
+  block-size: auto;
+}

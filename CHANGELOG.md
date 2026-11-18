@@ -31,6 +31,18 @@ and a `pd build` that stops leaves its output folders as they were. The guide no
   message `orphan-variant` (`OrphanVariantMessage`). `PD_PROTOCOL_VERSION` stays 1.
 - **A data variant can have its own docs and schema**, `chip~danger.md` and `chip~danger.schema.json`, as an
   own-markup variant could. Without its own `.md` a variant still shows the base's docs.
+- **Symbol images.** One SVG per symbol in an asset folder's `symbols/` folder, shown on a site page with
+  `![Alt](#name)` (or `![Alt](#name "Caption")` for a figure). The page inlines each symbol it shows once, in a hidden
+  sprite, so a diagram follows the site's colour tokens and its light and dark modes. Colours in a symbol are only
+  `var(--color-…)` and `currentColor`; anything else stops the build. A `<style>`'s simple class rules become
+  attributes; scripts, event attributes and links to other files are removed, with a warning. In a component's docs
+  in the workbench, a symbol image shows an error for now.
+- **A symbol as a file:** `/_pd/symbols/<name>.svg`, served by `pd dev` and written by `pd build` into both outputs,
+  with the token values from the document base layer written in (light, then dark by `prefers-color-scheme`), for a
+  README or anywhere else only an image file can be shown. `currentColor` becomes `--color-text` there, or the token
+  the new `assets.symbols.currentColor` names. An additive contract change carries the address:
+  `PD_ROUTE_PREFIX.symbols`.
+- The `pd init --storefront` skin keeps a symbol image inside its column (`.site .doc-image`).
 
 ### Changed
 

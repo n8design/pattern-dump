@@ -1089,6 +1089,62 @@ ratio, a skin needs this rule (the `pd init --storefront` skin has it):
 img { max-inline-size: 100%; block-size: auto; }
 ```
 
+### Symbol images
+
+A diagram or illustration can follow the site's colours, in light and dark, with no colour of its own: draw it as a
+symbol. Each symbol is one SVG file in a `symbols/` folder of an asset folder (`assets/symbols/flow.svg`), and a page
+shows it by its file name after `#`:
+
+```md
+![How a page is built from its layout](#flow)
+
+![The two layers of a page](#layers "Optional caption")
+```
+
+- The page gets one hidden sprite at the top of its body, holding each symbol it shows, once. The image is
+  `<svg class="doc-image" role="img" aria-label="…">` drawing that symbol at the size the file declares (its width
+  and height, else its `viewBox`). Because it is part of the page, it uses the page's custom properties and
+  `currentColor`, so it follows the skin's colour tokens and its light and dark modes.
+- With a title, the image is a `<figure class="doc-figure">` with the title as its `<figcaption>`; the image must
+  then be on a line of its own.
+- Alt text is required, as for every markdown image.
+- Colours in a symbol are only `var(--color-…)`, `currentColor`, `none`, `transparent` or a `url(#…)` to a gradient
+  or pattern in the same file. Anything else is a problem: the build stops and names the file.
+- A `<style>` in the file may hold only simple class rules of presentation properties (`.box { fill: var(--color-fill);
+  stroke: var(--color-line); }`). Each becomes attributes on the elements with that class, and the `<style>` and every
+  `class` go: a `<style>` left in a page styles the whole page, and the page's own CSS would reach the classes.
+  Anything else in a `<style>` is a problem.
+- `<script>`, `<foreignObject>`, `<image>`, event attributes (`onclick`) and links to other files are removed, and
+  the build and `pd dev` say what was removed, once per file. `<title>` and `<desc>` go too: the alt text is the
+  image's name.
+- Ids inside a file are prefixed with the symbol's (`img-flow--arrow`), so two symbols on a page never share one.
+  A heading whose anchor would be a symbol's id gets the next free one, as with the layout's ids.
+- When two asset folders have a symbol of the same name, the first one wins (your own folders come before
+  packages'), and `pd dev` and the build say which.
+- The skin keeps a symbol inside its column with the same rule as for images (the `pd init --storefront` skin
+  has it):
+
+  ```css
+  .doc-image { max-inline-size: 100%; block-size: auto; }
+  ```
+
+A symbol image shows on site pages. In a component's docs in the workbench it shows an error until a later release.
+
+#### A symbol as a file
+
+Where only an image file can be shown, such as a README on GitHub, use the symbol's standalone file:
+`/_pd/symbols/<name>.svg`, served by `pd dev` and written by `pd build` into the site and the workbench. It holds the
+values of the tokens the symbol uses, light, then dark for `prefers-color-scheme: dark`, read from your document base
+layer (the compiled `:root` rules, with `light-dark()` and `@supports` as a browser reads them). `currentColor` has no
+text around it there, so it becomes `--color-text`, or the token `assets.symbols.currentColor` names. A token the
+base layer doesn't declare stops the build.
+
+Point a README at the hosted file by its full address:
+
+```md
+![How a page is built from its layout](https://example.com/_pd/symbols/flow.svg)
+```
+
 ### The image checks
 
 Every `<img>` on an assembled page, whether from the page, a component it places, its layout or a partial, is

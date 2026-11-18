@@ -20,6 +20,14 @@ export interface AssetsConfig {
   /** Stylesheets to link in every preview document, before component CSS: a path relative to the
    *  assets dir, or a full URL (e.g. a web-font stylesheet), which is linked as it is. */
   css?: string[];
+  /** Symbol images (one SVG per symbol in an asset root's `symbols/` folder, shown by `![Alt](#stem)` on a site page). */
+  symbols?: SymbolsConfig;
+}
+
+export interface SymbolsConfig {
+  /** The colour token `currentColor` becomes in a symbol's standalone file (`/_pd/symbols/<stem>.svg`), which has no
+   *  text colour around it. Read from the document base layer like every token. Default: `"--color-text"`. */
+  currentColor?: string;
 }
 
 export interface StylesConfig {
