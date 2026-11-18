@@ -1,6 +1,6 @@
 // Theme discovery + swatch-token extraction.
 //
-// A LEAF: filesystem + postcss over explicit arguments, no server state.
+// A LEAF: filesystem + the CSS walk of css-tokens.ts over explicit arguments, no server state.
 //
 // Token extraction has ONE source per theme, deliberately: if a `.theme.json` sidecar exists it is
 // authoritative and a slot missing from it stays null — there is no CSS top-up. Mixing the two
@@ -8,8 +8,8 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import postcss from "postcss";
 import type { ThemeSummary } from "@pattern-dump/contracts";
+import { scopedDeclarations } from "./css-tokens.js";
 
 /** Every `*.theme.scss` across the theme folders, with the folder it lives in. A name already found
  *  in an earlier folder (the project's) hides a later one (a package's). */
@@ -65,13 +65,8 @@ export async function extractThemeTokens(
   // the quoted spelling alone found nothing and every sidecar-less theme showed empty swatches.
   const wanted = `[data-theme=${name}]`;
   const unquote = (selector: string): string => selector.replace(/=\s*(["'])(.*?)\1\s*\]/g, "=$2]").replace(/\s+/g, "");
-  const root = postcss.parse(compiledCss);
-  root.walkRules(rule => {
-    if (!rule.selectors.some(sel => unquote(sel) === wanted)) return;
-    rule.walkDecls(decl => {
-      if (slots.includes(decl.prop)) result[decl.prop] = decl.value;
-    });
-  });
+  const inTheme = (selectors: string[]): boolean => selectors.some(sel => unquote(sel) === wanted);
+  for (const d of scopedDeclarations(compiledCss, inTheme, prop => slots.includes(prop))) result[d.prop] = d.value;
   // Note: .theme.json edits without a companion .theme.scss change won't trigger
   // re-extraction (HMR only watches .scss). Acceptable for static fixtures.
   return result;
