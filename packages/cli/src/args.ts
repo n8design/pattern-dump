@@ -191,8 +191,8 @@ export const USAGE = `Usage: pd <command> [options]
   init [dir]   Set up a new Pattern Dump project (default: the current folder)
     --name <name>      Package name (default: the folder name; a generic one such as styleguide or
                        site is scoped by its parent folder: acme-web/site gives @acme-web/site)
-    --brand <title>    Title shown in the Nav Rail (default: the name, or the parent folder's for a
-                       scoped one)
+    --brand <title>    Title shown in the Nav Rail; with --site, the site's title (default: the name,
+                       or the parent folder's for a scoped one)
     --no-examples      Structure, config and themes only, no starter components
     --storefront       Also a website: pages, a skin, and a GitHub Pages workflow (default: no)
     --no-search        With a website: leave Pagefind out (default: a devDependency, so pd build
@@ -226,7 +226,8 @@ export const USAGE = `Usage: pd <command> [options]
     --root <path>      Build a specific project root
     --config <path>    Use a config file outside the root
     --out <dir>        Output folder, relative to the root (default: build.outDir, outDir, or dist)
-    --base <path>      Where it will be hosted: / (default) or a subpath such as /docs/
+    --base <path>      Where it will be hosted: / or a subpath such as /docs/ (default: build.basePath,
+                       then /)
     --browser          Also check the storefront's pages in Chromium: contrast and the accessibility
                        rules that need a rendered page, and each image's variant against its size.
                        Uses the project's own Playwright (npm install --save-dev playwright)
@@ -243,4 +244,4 @@ export const USAGE = `Usage: pd <command> [options]
     --out <dir>        Durable output sink (must be outside --root)
     --config <path>    Use a config file outside the root
 
-  help [command]   Show this help`;
+  help     Show this help`;

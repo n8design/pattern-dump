@@ -13,6 +13,7 @@
 // never show on a real page. A layout that declares `page` gets what is derived for the page (derived.ts),
 // each declared sub-key present and null where nothing is.
 
+import { placementSchemaPath } from "../discovery-index.js";
 import { createHeightFitter, generationBehind, PD_ROUTES, type DiscoveryMap, type ImageLookup, type Render, type StorefrontNavItem, type ThemeSwitch } from "@pattern-dump/contracts";
 import { themeSyncScript } from "./theme-sync.js";
 import { defaultsNote, originOf, placeOf } from "./folder-defaults.js";
@@ -524,7 +525,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       discoveryMap: a.discoveryMap, handleMap: a.handleMap, composition: a.composition,
       // Each component rendered for a placement: the page loads its behaviour scripts (page-head.ts).
       render: input => { placedIds.add(input.component.split("~")[0]!); return a.render(input); },
-      schemaOf: async id => (await readSchema(a.discoveryMap.get(id)?.schemaPath, designFiles(a.discoveryMap))).schema,
+      schemaOf: async id => (await readSchema(placementSchemaPath(id, a.discoveryMap), designFiles(a.discoveryMap))).schema,
       shown: a.shown,
     };
     const body = await renderDoc(

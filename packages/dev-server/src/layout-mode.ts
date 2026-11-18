@@ -10,6 +10,7 @@ import { readFolderFile, type PatternDirs } from "./pattern-dirs.js";
 import type { DiscoveryMap, LayoutMode } from "@pattern-dump/contracts";
 import { stripOrderPrefixes } from "@pattern-dump/discovery";
 import { parseJson, readPreviewMode } from "@pattern-dump/renderer";
+import { frontmatterString, readFrontmatter } from "./frontmatter.js";
 
 /**
  * Categories that default to `full` preview layout. A page, a template or a layout is a whole
@@ -17,6 +18,12 @@ import { parseJson, readPreviewMode } from "@pattern-dump/renderer";
  * Matched without ordering prefixes, so a PatternLab tree's `05-pages` counts (see stripOrderPrefixes).
  */
 export const FULL_CATEGORIES = new Set(["pages", "templates", "layouts"]);
+
+/** `preview:` from a pattern `.md` or folder `index.md` frontmatter, when it names a layout mode. */
+export function previewModeOf(md: string): LayoutMode | undefined {
+  const v = frontmatterString(readFrontmatter(md), "preview");
+  return v === "centered" || v === "full" ? v : undefined;
+}
 
 /**
  * Resolve a component's preview layout, most-specific-wins:
@@ -38,10 +45,7 @@ export async function resolveLayoutMode(
 
   // The raw category here: it is a folder on disk, prefix and all.
   const categoryIndex = await readFolderFile(patternsDir, join(category, "index.md"));
-  if (categoryIndex !== null) {
-    const m = categoryIndex.match(/^preview:\s*(centered|full)$/m);
-    if (m) layout = m[1] as LayoutMode;
-  }
+  if (categoryIndex !== null) layout = previewModeOf(categoryIndex) ?? layout;
 
   const schemaPath = discoveryMap?.get(componentId)?.schemaPath;
   if (schemaPath) {
@@ -55,9 +59,7 @@ export async function resolveLayoutMode(
   const mdPath = discoveryMap?.get(componentId)?.mdPath;
   if (mdPath) {
     try {
-      const md = await readFile(mdPath, "utf-8");
-      const m  = md.match(/^preview:\s*(centered|full)$/m);
-      if (m) layout = m[1] as LayoutMode;
+      layout = previewModeOf(await readFile(mdPath, "utf-8")) ?? layout;
     } catch { /* no component .md */ }
   }
 

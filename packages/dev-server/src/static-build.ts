@@ -10,7 +10,7 @@
 //     is included — its <link>/<script>/url() references are root-relative too.
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
-import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createImageCache } from "@pattern-dump/build";
 import { sameHostWorkbenchPath, type PatternDumpConfig, SKIPPABLE_CHECKS, type SkippableCheck } from "@pattern-dump/config";
@@ -39,7 +39,7 @@ import { changedInputs, stampInputs } from "./input-stamps.js";
 import { buildSearchIndex, SEARCH_PATH, searchPagefind, type PagefindModule, type SearchRecord } from "./storefront/search.js";
 
 export interface StaticBuildOptions {
-  /** Absolute output directory. Emptied first. */
+  /** Absolute output directory. Replaced as a whole once every check has passed; a build that stops leaves it as it was. */
   outDir: string;
   /** Where the snapshot will be hosted: "/" or "/sub/path/". */
   basePath?: string;
@@ -227,8 +227,13 @@ async function buildOnce(
     ...(storefront ? [storefront.pagesDir, ...(storefront.head ? [storefront.head] : [])] : []),
   ];
   const outputs = [...(buildWorkbench ? [outDir] : []), ...(storefront ? [storefront.outDir] : [])];
-  const startStamps = await stampInputs(inputs, outputs);
-  watch.changed = async () => changedInputs(startStamps, await stampInputs(inputs, outputs), project);
+  // Each part is written into a folder of its own beside its output, and put in place only once every check has
+  // passed: a build that stops leaves both outputs as they were.
+  const wbStage = staged(outDir);
+  const sfStage = storefront ? staged(storefront.outDir) : undefined;
+  for (const output of outputs) await clearLeftovers(output);
+  const startStamps = await stampInputs(inputs, [...outputs, wbStage, ...(sfStage ? [sfStage] : [])]);
+  watch.changed = async () => changedInputs(startStamps, await stampInputs(inputs, [...outputs, wbStage, ...(sfStage ? [sfStage] : [])]), project);
   /** Stops the build when an input changed since it started; `written` says what is on disk by then. */
   const assertUnchanged = async (written: string): Promise<void> => {
     const changed = await watch.changed!();
@@ -436,13 +441,13 @@ async function buildOnce(
 
   await assertUnchanged("nothing was written").catch(async (e: unknown) => { await server.close(); throw e; });
   if (buildWorkbench) {
-    await rm(outDir, { recursive: true, force: true });
-    await mkdir(outDir, { recursive: true });
+    await rm(wbStage, { recursive: true, force: true });
+    await mkdir(wbStage, { recursive: true });
   }
   const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], borrowedStyles: 0, ms: 0,
     ...(buildWorkbench ? {} : { workbench: false as const }) };
   if (opts.browser && !storefront) report.notes.push("--browser checks a storefront's pages in Chromium, and this project has no storefront: nothing was checked");
-  const { capture, store } = createSnapshotWriter({ outDir, basePath, origin, report });
+  const { capture, store } = createSnapshotWriter({ outDir: wbStage, basePath, origin, report });
 
   /** Every /_pd/ stylesheet and script a document references. */
   const referenced = (html: string): string[] =>
@@ -526,8 +531,8 @@ async function buildOnce(
         }
         const exists = await stat(rootDir).then(s => s.isDirectory(), () => false);
         if (!exists) continue;
-        await cp(rootDir, join(outDir, "assets", cfg.assetRootNames[i]), { recursive: true, filter: notABarrier });
-        if (cfg.assetRoots.length === 1) await cp(rootDir, join(outDir, "assets"), { recursive: true, force: false, filter: notABarrier });
+        await cp(rootDir, join(wbStage, "assets", cfg.assetRootNames[i]), { recursive: true, filter: notABarrier });
+        if (cfg.assetRoots.length === 1) await cp(rootDir, join(wbStage, "assets"), { recursive: true, force: false, filter: notABarrier });
       }
 
       // ---- 6. One shell page per route ----
@@ -547,10 +552,10 @@ async function buildOnce(
       }
       // GitHub Pages runs Jekyll unless told otherwise, and Jekyll drops every folder starting with "_"
       // — which would silently remove _pd/ (the shell, its CSS, every theme and component stylesheet).
-      await writeFile(join(outDir, ".nojekyll"), "");
+      await writeFile(join(wbStage, ".nojekyll"), "");
       report.files++;
       // Crawlers: the workbench is searchable, its previews are not.
-      await writeFile(join(outDir, "robots.txt"), workbenchRobotsTxt(basePath));
+      await writeFile(join(wbStage, "robots.txt"), workbenchRobotsTxt(basePath));
       report.files++;
       // Unless the storefront's own robots.txt, at this host's root, already keeps these previews out: a
       // workbench published on the storefront's host at this base path (with index: false, it keeps out everything),
@@ -561,12 +566,12 @@ async function buildOnce(
           + `its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
       }
 
-      await assertUnchanged(storefront ? `the workbench in ${outDir} may be part old, part new, and the storefront was not written` : `the workbench in ${outDir} may be part old, part new`);
+      await assertUnchanged("nothing was written");
     }
 
     // ---- 7. The storefront, into its own root, through its own writer ----
-    if (storefront && sfGet && sfCrawl) {
-      const sfOut = storefront.outDir;
+    if (storefront && sfStage && sfGet && sfCrawl) {
+      const sfOut = sfStage;
       await rm(sfOut, { recursive: true, force: true });
       await mkdir(sfOut, { recursive: true });
       const counts = { files: 0, bytes: 0, warnings: [] as string[] };
@@ -609,7 +614,7 @@ async function buildOnce(
       }
       const stubs = new Set((await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse).pages.flatMap(p => p.redirectFrom ?? []));
       const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u) && !stubs.has(u)).length;
-      report.storefront = { outDir: sfOut, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };
+      report.storefront = { outDir: storefront.outDir, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };
       if (sfBase !== "/") {
         // What the site's robots.txt would have said, for the host's own, if its owner can add to it.
         const wbPath = sameHostWorkbenchPath(storefront);
@@ -640,9 +645,18 @@ async function buildOnce(
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
 
-    if (storefront) {
-      await assertUnchanged(buildWorkbench ? `the workbench in ${outDir} and the storefront in ${storefront.outDir} may be part old, part new`
-        : `the storefront in ${storefront.outDir} may be part old, part new`);
+    if (storefront) await assertUnchanged("nothing was written");
+
+    // Every check has passed: each part takes its output's place. The workbench first: when the storefront then can't,
+    // the two are out of step, and the build says so.
+    if (buildWorkbench) await putInPlace(wbStage, outDir);
+    if (storefront && sfStage) {
+      await putInPlace(sfStage, storefront.outDir).catch((e: unknown) => {
+        if (!buildWorkbench) throw e;
+        throw new Error(`pd build: the workbench in ${outDir} is this build's, but the storefront could not take its place in `
+          + `${storefront.outDir}: the two are out of step. The storefront in it is the earlier one; run pd build again.\n`
+          + `  ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+      });
     }
 
     // ---- 8. The image cache keeps what this build used: the variants written to either root ----
@@ -660,11 +674,58 @@ async function buildOnce(
     // shell for a missing preview would boot a second workbench inside the preview iframe.
   } finally {
     await server.close();
+    // A build that stopped leaves nothing of its own beside the outputs.
+    await rm(wbStage, { recursive: true, force: true });
+    if (sfStage) await rm(sfStage, { recursive: true, force: true });
   }
 
   if (skipped.size) report.skippedChecks = SKIPPABLE_CHECKS.filter(c => skipped.has(c));
   report.ms = Math.round(performance.now() - started);
   return report;
+}
+
+/** The folder a build writes an output into before it takes the output's place: beside it, so on the same
+ *  filesystem, and hidden. Named with the build's process, so a later build can tell a killed one's leftovers. */
+function staged(output: string): string {
+  return join(dirname(output), `.${basename(output)}.pd-build-${process.pid}`);
+}
+
+/** Put a finished folder in an output's place: the earlier output is moved aside, then removed. When the finished
+ *  one can't take its place, the earlier one is put back, so the output is never missing. */
+async function putInPlace(stage: string, output: string): Promise<void> {
+  const aside = `${stage}.earlier`;
+  await rm(aside, { recursive: true, force: true });
+  const had = await rename(output, aside).then(() => true, (e: NodeJS.ErrnoException) => {
+    if (e.code === "ENOENT") return false;
+    throw e;
+  });
+  try {
+    await rename(stage, output);
+  } catch (e) {
+    if (had) await rename(aside, output).catch(() => {});
+    throw e;
+  }
+  if (had) await rm(aside, { recursive: true, force: true });
+}
+
+/** True while a process with this id runs (one of another user's counts: it can't be signalled, but it exists). */
+function running(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+/** Remove what killed builds left beside an output: every `.<out>.pd-build-<pid>` folder whose process no longer
+ *  runs. An earlier output such a build had moved aside (`….earlier`) and not replaced is put back first. */
+async function clearLeftovers(output: string): Promise<void> {
+  const dir = dirname(output);
+  const prefix = `.${basename(output)}.pd-build-`;
+  const names = await readdir(dir).catch(() => [] as string[]);
+  for (const name of names.filter(n => n.startsWith(prefix)).sort().reverse()) {
+    const m = /^(\d+)(\.earlier)?$/.exec(name.slice(prefix.length));
+    if (!m || running(Number(m[1]))) continue;
+    const path = join(dir, name);
+    if (m[2] && !(await stat(output).then(() => true, () => false))) await rename(path, output);
+    else await rm(path, { recursive: true, force: true });
+  }
 }
 
 /** The project's own style sources (SCSS and CSS) under `stylesDir`, each by its path from the project's root. */

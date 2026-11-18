@@ -88,6 +88,27 @@ test.describe("HMR — build errors reach the Console", () => {
     }
   });
 
+  // A data variant with no base template to overlay is left out of the tree. Until 0.6.1 nothing said so; now the
+  // server reports it like a collision, naming the data file and the template it needs.
+  test("a data variant with no base template is named on the Console", async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoComponent(page, "atoms/button");
+    await page.click("#dock-tab-console");
+
+    const slug = `orphan-${Date.now()}`;
+    const variant = path.join(testBench, "src/patterns/atoms", `${slug}~loud.json`);
+    try {
+      await save(variant, `{ "tone": "loud" }\n`);
+      const line = page.locator(`${consoleLines}[data-level="error"]`, { hasText: `${slug}~loud.json` });
+      await expect(line.first()).toBeAttached({ timeout: 20_000 });
+      await expect(line.first()).toContainText(`${slug}.hbs`);
+      await expect(line.first()).toContainText("left out");
+    } finally {
+      await rm(variant, { force: true });
+      await page.waitForTimeout(1500);
+    }
+  });
+
   test("a healthy edit logs no error line", async ({ page }) => {
     test.setTimeout(60_000);
     await gotoComponent(page, "atoms/button");

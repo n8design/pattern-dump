@@ -5,7 +5,7 @@
 // they look one up. No site outside discovery should be rebuilding `<id>/<name>.hbs`.
 
 import { resolve } from "node:path";
-import type { DiscoveryResult } from "@pattern-dump/contracts";
+import type { DiscoveryMap, DiscoveryResult } from "@pattern-dump/contracts";
 
 /** Component ids without variant segments — used to scope SCSS attribution. */
 export function baseComponentIds(dr: DiscoveryResult): Set<string> {
@@ -14,6 +14,14 @@ export function baseComponentIds(dr: DiscoveryResult): Set<string> {
     if (!id.includes("~")) ids.add(id);
   }
   return ids;
+}
+
+/** The schema a component is placed with: its own, else, for a variant, its base's. A data-overlay variant renders
+ *  the base's markup, so the base's schema describes it unless the variant has one of its own. */
+export function placementSchemaPath(id: string, discoveryMap: DiscoveryMap): string | undefined {
+  const own = discoveryMap.get(id)?.schemaPath;
+  if (own || !id.includes("~")) return own;
+  return discoveryMap.get(id.split("~")[0]!)?.schemaPath;
 }
 
 /** Resolve a changed file to its component id using the discovery result's reverse indexes.

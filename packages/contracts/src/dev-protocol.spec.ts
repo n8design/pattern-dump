@@ -321,6 +321,7 @@ describe("HmrMessage wire shapes", () => {
       { type: "css-link-swap", componentId: "a", href: "/x.css", orderedHrefs: ["/x.css"] },
       { type: "tree-changed" },
       { type: "collision", handle: "atoms-b", incumbentPath: "/a.hbs", quarantinedPath: "/b.hbs" },
+      { type: "orphan-variant", variantPath: "/chip~danger.json", basePath: "/chip.hbs" },
       { type: "page-changed", route: "/guides/setup/" },
       { type: "page-changed", route: null },
     ];
@@ -335,6 +336,7 @@ describe("HmrMessage wire shapes", () => {
         case "css-link-swap": return m.href;
         case "tree-changed":  return "tree";
         case "collision":     return m.handle;
+        case "orphan-variant": return m.variantPath;
         case "page-changed":  return m.route ?? "*";
         default: {
           const never: never = m;
@@ -342,7 +344,7 @@ describe("HmrMessage wire shapes", () => {
         }
       }
     });
-    expect(seen).toHaveLength(10);
+    expect(seen).toHaveLength(11);
   });
 });
 

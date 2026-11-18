@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.6.1 (2026-11-18)
+
+Fixes where Pattern Dump did less than its guide said: metadata is read from the frontmatter block only, variants
+with data alone get their own docs and schema and can be placed on a page, a private folder stays out of galleries,
+and a `pd build` that stops leaves its output folders as they were. The guide now describes what `pd audit` and
+`pd build` check.
+
+### Upgrading from 0.6.0
+
+- **Metadata outside the frontmatter block is no longer read.** `title`, `status`, `visibility`, `description`,
+  `deprecated-use`, `preview`, `overview`, `requireScript` and `requireAssets` in a component's `.md` or a folder's
+  `index.md` were matched as a `key:` line anywhere in the file, so a line in the body (a code sample with
+  `requireScript: x`) loaded a script, and a file without a `---` block still had metadata. They now come from the
+  block at the top only, like `order`: move any such line into the block. A quoted value loses its quotes
+  (`title: "Button, primary"`), and `requireScript: [toggle, menu]` loads two scripts (it was read as one id,
+  `toggle, menu`).
+- **A placed data variant brings its data.** `<pd-components-note~warning>` on a website page rendered like the base
+  note. It now takes each key it leaves unset from `note~warning.json` where that differs from `note.json`
+  (`tone: warning`); a page that placed a data variant and relied on its look being the base's sets those keys on
+  the tag.
+
+### Added
+
+- **A data variant with no base template is reported.** A `chip~danger.json` with no `chip.hbs` beside it (or
+  beside a base made of own-markup variants alone) has no markup to overlay. It is still left out, but `pd dev` now
+  names it in the terminal and on the Console, as it does a handle collision:
+  `Data variant left out: …/chip~danger.json needs …/chip.hbs to overlay, and there is none`.
+  Two additive contract changes carry it: `DiscoveryResult.orphanVariants` (`OrphanVariantEntry`) and the HMR
+  message `orphan-variant` (`OrphanVariantMessage`). `PD_PROTOCOL_VERSION` stays 1.
+- **A data variant can have its own docs and schema**, `chip~danger.md` and `chip~danger.schema.json`, as an
+  own-markup variant could. Without its own `.md` a variant still shows the base's docs.
+
+### Changed
+
+- **`pd build` replaces its output folders only once every check has passed.** The workbench and the storefront are
+  each written into a hidden folder beside their output (`.<folder>.pd-build-<process>`) and put in place at the
+  end, so a build that stops leaves both as they were. Leftovers of a build that was killed are removed when the
+  next one starts. If the workbench has taken its place and the storefront then can't, the build says the two are
+  out of step.
+- **A placed variant is checked against its base's schema** when it has none of its own.
+
+### Fixed
+
+- A `pd-` tag for a data variant failed with "has no schema, so it cannot be placed with values".
+- A variant's `.schema.json` was also read as a data variant of its own (`chip~icon.schema`).
+- `visibility: private` on a folder's `index.md` hid only the folder's node: an ancestor's gallery still listed its
+  components, and counted them when deciding whether it has a gallery.
+- A change noticed after the workbench was written, or while the storefront was, stopped `pd build` with both
+  folders part old, part new.
+- `pd help` and the guide no longer offer `pd help <command>`, which printed the same usage for every topic. The help
+  gives the `--base` default as `build.basePath`, then `/`, and says `--brand` sets the site's title with `--site`.
+- The accessibility coverage page called the rendered-page rules deferred; they run in the workbench's Diagnostics
+  tab and with `pd build --browser`.
+- The guide promised more than the code does in several places, among them that `pd audit` renders every variant
+  and reports handle collisions, that `pd build` fails on component findings, and that a component can be made of
+  data variants alone. Each now says what Pattern Dump does.
+
 ## 0.6.0 (2026-11-18)
 
 A website can now live on its own, on an existing style guide package: `pd init --site` writes pages and a config,

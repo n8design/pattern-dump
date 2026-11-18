@@ -17,6 +17,7 @@ import { basename, join, relative } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { parsePartialsFromHbs } from "./hbs-partials.js";
 import { designFiles } from "./storefront/design-files.js";
+import { frontmatterList, readFrontmatter } from "./frontmatter.js";
 
 // ---- requireScript / requireAssets aggregation ----
 
@@ -34,13 +35,9 @@ export function normalizeScriptId(raw: string): string {
   return s;
 }
 
-export function parseFrontmatterList(md: string, key: string): string[] {
-  const values: string[] = [];
-  const re = new RegExp(`^${key}:\\s*(.+)$`, "mg");
-  for (const [, val] of md.matchAll(re)) {
-    values.push(val.trim());
-  }
-  return values;
+/** A `requireScript` / `requireAssets` value from a pattern `.md`'s frontmatter, one entry per item. */
+export function requiresList(md: string, key: "requireScript" | "requireAssets"): string[] {
+  return frontmatterList(readFrontmatter(md), key);
 }
 
 
@@ -62,9 +59,8 @@ export async function aggregateRequires(
   if (entry?.mdPath) {
     try {
       const md = await readFile(entry.mdPath, "utf-8");
-      ownScripts = parseFrontmatterList(md, "requireScript").map(normalizeScriptId);
-      ownAssets  = parseFrontmatterList(md, "requireAssets")
-        .map(v => v.trim().replace(/^\[(.+)\]$/, "$1").trim());
+      ownScripts = requiresList(md, "requireScript").map(normalizeScriptId);
+      ownAssets  = requiresList(md, "requireAssets");
     } catch { /* no .md */ }
   }
 
@@ -141,7 +137,7 @@ export async function reportUnresolvableScripts(
     if (!entry.mdPath) continue;
     let md: string;
     try { md = await readFile(entry.mdPath, "utf-8"); } catch { continue; }
-    for (const raw of parseFrontmatterList(md, "requireScript")) {
+    for (const raw of requiresList(md, "requireScript")) {
       const id = normalizeScriptId(raw);
       if (resolves(id)) continue;
       console.warn(`[dev-server] requireScript "${raw}" on ${componentId}: no ${id}.ts in ${where}`);

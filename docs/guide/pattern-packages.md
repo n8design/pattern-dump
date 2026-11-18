@@ -135,6 +135,9 @@ holds only what is about the workbench, such as `outDir` and `build`:
 export default defineConfig({ outDir: "./dist" });
 ```
 
+Its `themes` in `patternDump` then need a `default`: optional for a package that sites use, it is required once the
+config takes it as its own `themes` (without it, `pd` stops with `missing required "themes.default"`).
+
 A field in both must have the same value in both (`"./patterns"` and `"patterns"` are the same). Different values
 stop `pd` with a config error naming both files, since the workbench and the sites using the package would
 otherwise read different folders.

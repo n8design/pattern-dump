@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join, basename, dirname, relative } from "node:path";
 import type {
-  DiscoveryEntry, DiscoveryResult, CollisionEntry, OverrideEntry, PatternRoot,
+  DiscoveryEntry, DiscoveryResult, CollisionEntry, OrphanVariantEntry, OverrideEntry, PatternRoot,
 } from "@pattern-dump/contracts";
 
 export type { PatternRoot };
@@ -96,7 +96,8 @@ export async function buildDiscoveryMap(roots: string | PatternRoot[]): Promise<
           await collectFiles(full);
         } else if (e.name.endsWith(".hbs")) {
           hbs.push(full);
-        } else if (e.name.includes("~") && e.name.endsWith(".json")) {
+        } else if (e.name.includes("~") && e.name.endsWith(".json") && !e.name.endsWith(".schema.json")) {
+          // A data-overlay variant; `name~v.schema.json` is a variant's schema, a sidecar, not a variant.
           varJson.push(full);
         }
       }
@@ -126,6 +127,7 @@ export async function buildDiscoveryMap(roots: string | PatternRoot[]): Promise<
   const handleMap = new Map<string, string>();
   const collisions: CollisionEntry[] = [];
   const overrides: OverrideEntry[] = [];
+  const orphanVariants: OrphanVariantEntry[] = [];
 
   // Derive slash id: apply the shared collapse rule — <dir>/<dir>.hbs → <dir>.
   function deriveId(absPath: string): string {
@@ -241,12 +243,23 @@ export async function buildDiscoveryMap(roots: string | PatternRoot[]): Promise<
     if (discoveryMap.has(variantId)) continue; // already registered as own-markup
 
     const baseEntry = discoveryMap.get(baseId);
-    if (!baseEntry?.hbsPath) continue; // no base to overlay on
+    if (!baseEntry?.hbsPath) {
+      // No base to overlay on. A base quarantined by a collision is reported as that collision.
+      if (!collisions.some(c => c.quarantinedId === baseId)) orphanVariants.push({ variantPath: jsonPath, basePath: join(dir, `${baseName}.hbs`) });
+      continue;
+    }
 
     const variantHandle = `${deriveHandle(baseId)}~${variantToken}`;
     if (!handleMap.has(variantHandle)) {
       const source = rootOf.get(jsonPath)?.root.source;
-      discoveryMap.set(variantId, { ...(source ? { source } : {}), hbsPath: baseEntry.hbsPath, jsonPath, ownMarkup: false });
+      // Its own docs and schema beside it (`chip~danger.md`, `chip~danger.schema.json`), as an own-markup variant has.
+      const fileSet = dirFileSets.get(dir) ?? new Set<string>();
+      const mdPath = fileSet.has(`${jsonStem}.md`) ? join(dir, `${jsonStem}.md`) : undefined;
+      const schemaPath = fileSet.has(`${jsonStem}.schema.json`) ? join(dir, `${jsonStem}.schema.json`) : undefined;
+      discoveryMap.set(variantId, {
+        ...(source ? { source } : {}), hbsPath: baseEntry.hbsPath, jsonPath, ownMarkup: false,
+        ...(mdPath ? { mdPath } : {}), ...(schemaPath ? { schemaPath } : {}),
+      });
       handleMap.set(variantHandle, variantId);
     }
   }
@@ -263,5 +276,6 @@ export async function buildDiscoveryMap(roots: string | PatternRoot[]): Promise<
     quarantineMap.set(col.quarantinedId, col);
   }
 
-  return { discoveryMap, handleMap, collisions, hbsPathToId, quarantineMap, overrides };
+  orphanVariants.sort((a, b) => a.variantPath < b.variantPath ? -1 : a.variantPath > b.variantPath ? 1 : 0);
+  return { discoveryMap, handleMap, collisions, hbsPathToId, quarantineMap, overrides, orphanVariants };
 }

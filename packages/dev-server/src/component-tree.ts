@@ -14,7 +14,7 @@ import type {
 } from "@pattern-dump/contracts";
 import { resolveLayoutMode } from "./layout-mode.js";
 import { readFolderFile, type PatternDirs } from "./pattern-dirs.js";
-import { readFrontmatter } from "./frontmatter.js";
+import { frontmatterString, readFrontmatter, type FrontmatterValue } from "./frontmatter.js";
 import { orderSiblings, parseOrder, type Orderable, type OrderSpec } from "./tree-order.js";
 
 /** Return all direct child path strings for a given parent path from a flat id list. */
@@ -49,11 +49,30 @@ function orderOf(md: string | null): OrderSpec | undefined {
   return md === null ? undefined : parseOrder(readFrontmatter(md)["order"]);
 }
 
-/** True when this node or anything beneath it is a component not marked private. The same set a
- *  folder overview lists — overview.ts derives its items from this tree, so the two cannot disagree. */
+/** `visibility:` from a file's frontmatter, when it is one of the two values. */
+function visibilityOf(fm: Record<string, FrontmatterValue>): "public" | "private" | undefined {
+  const v = frontmatterString(fm, "visibility");
+  return v === "public" || v === "private" ? v : undefined;
+}
+
+/** True when this node or anything beneath it is a component not marked private, and not inside a private
+ *  folder. The same set a folder overview lists (publicComponents), so the two cannot disagree. */
 export function hasPublicComponent(node: TreeNode): boolean {
-  if (node.kind === "component" && node.visibility !== "private") return true;
-  return node.children?.some(hasPublicComponent) ?? false;
+  return publicComponents(node, false).length > 0;
+}
+
+/** The public components in a node's subtree, in tree order (pre-order). A private component is left out (its
+ *  own sub-components are not), and so is everything in a private folder beneath `node`; `node` itself counts as
+ *  open (unless `open` is false), so a private folder's own gallery lists its components. */
+export function publicComponents(node: TreeNode, open = true): TreeNode[] {
+  const out: TreeNode[] = [];
+  const walk = (n: TreeNode, top: boolean): void => {
+    if (n.kind === "group" && n.visibility === "private" && !top) return;
+    if (n.kind === "component" && n.visibility !== "private") out.push(n);
+    n.children?.forEach(c => walk(c, false));
+  };
+  walk(node, open);
+  return out;
 }
 
 export async function buildComponentTree(
@@ -111,16 +130,12 @@ async function buildTreeNodeFromMap(
   if (isComponent && entry.mdPath) {
     const md = await readText(entry.mdPath);
     if (md !== null) {
-      const t = md.match(/^title:\s*(.+)$/m);
-      const s = md.match(/^status:\s*(.+)$/m);
-      const v = md.match(/^visibility:\s*(public|private)$/m);
-      if (t) title = t[1].trim();
-      if (s) {
-        const sv = s[1].trim();
-        if (sv === "stable" || sv === "deprecated" || sv === "draft") status = sv as ComponentStatus;
-      }
-      if (v) visibility = v[1] as "public" | "private";
-      const o = orderOf(md);
+      const fm = readFrontmatter(md);
+      title = frontmatterString(fm, "title") ?? title;
+      const sv = frontmatterString(fm, "status");
+      if (sv === "stable" || sv === "deprecated" || sv === "draft") status = sv;
+      visibility = visibilityOf(fm);
+      const o = parseOrder(fm["order"]);
       if (o && "weight" in o) weight = o.weight;
     }
   }
@@ -145,19 +160,17 @@ async function buildTreeNodeFromMap(
   let hasOverview = false;
   if (!isComponent) {
     let titled = false;
+    const fm = indexMd !== null ? readFrontmatter(indexMd) : {};
     if (indexMd !== null) {
-      const t = indexMd.match(/^title:\s*(.+)$/m);
-      if (t) { title = t[1].trim(); titled = true; }
-      if (!visibility) {
-        const v = indexMd.match(/^visibility:\s*(public|private)$/m);
-        if (v) visibility = v[1] as "public" | "private";
-      }
+      const t = frontmatterString(fm, "title");
+      if (t) { title = t; titled = true; }
+      visibility ??= visibilityOf(fm);
       if (folderOrder && "weight" in folderOrder) weight = folderOrder.weight;
     }
     if (!titled) title = folderTitle(name);
     // index.md is optional: any group with a public component beneath it gets an overview.
     // `overview: false` in index.md opts one folder out; the global switch opts all out.
-    const optedOut = indexMd !== null && /^overview:\s*false$/m.test(indexMd);
+    const optedOut = frontmatterString(fm, "overview") === "false";
     hasOverview = overviewsEnabled && !optedOut && children.some(hasPublicComponent);
   }
 

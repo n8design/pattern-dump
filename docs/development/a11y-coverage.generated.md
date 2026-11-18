@@ -19,10 +19,12 @@ No browser required.
 - `autocomplete-valid`
 - `duplicate-id`
 
-## Deferred (visual / on-demand tier)
+## Rendered-page tier (in the browser)
 
 These rules require a real rendering engine (computed styles, layout) to evaluate correctly.
-They return `incomplete` in jsdom. Deferred to the on-demand visual tier milestone.
+They return `incomplete` in jsdom, so `pd audit` leaves them out. They run in the browser: on the
+component on screen in the workbench (the Console's Diagnostics tab), and on a storefront's pages
+with `pd build --browser`.
 
 - `aria-hidden-focus`
 - `duplicate-id-aria`
@@ -32,7 +34,8 @@ They return `incomplete` in jsdom. Deferred to the on-demand visual tier milesto
 
 Automated axe checks cover structural and ARIA attribute correctness. They do not cover:
 
-- **Colour contrast** (requires computed styles, so deferred to the visual tier)
+- **Colour contrast** in what a single render doesn't show (hover and focus states, text over images); the
+  rendered-page tier above checks the rest
 - **Keyboard navigation order and focus management** (requires interactive testing)
 - **Screen reader announcements** (varies by AT and browser combination)
 - **Cognitive accessibility** (readability, plain language, consistent navigation)

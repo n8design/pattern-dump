@@ -1,10 +1,9 @@
 // A small reader for the leading `---` frontmatter block of a pattern `.md` / folder `index.md`, and of
 // a storefront page.
 //
-// The older per-key reads in this package regex-match `^key:` against the WHOLE file, so a body line
-// that happens to start with `title:` is read as metadata, and no list can be expressed at all. This
-// reader looks only inside the leading block and understands the two list spellings authors
-// actually write, and one level of keys under a key (`related:` with `  limit: 5` indented under it). It
+// It is the only reader of that metadata: a body line that happens to start with `title:` is text, not
+// a key (per-key regexes over the whole file read it as metadata until 0.6.1). It looks only inside the
+// leading block and understands the two list spellings authors actually write, and one level of keys under a key (`related:` with `  limit: 5` indented under it). It
 // is deliberately not YAML: scalars stay strings, no deeper nesting, no anchors. One key reads a block deeper:
 // `childDefaults:` on a folder's index.md holds frontmatter for the pages under it, written as a page writes it
 // (its own keys, lists and one level of map), indented under the key; it is read by the same rules (folder
@@ -12,7 +11,7 @@
 //
 // One scanner, two readings:
 //   - readFrontmatter (lenient): the values, nothing else. A line it cannot read is dropped without a
-//     word, an unclosed block is ignored. Used by `order` (tree-order.ts) and component docs.
+//     word, an unclosed block is ignored. Used for every key of a pattern `.md` and folder `index.md`.
 //   - readFrontmatterStrict: the same values, plus an error — with its line number — for everything the
 //     lenient reading passes over. Storefront pages use it, and fail on any error.
 // The values are the same in both, always: strict reading only adds errors.
@@ -207,6 +206,19 @@ function scan(md: string, nested = true): FrontmatterReading {
  *  cannot read is dropped, an unclosed block is ignored. */
 export function readFrontmatter(md: string): Record<string, FrontmatterValue> {
   return scan(md).values;
+}
+
+/** One key of a pattern `.md` / folder `index.md` as a single value: missing, empty or a list gives undefined. */
+export function frontmatterString(values: Record<string, FrontmatterValue>, key: string): string | undefined {
+  const v = values[key];
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+/** One key as a list: `[a, b]` or a block list gives each item, a single value a list of one. */
+export function frontmatterList(values: Record<string, FrontmatterValue>, key: string): string[] {
+  const v = values[key];
+  const items = Array.isArray(v) ? v : v === undefined ? [] : [v];
+  return items.map(s => s.trim()).filter(Boolean);
 }
 
 /** The same values as readFrontmatter, every problem the lenient reading passes over with its line, and

@@ -4,8 +4,7 @@
 pd <command> [options]
 ```
 
-Run it through npm scripts (`npm run dev`) or `npx pd` inside a project. `pd help [command]` prints the
-built-in help.
+Run it through npm scripts (`npm run dev`) or `npx pd` inside a project. `pd help` prints the built-in help.
 
 ## Global or local
 
@@ -40,12 +39,13 @@ pd init [dir]
 ```
 
 Sets up a Pattern Dump project in `dir` (default: the current folder): config, patterns, styles, themes,
-a TypeScript setup, and optional starter components. It asks for each choice unless given as a flag.
+a TypeScript setup, and optional starter components. In a terminal it asks for each choice not given as a flag;
+without one (in CI, or with input piped in) it takes every default without asking, as with `--yes`.
 
 | Option | Description |
 |---|---|
 | `--name <name>` | Package name. Default: the folder name; a generic one (`styleguide`, `site`, `docs` and the like) is scoped by its parent folder, `@<parent>/<folder>` |
-| `--brand <title>` | Title shown in the Nav Rail. Default: the name, or the parent folder's name for a scoped one |
+| `--brand <title>` | Title shown in the Nav Rail; with `--site`, the site's title. Default: the name, or the parent folder's name for a scoped one |
 | `--no-examples` | Structure, config and themes only, without starter components |
 | `--storefront` | Also a website: two pages, a small skin, a component of its own and a GitHub Pages workflow ([storefront.md](storefront.md#quick-start)). Default: no |
 | `--search` / `--no-search` | With a website: Pagefind as a devDependency, pinned, so `pd build` writes the search index. Default: yes |
@@ -83,7 +83,8 @@ Starts the workbench with live reload.
 | `--port <n>` | HTTP port. Default `4000`, or the `PD_PORT` environment variable |
 | `--ws-port <n>` | Live-reload WebSocket port. Default: the HTTP port + 1, or `PD_WS_PORT` |
 
-If a port is taken, `pd dev` says which one and exits; pick another with `--port`.
+If a port is taken, `pd dev` says which one and exits, with the command to try: another `--port`, or, when the
+live-reload port you chose with `--ws-port` (or `PD_WS_PORT`) is the taken one, another `--ws-port`.
 
 Restart `pd dev` after changing the config, a file a helper module imports (only the module itself
 reloads), or an installed pattern package. Everything else reloads while it runs, global data and helpers
@@ -94,13 +95,17 @@ shown.
 
 ## `pd audit`
 
-Renders every component and variant and reports defects across the whole design system:
+Renders every component once, with its own data, and reports defects across the whole design system:
 
 - render errors;
-- schema checks (`UNFILLED_REQUIRED`, `SHAPE_MISMATCH`);
+- data and schema checks (`UNFILLED_REQUIRED`, `SHAPE_MISMATCH`, `DATA_INVALID`, `SCHEMA_INVALID`, `HELPER_SHADOW`);
 - HTML validation;
-- structural accessibility checks (axe-core rules that don't need layout or colour);
-- discovery problems such as handle collisions.
+- structural accessibility checks (axe-core rules that don't need layout or colour).
+
+Variants are not part of the audit: each variant is checked on its own page in the workbench (the Console's
+**Diagnostics** tab), and `pd build` checks every variant it writes. A component left out of the tree by a handle
+collision is not in the audit either: the collision is named in the terminal, on the Console, and on that
+component's Diagnostics tab.
 
 | Option | Description |
 |---|---|
@@ -118,8 +123,8 @@ npx pd audit --format json | jq '.totals'
 Results are cached per component and reused when nothing changed, or when nothing a component includes
 changed.
 
-`pd audit` fails (exit code `1`) when it finds an error, as `pd build` fails on its checks' errors, so a CI
-step that runs it stops there. Warnings alone leave it at `0`; with `--strict`, any finding fails it. The
+`pd audit` fails (exit code `1`) when it finds an error, so a CI step that runs it stops there. (`pd build` does
+not fail on component findings, its own audit's included; it fails on its storefront and schema checks.) Warnings alone leave it at `0`; with `--strict`, any finding fails it. The
 last line says why it failed:
 
 ```
@@ -137,8 +142,8 @@ Writes a static snapshot of the workbench: plain files for any static host.
 
 | Option | Description |
 |---|---|
-| `--out <dir>` | Output folder, relative to the root. Default: `build.outDir`, `outDir`, then `dist`. Emptied first |
-| `--base <path>` | Where it will be hosted: `/` (default) or a subpath such as `/docs/` |
+| `--out <dir>` | Output folder, relative to the root. Default: `build.outDir`, `outDir`, then `dist`. Replaced as a whole once every check has passed; a build that stops leaves it as it was |
+| `--base <path>` | Where it will be hosted: `/` or a subpath such as `/docs/`. Default: `build.basePath`, then `/` (a project made with `pd init --storefront` sets `/workbench/`) |
 | `--browser` | Also check the storefront's pages in Chromium: contrast and the other accessibility rules that need a rendered page, and each image's variant against its box ([storefront.md](storefront.md#checks-in-a-browser-pd-build---browser)). Needs the project's own Playwright |
 | `--no-audit` / `--audit` | Leave the corpus audit out (it is not run, and there is no Audit tab), or force it in. Default: `build.audit` |
 | `--check-workers <n>` | Threads that check the storefront's pages for accessibility. Default: the cores less one, at most 8, within a quarter of the memory; `1` checks them in one thread. The findings are the same with any number |
@@ -167,7 +172,7 @@ meant for migrating an existing design system; review the output before copying 
 ## `pd help`
 
 ```
-pd help [command]
+pd help
 ```
 
-Prints the usage summary.
+Prints the usage summary: every command and option.

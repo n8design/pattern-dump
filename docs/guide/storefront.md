@@ -63,7 +63,8 @@ pages/
 - File and folder names are part of the URL: lowercase letters, digits and hyphens only.
 - Only `.md` files belong here. Images and other files go in the project's [assets](authoring.md).
   Files starting with a dot are ignored.
-- **Adding a page is adding a file.** It appears in the navigation with no other change.
+- **Adding a page is adding a file.** A top-level page, or a page one folder deep, appears in the navigation
+  with no other change; a page deeper than that is reached by its links, since the navigation is one level deep.
 
 `pagesDir` is not the same as a `pages` folder among the patterns, such as `src/patterns/pages/` in `pd init`'s
 starter components: that is the page level of atomic design, page-sized components shown in the workbench,
@@ -171,8 +172,11 @@ Install **Node 22** or later.
 ```
 
 The tag's name is `pd-` followed by the component's handle (`<category>-<name>`, as in `{{> components-note }}`);
-a variant is `pd-components-note~warning`. The component renders into the page, with its stylesheet linked
-in the page's head, so the page's own styles also reach it.
+a variant is `pd-components-note~warning`. A variant's values are checked against its own `.schema.json`, else its
+base's, and it brings the data that makes it the variant: each key the tag leaves unset whose value in
+`note~warning.json` differs from `note.json` (`tone: warning`), while sample text the two share stays out; the tag's
+own values win. The component renders into the page, with its stylesheet linked in the page's head, so the page's
+own styles also reach it.
 
 | Written | Becomes |
 |---|---|
@@ -778,8 +782,8 @@ rendered through the query's view, as HTML. `listing` is `null` without a view, 
 
 A layout that writes its own markup loops over `page.related.entries`, and can name a card for them with
 `x-pd-card` on the query's `entries` (`"properties": { "entries": { "x-pd-card": "components/card" } }`), so each
-page is checked against it. A query's name is letters and digits, starting with a lowercase letter, and is none of
-the sub-keys Pattern Dump fills.
+page is checked against it. A query's name is letters, digits, `_` and `-`, starting with a letter or `_`
+(`related`, `latestNotes`), and is none of the sub-keys Pattern Dump fills.
 
 | Option | Value | Default |
 |---|---|---|
@@ -1152,8 +1156,8 @@ check out with `fetch-depth: 0`). A layout that shows `page.created` still fails
 
 **`llms.txt`** ([llmstxt.org](https://llmstxt.org/)) gives a language model the site in one file: the site's title
 (`storefront.site.title`, else the home page's) and the home page's description as a quote, then a `## Pages` section
-with the top-level pages and one section per collection (a folder with an `index.md`, headed by its title and led by
-it), in nav order. Each page is a line `- [title](url): teaser`, its description else its first paragraph. It lists
+with the top-level pages and one section per collection (every folder with an `index.md`, nested ones too, headed by
+its title, led by it and listing that folder's own pages), in the order of the pages folder. Each page is a line `- [title](url): teaser`, its description else its first paragraph. It lists
 the same pages as the sitemap (no draft, no scheduled page, none with `index: false`); tag and category pages are left
 out, since their pages are listed. URLs are absolute with `storefront.url`, else paths from the site's root. `pd
 build` writes it to the site's root (under a path, at `<path>llms.txt`); `pd dev` has none. On unless the site has
@@ -1177,7 +1181,8 @@ previews only; the workbench itself stays searchable. A workbench on the storefr
 
 `pages/404.md` is the site's 404 page: rendered through its layout like a page, but not one of the site's
 pages (not in the navigation, the sitemap or the pages list), with `noindex` and no canonical, Open Graph or
-JSON-LD. Without one, a built-in page goes through the default layout (`layouts/page`). `pd build` writes it to
+JSON-LD. Without one, a built-in page goes through the default layout (the layout named `page`); a site with no
+default layout gets a plain built-in page, and Pattern Dump notes that. `pd build` writes it to
 `404.html`, which GitHub Pages and most static hosts serve for every missing address; `pd dev` serves it the
 same way, with status 404. Since it is shown at every depth, every URL in it (its own, its layout's and the
 head's) must be root-relative (`/…`) or absolute: a relative one is a problem.
