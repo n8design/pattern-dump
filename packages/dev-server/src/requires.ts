@@ -90,18 +90,53 @@ export async function aggregateRequires(
 
 // ---- SVG symbol set loading ----
 
-export async function loadSvgAssets(ids: string[], assetsDir: string): Promise<string[]> {
-  const contents: string[] = [];
+/** A symbol set a component needs (`requireAssets: [id]`), as found in the asset folders. */
+export interface SvgSet { id: string; svg: string; file: string }
+
+/**
+ * Each set `ids` names, in order: `<id>.svg`, then `images/<id>.svg`, in each asset folder in turn, the first that
+ * has it winning (the project's folders come before packages', as for symbol images). `missing` lists the ids no
+ * folder has.
+ */
+export async function findSvgSets(ids: readonly string[], assetRoots: readonly string[]): Promise<{ sets: SvgSet[]; missing: string[] }> {
+  const sets: SvgSet[] = [];
+  const missing: string[] = [];
   for (const id of ids) {
-    for (const candidate of [`${id}.svg`, `images/${id}.svg`]) {
-      try {
-        const raw = await readFile(join(assetsDir, candidate), "utf-8");
-        contents.push(hideSvg(raw));
-        break;
-      } catch { /* try next candidate */ }
+    let found: SvgSet | undefined;
+    for (const root of assetRoots) {
+      for (const candidate of [`${id}.svg`, `images/${id}.svg`]) {
+        const file = join(root, candidate);
+        try { found = { id, svg: await readFile(file, "utf-8"), file }; break; } catch { /* try the next */ }
+      }
+      if (found) break;
     }
+    if (found) sets.push(found); else missing.push(id);
   }
-  return contents;
+  return { sets, missing };
+}
+
+/** The sets a preview inlines, hidden with display:none (hideSvg); a set no folder has is left out. */
+export async function loadSvgAssets(ids: string[], assetRoots: readonly string[]): Promise<string[]> {
+  return (await findSvgSets(ids, assetRoots)).sets.map(s => hideSvg(s.svg));
+}
+
+/**
+ * A set hidden by its size, for a storefront page: zero width and height, never display:none, which keeps markers
+ * and gradients inside it from painting in Chromium and WebKit. The root's own width, height, style, aria-hidden and
+ * focusable go first, so the page's are the only ones; an XML declaration or doctype before it goes too.
+ */
+export function hideSvgBySize(svg: string): string {
+  // An XML declaration or a doctype before the root has no place in an HTML body.
+  const bare = svg.replace(/^\s*<\?xml[^>]*\?>\s*/i, "").replace(/^\s*<!DOCTYPE[^>]*>\s*/i, "");
+  return bare.replace(/<svg\b([^>]*)>/, (_, attrs: string) => {
+    const kept = attrs.replace(/\s(?:width|height|style|aria-hidden|focusable)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    return `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"${kept}>`;
+  });
+}
+
+/** Every id a set declares, in order. */
+export function svgIds(svg: string): string[] {
+  return [...svg.matchAll(/<[A-Za-z][^>]*?\sid\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map(m => m[1] ?? m[2] ?? "");
 }
 
 export function hideSvg(svg: string): string {

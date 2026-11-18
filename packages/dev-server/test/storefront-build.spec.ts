@@ -74,6 +74,8 @@ describe("pd build — the storefront root", () => {
       "_pd/base.css",
       "_pd/components/components/callout.css",
       "_pd/components/components/card.css",
+      // The about page places the icon label.
+      "_pd/components/components/icon-label.css",
       "_pd/components/components/slide.css",
       "_pd/components/components/slider.css",
       "_pd/components/layouts/doc.css",
@@ -136,7 +138,7 @@ describe("pd build — the storefront root", () => {
       "tags/layout/index.html",
       "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 55, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 56, bytes: expect.any(Number) });
     // llms.txt lists six pages: every page of the folder but the home page, whose title and description head it.
     expect(report.llms).toEqual({ pages: 6 });
   });

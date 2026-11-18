@@ -2,6 +2,7 @@
 
 | File | What it is | Origin | Licence |
 |---|---|---|---|
+| `bench-icons.svg` | A symbol set with one symbol, a rounded square filled by a gradient: the icon `components/icon-label` uses (`requireAssets`) | Drawn for this bench | The repository's MIT licence |
 | `bench-blocks.svg` | Blocks of colour, each with only its lower-left corner rounded | Drawn for this bench | The repository's MIT licence |
 | `about.png`, `share.png`, `favicon.png` | Plain colour images (200 × 100, 240 × 126, 32 × 32): the bench's link-preview images and favicon | Plain fills made for this bench; no third-party content | The repository's MIT licence |
 | `cable-cars.jpg` | A photograph of cable cars, 2400 × 1600: the slide's photo and the setup guide's prose image, so that the bench's image variants go up to 1600 px and beyond | [Cable cars](https://unsplash.com/photos/kzb0Mo0YQDw) by Cody Hiscox on Unsplash, cropped to 3:2 and scaled to 2400 × 1600 (below) | [Unsplash License](https://unsplash.com/license), not covered by the repository's MIT licence |

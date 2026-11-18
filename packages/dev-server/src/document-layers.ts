@@ -111,8 +111,8 @@ export async function resolveDocumentAssets(
 ): Promise<DocumentAssets> {
   const { componentId, html, requireScripts, requireAssets, compositionRegistry, discoveryMap } = input;
   const classOwners = state.classOwnerIndex ?? new Map();
-  const svgContents = requireAssets && cfg.assetsDir
-    ? await loadSvgAssets(requireAssets, cfg.assetsDir)
+  const svgContents = requireAssets && cfg.assetRoots.length
+    ? await loadSvgAssets(requireAssets, cfg.assetRoots)
     : [];
   const closureIds = withRenderedClassOwners(await computeCssClosure(
     componentId, compositionRegistry, cfg.patternDirs, classOwners, discoveryMap

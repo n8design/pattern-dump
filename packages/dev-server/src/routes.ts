@@ -68,7 +68,7 @@ import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } f
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import type { SearchRecord } from "./storefront/search.js";
-import { pageBorrowedStyles, pageStylesheets } from "./storefront/page-head.js";
+import { pageBorrowedStyles, pageStylesheets, pageSymbolSets } from "./storefront/page-head.js";
 import type { RenderingHandle } from "./rendering.js";
 import type { SiteValuesHandle } from "./storefront/site-values.js";
 
@@ -752,6 +752,7 @@ async function routeRequest(
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
         workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
         head: (layoutId, html, placed) => pageStylesheets(cfg, state, discovery, layoutId, html, placed),
+        symbolSets: roots => pageSymbolSets(cfg, discovery, roots),
         borrowed: roots => pageBorrowedStyles(state, discovery, patternDirs, roots),
         ...(ctx.dates ? { dates: ctx.dates } : {}),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "", basePath: cfg.storefront.basePath } } : {}),
