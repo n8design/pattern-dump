@@ -12,10 +12,11 @@
 // included with the current context sees the placement's values too.
 
 import { basename } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { createMarkdown } from "../code-blocks.js";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
 import { placementSchemaPath } from "../discovery-index.js";
-import { checkSchemaExtensions, isHelperNameProblem, unescapedOutputs } from "@pattern-dump/renderer";
+import { checkSchemaExtensions, isHelperNameProblem, parseJson, unescapedOutputs } from "@pattern-dump/renderer";
 import type { CompositionRegistry } from "../composition.js";
 import { toPlaced, type PlacedBlock, type PlacedResolver, type PlacedTag } from "../placed-tags.js";
 import type { PageHeading } from "./derived.js";
@@ -217,10 +218,30 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps, page: 
   // A placement that fails to render (an image that can't be served as variants, a helper that isn't registered)
   // is a problem of the page at the tag, listed and escaped like any other, never an unhandled 500.
   try {
-    return { html: (await deps.render({ component: id, data: checked.value })).html, problems, ...where };
+    const data = id.includes("~") ? await withVariantData(id, checked.value, deps.discoveryMap) : checked.value;
+    return { html: (await deps.render({ component: id, data })).html, problems, ...where };
   } catch (e) {
     return { problems: [{ at: block.root.at, message: `<${block.root.name}>: ${e instanceof Error ? e.message : String(e)}` }] };
   }
+}
+
+/** A data-overlay variant's placed values with the data that makes it the variant: each top-level key whose value in
+ *  the variant's .json differs from the base's .json, and that the tag left unset (null), takes the variant's value.
+ *  Keys the two share are sample text and stay null, as every unset key of a placement does (declared-values.ts). */
+async function withVariantData(id: string, value: Record<string, unknown>, discoveryMap: DiscoveryMap): Promise<Record<string, unknown>> {
+  const readData = async (path: string | undefined): Promise<Record<string, unknown>> => {
+    if (!path) return {};
+    const parsed = parseJson(await designFiles(discoveryMap).text(path).catch(() => ""));
+    return parsed.ok && typeof parsed.value === "object" && parsed.value !== null && !Array.isArray(parsed.value)
+      ? parsed.value as Record<string, unknown> : {};
+  };
+  const own = await readData(discoveryMap.get(id)?.jsonPath);
+  const base = await readData(discoveryMap.get(id.split("~")[0]!)?.jsonPath);
+  const out = { ...value };
+  for (const [key, v] of Object.entries(own)) {
+    if (Object.hasOwn(out, key) && out[key] === null && !isDeepStrictEqual(v, base[key])) out[key] = v;
+  }
+  return out;
 }
 
 /** The table of contents (toc.ts), placed with `items`: from the tag's links, or derived from the page's headings. */
