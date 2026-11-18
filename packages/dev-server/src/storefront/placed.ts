@@ -14,6 +14,7 @@
 import { basename } from "node:path";
 import { createMarkdown } from "../code-blocks.js";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
+import { placementSchemaPath } from "../discovery-index.js";
 import { checkSchemaExtensions, isHelperNameProblem, unescapedOutputs } from "@pattern-dump/renderer";
 import type { CompositionRegistry } from "../composition.js";
 import { toPlaced, type PlacedBlock, type PlacedResolver, type PlacedTag } from "../placed-tags.js";
@@ -137,20 +138,21 @@ async function schemaProblems(id: string, at: PlacedProblem["at"], deps: Placeme
   const problems: PlacedProblem[] = [];
   for (const component of await placementComponents(id, deps)) {
     const entry = deps.discoveryMap.get(component);
-    if (!entry?.schemaPath) continue; // no schema: checkPlaced says it cannot be placed with values
+    const schemaPath = placementSchemaPath(component, deps.discoveryMap);
+    if (!entry || !schemaPath) continue; // no schema: checkPlaced says it cannot be placed with values
     const template = entry.hbsPath ? await designFiles(deps.discoveryMap).text(entry.hbsPath).catch(() => undefined) : undefined;
     for (const p of checkSchemaExtensions(await deps.schemaOf(component), template, {
       componentExists: c => deps.discoveryMap.has(c),
-      hasSchema: c => deps.discoveryMap.get(c)?.schemaPath !== undefined,
+      hasSchema: c => placementSchemaPath(c, deps.discoveryMap) !== undefined,
     })) {
-      problems.push({ at, message: `${component} cannot be placed: its schema (${deps.shown(entry.schemaPath)}, ${p.path}): ${p.message}` });
+      problems.push({ at, message: `${component} cannot be placed: its schema (${deps.shown(schemaPath)}, ${p.path}): ${p.message}` });
     }
     // A field named like a registered helper (the render's own check, schema-helper-names.ts): its value could
     // never show, so the component can't be placed, as a layout with one fails its pages.
     const rendered = await deps.render({ component }).catch(() => undefined);
     for (const d of rendered?.meta?.diagnostics ?? []) {
       if (d.kind !== "SCHEMA_INVALID" || !isHelperNameProblem(d.message)) continue;
-      problems.push({ at, message: `${component} cannot be placed: its schema (${deps.shown(entry.schemaPath)}, ${d.path ?? "#"}): ${d.message}` });
+      problems.push({ at, message: `${component} cannot be placed: its schema (${deps.shown(schemaPath)}, ${d.path ?? "#"}): ${d.message}` });
     }
   }
   return problems;
