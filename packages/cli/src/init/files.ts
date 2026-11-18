@@ -21,13 +21,14 @@ export async function readTemplateDir(dir: string): Promise<TemplateFile[]> {
 /** Every template set, from the `templates/` folder shipped beside the CLI. */
 export async function readTemplates(templatesDir: string): Promise<Templates> {
   const fill = (name: string) => readFile(join(templatesDir, "storefront-fills", name), "utf8");
-  const [base, examples, storefront, config, readme, gitignore] = await Promise.all([
+  const [base, examples, storefront, storefrontSystem, config, readme, gitignore] = await Promise.all([
     readTemplateDir(join(templatesDir, "base")),
     readTemplateDir(join(templatesDir, "examples")),
     readTemplateDir(join(templatesDir, "storefront")),
+    readTemplateDir(join(templatesDir, "storefront-system")),
     fill("config.txt"), fill("readme.md"), fill("gitignore.txt"),
   ]);
-  return { base, examples, storefront, storefrontFills: { config, readme, gitignore } };
+  return { base, examples, storefront, storefrontSystem, storefrontFills: { config, readme, gitignore } };
 }
 
 /** Perform a plan. Writes use the `wx` flag, so even a file that appeared after planning is never

@@ -87,11 +87,20 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   const brand = cmd.brand ?? (prompt ? await io.ask("Title in the Nav Rail", brandDefault) : brandDefault);
   const examples = cmd.examples ?? (prompt ? await io.confirm("Include starter components", true) : true);
   const storefront = cmd.storefront ?? (prompt ? await io.confirm("Include a website (storefront)", false) : false);
+  for (const [flag, given] of [["--search", cmd.search], ["--system-theme", cmd.systemTheme]] as const) {
+    if (given !== undefined && !storefront) {
+      io.log(`✗ ${given ? flag : flag.replace("--", "--no-")} is a choice for a website: add --storefront. Nothing was written.`);
+      return 1;
+    }
+  }
+  const search = storefront && (cmd.search ?? (prompt ? await io.confirm("Include site search (Pagefind)", true) : true));
+  const systemTheme = storefront && (cmd.systemTheme
+    ?? (prompt ? await io.confirm("Follow the viewer's light or dark setting (a system theme as the default)", true) : true));
   const gitDefault = !(await insideGitRepo(target, io));
   const git = cmd.git ?? (prompt && gitDefault ? await io.confirm("Initialise a git repository", true) : gitDefault);
   const install = cmd.install ?? (prompt ? await io.confirm("Run npm install", true) : true);
 
-  const answers: InitAnswers = { name, brand, examples, storefront, dependency };
+  const answers: InitAnswers = { name, brand, examples, storefront, search, systemTheme, dependency };
   const templates = await readTemplates(io.templatesDir);
   const result = planInit(templates, answers, { packageJson, exists: p => existsSync(join(target, p)) }, PD_PACKAGE_NAME);
   if (!result.ok) {
@@ -142,7 +151,7 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   const dev = `npm run ${JSON.parse(plan.packageJson.content).scripts["pd:dev"] ? "pd:dev" : "dev"}`;
   if (storefront) {
     io.log(`  ${dev}      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/`);
-    io.log("  npm install --save-dev pagefind   # for the site's search: pd build then writes its index");
+    if (!search) io.log("  npm install --save-dev pagefind   # for the site's search: pd build then writes its index");
   } else {
     io.log(`  ${dev}      # http://localhost:4000`);
   }

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { readTemplates } from "./files.js";
-import { defaultName, GENERIC_FOLDER_NAMES, planInit, toPackageName, type ExistingProject, type InitAnswers, type Templates } from "./plan.js";
+import { defaultName, GENERIC_FOLDER_NAMES, INSTALL_SCRIPTS, PAGEFIND_VERSION, planInit, toPackageName, type ExistingProject, type InitAnswers, type Templates } from "./plan.js";
 
 const templates: Templates = {
   base: [
@@ -22,9 +23,13 @@ const templates: Templates = {
     { path: "src/patterns/components/note/note.hbs", content: "<aside>{{heading}}</aside>\n" },
     { path: ".github/workflows/pages.yml", content: "name: Pages\n" },
   ],
+  storefrontSystem: [
+    { path: "themes/system.theme.scss", content: '[data-theme="system"] { color-scheme: light dark; }\n' },
+    { path: "src/styles/base/colors.scss", content: ":root { color-scheme: light dark; }\n" },
+  ],
   storefrontFills: { config: "storefront: { site: { title: __PD_BRAND_JSON__ } },\n", readme: "## The website\n", gitignore: "site\n_site\n" },
 };
-const answers: InitAnswers = { name: "my-ds", brand: "My DS", examples: true, storefront: false, dependency: "^0.1.0" };
+const answers: InitAnswers = { name: "my-ds", brand: "My DS", examples: true, storefront: false, search: false, systemTheme: false, dependency: "0.1.0" };
 const empty: ExistingProject = { packageJson: null, exists: () => false };
 const plan = (a: Partial<InitAnswers> = {}, existing: ExistingProject = empty) => {
   const r = planInit(templates, { ...answers, ...a }, existing, "pattern-dump");
@@ -63,6 +68,7 @@ describe("planInit — a new folder", () => {
       name: "my-design-system", version: "0.1.0", private: true, type: "module",
       scripts: { dev: "pd dev", audit: "pd audit", typecheck: "tsc --noEmit", "build:scripts": "tsc" },
       devDependencies: { "pattern-dump": "file:/tmp/pattern-dump-0.1.0.tgz", typescript: "^5.9.0" },
+      allowScripts: { esbuild: true, "@parcel/watcher": true },
     });
   });
 });
@@ -157,7 +163,8 @@ describe("planInit — an existing folder", () => {
     expect(JSON.parse(p.packageJson.content)).toEqual({
       name: "acme-ui", version: "3.2.1", type: "commonjs",
       scripts: { build: "tsc", dev: "pd dev", audit: "pd audit", typecheck: "tsc --noEmit", "build:scripts": "tsc" },
-      devDependencies: { typescript: "^5", "pattern-dump": "^0.1.0" },
+      devDependencies: { typescript: "^5", "pattern-dump": "0.1.0" },
+      allowScripts: { esbuild: true, "@parcel/watcher": true },
     });
   });
 
@@ -202,6 +209,55 @@ describe("toPackageName", () => {
   });
 });
 
+describe("planInit — search, install scripts, the system theme", () => {
+  const pkg = (p: ReturnType<typeof plan>) => JSON.parse(p.packageJson.content) as Record<string, Record<string, unknown>>;
+
+  it("search adds Pagefind, pinned exactly; without it, or without a website, there is none", () => {
+    expect(pkg(plan({ storefront: true, search: true })).devDependencies!.pagefind).toBe(PAGEFIND_VERSION);
+    expect(pkg(plan({ storefront: true, search: false })).devDependencies!.pagefind).toBeUndefined();
+    expect(pkg(plan({ storefront: false, search: true })).devDependencies!.pagefind).toBeUndefined();
+  });
+
+  it("keeps a project's own Pagefind, and says so", () => {
+    const p = plan({ storefront: true, search: true }, { packageJson: { name: "x", devDependencies: { pagefind: "^1.0.0" } }, exists: () => false });
+    expect(pkg(p).devDependencies!.pagefind).toBe("^1.0.0");
+    expect(p.packageJson.notes).toContain("pagefind is already a dependency (^1.0.0), left as is");
+  });
+
+  it("allows Pattern Dump's own install scripts, by name, and keeps a denial the project wrote", () => {
+    expect(pkg(plan()).allowScripts).toEqual({ esbuild: true, "@parcel/watcher": true });
+    const p = plan({}, { packageJson: { name: "x", allowScripts: { esbuild: false, sharp: true } }, exists: () => false });
+    expect(pkg(p).allowScripts).toEqual({ esbuild: false, sharp: true, "@parcel/watcher": true });
+    expect(p.packageJson.notes).toContain("allowScripts denies esbuild, left as is: Pattern Dump needs its install script");
+  });
+
+  it("the lists are the repository's: Pagefind's version is the one locked, each install script is one", async () => {
+    const lock = JSON.parse(await readFile(fileURLToPath(new URL("../../../../package-lock.json", import.meta.url)), "utf8")) as
+      { packages: Record<string, { version: string; hasInstallScript?: boolean }> };
+    expect(lock.packages["node_modules/pagefind"]!.version).toBe(PAGEFIND_VERSION);
+    for (const name of INSTALL_SCRIPTS) expect(lock.packages[`node_modules/${name}`]!.hasInstallScript, name).toBe(true);
+  });
+
+  it("a system theme with a website: the theme and the skin's colours written, the config's default system", () => {
+    const shippedConfig = { path: "pattern-dump.config.ts", content: 'themes: { default: "__PD_THEME_DEFAULT__" }\n' };
+    const withConfig: Templates = { ...templates, base: [shippedConfig] };
+    const run = (a: Partial<InitAnswers>) => { const r = planInit(withConfig, { ...answers, ...a }, empty, "pattern-dump"); if (!r.ok) throw new Error(r.reason); return r.plan; };
+    const on = run({ storefront: true, systemTheme: true });
+    expect(on.writes.map(w => w.path)).toEqual(expect.arrayContaining(["themes/system.theme.scss", "src/styles/base/colors.scss"]));
+    expect(content(on, "pattern-dump.config.ts")).toBe('themes: { default: "system" }\n');
+    for (const off of [run({ storefront: true, systemTheme: false }), run({ storefront: false, systemTheme: true })]) {
+      expect(off.writes.map(w => w.path)).not.toContain("themes/system.theme.scss");
+      expect(content(off, "pattern-dump.config.ts")).toBe('themes: { default: "light" }\n');
+    }
+  });
+
+  it("the skin's colours belong to the skin: a skin already there leaves them out with it", () => {
+    const p = plan({ storefront: true, systemTheme: true }, { packageJson: null, exists: f => f === "src/patterns/partials/base/base.hbs" });
+    expect(p.writes.map(w => w.path)).not.toContain("src/styles/base/colors.scss");
+    expect(p.writes.map(w => w.path)).toContain("themes/system.theme.scss");
+  });
+});
+
 describe("defaultName", () => {
   it("a generic folder name is scoped by its parent, which also titles it", () => {
     expect(defaultName("styleguide", "acme-web")).toEqual({ name: "@acme-web/styleguide", brand: "acme-web" });
@@ -221,7 +277,7 @@ describe("planInit — the shipped templates", () => {
   for (const storefront of [false, true]) {
     for (const examples of [false, true]) {
       it(`leaves no placeholder in any file it writes (storefront ${storefront}, examples ${examples})`, async () => {
-        const r = planInit(await shipped, { ...answers, storefront, examples }, empty, "pattern-dump");
+        const r = planInit(await shipped, { ...answers, storefront, examples, search: storefront, systemTheme: storefront }, empty, "pattern-dump");
         if (!r.ok) throw new Error(r.reason);
         for (const w of r.plan.writes) expect(w.content, w.path).not.toMatch(/__PD_[A-Z_]+__/);
         expect(r.plan.packageJson.content).not.toMatch(/__PD_/);

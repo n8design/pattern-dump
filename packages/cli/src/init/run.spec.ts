@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dependencySpec, runInit, type InitIO } from "./run.js";
 import { PD_VERSION } from "../distribution.js";
+import { PAGEFIND_VERSION } from "./plan.js";
 import { save } from "../../../../test-support/save.js";
 
 const templatesDir = fileURLToPath(new URL("../../templates/", import.meta.url));
@@ -105,8 +106,33 @@ describe("runInit", () => {
     expect(await runInit(init(join(root, "ds"), { storefront: true, install: false, git: false }), io)).toBe(0);
     expect(asked).not.toContain("Include a website (storefront)");
     expect(existsSync(join(root, "ds", ".github", "workflows", "pages.yml"))).toBe(true);
-    expect(logs.slice(-2)).toEqual(["  npm run dev      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/",
-      "  npm install --save-dev pagefind   # for the site's search: pd build then writes its index"]);
+    expect(logs.at(-1)).toBe("  npm run dev      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/");
+    // Search and the system theme are asked for with the website, both yes by default.
+    expect(asked).toEqual(expect.arrayContaining(["Include site search (Pagefind)", "Follow the viewer's light or dark setting (a system theme as the default)"]));
+    const pkg = JSON.parse(await readFile(join(root, "ds", "package.json"), "utf8"));
+    expect(pkg.devDependencies.pagefind).toBe(PAGEFIND_VERSION);
+    expect(await readFile(join(root, "ds", "pattern-dump.config.ts"), "utf8")).toContain('default: "system"');
+  });
+
+  it("--no-search and --no-system-theme answer both questions; the Pagefind hint comes back without search", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    const { io, asked, logs } = fakeIO({ interactive: true });
+    expect(await runInit(init(join(root, "ds"), { storefront: true, search: false, systemTheme: false, install: false, git: false }), io)).toBe(0);
+    expect(asked.filter(q => /Pagefind|light or dark/.test(q))).toEqual([]);
+    expect(JSON.parse(await readFile(join(root, "ds", "package.json"), "utf8")).devDependencies.pagefind).toBeUndefined();
+    expect(await readFile(join(root, "ds", "pattern-dump.config.ts"), "utf8")).toContain('default: "light"');
+    expect(existsSync(join(root, "ds", "themes", "system.theme.scss"))).toBe(false);
+    expect(logs.at(-1)).toBe("  npm install --save-dev pagefind   # for the site's search: pd build then writes its index");
+  });
+
+  it("--search or --system-theme without a website is refused, writing nothing", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    for (const extra of [{ search: true }, { systemTheme: false }]) {
+      const { io, logs } = fakeIO();
+      expect(await runInit(init(join(root, "ds"), { yes: true, ...extra }), io)).toBe(1);
+      expect(logs.at(-1)).toMatch(/^✗ --(no-)?(search|system-theme) is a choice for a website: add --storefront\. Nothing was written\.$/);
+      expect(existsSync(join(root, "ds"))).toBe(false);
+    }
   });
 
   it("--yes leaves the website out, and the next steps name the workbench only", async () => {

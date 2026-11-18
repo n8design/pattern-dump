@@ -15,6 +15,8 @@ export interface Templates {
   examples: TemplateFile[];
   /** The website starter: pages, a skin, a component of its own, a GitHub Pages workflow. */
   storefront: TemplateFile[];
+  /** With the website, when it follows the viewer's light or dark setting: the `system` theme, the skin's colours. */
+  storefrontSystem: TemplateFile[];
   /** What the base templates' storefront placeholders become with a storefront; never files of their own. */
   storefrontFills: { config: string; readme: string; gitignore: string };
 }
@@ -28,6 +30,10 @@ export interface InitAnswers {
   examples: boolean;
   /** Include the website starter (storefront). */
   storefront: boolean;
+  /** With the website: Pagefind as a devDependency, so pd build writes the search index. */
+  search: boolean;
+  /** With the website: the default theme `system` (`color-scheme: light dark`), and the skin's pages follow it. */
+  systemTheme: boolean;
   /** Dependency spec for the PD package: `^0.1.0`, `file:/abs/pattern-dump-0.1.0.tgz`, … */
   dependency: string;
 }
@@ -57,7 +63,7 @@ const RENAMES: Record<string, string> = { _gitignore: ".gitignore" };
  * `layouts/page` beside the starter's `partials/base`, say), pages would render with parts of two skins.
  */
 const SKIN_PREFIXES = ["src/patterns/layouts/", "src/patterns/partials/", "src/patterns/views/", "src/styles/layouts/", "src/styles/partials/", "src/styles/views/"];
-const SKIN_FILES = ["assets/icon.svg", "src/styles/base/page.scss"];
+const SKIN_FILES = ["assets/icon.svg", "src/styles/base/page.scss", "src/styles/base/colors.scss"];
 const isSkin = (path: string): boolean => SKIN_PREFIXES.some(p => path.startsWith(p)) || SKIN_FILES.includes(path);
 
 /** A valid npm package name from a free-form folder or project name; a scope (`@acme/ds`) stays a scope. */
@@ -99,8 +105,11 @@ export function planInit(
 
   // A placeholder stands on a line of its own; without a storefront the line goes.
   const fills = templates.storefrontFills;
+  const system = answers.storefront && answers.systemTheme;
   const substitute = (text: string): string => text
     .replaceAll("__PD_STOREFRONT__\n", answers.storefront ? fills.config : "")
+    .replaceAll("__PD_SEARCH_NOTE__\n", answers.search ? SEARCH_NOTE.on : SEARCH_NOTE.off)
+    .replaceAll("__PD_THEME_DEFAULT__", system ? "system" : "light")
     .replaceAll("__PD_STOREFRONT_README__\n", answers.storefront ? fills.readme : "")
     .replaceAll("__PD_STOREFRONT_GITIGNORE__\n", answers.storefront ? fills.gitignore : "")
     .replaceAll("__PD_PACKAGE__", packageName)
@@ -109,7 +118,7 @@ export function planInit(
 
   const writes: TemplateFile[] = [];
   const skipped: InitPlan["skipped"] = [];
-  const storefront = answers.storefront ? templates.storefront : [];
+  const storefront = answers.storefront ? [...templates.storefront, ...(system ? templates.storefrontSystem : [])] : [];
   // The skin goes in whole or not at all: one file of it already there leaves all of it out.
   const skin = storefront.filter(f => isSkin(renamed(f.path)));
   const skinTaken = skin.map(f => renamed(f.path)).find(p => existing.exists(p));
@@ -131,6 +140,14 @@ export function planInit(
   return { ok: true, plan: { writes, skipped, packageJson: mergePackageJson(existing.packageJson, answers, packageName) } };
 }
 
+/** The config's comment on search, as the project has Pagefind or not. */
+const SEARCH_NOTE = {
+  on: "    // Search: pd build indexes every page with Pagefind (a devDependency of this site); components/search is the\n"
+    + "    // search field. search: true makes a build without Pagefind stop, false turns it off.\n",
+  off: "    // Search: pd build indexes every page with Pagefind once the project has it (npm install --save-dev pagefind);\n"
+    + "    // components/search is the search field. search: true makes a build without Pagefind stop, false turns it off.\n",
+};
+
 function renamed(path: string): string {
   const parts = path.split("/");
   const last = parts.pop()!;
@@ -143,6 +160,15 @@ const SCRIPTS: Record<string, string> = {
 
 /** The TypeScript the starter's tsconfig and scripts are written for. */
 export const TYPESCRIPT_RANGE = "^5.9.0";
+
+/** The Pagefind Pattern Dump is tested with (the repository's lockfile), pinned exactly as Pattern Dump is. */
+export const PAGEFIND_VERSION = "1.6.0";
+
+/**
+ * Pattern Dump's own dependencies with install scripts, allowed in the project's `allowScripts` (npm 11.19 asks
+ * for it; older npm ignores the field). By name, so an upgrade of Pattern Dump needs no new approval.
+ */
+export const INSTALL_SCRIPTS = ["esbuild", "@parcel/watcher"];
 
 function mergePackageJson(
   current: Record<string, unknown> | null,
@@ -186,7 +212,20 @@ function mergePackageJson(
   } else if (existingTs !== TYPESCRIPT_RANGE) {
     notes.push(`typescript is already a dependency (${existingTs}), left as is; the starter scripts expect ${TYPESCRIPT_RANGE}`);
   }
+  if (answers.search && answers.storefront) {
+    const existingPagefind = deps?.pagefind ?? devDeps.pagefind;
+    if (existingPagefind === undefined) devDeps.pagefind = PAGEFIND_VERSION;
+    else if (existingPagefind !== PAGEFIND_VERSION) notes.push(`pagefind is already a dependency (${existingPagefind}), left as is`);
+  }
   pkg.devDependencies = devDeps;
+
+  // A denial (false) the project wrote stays: it is the project's decision.
+  const allow = { ...(pkg.allowScripts as Record<string, boolean> | undefined) };
+  for (const name of INSTALL_SCRIPTS) {
+    if (allow[name] === undefined) allow[name] = true;
+    else if (allow[name] === false) notes.push(`allowScripts denies ${name}, left as is: Pattern Dump needs its install script`);
+  }
+  pkg.allowScripts = allow;
 
   return { content: JSON.stringify(pkg, null, 2) + "\n", created, notes };
 }

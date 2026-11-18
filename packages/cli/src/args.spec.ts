@@ -95,6 +95,15 @@ describe("pd init", () => {
     expect(parseCommand(["init"], cwd)).not.toHaveProperty("storefront");
   });
 
+  it("reads --search / --no-search and --system-theme / --no-system-theme, open without either", () => {
+    expect(parseCommand(["init", "--no-search", "--system-theme"], cwd)).toMatchObject({ kind: "init", search: false, systemTheme: true });
+    expect(parseCommand(["init", "--search", "--no-system-theme"], cwd)).toMatchObject({ kind: "init", search: true, systemTheme: false });
+    const open = parseCommand(["init"], cwd);
+    expect(open).not.toHaveProperty("search");
+    expect(open).not.toHaveProperty("systemTheme");
+    expect(parseCommand(["init", "--search", "--no-search"], cwd)).toEqual({ kind: "error", message: "--search and --no-search cannot both be given" });
+  });
+
   it("defaults to the current folder and asks for everything else", () => {
     expect(parseCommand(["init"], cwd)).toEqual({ kind: "init", target: cwd, yes: false });
   });

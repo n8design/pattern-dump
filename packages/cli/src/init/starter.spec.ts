@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { crc32, deflateSync } from "node:zlib";
-import { componentCssUrl, type ComponentDetailResponse, type ComponentTree, type TreeNode } from "@pattern-dump/contracts";
+import { componentCssUrl, componentUrl, PD_ROUTES, type ComponentDetailResponse, type ComponentTree, type TreeNode } from "@pattern-dump/contracts";
 import { loadConfig } from "@pattern-dump/core";
 import { runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { applyPlan, readTemplates } from "./files.js";
@@ -33,7 +33,7 @@ async function scaffold(examples: boolean, storefront = false): Promise<string> 
   const templates = await readTemplates(join(cliDir, "templates"));
   const r = planInit(
     templates,
-    { name: "starter-check", brand: "Starter Check", examples, storefront, dependency: "^0.0.0" },
+    { name: "starter-check", brand: "Starter Check", examples, storefront, search: storefront, systemTheme: storefront, dependency: "0.0.0" },
     { packageJson: null, exists: () => false },
     "@pattern-dump/config",
   );
@@ -223,7 +223,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
       expect(search.status).toBe(200);
       expect(search.body).toContain(`<body data-pd-regions="">`);
       expect(search.body).not.toContain(`class="doc-sidebar"`);
-      expect(search.body).toMatch(/<search class="search" data-search>\s*<form class="search-form" method="get">\s*<label class="search-label" for="search-field">Search this site<\/label>/);
+      expect(search.body).toMatch(/<search class="search" data-search>\s*<form class="search-form" method="get">\s*<label class="search-label" for="search-input">Search this site<\/label>/);
       expect(search.body).toMatch(/<script type="module" src="\/_pd\/scripts\/site-search\.js[^"]*"><\/script>/);
       expect(home.body).toContain(`<a href="/search/">Search</a>`);
       const notes = await onHost(server.port, "live.localhost", "/tags/notes/");
