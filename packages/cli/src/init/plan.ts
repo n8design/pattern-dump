@@ -60,10 +60,30 @@ const SKIN_PREFIXES = ["src/patterns/layouts/", "src/patterns/partials/", "src/p
 const SKIN_FILES = ["assets/icon.svg", "src/styles/base/page.scss"];
 const isSkin = (path: string): boolean => SKIN_PREFIXES.some(p => path.startsWith(p)) || SKIN_FILES.includes(path);
 
-/** A valid npm package name from a free-form folder or project name. */
+/** A valid npm package name from a free-form folder or project name; a scope (`@acme/ds`) stays a scope. */
 export function toPackageName(input: string): string {
-  const slug = input.toLowerCase().replace(/[^a-z0-9._~-]+/g, "-").replace(/^[-._]+|[-._]+$/g, "");
-  return slug || "design-system";
+  const slug = (part: string) => part.toLowerCase().replace(/[^a-z0-9._~-]+/g, "-").replace(/^[-._]+|[-._]+$/g, "");
+  const scoped = /^@([^/]+)\/([^/]+)$/.exec(input.trim());
+  if (scoped) {
+    const [scope, name] = [slug(scoped[1]!), slug(scoped[2]!)];
+    if (scope && name) return `@${scope}/${name}`;
+  }
+  return slug(input) || "design-system";
+}
+
+/** Folder names that say what a folder is rather than whose it is: the parent folder then names the project. */
+export const GENERIC_FOLDER_NAMES = ["styleguide", "style-guide", "design-system", "site", "website", "docs", "www"];
+
+/**
+ * The default package name and title for a project in `folder` (inside `parent`): the folder's name, or, for a
+ * generic one (`styleguide` inside `acme-web`), the parent's name as the scope (`@acme-web/styleguide`) and as the
+ * title (`acme-web`).
+ */
+export function defaultName(folder: string, parent: string): { name: string; brand: string } {
+  const name = toPackageName(folder);
+  const scope = toPackageName(parent);
+  if (!GENERIC_FOLDER_NAMES.includes(name) || !/[a-z0-9]/i.test(parent)) return { name, brand: name };
+  return { name: `@${scope}/${name}`, brand: parent };
 }
 
 export function planInit(

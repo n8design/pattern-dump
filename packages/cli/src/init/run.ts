@@ -9,7 +9,7 @@ import type { Command } from "../args.js";
 import { PD_PACKAGE_NAME, PD_VERSION } from "../distribution.js";
 import { applyPlan, readTemplates } from "./files.js";
 import type { LocalBuild } from "./local-build.js";
-import { planInit, toPackageName, type InitAnswers } from "./plan.js";
+import { defaultName, planInit, type InitAnswers } from "./plan.js";
 
 type InitCommand = Extract<Command, { kind: "init" }>;
 
@@ -30,7 +30,8 @@ export interface InitIO {
 
 /** The dependency spec for PD in the new project's package.json. */
 export function dependencySpec(pdSource: string | undefined, cwd: string): string {
-  if (pdSource === undefined) return `^${PD_VERSION}`;
+  // Exact: a patch release of Pattern Dump can change what a build writes and what it checks.
+  if (pdSource === undefined) return PD_VERSION;
   const asPath = resolve(cwd, pdSource);
   if (existsSync(asPath)) return `file:${asPath}`;
   // An npm spec: "pattern-dump@0.2.0" means the range after the @; anything else is used verbatim.
@@ -78,8 +79,12 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
 
   const prompt = io.interactive && !cmd.yes;
   const existingName = typeof packageJson?.name === "string" ? packageJson.name : undefined;
-  const name = cmd.name ?? (prompt ? await io.ask("Project name", existingName ?? toPackageName(basename(target))) : existingName ?? toPackageName(basename(target)));
-  const brand = cmd.brand ?? (prompt ? await io.ask("Title in the Nav Rail", name) : name);
+  const suggested = defaultName(basename(target), basename(dirname(target)));
+  const nameDefault = existingName ?? suggested.name;
+  const name = cmd.name ?? (prompt ? await io.ask("Project name", nameDefault) : nameDefault);
+  // A scoped default (`@acme-web/styleguide`) titles the project by its scope's folder (`acme-web`).
+  const brandDefault = name === suggested.name ? suggested.brand : name;
+  const brand = cmd.brand ?? (prompt ? await io.ask("Title in the Nav Rail", brandDefault) : brandDefault);
   const examples = cmd.examples ?? (prompt ? await io.confirm("Include starter components", true) : true);
   const storefront = cmd.storefront ?? (prompt ? await io.confirm("Include a website (storefront)", false) : false);
   const gitDefault = !(await insideGitRepo(target, io));
@@ -98,7 +103,8 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   await applyPlan(target, plan);
   const where = relative(io.cwd, target) || ".";
   io.log(`✓ ${plan.writes.length} files written to ${where}`);
-  io.log(`✓ package.json ${plan.packageJson.created ? "created" : "updated"} (${PD_PACKAGE_NAME} ${answers.dependency})`);
+  const written = JSON.parse(plan.packageJson.content) as { name?: string };
+  io.log(`✓ package.json ${plan.packageJson.created ? "created" : "updated"}: ${written.name ?? "(no name)"}, with ${PD_PACKAGE_NAME} ${answers.dependency}`);
   for (const note of plan.packageJson.notes) io.log(`  · ${note}`);
   for (const s of plan.skipped) io.log(`  · ${s.path}: ${s.reason}`);
   if (storefront && dependency.startsWith("file:")) {
@@ -118,7 +124,7 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
     if (code !== 0) {
       // The project files are written, so re-running `pd init` would be refused: point at npm instead.
       io.log("✗ npm install failed. The project files are in place.");
-      if (dependency.startsWith("^")) {
+      if (dependency === PD_VERSION) {
         io.log(`  ${PD_PACKAGE_NAME} may not be published yet. Install a local build into the project:`);
         io.log(`    ${where === "." ? "" : `cd ${where} && `}npm install --save-dev <path to ${PD_PACKAGE_NAME}-${PD_VERSION}.tgz>`);
         io.log("  (build one in the Pattern Dump repo with: npm run pack:pd)");

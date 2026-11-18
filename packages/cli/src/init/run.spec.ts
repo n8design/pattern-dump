@@ -45,13 +45,31 @@ describe("runInit", () => {
     expect(await runInit(init(target), io)).toBe(0);
 
     const pkg = JSON.parse(await readFile(join(target, "package.json"), "utf8"));
-    expect(pkg).toMatchObject({ name: "acme-ds", scripts: { dev: "pd dev" }, devDependencies: { "pattern-dump": `^${PD_VERSION}` } });
+    expect(pkg).toMatchObject({ name: "acme-ds", scripts: { dev: "pd dev" }, devDependencies: { "pattern-dump": PD_VERSION } });
     expect(await readFile(join(target, "pattern-dump.config.ts"), "utf8")).toContain('title: "acme-ds"');
     expect(existsSync(join(target, ".gitignore"))).toBe(true);
     expect(existsSync(join(target, "src/patterns/atoms/button/button.hbs"))).toBe(true);
     expect(existsSync(join(target, "assets"))).toBe(true);
     expect(calls).toEqual(["git rev-parse --is-inside-work-tree", "git init -q", "npm install"]);
     expect(logs.at(-1)).toContain("npm run dev");
+  });
+
+  it("names a generic folder by its parent: suggested in the prompt, used with --yes, and printed", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    const target = join(root, "acme-web", "styleguide");
+    const asked = fakeIO({ interactive: true });
+    const defaults: Record<string, string> = {};
+    asked.io.ask = async (q, fallback) => { defaults[q] = fallback; return fallback; };
+    expect(await runInit(init(target, { install: false, git: false, examples: false, storefront: false }), asked.io)).toBe(0);
+    expect(defaults).toEqual({ "Project name": "@acme-web/styleguide", "Title in the Nav Rail": "acme-web" });
+    expect(asked.logs).toContain(`✓ package.json created: @acme-web/styleguide, with pattern-dump ${PD_VERSION}`);
+
+    const yes = fakeIO();
+    const other = join(root, "acme-web", "site");
+    expect(await runInit(init(other, { yes: true, install: false, git: false }), yes.io)).toBe(0);
+    expect(JSON.parse(await readFile(join(other, "package.json"), "utf8")).name).toBe("@acme-web/site");
+    expect(await readFile(join(other, "pattern-dump.config.ts"), "utf8")).toContain('title: "acme-web"');
+    expect(yes.logs).toContain(`✓ package.json created: @acme-web/site, with pattern-dump ${PD_VERSION}`);
   });
 
   it("asks only for what flags did not answer, and honours the answers", async () => {
@@ -216,7 +234,8 @@ describe("dependencySpec", () => {
   it("defaults to the registry range, turns an existing file into file:, and unwraps name@range", async () => {
     root = await mkdtemp(join(tmpdir(), "pd-init-"));
     await save(join(root, "pattern-dump-0.1.0.tgz"), "");
-    expect(dependencySpec(undefined, root)).toBe(`^${PD_VERSION}`);
+    // Exact, not a caret: a patch release can change what a build writes and checks.
+    expect(dependencySpec(undefined, root)).toBe(PD_VERSION);
     expect(dependencySpec("./pattern-dump-0.1.0.tgz", root)).toBe(`file:${join(root, "pattern-dump-0.1.0.tgz")}`);
     expect(dependencySpec("pattern-dump@0.2.0", root)).toBe("0.2.0");
     expect(dependencySpec("latest", root)).toBe("latest");

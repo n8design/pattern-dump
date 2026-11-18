@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { readTemplates } from "./files.js";
-import { planInit, toPackageName, type ExistingProject, type InitAnswers, type Templates } from "./plan.js";
+import { defaultName, GENERIC_FOLDER_NAMES, planInit, toPackageName, type ExistingProject, type InitAnswers, type Templates } from "./plan.js";
 
 const templates: Templates = {
   base: [
@@ -194,6 +194,25 @@ describe("toPackageName", () => {
     expect(toPackageName("My Design System")).toBe("my-design-system");
     expect(toPackageName("acme_ui.v2")).toBe("acme_ui.v2");
     expect(toPackageName("  !!  ")).toBe("design-system");
+  });
+
+  it("keeps a scope a scope", () => {
+    expect(toPackageName("@Acme Web/Style Guide")).toBe("@acme-web/style-guide");
+    expect(toPackageName("@/x")).toBe("x");
+  });
+});
+
+describe("defaultName", () => {
+  it("a generic folder name is scoped by its parent, which also titles it", () => {
+    expect(defaultName("styleguide", "acme-web")).toEqual({ name: "@acme-web/styleguide", brand: "acme-web" });
+    expect(defaultName("site", "Acme Web")).toEqual({ name: "@acme-web/site", brand: "Acme Web" });
+    for (const generic of GENERIC_FOLDER_NAMES) expect(defaultName(generic, "acme").name).toBe(`@acme/${generic}`);
+  });
+
+  it("any other folder name stays as it was, and a generic one without a usable parent too", () => {
+    expect(defaultName("Acme DS", "work")).toEqual({ name: "acme-ds", brand: "acme-ds" });
+    expect(defaultName("styleguide", "")).toEqual({ name: "styleguide", brand: "styleguide" });
+    expect(defaultName("site", "!!")).toEqual({ name: "site", brand: "site" });
   });
 });
 

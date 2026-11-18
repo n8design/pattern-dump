@@ -179,8 +179,10 @@ function base(values: { root?: string; config?: string }, cwd: string): { root: 
 export const USAGE = `Usage: pd <command> [options]
 
   init [dir]   Set up a new Pattern Dump project (default: the current folder)
-    --name <name>      Package name (default: the folder name)
-    --brand <title>    Title shown in the Nav Rail (default: the name)
+    --name <name>      Package name (default: the folder name; a generic one such as styleguide or
+                       site is scoped by its parent folder: acme-web/site gives @acme-web/site)
+    --brand <title>    Title shown in the Nav Rail (default: the name, or the parent folder's for a
+                       scoped one)
     --no-examples      Structure, config and themes only, no starter components
     --storefront       Also a website: pages, a skin, and a GitHub Pages workflow (default: no)
     --no-install       Skip npm install
