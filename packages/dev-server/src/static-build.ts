@@ -85,6 +85,9 @@ export interface StaticBuildReport {
   notes: string[];
   /** Stylesheets linked by a borrowed class: the (component, owner) pairs, each a STYLE_BORROWED on its component. */
   borrowedStyles: number;
+  /** false when the workbench was not built (build.workbench: false): outDir, basePath, files and components then
+   *  say nothing about it. Absent when it was. */
+  workbench?: false;
   /** The storefront's own output root, when the project has a storefront. */
   storefront?: { outDir: string; basePath: string; pages: number; files: number; bytes: number };
   /** The storefront's link check: the site pages read, the references checked, the other hosts listed in the notes. */
@@ -169,8 +172,14 @@ async function buildOnce(
   const log = (line: string): void => logLine(`${line} (${((performance.now() - started) / 1000).toFixed(1)}s)`);
   const basePath = normalizeBasePath(opts.basePath ?? config.build?.basePath);
   const includeAudit = opts.audit ?? config.build?.audit ?? true;
+  // build.workbench: false: a site whose workbench is published by another build (its style guide's) writes the
+  // storefront only; outDir and the base path are not used.
+  const buildWorkbench = config.build?.workbench ?? true;
   const outDir = resolve(opts.outDir);
   const cfg = resolveServerConfig(config, root, {}, loadPatternPackages(config.packages, root));
+  if (!buildWorkbench && !cfg.storefront) {
+    throw new Error("pd build: build.workbench is false and the project has no storefront, so there is nothing to build");
+  }
 
   // The output folder is emptied first, so it must not be — or contain — anything PD reads.
   const inside = (child: string, parent: string): boolean => {
@@ -178,8 +187,8 @@ async function buildOnce(
     return rel === "" || (!rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-zA-Z]:/.test(rel));
   };
   const project = resolve(root);
-  if (inside(project, outDir)) throw new Error(`pd build: --out ${outDir} would contain the project itself: choose a folder inside or beside it, like ./dist`);
-  for (const source of [cfg.patternsDir, cfg.stylesDir, ...cfg.themeDirs, ...cfg.assetRoots]) {
+  if (buildWorkbench && inside(project, outDir)) throw new Error(`pd build: --out ${outDir} would contain the project itself: choose a folder inside or beside it, like ./dist`);
+  for (const source of buildWorkbench ? [cfg.patternsDir, cfg.stylesDir, ...cfg.themeDirs, ...cfg.assetRoots] : []) {
     if (inside(outDir, source) || inside(source, outDir)) {
       throw new Error(`pd build: --out ${outDir} overlaps ${source}, which Pattern Dump reads: choose another folder`);
     }
@@ -194,16 +203,17 @@ async function buildOnce(
         throw new Error(`pd build: storefront.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads: choose another folder`);
       }
     }
-    if (inside(sfOut, outDir) || inside(outDir, sfOut)) {
+    if (buildWorkbench && (inside(sfOut, outDir) || inside(outDir, sfOut))) {
       throw new Error(`pd build: storefront.outDir ${sfOut} and --out ${outDir} overlap: the storefront and the workbench each need a folder of their own`);
     }
     if (!storefront.workbenchUrl) {
       throw new Error("pd build: storefront.workbenchUrl is required to build the storefront: its pages link into the workbench at that address");
     }
     // A workbench published on the storefront's own host is linked at its path, so it must be built for that
-    // path: the base path this build uses (--base, else build.basePath, else /).
+    // path: the base path this build uses (--base, else build.basePath, else /). A workbench another build writes
+    // (build.workbench: false) is that build's to place.
     const sameHost = sameHostWorkbenchPath(storefront);
-    if (sameHost !== undefined && sameHost !== basePath) {
+    if (buildWorkbench && sameHost !== undefined && sameHost !== basePath) {
       throw new Error(`pd build: storefront.workbenchUrl is ${storefront.workbenchUrl}, so the workbench must be built for ${sameHost} `
         + `(build.basePath or --base); it is being built for ${basePath}`);
     }
@@ -216,7 +226,7 @@ async function buildOnce(
     ...cfg.scriptsDirs, ...cfg.themeDirs, ...cfg.assetRoots,
     ...(storefront ? [storefront.pagesDir, ...(storefront.head ? [storefront.head] : [])] : []),
   ];
-  const outputs = [outDir, ...(storefront ? [storefront.outDir] : [])];
+  const outputs = [...(buildWorkbench ? [outDir] : []), ...(storefront ? [storefront.outDir] : [])];
   const startStamps = await stampInputs(inputs, outputs);
   watch.changed = async () => changedInputs(startStamps, await stampInputs(inputs, outputs), project);
   /** Stops the build when an input changed since it started; `written` says what is on disk by then. */
@@ -425,9 +435,12 @@ async function buildOnce(
   }
 
   await assertUnchanged("nothing was written").catch(async (e: unknown) => { await server.close(); throw e; });
-  await rm(outDir, { recursive: true, force: true });
-  await mkdir(outDir, { recursive: true });
-  const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], borrowedStyles: 0, ms: 0 };
+  if (buildWorkbench) {
+    await rm(outDir, { recursive: true, force: true });
+    await mkdir(outDir, { recursive: true });
+  }
+  const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], borrowedStyles: 0, ms: 0,
+    ...(buildWorkbench ? {} : { workbench: false as const }) };
   if (opts.browser && !storefront) report.notes.push("--browser checks a storefront's pages in Chromium, and this project has no storefront: nothing was checked");
   const { capture, store } = createSnapshotWriter({ outDir, basePath, origin, report });
 
@@ -436,117 +449,120 @@ async function buildOnce(
     [...html.matchAll(/(?:href|src)="(\/_pd\/(?:components|themes|scripts)\/[^"]+)"/g)].map(m => m[1].replace(/&amp;/g, "&"));
 
   try {
-    // ---- 1. Fixed resources ----
-    for (const url of [PD_ROUTES.mainJs, PD_ROUTES.mainCss, PD_ROUTES.shikiCss, PD_ROUTES.baseCss,
-      PD_ROUTES.axeCore, PD_ROUTES.ruleTiers, PD_ROUTES.config, PD_ROUTES.version]) {
-      await capture(url);
-    }
-    const tree = JSON.parse((await capture(PD_ROUTES.tree))!) as ComponentTree;
-    const themes = JSON.parse((await capture(PD_ROUTES.themes))!) as ThemeSummary[];
-    for (const t of themes) await capture(themeCssUrl(t.name));
-    log(`… ${themes.length} themes`);
+    // ---- 1 to 6: the workbench, unless another build writes it (build.workbench: false) ----
+    if (buildWorkbench) {
+      // ---- 1. Fixed resources ----
+      for (const url of [PD_ROUTES.mainJs, PD_ROUTES.mainCss, PD_ROUTES.shikiCss, PD_ROUTES.baseCss,
+        PD_ROUTES.axeCore, PD_ROUTES.ruleTiers, PD_ROUTES.config, PD_ROUTES.version]) {
+        await capture(url);
+      }
+      const tree = JSON.parse((await capture(PD_ROUTES.tree))!) as ComponentTree;
+      const themes = JSON.parse((await capture(PD_ROUTES.themes))!) as ThemeSummary[];
+      for (const t of themes) await capture(themeCssUrl(t.name));
+      log(`… ${themes.length} themes`);
 
-    // ---- 2. Components, their variants, previews and source views ----
-    const components: string[] = [];
-    const folders: string[] = [];
-    const walk = (nodes: TreeNode[]): void => nodes.forEach(n => {
-      if (n.kind === "component") components.push(n.path);
-      if (n.children?.length) folders.push(n.path);
-      walk(n.children ?? []);
-    });
-    walk(tree.roots);
-    report.components = components.length;
-    const routes = new Set<string>(["/"]);
+      // ---- 2. Components, their variants, previews and source views ----
+      const components: string[] = [];
+      const folders: string[] = [];
+      const walk = (nodes: TreeNode[]): void => nodes.forEach(n => {
+        if (n.kind === "component") components.push(n.path);
+        if (n.children?.length) folders.push(n.path);
+        walk(n.children ?? []);
+      });
+      walk(tree.roots);
+      report.components = components.length;
+      const routes = new Set<string>(["/"]);
 
-    for (const id of components) {
-      routes.add(`/${id}`);
-      const baseText = await capture(componentUrl(id));
-      if (!baseText) continue;
-      const base = JSON.parse(baseText) as ComponentDetailResponse;
-      report.borrowedStyles += base.diagnostics.filter(d => d.kind === "STYLE_BORROWED").length;
-      if (base.variants.length) routes.add(`/${id}/variants`);
-      for (const variant of [undefined, ...base.variants.map(v => v.name)]) {
-        const detailText = variant ? await capture(componentUrl(id, variant)) : baseText;
-        if (detailText) {
-          // The detail response carries the complete preview document — byte-identical to what
-          // /preview/:id serves for the default theme — so write it rather than render it twice.
-          const { document } = JSON.parse(detailText) as ComponentDetailResponse;
-          // Under a base path the robots.txt rule for /preview/ is never read, so each preview says noindex itself.
-          await store(previewUrl(id, variant), basePath === "/" ? document : withNoindex(document));
-          for (const ref of referenced(document)) await capture(ref);
+      for (const id of components) {
+        routes.add(`/${id}`);
+        const baseText = await capture(componentUrl(id));
+        if (!baseText) continue;
+        const base = JSON.parse(baseText) as ComponentDetailResponse;
+        report.borrowedStyles += base.diagnostics.filter(d => d.kind === "STYLE_BORROWED").length;
+        if (base.variants.length) routes.add(`/${id}/variants`);
+        for (const variant of [undefined, ...base.variants.map(v => v.name)]) {
+          const detailText = variant ? await capture(componentUrl(id, variant)) : baseText;
+          if (detailText) {
+            // The detail response carries the complete preview document — byte-identical to what
+            // /preview/:id serves for the default theme — so write it rather than render it twice.
+            const { document } = JSON.parse(detailText) as ComponentDetailResponse;
+            // Under a base path the robots.txt rule for /preview/ is never read, so each preview says noindex itself.
+            await store(previewUrl(id, variant), basePath === "/" ? document : withNoindex(document));
+            for (const ref of referenced(document)) await capture(ref);
+          }
+          await capture(renderedSourceUrl(id, variant), { optional: true });
+          await capture(dataSourceUrl(id, variant), { optional: true });
         }
-        await capture(renderedSourceUrl(id, variant), { optional: true });
-        await capture(dataSourceUrl(id, variant), { optional: true });
       }
-    }
 
-    log(`… ${components.length} components with their variants, previews and source views`);
+      log(`… ${components.length} components with their variants, previews and source views`);
 
-    // ---- 3. Folder overviews ----
-    for (const path of folders) {
-      routes.add(`/${path}`);
-      await capture(overviewUrl(path), { optional: true });
-    }
-
-    log(`… ${folders.length} folder overviews`);
-
-    // ---- 4. The corpus audit, as of now — unless left out, in which case it never runs (the audit
-    // route computes on request, so not requesting it is enough) ----
-    if (includeAudit) {
-      await capture(PD_ROUTES.audit);
-      log("… corpus audit");
-    } else {
-      log("… corpus audit left out (build.audit: false / --no-audit)");
-    }
-
-    // ---- 5. Assets, copied as served: /assets/<root name>/…, and the single-root mirror. A root
-    // hidden by an earlier one of the same name is never served by `pd dev`, so it is left out here
-    // too rather than copied over (or under) the root that wins. ----
-    const shadowed = new Map(shadowedAssetRoots(cfg.assetRoots).map(s => [s.root, s.by]));
-    for (const [i, rootDir] of cfg.assetRoots.entries()) {
-      const by = shadowed.get(rootDir);
-      if (by !== undefined) {
-        report.warnings.push(`assets: ${relative(root, rootDir)} is hidden by ${relative(root, by) || "."}, which has the same folder name; left out`);
-        continue;
+      // ---- 3. Folder overviews ----
+      for (const path of folders) {
+        routes.add(`/${path}`);
+        await capture(overviewUrl(path), { optional: true });
       }
-      const exists = await stat(rootDir).then(s => s.isDirectory(), () => false);
-      if (!exists) continue;
-      await cp(rootDir, join(outDir, "assets", cfg.assetRootNames[i]), { recursive: true, filter: notABarrier });
-      if (cfg.assetRoots.length === 1) await cp(rootDir, join(outDir, "assets"), { recursive: true, force: false, filter: notABarrier });
-    }
 
-    // ---- 6. One shell page per route ----
-    const runtime: ShellRuntime = {
-      mode: "static", basePath, builtAt: now().toISOString(), pdVersion: opts.pdVersion,
-      ...(includeAudit ? {} : { audit: false }),
-    };
-    // Through the writer like every other file: the base path is applied there, once, and a route whose
-    // file is already written (by a capture) is not written over. That only happens when a pattern folder
-    // shares its name with one of PD's own URL prefixes; the route then has no page, so it is reported.
-    const shell = buildShellHtml(runtime, config.shell?.brand);
-    for (const route of routes) {
-      const holder = await store(route, shell);
-      if (holder !== null) {
-        report.warnings.push(`shell page for route ${route} not written: ${staticPathFor(route)} already holds the server's response to ${holder}`);
+      log(`… ${folders.length} folder overviews`);
+
+      // ---- 4. The corpus audit, as of now — unless left out, in which case it never runs (the audit
+      // route computes on request, so not requesting it is enough) ----
+      if (includeAudit) {
+        await capture(PD_ROUTES.audit);
+        log("… corpus audit");
+      } else {
+        log("… corpus audit left out (build.audit: false / --no-audit)");
       }
-    }
-    // GitHub Pages runs Jekyll unless told otherwise, and Jekyll drops every folder starting with "_"
-    // — which would silently remove _pd/ (the shell, its CSS, every theme and component stylesheet).
-    await writeFile(join(outDir, ".nojekyll"), "");
-    report.files++;
-    // Crawlers: the workbench is searchable, its previews are not.
-    await writeFile(join(outDir, "robots.txt"), workbenchRobotsTxt(basePath));
-    report.files++;
-    // Unless the storefront's own robots.txt, at this host's root, already keeps these previews out: a
-    // workbench published on the storefront's host at this base path (with index: false, it keeps out everything),
-    // when the storefront itself is at the host's root and so has a robots.txt.
-    if (basePath !== "/" && (sameHostWorkbenchPath(storefront ?? undefined) !== basePath || sfBase !== "/")) {
-      report.notes.push(`robots.txt is written to the workbench's root, but crawlers read it only at a host's root: `
-        + `with the base path ${basePath}, each preview carries a robots noindex tag instead; where you can, also add `
-        + `its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
-    }
 
-    await assertUnchanged(storefront ? `the workbench in ${outDir} may be part old, part new, and the storefront was not written` : `the workbench in ${outDir} may be part old, part new`);
+      // ---- 5. Assets, copied as served: /assets/<root name>/…, and the single-root mirror. A root
+      // hidden by an earlier one of the same name is never served by `pd dev`, so it is left out here
+      // too rather than copied over (or under) the root that wins. ----
+      const shadowed = new Map(shadowedAssetRoots(cfg.assetRoots).map(s => [s.root, s.by]));
+      for (const [i, rootDir] of cfg.assetRoots.entries()) {
+        const by = shadowed.get(rootDir);
+        if (by !== undefined) {
+          report.warnings.push(`assets: ${relative(root, rootDir)} is hidden by ${relative(root, by) || "."}, which has the same folder name; left out`);
+          continue;
+        }
+        const exists = await stat(rootDir).then(s => s.isDirectory(), () => false);
+        if (!exists) continue;
+        await cp(rootDir, join(outDir, "assets", cfg.assetRootNames[i]), { recursive: true, filter: notABarrier });
+        if (cfg.assetRoots.length === 1) await cp(rootDir, join(outDir, "assets"), { recursive: true, force: false, filter: notABarrier });
+      }
+
+      // ---- 6. One shell page per route ----
+      const runtime: ShellRuntime = {
+        mode: "static", basePath, builtAt: now().toISOString(), pdVersion: opts.pdVersion,
+        ...(includeAudit ? {} : { audit: false }),
+      };
+      // Through the writer like every other file: the base path is applied there, once, and a route whose
+      // file is already written (by a capture) is not written over. That only happens when a pattern folder
+      // shares its name with one of PD's own URL prefixes; the route then has no page, so it is reported.
+      const shell = buildShellHtml(runtime, config.shell?.brand);
+      for (const route of routes) {
+        const holder = await store(route, shell);
+        if (holder !== null) {
+          report.warnings.push(`shell page for route ${route} not written: ${staticPathFor(route)} already holds the server's response to ${holder}`);
+        }
+      }
+      // GitHub Pages runs Jekyll unless told otherwise, and Jekyll drops every folder starting with "_"
+      // — which would silently remove _pd/ (the shell, its CSS, every theme and component stylesheet).
+      await writeFile(join(outDir, ".nojekyll"), "");
+      report.files++;
+      // Crawlers: the workbench is searchable, its previews are not.
+      await writeFile(join(outDir, "robots.txt"), workbenchRobotsTxt(basePath));
+      report.files++;
+      // Unless the storefront's own robots.txt, at this host's root, already keeps these previews out: a
+      // workbench published on the storefront's host at this base path (with index: false, it keeps out everything),
+      // when the storefront itself is at the host's root and so has a robots.txt.
+      if (basePath !== "/" && (sameHostWorkbenchPath(storefront ?? undefined) !== basePath || sfBase !== "/")) {
+        report.notes.push(`robots.txt is written to the workbench's root, but crawlers read it only at a host's root: `
+          + `with the base path ${basePath}, each preview carries a robots noindex tag instead; where you can, also add `
+          + `its rule (Disallow: ${basePath}preview/) to the robots.txt the host serves at /`);
+      }
+
+      await assertUnchanged(storefront ? `the workbench in ${outDir} may be part old, part new, and the storefront was not written` : `the workbench in ${outDir} may be part old, part new`);
+    }
 
     // ---- 7. The storefront, into its own root, through its own writer ----
     if (storefront && sfGet && sfCrawl) {
@@ -624,11 +640,14 @@ async function buildOnce(
       log(`… storefront: ${pages} pages, ${counts.files} files`);
     }
 
-    if (storefront) await assertUnchanged(`the workbench in ${outDir} and the storefront in ${storefront.outDir} may be part old, part new`);
+    if (storefront) {
+      await assertUnchanged(buildWorkbench ? `the workbench in ${outDir} and the storefront in ${storefront.outDir} may be part old, part new`
+        : `the storefront in ${storefront.outDir} may be part old, part new`);
+    }
 
     // ---- 8. The image cache keeps what this build used: the variants written to either root ----
     const used = new Set<string>();
-    for (const root of [outDir, ...(storefront ? [storefront.outDir] : [])]) {
+    for (const root of outputs) {
       const files = await readdir(join(root, "_pd", "images"), { recursive: true }).catch(() => [] as string[]);
       for (const f of files) {
         const m = /\.([0-9a-f]{10})\.[1-9][0-9]*\.webp$/.exec(String(f));

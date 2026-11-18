@@ -47,8 +47,12 @@ export async function runBuild(
     log: line => console.log(`[pd build] ${line}`),
   });
   const mb = (report.bytes / 1024 / 1024).toFixed(1);
-  console.log(`[pd build] ${report.components} components → ${report.files} files, ${mb} MB in ${report.ms} ms`);
-  console.log(`[pd build] ${report.outDir}  (served from ${report.basePath})`);
+  if (report.workbench === false) {
+    console.log(`[pd build] workbench: not built (build.workbench: false); the pages link to it at ${config.storefront?.workbenchUrl ?? "storefront.workbenchUrl"}`);
+  } else {
+    console.log(`[pd build] ${report.components} components → ${report.files} files, ${mb} MB in ${report.ms} ms`);
+    console.log(`[pd build] ${report.outDir}  (served from ${report.basePath})`);
+  }
   if (report.borrowedStyles) {
     const n = report.borrowedStyles;
     console.log(`[pd build] styles: ${n} stylesheet${n === 1 ? "" : "s"} linked by a borrowed class (STYLE_BORROWED on the component's Diagnostics tab)`);
