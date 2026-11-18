@@ -4,6 +4,26 @@
 
 ### Added
 
+- **`pd init --site <package or folder>`: a content-only website** on an existing style guide package. It writes
+  pages, a config and a `package.json`, nothing else: no components, styles, themes or skin, which all come from the
+  package (an npm name, optionally with a version, or a folder next to the site as a `file:` dependency). After
+  `npm install` it asks the site's dev server for every page, so a package without a skin (`layouts/page`,
+  `partials/base`) or without a `patternDump` field is named at once; a package named without a version is pinned
+  to the one installed. `--workbench-url` says where the style guide publishes its own workbench (default
+  `/workbench/`). A style guide and its site in one repository are two inits and a root `package.json`, described in
+  the getting started guide.
+- **`build.workbench: false`** (a new config option): `pd build` writes the storefront only, for a site whose
+  workbench another build publishes (its style guide's). The base-path check for a same-host `workbenchUrl` is then
+  the other build's, and `outDir` is not used. `pd init --site` sets it.
+- **`pd init` asks two more questions with a website:** site search, which adds Pagefind as a devDependency so
+  `pd build` writes the index (`--search` / `--no-search`, default yes), and whether the site follows the viewer's
+  light or dark setting (`--system-theme` / `--no-system-theme`, default yes): a `system` theme
+  (`color-scheme: light dark`) as the default, so the examples on a page follow the viewer with or without
+  JavaScript, and the skin's own colours in `src/styles/base/colors.scss`.
+- **Layouts preview at full height.** A component in `layouts/` fills the stage's height and width in the workbench,
+  as pages and templates do. `"x-pd-preview": "full"` or `"centered"` at the top of a schema sets it for one
+  component (an index.md's `preview:` for a folder, a component `.md`'s `preview:` above both), and the **Full
+  height** toggle beside the viewport sizes switches it, as `?layout=full|centered` in the address.
 - **Folder defaults.** A folder's `index.md` sets frontmatter for the pages under it once, in a `childDefaults:`
   block written as a page writes its frontmatter: the layout, any key the layout declares, a query's options,
   `tags`, `categories`, `draft`, `index`, `toc`, `image`. A page's own value wins, key by key and option by option;
@@ -41,6 +61,36 @@
   `src/styles/layouts/page.scss` (and the three `.doc-content .page-*` rules out of `src/styles/layouts/doc.scss`)
   into a new `src/styles/base/page.scss`, which the base layer (`documentBase: ["base"]`) links on every page, as
   the starter now does. Start it with `@use "tokens";` for the spacing tokens.
+
+### Changed
+
+- **`pd init` pins `pattern-dump` exactly** (`0.6.0`, not `^0.6.0`), and Pagefind with it: a patch release can
+  change what a build writes and checks. `npm install --save-dev --save-exact pattern-dump@<version>` moves the pin.
+- **`pd init` allows Pattern Dump's own install scripts** (esbuild, `@parcel/watcher`) in the `package.json` it
+  writes (`allowScripts`), so npm 11.19 no longer warns about them after the install. A denial the project already
+  has stays.
+- **`pd init` names a generic folder by its parent:** `pd init styleguide` inside `acme-web/` makes the package
+  `@acme-web/styleguide`, titled `acme-web` (`styleguide`, `style-guide`, `design-system`, `site`, `website`, `docs`,
+  `www`). The question shows it, `--yes` takes it, and init prints the name it wrote.
+- The starter's `light` and `dark` themes declare their `color-scheme`, and its note and search styles follow it.
+
+### Fixed
+
+- **An example on a website page takes the page's theme.** When the page's `<html>` (or `<body>`) has a
+  `data-theme` naming one of the workbench's themes, every live example on it shows that theme, and follows when a
+  toggle changes it (with `themes.switch: "stylesheet"` too). Without JavaScript an example keeps the default theme.
+- **The workbench shows a change saved while it was opening.** A save in the moment between the first view and the
+  live-reload connection was missed until the next change; the Nav Rail and the open page now catch up on connect.
+- **`pd init` with the starter components and a website** (`--storefront --yes`): the example page's classes
+  (`page-title` and others) were also the skin's, so the home and about pages warned that they borrow
+  `pages/example`'s stylesheet; and the website's search field had the class of `molecules/search-field`. The example
+  page's classes are now `example-page-*`, the search field's `search-input`.
+
+  **Upgrading a project made that way with an earlier `pd init`:** rename the classes in
+  `src/patterns/pages/example/example.hbs` and `src/styles/pages/example.scss` (`page`, `page-header`, `page-title`,
+  `page-content` to `example-page`, `example-page-header`, `example-page-title`, `example-page-content`), and in
+  `src/patterns/components/search/search.hbs` and `src/styles/components/search.scss` the input's `search-field` to
+  `search-input` (its `id` and the label's `for` too).
 
 ## 0.5.3
 

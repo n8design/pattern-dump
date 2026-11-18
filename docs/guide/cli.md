@@ -44,10 +44,14 @@ a TypeScript setup, and optional starter components. It asks for each choice unl
 
 | Option | Description |
 |---|---|
-| `--name <name>` | Package name. Default: the folder name |
-| `--brand <title>` | Title shown in the Nav Rail. Default: the name |
+| `--name <name>` | Package name. Default: the folder name; a generic one (`styleguide`, `site`, `docs` and the like) is scoped by its parent folder, `@<parent>/<folder>` |
+| `--brand <title>` | Title shown in the Nav Rail. Default: the name, or the parent folder's name for a scoped one |
 | `--no-examples` | Structure, config and themes only, without starter components |
 | `--storefront` | Also a website: two pages, a small skin, a component of its own and a GitHub Pages workflow ([storefront.md](storefront.md#quick-start)). Default: no |
+| `--search` / `--no-search` | With a website: Pagefind as a devDependency, pinned, so `pd build` writes the search index. Default: yes |
+| `--system-theme` / `--no-system-theme` | With a website: the default theme `system`, which follows the viewer's light or dark setting, and the skin's pages with it. Default: yes |
+| `--site <package or folder>` | A content-only website on an existing style guide instead of a design system ([getting-started.md](getting-started.md#a-content-only-website)) |
+| `--workbench-url <url>` | With `--site`: where the style guide's workbench is published, a full address or a path on the site's host. Default: `/workbench/` |
 | `--no-install` | Skip `npm install` |
 | `--git` / `--no-git` | Run `git init`. Default: yes, unless already inside a repository |
 | `--pd-source <src>` | Where to install Pattern Dump from: a `.tgz` file or an npm spec |
@@ -58,7 +62,10 @@ overwritten, an existing script name gets a `pd:` variant instead, and existing 
 `typescript` versions are kept. It refuses a folder that already has a Pattern Dump config.
 
 It adds these scripts: `dev` (`pd dev`), `audit` (`pd audit`), `typecheck` (`tsc --noEmit`) and
-`build:scripts` (`tsc`), and with `--storefront` also `build` (`pd build`).
+`build:scripts` (`tsc`), and with `--storefront` also `build` (`pd build`); with `--site`, `dev` and `build` only.
+`pattern-dump` and Pagefind are pinned to exact versions (`npm install --save-dev --save-exact pattern-dump@<version>`
+moves the pin), and `allowScripts` allows the install scripts of esbuild and `@parcel/watcher`, Pattern Dump's own
+dependencies; a denial the project already has (`false`) is kept.
 
 With `--storefront`, the skin (`src/patterns/layouts/`, `src/patterns/partials/` and their styles) is written
 as a whole or not at all: if one of its files is already there, `pd init` leaves the skin out and says so,
