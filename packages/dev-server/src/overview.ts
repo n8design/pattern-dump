@@ -9,11 +9,11 @@
 import { join } from "node:path";
 import { readFolderFile, type PatternDirs } from "./pattern-dirs.js";
 import type {
-  DiscoveryMap, FolderOverview, FolderOverviewItem, LayoutMode, TreeNode,
+  DiscoveryMap, FolderOverview, FolderOverviewItem, LayoutMode,
 } from "@pattern-dump/contracts";
 import { stripOrderPrefixes } from "@pattern-dump/discovery";
 import { FULL_CATEGORIES, previewModeOf } from "./layout-mode.js";
-import { buildSubtree } from "./component-tree.js";
+import { buildSubtree, publicComponents } from "./component-tree.js";
 import { renderDoc } from "./markdown.js";
 
 export async function buildFolderOverview(
@@ -55,16 +55,8 @@ async function collectPublicLeaves(
   discoveryMap: DiscoveryMap
 ): Promise<FolderOverviewItem[]> {
   const root = await buildSubtree(folderPath, patternsDir, discoveryMap);
-  const items: FolderOverviewItem[] = [];
-  const walk = (node: TreeNode): void => {
-    if (node.kind === "component" && node.visibility !== "private") {
-      items.push({
-        id: node.path, title: node.title, status: node.status ?? "draft", layout: node.layout ?? "centered",
-        ...(node.source ? { source: node.source } : {}),
-      });
-    }
-    node.children?.forEach(walk);
-  };
-  if (root) walk(root);
-  return items;
+  return (root ? publicComponents(root) : []).map((node): FolderOverviewItem => ({
+    id: node.path, title: node.title, status: node.status ?? "draft", layout: node.layout ?? "centered",
+    ...(node.source ? { source: node.source } : {}),
+  }));
 }

@@ -55,11 +55,24 @@ function visibilityOf(fm: Record<string, FrontmatterValue>): "public" | "private
   return v === "public" || v === "private" ? v : undefined;
 }
 
-/** True when this node or anything beneath it is a component not marked private. The same set a
- *  folder overview lists — overview.ts derives its items from this tree, so the two cannot disagree. */
+/** True when this node or anything beneath it is a component not marked private, and not inside a private
+ *  folder. The same set a folder overview lists (publicComponents), so the two cannot disagree. */
 export function hasPublicComponent(node: TreeNode): boolean {
-  if (node.kind === "component" && node.visibility !== "private") return true;
-  return node.children?.some(hasPublicComponent) ?? false;
+  return publicComponents(node, false).length > 0;
+}
+
+/** The public components in a node's subtree, in tree order (pre-order). A private component is left out (its
+ *  own sub-components are not), and so is everything in a private folder beneath `node`; `node` itself counts as
+ *  open (unless `open` is false), so a private folder's own gallery lists its components. */
+export function publicComponents(node: TreeNode, open = true): TreeNode[] {
+  const out: TreeNode[] = [];
+  const walk = (n: TreeNode, top: boolean): void => {
+    if (n.kind === "group" && n.visibility === "private" && !top) return;
+    if (n.kind === "component" && n.visibility !== "private") out.push(n);
+    n.children?.forEach(c => walk(c, false));
+  };
+  walk(node, open);
+  return out;
 }
 
 export async function buildComponentTree(
