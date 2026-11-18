@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.1 (2026-11-18)
+## Unreleased
 
 Fixes where Pattern Dump did less than its guide said: metadata is read from the frontmatter block only, variants
 with data alone get their own docs and schema and can be placed on a page, a private folder stays out of galleries,
