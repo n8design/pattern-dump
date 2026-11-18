@@ -23,5 +23,6 @@
       "@pattern-dump/discovery": ["packages/discovery/src/index.ts"]
     }
   },
+  "files": ["packages/dev-server/src/markdown-it-deflist.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

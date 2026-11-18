@@ -78,6 +78,41 @@ folder's pages beneath it. `order` sorts them, with the same meaning as for comp
 A page's markdown is the same markdown as component docs, with the same safety rules: raw HTML in a page
 is shown as text, not run.
 
+### Definition lists
+
+For a list of terms and what is said about each (the keys of a configuration, say), write a definition list: the
+term on its own line, then each definition on a line of its own starting with `:` (or `~`) and a space. A term can
+have several definitions.
+
+```md
+outDir
+: A string. The only required top-level key.
+: The folder `pd build` writes the workbench to.
+
+patternsDir
+: A string. Default `<sourceDir>/patterns`.
+```
+
+renders as
+
+```html
+<dl>
+<dt>outDir</dt>
+<dd>A string. The only required top-level key.</dd>
+<dd>The folder <code>pd build</code> writes the workbench to.</dd>
+<dt>patternsDir</dt>
+<dd>A string. Default <code>&lt;sourceDir&gt;/patterns</code>.</dd>
+</dl>
+```
+
+- With a blank line between a term and its definitions, each definition is a paragraph: `<dd><p>…</p></dd>`.
+- A definition can hold more than one block (further lines indented, a list, a code block), and a component placed
+  with a `pd-` tag.
+- The same syntax works in a placed component's markdown content and in component docs.
+- A term is not a heading: it gets no anchor and is not in the table of contents.
+- The elements have no classes: the skin styles `dl`, `dt` and `dd` in its document base, as it styles `ul` and `p`.
+- A listing's teaser (a page's first paragraph, when it has no description) never comes from a definition list.
+
 ### Live examples
 
 A `pattern` fence shows a component:
