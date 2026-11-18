@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-11-18)
+
+A website can now live on its own, on an existing style guide package: `pd init --site` writes pages and a config,
+and the components, styles and skin come from the package. Layouts preview at full height, a folder's `index.md`
+sets defaults for its pages, a page or template pattern can be a layout, and a class borrowed from another
+component is now reported (`STYLE_BORROWED`). `pd init` pins `pattern-dump` exactly.
 
 ### Added
 
