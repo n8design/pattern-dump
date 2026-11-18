@@ -88,7 +88,7 @@ test.describe("HMR — build errors reach the Console", () => {
     }
   });
 
-  // A data variant with no base template to overlay is left out of the tree. Until 0.6.1 nothing said so; now the
+  // A data variant with no base template to overlay is left out of the tree. Until 0.7.0 nothing said so; now the
   // server reports it like a collision, naming the data file and the template it needs.
   test("a data variant with no base template is named on the Console", async ({ page }) => {
     test.setTimeout(60_000);

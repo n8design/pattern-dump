@@ -4,7 +4,7 @@
 //
 // The check runs again once the workbench is written and once the storefront is. A change noticed there also leaves
 // both folders as they were: the build writes into folders of its own beside them and puts them in place only when
-// every check has passed. (Until 0.6.1 the workbench folder had been emptied and rewritten by then.) Those changes
+// every check has passed. (Until 0.7.0 the workbench folder had been emptied and rewritten by then.) Those changes
 // are made from the build's log, at the line it prints after writing each part.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
