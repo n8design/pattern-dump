@@ -32,15 +32,35 @@ npx --package=/path/to/pattern-dump-<version>.tgz pd init my-design-system --pd-
 
 | Question | Flag | Default |
 |---|---|---|
-| Package name | `--name <name>` | the folder name |
-| Title in the Nav Rail | `--brand <title>` | the name |
+| A website on an existing style guide package? | `--site <package or folder>` | no: a new design system ([a content-only website](#a-content-only-website)) |
+| Package name | `--name <name>` | the folder name; a generic one is scoped by its parent folder (below) |
+| Title in the Nav Rail | `--brand <title>` | the name, or the parent folder's name for a scoped one |
 | Include the starter components? | `--no-examples` to skip | yes |
 | Include a website (storefront)? | `--storefront` | no |
+| Include site search (Pagefind)? (with a website) | `--search` / `--no-search` | yes |
+| Follow the viewer's light or dark setting? (with a website) | `--system-theme` / `--no-system-theme` | yes |
 | Run `git init`? | `--git` / `--no-git` | yes, unless already inside a repository |
 | Run `npm install`? | `--no-install` to skip | yes |
 
+A folder name that says what a folder is rather than whose it is (`styleguide`, `style-guide`, `design-system`,
+`site`, `website`, `docs`, `www`) is scoped by the folder it is in: `pd init styleguide` inside `acme-web/` makes the
+package `@acme-web/styleguide`, titled `acme-web`. The question shows it as the default, `--yes` takes it, and init
+prints the name it wrote.
+
 A website adds pages written in markdown, a small skin and a GitHub Pages workflow; see
-[storefront.md](storefront.md#quick-start). `--yes` accepts every default without asking. In a folder that already has a `package.json`, `pd init`
+[storefront.md](storefront.md#quick-start). With search, Pagefind is a devDependency and `pd build` writes the
+site's index. With the system theme, the default theme is `system` (`color-scheme: light dark`): the pages and the
+examples on them follow the viewer's light or dark setting, with or without JavaScript.
+
+`pattern-dump` (and Pagefind) are pinned to an exact version, since a patch release can change what a build writes
+and checks. To move to a newer one:
+
+```bash
+npm install --save-dev --save-exact pattern-dump@<version>
+```
+
+The `package.json` also allows the install scripts of Pattern Dump's own dependencies, esbuild and
+`@parcel/watcher` (`allowScripts`, which npm 11.19 asks for), so `npm install` has nothing to warn about. `--yes` accepts every default without asking. In a folder that already has a `package.json`, `pd init`
 adds to the project and never overwrites a file; a script name that is taken gets a `pd:` prefix instead.
 
 A global install (`npm install --global pattern-dump`) also works for creating projects, but each
@@ -160,6 +180,93 @@ npx pd build             # → ./dist
 
 `pd build` writes the whole workbench as plain files that any static host can serve. See
 [static-build.md](static-build.md).
+
+## A content-only website
+
+`pd init <dir> --site <package or folder>` writes a website whose components, styles, themes and skin all come from
+a style guide package. The project is pages and a config, nothing else:
+
+```bash
+npx pattern-dump init site --site @acme/styleguide         # from the npm registry (a version: @acme/styleguide@1.2.0)
+npx pattern-dump init site --site ../styleguide            # a folder next to it, as a file: dependency
+```
+
+| File | What |
+|---|---|
+| `package.json` | `dev` and `build`; `pattern-dump`, the style guide and (with search) Pagefind as devDependencies |
+| `pattern-dump.config.ts` | `packages: ["<the style guide>"]`, the `storefront` block, and `build: { workbench: false }` |
+| `pages/index.md`, `pages/about.md` | two pages that name no layout, so they render with the style guide's `layouts/page` |
+| `.gitignore`, `README.md` | |
+| `.github/workflows/pages.yml` | for a style guide from the registry: builds the website and publishes it |
+
+- **The style guide is checked.** After `npm install`, init asks the site's dev server for every page. A package
+  without a skin (`layouts/page` and `partials/base`) or without a `patternDump` field is named then, with what is
+  missing; the site is written either way.
+- **Its workbench is the style guide's.** `--workbench-url` (default `/workbench/`) says where the style guide
+  publishes its own workbench; the pages' examples link there. `build.workbench: false` makes `pd build` write the
+  website only, to `site/`.
+- **A version given is kept; none given is pinned** to the version `npm install` installed.
+
+### A style guide and its site in one repository
+
+Two inits and a root `package.json`. The style guide is a design system with a website starter (for its skin), made
+a pattern package:
+
+```bash
+mkdir acme-web && cd acme-web
+npx pattern-dump init styleguide --storefront --no-git    # @acme-web/styleguide
+```
+
+Add the `patternDump` field to `styleguide/package.json`, naming the same folders as its config (a folder named in
+both must be the same in both):
+
+```json
+"patternDump": {
+  "patterns": "src/patterns",
+  "styles": { "dir": "src/styles", "documentBase": ["base"] },
+  "themes": { "dir": "themes", "default": "system", "switch": "attribute" },
+  "scripts": "src/scripts",
+  "assets": ["assets"]
+}
+```
+
+Then the site, on the folder, and the root:
+
+```bash
+npx pattern-dump init site --site ../styleguide --no-git  # @acme-web/site
+rm -r styleguide/.github                                  # GitHub reads workflows from the root only
+```
+
+```json
+{
+  "name": "acme-web",
+  "private": true,
+  "workspaces": ["styleguide", "site"],
+  "scripts": {
+    "dev": "npm run dev -w @acme-web/site",
+    "dev:styleguide": "npm run dev -w @acme-web/styleguide -- --port 4300",
+    "build": "npm run build -w @acme-web/site",
+    "pages": "npm run build -w @acme-web/site && npm run build -w @acme-web/styleguide -- --base /workbench/ && node scripts/assemble-pages.mjs"
+  }
+}
+```
+
+`scripts/assemble-pages.mjs` puts both builds into one folder for GitHub Pages: `site/site/` at its root, and
+`styleguide/dist/` under `workbench/`:
+
+```js
+import { cp, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+
+for (const dir of ["site/site", "styleguide/dist"]) if (!existsSync(dir)) throw new Error(`${dir} is missing: run npm run pages`);
+await rm("_site", { recursive: true, force: true });
+await cp("site/site", "_site", { recursive: true });
+await cp("styleguide/dist", "_site/workbench", { recursive: true });
+```
+
+The root's `.github/workflows/pages.yml` is the one `pd init --storefront` writes, with its build and copy steps
+replaced by `- run: npm run pages`. Run `npm install` at the root once, so there is one lockfile; add `_site` to
+the root's `.gitignore`. People who write content work in `site/pages/` only.
 
 ## Next
 

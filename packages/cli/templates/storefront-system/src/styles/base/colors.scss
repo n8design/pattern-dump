@@ -1,0 +1,12 @@
+// The website's colours: its pages follow the viewer's light or dark setting. A site's light and dark live in
+// its skin, not in the workbench's themes (themes/), which style the previews: in a preview the theme's own
+// values on <body> win over these. Keep them in step with themes/system.theme.scss.
+:root {
+  color-scheme: light dark;
+  --color-surface: light-dark(#ffffff, #16181d);
+  --color-text: light-dark(#1b1b1f, #eceef2);
+  --color-text-muted: light-dark(#4b5563, #b4bac4);
+  --color-primary: light-dark(#0b5cad, #7ab8ff);
+  --color-on-primary: light-dark(#ffffff, #0b1220);
+  --color-border: light-dark(#6b7280, #9aa1ad);
+}

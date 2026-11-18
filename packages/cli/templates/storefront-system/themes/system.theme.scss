@@ -1,0 +1,12 @@
+// Follows the viewer's light or dark setting: the light theme's colours, or the dark theme's. The default
+// theme of a website, so an example embedded in a page follows the viewer as the page does, without script.
+// Keep the values in step with light.theme.scss, dark.theme.scss and src/styles/base/colors.scss.
+[data-theme="system"] {
+  color-scheme: light dark;
+  --color-surface: light-dark(#ffffff, #16181d);
+  --color-text: light-dark(#1b1b1f, #eceef2);
+  --color-text-muted: light-dark(#4b5563, #b4bac4);
+  --color-primary: light-dark(#0b5cad, #7ab8ff);
+  --color-on-primary: light-dark(#ffffff, #0b1220);
+  --color-border: light-dark(#6b7280, #9aa1ad);
+}

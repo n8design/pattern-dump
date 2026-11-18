@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { crc32, deflateSync } from "node:zlib";
-import { componentCssUrl, type ComponentDetailResponse, type ComponentTree, type TreeNode } from "@pattern-dump/contracts";
+import { componentCssUrl, componentUrl, PD_ROUTES, type ComponentDetailResponse, type ComponentTree, type TreeNode } from "@pattern-dump/contracts";
 import { loadConfig } from "@pattern-dump/core";
 import { runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { applyPlan, readTemplates } from "./files.js";
@@ -33,7 +33,7 @@ async function scaffold(examples: boolean, storefront = false): Promise<string> 
   const templates = await readTemplates(join(cliDir, "templates"));
   const r = planInit(
     templates,
-    { name: "starter-check", brand: "Starter Check", examples, storefront, dependency: "^0.0.0" },
+    { name: "starter-check", brand: "Starter Check", examples, storefront, search: storefront, systemTheme: storefront, dependency: "0.0.0" },
     { packageJson: null, exists: () => false },
     "@pattern-dump/config",
   );
@@ -223,7 +223,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
       expect(search.status).toBe(200);
       expect(search.body).toContain(`<body data-pd-regions="">`);
       expect(search.body).not.toContain(`class="doc-sidebar"`);
-      expect(search.body).toMatch(/<search class="search" data-search>\s*<form class="search-form" method="get">\s*<label class="search-label" for="search-field">Search this site<\/label>/);
+      expect(search.body).toMatch(/<search class="search" data-search>\s*<form class="search-form" method="get">\s*<label class="search-label" for="search-input">Search this site<\/label>/);
       expect(search.body).toMatch(/<script type="module" src="\/_pd\/scripts\/site-search\.js[^"]*"><\/script>/);
       expect(home.body).toContain(`<a href="/search/">Search</a>`);
       const notes = await onHost(server.port, "live.localhost", "/tags/notes/");
@@ -309,6 +309,31 @@ describe("the starter project with a website (--storefront, no examples)", () =>
 
 // The README's "Try breaking it" step, done as it says on a running server: the page then shows the
 // problem with its place in the file, and comes back by itself once the value is saved back.
+describe("the starter project with the examples and a website (what --storefront -y writes)", () => {
+  let both = "";
+  beforeAll(async () => { both = await scaffold(true, true); }, 60_000);
+  afterAll(async () => { if (both) await rm(both, { recursive: true, force: true }); });
+
+  it("no page borrows a class from the examples, and no component a style", async () => {
+    const config = await loadConfig(both);
+    const notes: string[] = [];
+    const server = await startDevServer(config, both, { port: 0, wsPort: 0, onStorefrontNote: n => { notes.push(n); } });
+    try {
+      const pages = JSON.parse((await onHost(server.port, "live.localhost", PD_ROUTES.pages)).body) as { pages: { route: string }[] };
+      expect(pages.pages.length).toBeGreaterThan(3);
+      for (const { route } of pages.pages) expect((await onHost(server.port, "live.localhost", route)).status, route).toBe(200);
+      expect(notes.filter(n => n.includes("uses class"))).toEqual([]);
+      const tree = await (await fetch(`http://127.0.0.1:${server.port}${PD_ROUTES.tree}`)).json() as ComponentTree;
+      for (const c of components(tree.roots)) {
+        const detail = await (await fetch(`http://127.0.0.1:${server.port}${componentUrl(c.path)}`)).json() as ComponentDetailResponse;
+        expect(detail.diagnostics.filter(d => d.kind === "STYLE_BORROWED"), c.path).toEqual([]);
+      }
+    } finally {
+      await server.close();
+    }
+  }, 120_000);
+});
+
 describe("the website starter's README step: break a pd- tag, then fix it", () => {
   it("shows the problem on the page with file, line and column, then the note again", async () => {
     const readme = await readFile(join(cliDir, "templates", "storefront-fills", "readme.md"), "utf8");

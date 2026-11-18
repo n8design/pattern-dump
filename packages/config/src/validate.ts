@@ -57,7 +57,7 @@ const SHAPE: Shape = {
   },
   packages: "packages",
   exclude: "strings",
-  build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks" } },
+  build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks", workbench: "boolean" } },
   images: IMAGES,
   storefront: {
     keys: {

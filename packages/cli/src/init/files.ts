@@ -21,13 +21,15 @@ export async function readTemplateDir(dir: string): Promise<TemplateFile[]> {
 /** Every template set, from the `templates/` folder shipped beside the CLI. */
 export async function readTemplates(templatesDir: string): Promise<Templates> {
   const fill = (name: string) => readFile(join(templatesDir, "storefront-fills", name), "utf8");
-  const [base, examples, storefront, config, readme, gitignore] = await Promise.all([
+  const [base, examples, storefront, storefrontSystem, site, config, readme, gitignore] = await Promise.all([
     readTemplateDir(join(templatesDir, "base")),
     readTemplateDir(join(templatesDir, "examples")),
     readTemplateDir(join(templatesDir, "storefront")),
+    readTemplateDir(join(templatesDir, "storefront-system")),
+    readTemplateDir(join(templatesDir, "site")),
     fill("config.txt"), fill("readme.md"), fill("gitignore.txt"),
   ]);
-  return { base, examples, storefront, storefrontFills: { config, readme, gitignore } };
+  return { base, examples, storefront, storefrontSystem, site, storefrontFills: { config, readme, gitignore } };
 }
 
 /** Perform a plan. Writes use the `wx` flag, so even a file that appeared after planning is never
@@ -40,6 +42,5 @@ export async function applyPlan(target: string, plan: InitPlan): Promise<void> {
     await writeFile(abs, file.content, { flag: "wx" });
   }
   await writeFile(join(target, "package.json"), plan.packageJson.content);
-  // Directories the config names that have no template file of their own.
-  for (const dir of ["assets", "src/patterns"]) await mkdir(join(target, dir), { recursive: true });
+  for (const dir of plan.dirs) await mkdir(join(target, dir), { recursive: true });
 }

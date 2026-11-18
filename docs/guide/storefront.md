@@ -152,7 +152,9 @@ setting, make the default theme follow it too, with `color-scheme: light dark`:
 }
 ```
 
-Its examples then follow the viewer with or without JavaScript, as the page does.
+Its examples then follow the viewer with or without JavaScript, as the page does. `pd init --storefront` sets this
+up unless given `--no-system-theme`: a `system` theme as the default, and the skin's own colours
+(`src/styles/base/colors.scss`) following the viewer too.
 
 A `pattern:` link, such as `[the callout](pattern:components/callout)`, links to the component in the
 workbench.
@@ -970,6 +972,8 @@ There is no server: search runs in the reader's browser, on GitHub Pages and und
 ```bash
 npm install --save-dev pagefind
 ```
+
+`pd init` adds it with the website, pinned, unless given `--no-search`.
 
 - **Pagefind is the project's own**, as Playwright is for `--browser`; Pattern Dump does not depend on it.
   `storefront.search` left out: the site is indexed when the project has Pagefind, and built without search, with no

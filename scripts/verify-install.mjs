@@ -16,6 +16,7 @@
 // pd build both serve. Then the website starter (pd init --storefront) in a project of its own: both
 // addresses in pd dev, the page's inlined height fitter run on its own, the audit, npm run build put
 // together as the GitHub Pages workflow does, served as plain files and read with axe in Chromium. Then a
+// content-only website on that starter (pd init --site), its pages checked by init and built without a workbench. Then a
 // packed pattern package installed as a real copy: its compiled helpers render a page, pd dev does not
 // watch it, and a TypeScript helper path stops pd dev with the named error.
 
@@ -208,14 +209,13 @@ if (failures.length === 0 && tmp) {
   const name = (await readFile(join(repo, "packages/cli/src/distribution.ts"), "utf8")).match(/PD_PACKAGE_NAME = "([^"]+)"/)[1];
   const source = join(repo, ".pd-pack", `${name}-${cliVersion}.tgz`);
   const starter = join(tmp, "website");
-  let initLog = "";
-  try {
-    initLog = execFileSync("npx", ["--yes", `--package=${source}`, "pd", "init", "website", "--yes", "--no-git", "--no-examples", "--storefront", "--pd-source", source],
-      { cwd: tmp, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    check(true, "pd init --storefront + npm install");
-  } catch (e) {
-    check(false, "pd init --storefront + npm install", String(e.stdout ?? e).slice(-800));
-  }
+  const inited = spawnSync("npx", ["--yes", `--package=${source}`, "pd", "init", "website", "--yes", "--no-git", "--no-examples", "--storefront", "--pd-source", source],
+    { cwd: tmp, encoding: "utf8" });
+  const initLog = `${inited.stdout}${inited.stderr}`;
+  check(inited.status === 0, "pd init --storefront + npm install", initLog.slice(-800));
+  // Pattern Dump's own install scripts are allowed in the package.json init writes (allowScripts), so npm has
+  // nothing to warn about.
+  check(!initLog.includes("install-scripts"), "npm doesn't warn about Pattern Dump's install scripts", initLog.split("\n").filter(l => l.includes("install-scripts")).join("\n"));
   check(initLog.includes("The GitHub Pages workflow installs with npm ci, which can't reach it"),
     "pd init warns that the workflow can't install a local-file dependency", initLog.slice(-800));
   check(initLog.includes("the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/"),
@@ -287,6 +287,8 @@ if (failures.length === 0 && tmp) {
   check(built.stdout.includes("classes: every class on the site's pages is the style guide's"),
     "the website starter's pages carry only the style guide's classes", built.stdout.split("\n").filter(l => /class/.test(l)).join("\n").slice(-800));
   check(existsSync(join(starter, "site", "llms.txt")), "the website starter's build writes llms.txt");
+  // Pagefind is a devDependency of a new website (pinned), so its build writes the search index.
+  check(existsSync(join(starter, "site", "_pd", "search", "pagefind.js")), "the website starter's build writes its search index", built.stdout.slice(-400));
   // As the workflow does it: the website at the root, the workbench copied in under /workbench/.
   const out = join(tmp, "website-pages");
   await cp(join(starter, "site"), out, { recursive: true });
@@ -330,6 +332,44 @@ if (failures.length === 0 && tmp) {
     }
   }
   fileServer.kill();
+}
+
+// A content-only website on the starter above (`pd init --site ../website`), as the getting started guide sets one
+// up: the style guide becomes a pattern package (the patternDump field, the same folders as its config), and the site
+// is pages and a config. Init checks its pages with the style guide; its build writes the website only
+// (build.workbench: false), checked as always, with its search index.
+if (failures.length === 0 && tmp) {
+  const cliVersion = JSON.parse(await readFile(join(repo, "packages/cli/package.json"), "utf8")).version;
+  const name = (await readFile(join(repo, "packages/cli/src/distribution.ts"), "utf8")).match(/PD_PACKAGE_NAME = "([^"]+)"/)[1];
+  const source = join(repo, ".pd-pack", `${name}-${cliVersion}.tgz`);
+  const guide = join(tmp, "website");
+  const manifest = JSON.parse(await readFile(join(guide, "package.json"), "utf8"));
+  manifest.patternDump = {
+    patterns: "src/patterns", styles: { dir: "src/styles", documentBase: ["base"] },
+    themes: { dir: "themes", default: "system", switch: "attribute" }, scripts: "src/scripts", assets: ["assets"],
+  };
+  await writeFile(join(guide, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
+  const siteDir = join(tmp, "site");
+  const inited = spawnSync("npx", ["--yes", `--package=${source}`, "pd", "init", "site", "--site", "./website", "--yes", "--no-git", "--pd-source", source],
+    { cwd: tmp, encoding: "utf8" });
+  const initLog = `${inited.stdout}${inited.stderr}`;
+  check(inited.status === 0, "pd init --site + npm install", initLog.slice(-800));
+  // The folder name "website" is generic, so the style guide's package is scoped by the folder it is in.
+  check(initLog.includes(`✓ every page renders with ${manifest.name}`), "pd init --site checks the pages with the style guide", initLog.slice(-800));
+  const sitePkg = JSON.parse(await readFile(join(siteDir, "package.json"), "utf8").catch(() => "{}"));
+  check(sitePkg.devDependencies?.[manifest.name] === "file:../website" && /^\d+\.\d+\.\d+$/.test(sitePkg.devDependencies?.pagefind ?? ""),
+    "the site depends on the style guide's folder, and on Pagefind pinned exactly", JSON.stringify(sitePkg.devDependencies));
+  check(["src", "themes", "assets", ".github"].every(d => !existsSync(join(siteDir, d))), "the site holds no components, themes, assets or workflow of its own");
+  const built = spawnSync("npm", ["run", "build"], { cwd: siteDir, encoding: "utf8" });
+  check(built.status === 0, "npm run build on the site", `${built.stdout}${built.stderr}`.slice(-800));
+  check(built.stdout.includes("workbench: not built (build.workbench: false)") && !existsSync(join(siteDir, "dist")),
+    "the site's build writes no workbench", built.stdout.slice(-800));
+  check(built.stdout.includes("classes: every class on the site's pages is the style guide's"),
+    "the site's pages carry only the style guide's classes", built.stdout.split("\n").filter(l => /class/.test(l)).join("\n").slice(-800));
+  const home = await readFile(join(siteDir, "site", "index.html"), "utf8").catch(() => "");
+  check(home.includes(`<header class="site-header">`) && home.includes("<title>Home · "),
+    "the site's home page renders through the style guide's skin", home.slice(0, 400));
+  check(existsSync(join(siteDir, "site", "_pd", "search", "pagefind.js")), "the site's build writes its search index");
 }
 
 // A packed pattern package, installed as a real copy (as from a registry) into a second project outside

@@ -162,6 +162,7 @@ Defaults for `pd build`; the command line overrides each. See [static-build.md](
 | `build.outDir` | string | `outDir`, then `dist` | Output folder, relative to the root. Emptied before each build |
 | `build.basePath` | string | `/` | Where the site will be hosted, such as `/docs/` |
 | `build.audit` | boolean | `true` | Include the corpus audit and the Audit tab |
+| `build.workbench` | boolean | `true` | `false` writes the storefront only: for a site whose components come from a style guide package that publishes its own workbench, at `storefront.workbenchUrl`. `outDir` and the base path are then not used, and there must be a storefront |
 
 ### storefront
 

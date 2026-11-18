@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @pattern-dump/cli — the `pd` binary. Parsing is pure (./args.ts); this file only runs the result.
-import { runDev, runAudit, runBuild, runExport } from "@pattern-dump/core";
+import { checkSitePages, runDev, runAudit, runBuild, runExport } from "@pattern-dump/core";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -28,7 +28,7 @@ switch (command.kind) {
       interactive: rl !== null,
       localBuild: detectLocalBuild(import.meta.url, PD_PACKAGE_NAME, PD_VERSION),
       async ask(question, fallback) {
-        const answer = (await rl!.question(`${question} (${fallback}): `)).trim();
+        const answer = (await rl!.question(fallback ? `${question} (${fallback}): ` : `${question}: `)).trim();
         return answer || fallback;
       },
       async confirm(question, fallback) {
@@ -36,6 +36,7 @@ switch (command.kind) {
         return answer === "" ? fallback : answer.startsWith("y");
       },
       log: message => console.log(message),
+      checkSite: root => checkSitePages(root),
       run: (cmd, args, cwd) => new Promise(resolve => {
         const quiet = cmd === "git" && args[0] === "rev-parse";
         const child = spawn(cmd, args, { cwd, stdio: quiet ? "ignore" : "inherit", shell: process.platform === "win32" });

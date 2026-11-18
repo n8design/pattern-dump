@@ -162,9 +162,11 @@ export interface PatternDumpConfig {
    * subpath) and defaults to "/". `audit: false` leaves the corpus audit out — it is not run, and the
    * static site has no Audit tab. All three can be overridden on the command line. `skipChecks` names checks the
    * build leaves out (SKIPPABLE_CHECKS), for a quick local build: none by default, and the build report names each
-   * one skipped. `--skip-checks` on the command line replaces it.
+   * one skipped. `--skip-checks` on the command line replaces it. `workbench: false` writes the storefront only:
+   * for a site whose components come from a style guide package that publishes its own workbench, at
+   * `storefront.workbenchUrl` (default: true). `outDir` and `basePath` are then not used.
    */
-  build?: { outDir?: string; basePath?: string; audit?: boolean; skipChecks?: SkippableCheck[] };
+  build?: { outDir?: string; basePath?: string; audit?: boolean; skipChecks?: SkippableCheck[]; workbench?: boolean };
   /** How responsive image variants are encoded (WebP). Defaults: quality 75, effort 4. A site can override
    *  either in `storefront.images`. */
   images?: ImageSettings;

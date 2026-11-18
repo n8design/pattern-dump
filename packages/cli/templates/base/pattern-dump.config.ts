@@ -13,7 +13,7 @@ export default defineConfig({
 
   themes: {
     dir: "./themes",
-    default: "light",
+    default: "__PD_THEME_DEFAULT__",
     switch: "attribute",
     // Custom properties sampled for the swatch strip in the theme picker.
     swatch: { slots: ["--color-surface", "--color-primary", "--color-text"] },
