@@ -1,7 +1,7 @@
 // Definition lists (markdown-it-deflist, installed in createMarkdown): `term` then `: definition` renders as plain
 // <dl>/<dt>/<dd> in every markdown Pattern Dump renders, the workbench's docs, a site page's body and a placed
 // component's markdown content, with raw HTML escaped and links checked as everywhere else. A component placed with a
-// pd- tag inside a definition is placed.
+// pd- tag inside a definition is placed. The teaser never takes a definition, tight or loose.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { request } from "node:http";
@@ -11,6 +11,7 @@ import { defineConfig } from "@pattern-dump/config";
 import { PD_HOSTS } from "@pattern-dump/contracts";
 import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import { renderDoc } from "../src/markdown.js";
+import { firstParagraph } from "../src/storefront/teaser.js";
 import { save } from "../../../test-support/save.js";
 
 const TIGHT = "outDir\n: A string. The only required top-level key.\n: The folder `pd build` writes the workbench to.\n\n"
@@ -43,6 +44,14 @@ describe("definition lists in markdown", () => {
 
   it("a term is no heading: it gets no anchor on a page", async () => {
     expect(await site("## Keys\n\noutDir\n: A string.\n")).toBe(`<h2 id="keys">Keys</h2>\n<dl>\n<dt>outDir</dt>\n<dd>A string.</dd>\n</dl>\n`);
+  });
+});
+
+describe("the teaser", () => {
+  it("never takes a definition, tight or loose: the first paragraph after the list", () => {
+    expect(firstParagraph(`${TIGHT}\nThe keys a project sets.\n`)).toBe("The keys a project sets.");
+    expect(firstParagraph(`${LOOSE}\nThe keys a project sets.\n`)).toBe("The keys a project sets.");
+    expect(firstParagraph(TIGHT)).toBeNull();
   });
 });
 
