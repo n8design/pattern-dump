@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 (2026-11-18)
 
-Fixes where Pattern Dump did less than its guide said: metadata is read from the frontmatter block only, variants
-with data alone get their own docs and schema and can be placed on a page, a private folder stays out of galleries,
-and a `pd build` that stops leaves its output folders as they were. The guide now describes what `pd audit` and
-`pd build` check.
+Diagrams that follow the site's colours: symbol images, drawn once with colour tokens, shown on site pages in light
+and dark, and written as standalone files for a README. A component's icon sets now reach site pages, and are found in
+a pattern package's assets too. Markdown gains definition lists. Plus the fixes where Pattern Dump did less than its
+guide said: metadata is read from the frontmatter block only, variants with data alone get their own docs and schema
+and can be placed on a page, a private folder stays out of galleries, and a `pd build` that stops leaves its output
+folders as they were.
 
 ### Upgrading from 0.6.0
 
@@ -20,21 +22,22 @@ and a `pd build` that stops leaves its output folders as they were. The guide no
   note. It now takes each key it leaves unset from `note~warning.json` where that differs from `note.json`
   (`tone: warning`); a page that placed a data variant and relied on its look being the base's sets those keys on
   the tag.
+- **An asset folder's `symbols/` folder now holds symbol images.** Every SVG directly in it is a symbol: it is checked
+  (colours only as `var(--color-…)` and `currentColor`), and `pd build` writes it as `/_pd/symbols/<name>.svg`, with
+  the values of the tokens it uses read from the document base layer. A project that keeps other SVG files in a
+  folder of that name moves them, or the build stops on their colours. A markdown image whose address is a `#name`
+  (`![Alt](#name)`), which showed a broken image, is now that symbol on a site page, and a page problem when there is
+  none; in component docs it shows an error.
+- **A component's symbol sets reach site pages,** and are looked up in every asset folder, yours first. A site page
+  whose components need a set (`requireAssets`) that no asset folder has used to show blank icons; it now fails, and
+  so does `pd build`, naming the component and the set. A preview of a pattern package's component now finds the
+  package's own sets.
+- **A line that starts with `:` or `~` and a space, right after a line of text, starts a definition list:** the line
+  before it becomes the term. Such a line was part of a paragraph before. Check pages and docs that start a line that
+  way.
 
 ### Added
 
-- **A data variant with no base template is reported.** A `chip~danger.json` with no `chip.hbs` beside it (or
-  beside a base made of own-markup variants alone) has no markup to overlay. It is still left out, but `pd dev` now
-  names it in the terminal and on the Console, as it does a handle collision:
-  `Data variant left out: …/chip~danger.json needs …/chip.hbs to overlay, and there is none`.
-  Two additive contract changes carry it: `DiscoveryResult.orphanVariants` (`OrphanVariantEntry`) and the HMR
-  message `orphan-variant` (`OrphanVariantMessage`). `PD_PROTOCOL_VERSION` stays 1.
-- **Definition lists in markdown.** A term on its own line, then each definition on a line starting with `:`, renders
-  as plain `<dl>`, `<dt>` and `<dd>`, in site pages, placed components' markdown content and component docs (the
-  syntax of `markdown-it-deflist`, now a dependency at exactly 4.0.0). A listing's teaser never comes from a
-  definition list.
-- **A data variant can have its own docs and schema**, `chip~danger.md` and `chip~danger.schema.json`, as an
-  own-markup variant could. Without its own `.md` a variant still shows the base's docs.
 - **Symbol images.** One SVG per symbol in an asset folder's `symbols/` folder, shown on a site page with
   `![Alt](#name)` (or `![Alt](#name "Caption")` for a figure). The page inlines each symbol it shows once, in a hidden
   sprite, so a diagram follows the site's colour tokens and its light and dark modes. Colours in a symbol are only
@@ -47,6 +50,18 @@ and a `pd build` that stops leaves its output folders as they were. The guide no
   the new `assets.symbols.currentColor` names. An additive contract change carries the address:
   `PD_ROUTE_PREFIX.symbols`.
 - The `pd init --storefront` skin keeps a symbol image inside its column (`.site .doc-image`).
+- **Definition lists in markdown.** A term on its own line, then each definition on a line starting with `:`, renders
+  as plain `<dl>`, `<dt>` and `<dd>`, in site pages, placed components' markdown content and component docs (the
+  syntax of `markdown-it-deflist`, now a dependency at exactly 4.0.0). A listing's teaser never comes from a
+  definition list.
+- **A data variant with no base template is reported.** A `chip~danger.json` with no `chip.hbs` beside it (or
+  beside a base made of own-markup variants alone) has no markup to overlay. It is still left out, but `pd dev` now
+  names it in the terminal and on the Console, as it does a handle collision:
+  `Data variant left out: …/chip~danger.json needs …/chip.hbs to overlay, and there is none`.
+  Two additive contract changes carry it: `DiscoveryResult.orphanVariants` (`OrphanVariantEntry`) and the HMR
+  message `orphan-variant` (`OrphanVariantMessage`). `PD_PROTOCOL_VERSION` stays 1.
+- **A data variant can have its own docs and schema**, `chip~danger.md` and `chip~danger.schema.json`, as an
+  own-markup variant could. Without its own `.md` a variant still shows the base's docs.
 
 ### Changed
 

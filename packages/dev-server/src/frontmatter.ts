@@ -2,7 +2,7 @@
 // a storefront page.
 //
 // It is the only reader of that metadata: a body line that happens to start with `title:` is text, not
-// a key (per-key regexes over the whole file read it as metadata until 0.6.1). It looks only inside the
+// a key (per-key regexes over the whole file read it as metadata until 0.7.0). It looks only inside the
 // leading block and understands the two list spellings authors actually write, and one level of keys under a key (`related:` with `  limit: 5` indented under it). It
 // is deliberately not YAML: scalars stay strings, no deeper nesting, no anchors. One key reads a block deeper:
 // `childDefaults:` on a folder's index.md holds frontmatter for the pages under it, written as a page writes it
