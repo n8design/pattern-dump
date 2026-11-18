@@ -1145,6 +1145,19 @@ Point a README at the hosted file by its full address:
 ![How a page is built from its layout](https://example.com/_pd/symbols/flow.svg)
 ```
 
+### Symbol sets of components
+
+A component that needs a symbol set (`requireAssets: [icons]` in its frontmatter, see the authoring guide) brings it
+to every site page that shows it: the page's layout and what it includes, a component placed with a `pd-` tag, and a
+listing's or a query's view. The page holds each set once, right after its symbol images, hidden by its size, as a
+preview holds it.
+
+- A set that no asset folder has is a problem that names the component and the set: the page fails, and so does
+  `pd build`. (A preview leaves a missing set out without a word.)
+- Two sets that declare the same id, or a set that declares an id one of the page's symbol images has (`img-…`), are
+  a problem too: a `<use>` of that id could draw either.
+- A heading whose anchor would be a set's id gets the next free one, with a note.
+
 ### The image checks
 
 Every `<img>` on an assembled page, whether from the page, a component it places, its layout or a partial, is

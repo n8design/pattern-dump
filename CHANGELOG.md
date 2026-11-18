@@ -46,6 +46,12 @@ and a `pd build` that stops leaves its output folders as they were. The guide no
 
 ### Changed
 
+- **A component's symbol sets reach site pages.** A component that needs a set (`requireAssets`) left its icons
+  blank on a site page: only its previews inlined the set. A page now holds each set its layout and the components
+  it shows need, once, right after its symbol images, hidden by its size. A set no asset folder has fails the page,
+  naming the component; so does an id two sets declare, or one a symbol image has.
+- **A symbol set is found in every asset folder,** yours before packages', the first that has it winning; only the
+  first folder was read, so a pattern package's sets were never found, in a preview or on a page.
 - **`pd build` replaces its output folders only once every check has passed.** The workbench and the storefront are
   each written into a hidden folder beside their output (`.<folder>.pd-build-<process>`) and put in place at the
   end, so a build that stops leaves both as they were. Leftovers of a build that was killed are removed when the
