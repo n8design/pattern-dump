@@ -12,7 +12,7 @@ import type {
   DiscoveryMap, FolderOverview, FolderOverviewItem, LayoutMode, TreeNode,
 } from "@pattern-dump/contracts";
 import { stripOrderPrefixes } from "@pattern-dump/discovery";
-import { FULL_CATEGORIES } from "./layout-mode.js";
+import { FULL_CATEGORIES, previewModeOf } from "./layout-mode.js";
 import { buildSubtree } from "./component-tree.js";
 import { renderDoc } from "./markdown.js";
 
@@ -30,8 +30,7 @@ export async function buildFolderOverview(
   try {
     const rawIndex = await readFolderFile(patternsDir, join(folderPath, "index.md"));
     if (rawIndex === null) throw new Error("no index.md");
-    const m = rawIndex.match(/^preview:\s*(centered|full)$/m);
-    if (m) folderLayout = m[1] as LayoutMode;
+    folderLayout = previewModeOf(rawIndex) ?? folderLayout;
     const stripped = rawIndex.replace(/^---[\s\S]*?---\n?/, "").trim();
     if (stripped) {
       doc = await renderDoc(

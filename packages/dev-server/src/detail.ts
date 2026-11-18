@@ -24,12 +24,13 @@ import { resolveLayoutMode } from "./layout-mode.js";
 import { renderDoc } from "./markdown.js";
 import { deriveClassBorrowingFields } from "./css-closure.js";
 import { aggregateRequires } from "./requires.js";
+import { frontmatterString, readFrontmatter } from "./frontmatter.js";
 import type { CompositionRegistry } from "./composition.js";
 import type { ScssModuleGraph, ClassOwnerIndex, BaseProvenanceIndex } from "./style-index.js";
 
 /** A component's title as the Inspector shows it: its .md `title:`, else `name` (the last segment of its id). */
 export function titleFromMd(rawMd: string, name: string): string {
-  return rawMd.match(/^title:\s*(.+)$/m)?.[1]?.trim() ?? name;
+  return frontmatterString(readFrontmatter(rawMd), "title") ?? name;
 }
 
 /**
@@ -73,16 +74,12 @@ export async function buildComponentDetail(
   if (entry?.mdPath) {
     try {
       rawMd = await readFile(entry.mdPath, "utf-8");
-      const d = rawMd.match(/^description:\s*(.+)$/m);
-      const s = rawMd.match(/^status:\s*(.+)$/m);
-      const u = rawMd.match(/^deprecated-use:\s*(.+)$/m);
-      title = titleFromMd(rawMd, name);
-      if (d) description = d[1].trim();
-      if (s) {
-        const sv = s[1].trim();
-        if (sv === "stable" || sv === "deprecated" || sv === "draft") status = sv;
-      }
-      if (u) deprecatedUse = u[1].trim();
+      const fm = readFrontmatter(rawMd);
+      title = frontmatterString(fm, "title") ?? name;
+      description = frontmatterString(fm, "description") ?? "";
+      const sv = frontmatterString(fm, "status");
+      if (sv === "stable" || sv === "deprecated" || sv === "draft") status = sv;
+      deprecatedUse = frontmatterString(fm, "deprecated-use");
     } catch { /* no .md */ }
   }
 
