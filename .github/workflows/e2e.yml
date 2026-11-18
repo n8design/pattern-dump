@@ -197,7 +197,9 @@ jobs:
         run: npx playwright install chromium
 
       - name: Install the load generator
-        run: sudo apt-get install -y --no-install-recommends stress-ng
+        # The runner image's package lists can be older than the mirrors: install from fresh ones, or a dependency's
+        # old version is a 404 (2026-11-18, libegl-mesa0).
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends stress-ng
 
       - name: Repeat the group's specs
         env:
