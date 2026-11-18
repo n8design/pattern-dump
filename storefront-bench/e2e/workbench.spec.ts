@@ -19,7 +19,7 @@ test.describe("the skin in the workbench", () => {
     await page.goto(`${WORKBENCH}/layouts/page`);
     await page.waitForSelector("#preview-frame[srcdoc]");
     const hrefs = await page.locator(".sidebar-tree a.tree-link").evaluateAll(as => as.map(a => a.getAttribute("href")));
-    expect(hrefs.sort()).toEqual(["/components/callout", "/components/card", "/components/compact-card", "/components/slide", "/components/slider", "/components/toc", "/layouts/article", "/layouts/categories", "/layouts/category", "/layouts/doc", "/layouts/home", "/layouts/listing", "/layouts/page", "/layouts/tag", "/layouts/tags", "/partials/base", "/partials/footer", "/partials/head", "/partials/header", "/partials/nav", "/views/compact"]);
+    expect(hrefs.sort()).toEqual(["/components/callout", "/components/card", "/components/compact-card", "/components/icon-label", "/components/slide", "/components/slider", "/components/toc", "/layouts/article", "/layouts/categories", "/layouts/category", "/layouts/doc", "/layouts/home", "/layouts/listing", "/layouts/page", "/layouts/tag", "/layouts/tags", "/partials/base", "/partials/footer", "/partials/head", "/partials/header", "/partials/nav", "/views/compact"]);
   });
 
   test("documents partials/head, whose preview shows nothing: its markup all belongs in a head", async ({ page }) => {

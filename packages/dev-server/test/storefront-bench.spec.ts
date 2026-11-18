@@ -73,8 +73,9 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
   ["components/compact-card", "Compact card", "One page in the compact view, its title as a link and its date.", "centered",
     ["A harbour of cable cars", "2026-11-01"]],
 ];
-/** The components the guides page places with values (pd- tags): a slider and its slides. */
-const PLACED = ["components/slide", "components/slider"];
+/** The components pages place with values (pd- tags): the guides page's slider and its slides, the about page's icon
+ *  label (the bench's symbol set). */
+const PLACED = ["components/icon-label", "components/slide", "components/slider"];
 
 describe("storefront bench in the workbench", () => {
   it("lists the skin's layouts and partials, the embedded component and the placed ones, and nothing else", async () => {

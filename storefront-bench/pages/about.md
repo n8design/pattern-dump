@@ -15,6 +15,8 @@ toc: true
 
 The bench is where the storefront is tried out: a few pages, a skin, and a component to show.
 
+<pd-components-icon-label label="Checked by the bench"></pd-components-icon-label>
+
 ![Blocks of colour, each with one rounded corner, stacked like the parts of a page](/assets/images/bench-blocks.svg)
 
 ## The skin
