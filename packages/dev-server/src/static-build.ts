@@ -231,6 +231,7 @@ async function buildOnce(
   // passed: a build that stops leaves both outputs as they were.
   const wbStage = staged(outDir);
   const sfStage = storefront ? staged(storefront.outDir) : undefined;
+  for (const output of outputs) await clearLeftovers(output);
   const startStamps = await stampInputs(inputs, [...outputs, wbStage, ...(sfStage ? [sfStage] : [])]);
   watch.changed = async () => changedInputs(startStamps, await stampInputs(inputs, [...outputs, wbStage, ...(sfStage ? [sfStage] : [])]), project);
   /** Stops the build when an input changed since it started; `written` says what is on disk by then. */
@@ -646,9 +647,17 @@ async function buildOnce(
 
     if (storefront) await assertUnchanged("nothing was written");
 
-    // Every check has passed: each part takes its output's place.
+    // Every check has passed: each part takes its output's place. The workbench first: when the storefront then can't,
+    // the two are out of step, and the build says so.
     if (buildWorkbench) await putInPlace(wbStage, outDir);
-    if (storefront && sfStage) await putInPlace(sfStage, storefront.outDir);
+    if (storefront && sfStage) {
+      await putInPlace(sfStage, storefront.outDir).catch((e: unknown) => {
+        if (!buildWorkbench) throw e;
+        throw new Error(`pd build: the workbench in ${outDir} is this build's, but the storefront could not take its place in `
+          + `${storefront.outDir}: the two are out of step. The storefront in it is the earlier one; run pd build again.\n`
+          + `  ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+      });
+    }
 
     // ---- 8. The image cache keeps what this build used: the variants written to either root ----
     const used = new Set<string>();
@@ -676,12 +685,13 @@ async function buildOnce(
 }
 
 /** The folder a build writes an output into before it takes the output's place: beside it, so on the same
- *  filesystem, and hidden. */
+ *  filesystem, and hidden. Named with the build's process, so a later build can tell a killed one's leftovers. */
 function staged(output: string): string {
   return join(dirname(output), `.${basename(output)}.pd-build-${process.pid}`);
 }
 
-/** Put a finished folder in an output's place: the earlier output is moved aside, then removed. */
+/** Put a finished folder in an output's place: the earlier output is moved aside, then removed. When the finished
+ *  one can't take its place, the earlier one is put back, so the output is never missing. */
 async function putInPlace(stage: string, output: string): Promise<void> {
   const aside = `${stage}.earlier`;
   await rm(aside, { recursive: true, force: true });
@@ -689,8 +699,33 @@ async function putInPlace(stage: string, output: string): Promise<void> {
     if (e.code === "ENOENT") return false;
     throw e;
   });
-  await rename(stage, output);
+  try {
+    await rename(stage, output);
+  } catch (e) {
+    if (had) await rename(aside, output).catch(() => {});
+    throw e;
+  }
   if (had) await rm(aside, { recursive: true, force: true });
+}
+
+/** True while a process with this id runs (one of another user's counts: it can't be signalled, but it exists). */
+function running(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; }
+}
+
+/** Remove what killed builds left beside an output: every `.<out>.pd-build-<pid>` folder whose process no longer
+ *  runs. An earlier output such a build had moved aside (`….earlier`) and not replaced is put back first. */
+async function clearLeftovers(output: string): Promise<void> {
+  const dir = dirname(output);
+  const prefix = `.${basename(output)}.pd-build-`;
+  const names = await readdir(dir).catch(() => [] as string[]);
+  for (const name of names.filter(n => n.startsWith(prefix)).sort().reverse()) {
+    const m = /^(\d+)(\.earlier)?$/.exec(name.slice(prefix.length));
+    if (!m || running(Number(m[1]))) continue;
+    const path = join(dir, name);
+    if (m[2] && !(await stat(output).then(() => true, () => false))) await rename(path, output);
+    else await rm(path, { recursive: true, force: true });
+  }
 }
 
 /** The project's own style sources (SCSS and CSS) under `stylesDir`, each by its path from the project's root. */
