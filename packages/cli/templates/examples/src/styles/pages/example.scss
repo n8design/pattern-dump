@@ -1,6 +1,6 @@
 @use "../base/tokens";
 
-.page-header {
+.example-page-header {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -10,11 +10,11 @@
   border-bottom: 1px solid var(--color-border, #6b7280);
 }
 
-.page-title {
+.example-page-title {
   margin: 0;
 }
 
-.page-content {
+.example-page-content {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -22,7 +22,7 @@
   padding: tokens.$space-lg;
 }
 
-.page-content p {
+.example-page-content p {
   flex-basis: 100%;
   margin: 0;
 }

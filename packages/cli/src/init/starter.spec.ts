@@ -309,6 +309,31 @@ describe("the starter project with a website (--storefront, no examples)", () =>
 
 // The README's "Try breaking it" step, done as it says on a running server: the page then shows the
 // problem with its place in the file, and comes back by itself once the value is saved back.
+describe("the starter project with the examples and a website (what --storefront -y writes)", () => {
+  let both = "";
+  beforeAll(async () => { both = await scaffold(true, true); }, 60_000);
+  afterAll(async () => { if (both) await rm(both, { recursive: true, force: true }); });
+
+  it("no page borrows a class from the examples, and no component a style", async () => {
+    const config = await loadConfig(both);
+    const notes: string[] = [];
+    const server = await startDevServer(config, both, { port: 0, wsPort: 0, onStorefrontNote: n => { notes.push(n); } });
+    try {
+      const pages = JSON.parse((await onHost(server.port, "live.localhost", PD_ROUTES.pages)).body) as { pages: { route: string }[] };
+      expect(pages.pages.length).toBeGreaterThan(3);
+      for (const { route } of pages.pages) expect((await onHost(server.port, "live.localhost", route)).status, route).toBe(200);
+      expect(notes.filter(n => n.includes("uses class"))).toEqual([]);
+      const tree = await (await fetch(`http://127.0.0.1:${server.port}${PD_ROUTES.tree}`)).json() as ComponentTree;
+      for (const c of components(tree.roots)) {
+        const detail = await (await fetch(`http://127.0.0.1:${server.port}${componentUrl(c.path)}`)).json() as ComponentDetailResponse;
+        expect(detail.diagnostics.filter(d => d.kind === "STYLE_BORROWED"), c.path).toEqual([]);
+      }
+    } finally {
+      await server.close();
+    }
+  }, 120_000);
+});
+
 describe("the website starter's README step: break a pd- tag, then fix it", () => {
   it("shows the problem on the page with file, line and column, then the note again", async () => {
     const readme = await readFile(join(cliDir, "templates", "storefront-fills", "readme.md"), "utf8");
