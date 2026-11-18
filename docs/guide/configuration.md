@@ -79,7 +79,8 @@ both must be the same ([pattern-packages.md](pattern-packages.md#making-a-packag
 ### documentBase
 
 `string[]`, relative to `styles.dir`. Turns on the shared base layer, which is linked into every
-preview beneath the component styles. Without it, no base layer is linked.
+preview beneath the component styles. Without it, no base layer is linked, unless a pattern package used with its
+styles names a `styles.documentBase` of its own, which turns the layer on too.
 
 - **Listed files and folders always go into the base layer**, even a file that would otherwise belong
   to a component. List `00-base` for resets and `:root` defaults, a component's file when its rules
@@ -103,7 +104,7 @@ documentBase: ["00-base", "03-organisms/hero"],
 | `themes.dir` | string | Optional. Folder of your own `<name>.theme.scss` files. Leave it out to use only the themes your pattern packages provide |
 | `themes.default` | string | The theme previews start with: one of yours or a package's. `pd dev` warns when it matches no theme |
 | `themes.switch` | `"attribute"` (default) or `"stylesheet"` | How themes switch; see [themes.md](themes.md#switching) |
-| `themes.swatch.slots` | string[] | Custom properties shown as colour swatches in the theme picker. Default: `["--bodyBackground", "--themePrimary", "--accent"]` |
+| `themes.swatch.slots` | string[] | Custom properties shown as colour swatches for your own themes in the theme picker (a package's themes show the default ones). Default: `["--bodyBackground", "--themePrimary", "--accent"]` |
 
 ### assets
 
@@ -155,11 +156,12 @@ How the storefront's images are encoded as WebP variants ([Storefront: Images](s
 
 ### build
 
-Defaults for `pd build`; the command line overrides each. See [static-build.md](static-build.md).
+Defaults for `pd build`; the command line overrides each, except `build.workbench`, which has no flag. See
+[static-build.md](static-build.md).
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `build.outDir` | string | `outDir`, then `dist` | Output folder, relative to the root. Emptied before each build |
+| `build.outDir` | string | `outDir`, then `dist` | Output folder, relative to the root. Replaced as a whole once a build has passed every check; a build that stops leaves it as it was |
 | `build.basePath` | string | `/` | Where the site will be hosted, such as `/docs/` |
 | `build.audit` | boolean | `true` | Include the corpus audit and the Audit tab |
 | `build.workbench` | boolean | `true` | `false` writes the storefront only: for a site whose components come from a style guide package that publishes its own workbench, at `storefront.workbenchUrl`. `outDir` and the base path are then not used, and there must be a storefront |
@@ -178,7 +180,7 @@ in [storefront.md](storefront.md).
 | `storefront.pagesDir` | string | required | Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/` |
 | `storefront.outDir` | string | required | Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench snapshot |
 | `storefront.host` | string | `live.localhost` | The host name `pd dev` serves the storefront on. A bare name, with no scheme, port or path |
-| `storefront.workbenchUrl` | string | (none) | Where the built workbench will be hosted: an absolute http(s) URL with no query or fragment, such as `https://workbench.example.com/`, or a path such as `/workbench/` for a workbench on the storefront's own host (see [storefront.md](storefront.md#building)). A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
+| `storefront.workbenchUrl` | string | (none; `pd build` of a project with a storefront needs it, with `build.workbench: false` too) | Where the built workbench will be hosted: an absolute http(s) URL with no query or fragment, such as `https://workbench.example.com/`, or a path such as `/workbench/` for a workbench on the storefront's own host (see [storefront.md](storefront.md#building)). A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
 | `storefront.head` | string | (none) | A Handlebars file of the site's, such as `./head.hbs`, rendered with `site` into every page's head after the skin's `partials/head` ([storefront.md](storefront.md#skins)) |
 | `storefront.url` | string | (none) | The site's address, such as `https://example.com/`: an absolute http(s) URL with no query or fragment (loaded with one trailing slash). It may have a path, such as `https://example.github.io/project/`: the site is then published under it, in `pd dev` too ([storefront.md](storefront.md#publishing-under-a-path)). With it, pages get canonical URLs, Open Graph and JSON-LD, and `pd build` writes `sitemap.xml`; without it, those are left out ([storefront.md](storefront.md#search-engines-and-link-previews)) |
 | `storefront.lang` | string | `en` | The language of every page, for `<html lang>`: a language tag such as `de-AT` |

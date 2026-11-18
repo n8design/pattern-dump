@@ -6,8 +6,9 @@ anywhere ([configuration.md](configuration.md)).
 
 ## Components
 
-**Every `.hbs` file under the patterns folder is a component**, wherever it lives. Folders only group
-components; they never change a component's identity.
+**Every `.hbs` file in a folder under the patterns folder is a component**, however deep it lives. Folders only
+group components; they never change a component's identity. A file directly in the patterns folder, with no folder
+of its own, is not read, and neither is a file or folder whose name starts with a dot.
 
 | File | Component id | Handle |
 |---|---|---|
@@ -22,7 +23,8 @@ components; they never change a component's identity.
   route, but not in the handle, as in PatternLab.
 - The **handle** is the first folder plus the component name. It is how templates include each other.
 - Two components with the same handle **collide**: the first by sorted path keeps the handle, the other
-  is left out of the tree and shows a `HANDLE_COLLISION` diagnostic naming both files. Rename or move one.
+  is left out of the tree. Its Diagnostics tab shows `HANDLE_COLLISION`, naming the handle and the component that
+  keeps it; the terminal and the Console name both files. Rename or move one.
 
 Files belonging to a component sit next to its template and share its name:
 
@@ -62,10 +64,13 @@ A variant is a sibling file named `<name>~<variant>`:
 - **`button~icon.hbs`:** its own markup. It still gets the base's data, and can have its own
   `button~icon.json` on top.
 
-A component can consist of variants alone, with no `button.hbs`. The workbench then shows the variants,
-each selectable, and a gallery of all of them.
+A component can consist of variants with their own markup alone (`button~icon.hbs`), with no `button.hbs`. The
+workbench then shows the variants, each selectable, and a gallery of all of them. A data overlay needs a base
+template to overlay: a `button~secondary.json` with no `button.hbs` beside it has no markup, so it is left out, and
+`pd dev` names it in the terminal and on the Console.
 
-A variant with no `.md` of its own shows the base component's documentation.
+A variant can have its own `.md` and `.schema.json` (`button~secondary.md`); a variant with no `.md` of its own shows
+the base component's documentation.
 
 ## Data
 
@@ -76,8 +81,9 @@ A component renders with data merged in this order, later winning:
 3. The variant's `<name>~<variant>.json`
 
 Objects merge deeply; anything else (strings, numbers, arrays) is replaced. When one component includes
-another, arguments passed to the include (`{{> atoms-button label="Save" }}`) apply inside that
-include.
+another, the included one gets its own data with the including context merged over it, and the arguments passed to
+the include (`{{> atoms-button label="Save" }}`) over that. So a field of the parent's with the same name as one of
+the child's wins inside the include even when it isn't passed.
 
 ### Schema
 
@@ -108,7 +114,9 @@ is a warning (`HELPER_SHADOW`), both on the component's **Diagnostics** tab.
 
 ## Docs and metadata: `<name>.md`
 
-The Markdown body is shown in the Inspector's **Docs** tab. The frontmatter at the top holds metadata:
+The Markdown body is shown in the Inspector's **Docs** tab. The frontmatter block at the top (between the two `---`
+lines) holds metadata. Only that block is read: a line such as `title: x` in the body, or in a file without the
+block, is text.
 
 ```md
 ---
@@ -129,11 +137,14 @@ Triggers an action. `variant` picks the emphasis.
 | `visibility` | `public` (default), `private` | Private components are hidden from the tree until **Show private** is on, and left out of folder galleries |
 | `order` | number | Position among its siblings, see [Order](#order) |
 | `preview` | `centered`, `full` | How the Stage frames the preview, see [Preview layout](#preview-layout) |
-| `requireScript` | script id | Loads a behaviour script, see [Behaviour scripts](#behaviour-scripts) |
-| `requireAssets` | asset id | Inlines an SVG symbol set, see [Assets](#assets) |
+| `requireScript` | script id, or a list (`[toggle, menu]`) | Loads behaviour scripts, see [Behaviour scripts](#behaviour-scripts) |
+| `requireAssets` | asset id, or a list | Inlines SVG symbol sets, see [Assets](#assets) |
 
-Raw HTML in Markdown is escaped, and only `http(s)`, `mailto`, `tel`, relative and `pattern:` links are
-allowed.
+A value may be quoted (`title: "Button, primary"`); the quotes are not part of it.
+
+Raw HTML in Markdown is escaped, and only `http(s)`, `mailto`, `tel`, `pattern:` and relative links are allowed. A
+relative link starts with `.`, `#` or `/` (`./guide/`, `#usage`, `/atoms/button/`); `[x](sibling.md)` is not a link
+and stays text.
 
 ### Live examples and source in docs
 
@@ -324,9 +335,11 @@ Files in the assets folder are served at `/assets/`, with the path mirroring the
 `assets/images/logo.svg` is `/assets/images/logo.svg`. Use that path in templates and CSS. With several
 asset folders, each is served under its folder name (`/assets/images/…`, `/assets/fonts/…`).
 
-A reference that starts with an asset folder's name also works, as PatternLab projects write it:
-`/images/logo.svg` and `../../images/logo.svg` are rewritten to `/assets/images/logo.svg`, in templates
-and in `url()` in your styles and themes. Stylesheets listed in `assets.css` are served as they are.
+A reference that starts with an asset folder's own name also works, as PatternLab projects write it: with an asset
+folder named `images` (`assets.dir: ["./images"]`), `/images/logo.svg` and `../../images/logo.svg` are rewritten to
+`/assets/images/logo.svg`, in templates and in `url()` in your styles and themes. A folder inside an asset folder
+(`assets/images/`) is not rewritten that way: write `/assets/images/logo.svg`. Stylesheets listed in `assets.css` are
+served as they are.
 
 A path to a file that doesn't exist returns 404, so a broken image, font or `url()` shows up as a failed
 request in the browser's network panel.

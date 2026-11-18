@@ -55,8 +55,8 @@ themes: {
 ```
 
 - **`default`** is the theme a preview starts with, and the one baked into a static build.
-- **`swatch.slots`** lists the properties shown as small colour swatches next to each theme in the
-  picker.
+- **`swatch.slots`** lists the properties shown as small colour swatches next to each of your own themes (those in
+  `themes.dir`) in the picker. A pattern package's themes show `--bodyBackground`, `--themePrimary` and `--accent`.
 
 ## Switching
 
@@ -75,7 +75,9 @@ When pattern packages are used and any of them needs `stylesheet`, it applies to
 
 ## Swatch values from JSON
 
-The picker normally reads swatch colours from the compiled theme CSS. A theme can instead provide them in
+The picker normally reads swatch colours from the compiled theme CSS, from its `[data-theme="<name>"]` rule. A theme
+written on a bare `:root` (as `switch: "stylesheet"` allows) has no such rule, so its swatches stay empty unless it
+provides them. A theme can provide them in
 a sidecar file, `<name>.theme.json`, next to its `.theme.scss`, keyed by property name without the
 leading `--`:
 

@@ -168,7 +168,7 @@ The full set of conventions is in [authoring.md](authoring.md).
 npm run audit
 ```
 
-`pd audit` renders every component and variant and reports defects: render errors, schema mismatches,
+`pd audit` renders every component with its own data and reports defects: render errors, schema mismatches,
 HTML validation and structural accessibility checks. The same results appear in the workbench's
 **Audit** tab. See [cli.md](cli.md#pd-audit) for the report formats.
 

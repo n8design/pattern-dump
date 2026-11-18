@@ -6,7 +6,7 @@ how they relate, and publishes the result as a static site.
 
 **Demo:** a style guide and the website built from it, at https://lab.n8d.studio/pattern-dump-demo/
 
-> **{{version}}.** Pattern Dump is at 0.x, so breaking changes are possible between minor versions (0.3 to 0.4);
+> **{{version}}.** Pattern Dump is at 0.x, so breaking changes are possible between minor versions (0.5 to 0.6);
 > the [changelog]({{repo}}/blob/main/CHANGELOG.md) names them.
 
 **Coming from Pattern Lab?** Point `patternsDir` at your patterns folder: Handlebars templates, `.json` data and
@@ -58,7 +58,7 @@ and `npx pd build`, which always use the version the project depends on.
 | `pd audit` | Report defects across every component (`--format md`, `text` or `json`) |
 | `pd build` | Write the workbench as a static site for any host |
 | `pd export` | Rewrite near-duplicate component copies as one base with variants |
-| `pd help [command]` | Show options |
+| `pd help` | Show every command and option |
 
 ## Configuration
 

@@ -49,7 +49,7 @@ The command line wins.
 
 | Command line | Config | Default | What it does |
 |---|---|---|---|
-| `--out <dir>` | `build.outDir` | `outDir`, then `dist` | Output folder, relative to the project root. **Emptied before each build.** |
+| `--out <dir>` | `build.outDir` | `outDir`, then `dist` | Output folder, relative to the project root. **Replaced as a whole once the build has passed every check**; a build that stops leaves it as it was. |
 | `--base <path>` | `build.basePath` | `/` | Where the site will be hosted: `/` at a domain root, or a subpath such as `/docs/htwoo/` |
 | `--no-audit` / `--audit` | `build.audit` | `true` | Include the corpus audit |
 | `--check-workers <n>` | (none) | cores less one, at most 8 | Threads that check the storefront's pages for accessibility |
@@ -78,8 +78,9 @@ build made for one base path does not work under another. Rebuild when the addre
 
 A project with a storefront whose workbench is on the storefront's own host (`storefront.workbenchUrl` a
 path such as `/workbench/`, [storefront.md](storefront.md#building)) must build the workbench for that
-path; another base path is an error. The build's note about copying the workbench's `robots.txt` rule then
-doesn't appear: the storefront's own `robots.txt` carries it.
+path; another base path is an error. When the storefront itself is at its host's root, the build's note about
+copying the workbench's `robots.txt` rule then doesn't appear: the storefront's own `robots.txt` carries it. With
+the storefront under a path, the note still appears, since that `robots.txt` isn't at the host's root.
 
 ### Leaving the audit out
 
@@ -204,8 +205,9 @@ When the build finishes it prints a summary:
 [pd build]   not built: 500 /source/atoms/loading/shimmer-theming-support/rendered: Render error: …
 ```
 
-**"not built"** lines list components that fail to render. They are findings about the design
-system, not build errors. The build still succeeds, and the static site shows those components the
+**"not built"** lines list what the build could not write as it is: mostly components that fail to render, and
+also any other address that didn't answer, an asset folder hidden by another of the same name, and a workbench
+route it left out. They are findings about the design system, not build errors. The build still succeeds, and the static site shows those components the
 same way `pd dev` does. Fix the template and rebuild.
 
 ---
@@ -233,7 +235,8 @@ workbench snapshot is written exactly as it would be without one. Deploy each fo
 
 The storefront is served at `storefront.url`: the root of its host, or a path under it, which the second line
 names ([storefront.md](storefront.md#publishing-under-a-path)). Unlike a component that fails to render in the
-workbench, a problem on a storefront page fails the build, and then neither folder is written.
+workbench, a problem on a storefront page fails the build, and then neither folder is written: each is replaced
+only once every check has passed, so a build that stops leaves both as they were.
 
 **"note"** lines are about pages that were built as they are: nothing is left out for them. A heading's
 anchor that the layout already uses as an id (`## Main` against `<main id="main">`) gets the next free

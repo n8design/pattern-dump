@@ -27,8 +27,8 @@ how they relate, and publishes the result as a static site.
   and a corpus-wide audit (`pd audit`) with machine-readable output for CI.
 - **Static publishing.** `pd build` writes the whole workbench as plain files for any static host.
 - **Pattern packages.** Use a design system from npm next to your own components.
-- **Your conventions.** Components are found wherever their templates live; Pattern Lab-style `~`
-  variants and existing Handlebars helpers work.
+- **Your conventions.** Components are found wherever their templates live in the patterns folder's
+  folders; Pattern Lab-style `~` variants and existing Handlebars helpers work.
 
 ## Requirements
 
