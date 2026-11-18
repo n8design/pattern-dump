@@ -146,6 +146,10 @@ Raw HTML in Markdown is escaped, and only `http(s)`, `mailto`, `tel`, `pattern:`
 relative link starts with `.`, `#` or `/` (`./guide/`, `#usage`, `/atoms/button/`); `[x](sibling.md)` is not a link
 and stays text.
 
+Besides the usual Markdown, docs can hold definition lists: a term on its own line, then each definition on a line
+starting with `:` and a space. They render as plain `<dl>`, `<dt>` and `<dd>`; the storefront guide shows the syntax
+and the HTML in full.
+
 ### Live examples and source in docs
 
 Fenced blocks with these languages are replaced when the docs render. Name the component on the fence

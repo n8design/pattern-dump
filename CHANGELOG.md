@@ -29,6 +29,10 @@ and a `pd build` that stops leaves its output folders as they were. The guide no
   `Data variant left out: …/chip~danger.json needs …/chip.hbs to overlay, and there is none`.
   Two additive contract changes carry it: `DiscoveryResult.orphanVariants` (`OrphanVariantEntry`) and the HMR
   message `orphan-variant` (`OrphanVariantMessage`). `PD_PROTOCOL_VERSION` stays 1.
+- **Definition lists in markdown.** A term on its own line, then each definition on a line starting with `:`, renders
+  as plain `<dl>`, `<dt>` and `<dd>`, in site pages, placed components' markdown content and component docs (the
+  syntax of `markdown-it-deflist`, now a dependency at exactly 4.0.0). A listing's teaser never comes from a
+  definition list.
 - **A data variant can have its own docs and schema**, `chip~danger.md` and `chip~danger.schema.json`, as an
   own-markup variant could. Without its own `.md` a variant still shows the base's docs.
 - **Symbol images.** One SVG per symbol in an asset folder's `symbols/` folder, shown on a site page with
