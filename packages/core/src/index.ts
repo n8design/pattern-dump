@@ -2,7 +2,8 @@
 // Orchestration: load config, start dev server, run the diagnostics audit.
 import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite } from "@pattern-dump/dev-server";
 import type { DevServerOptions, AuditFormat } from "@pattern-dump/dev-server";
-import type { DiagnosticsGraph } from "@pattern-dump/contracts";
+import { PD_HOSTS, PD_ROUTES, type DiagnosticsGraph, type StorefrontPagesResponse } from "@pattern-dump/contracts";
+import { request as httpRequest } from "node:http";
 import { build as esbuild } from "esbuild";
 import { existsSync } from "node:fs";
 import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
@@ -22,6 +23,51 @@ export async function runDev(
   const file = configFileOf(root, configPath);
   await startDevServer(config, root, { ...opts, configPath: file, reloadConfig: () => loadConfig(root, configPath) });
   // dev-server runs indefinitely; do not close unless signalled.
+}
+
+/**
+ * Whether a website's pages render: the project's dev server, started without live reload, is asked for every page
+ * the site has, as a browser asks for them. `pd init --site` runs it once the style guide is installed, so a
+ * package without a skin (layouts/page, partials/base) or without a `patternDump` field is named before the first
+ * `npm run dev`. Resolves to the problems, one line each; none when every page answers 200. What the server prints
+ * while it runs is kept, and returned with a problem.
+ */
+export async function checkSitePages(root: string): Promise<string[]> {
+  const printed: string[] = [];
+  const keep = { log: console.log, error: console.error, warn: console.warn };
+  const capture = (...args: unknown[]): void => { printed.push(args.map(String).join(" ")); };
+  console.log = capture; console.error = capture; console.warn = capture;
+  try {
+    const config = await loadConfig(root);
+    if (!config.storefront) return ["the project has no storefront: there are no pages to check"];
+    const host = config.storefront.host ?? PD_HOSTS.storefront;
+    const server = await startDevServer(config, root, { port: 0, wsPort: 0, live: false });
+    try {
+      const get = (path: string) => new Promise<{ status: number; body: string }>((ok, fail) => {
+        httpRequest({ host: "127.0.0.1", port: server.port, path, headers: { host: `${host}:${server.port}` } }, res => {
+          let body = "";
+          res.setEncoding("utf8");
+          res.on("data", d => { body += d; });
+          res.on("end", () => ok({ status: res.statusCode ?? 0, body }));
+        }).on("error", fail).end();
+      });
+      const list = await get(PD_ROUTES.pages);
+      if (list.status !== 200) return [`the site's page list answered ${list.status}`];
+      const problems: string[] = [];
+      for (const page of (JSON.parse(list.body) as StorefrontPagesResponse).pages) {
+        const res = await get(page.route);
+        if (res.status !== 200) problems.push(`${page.route} (layout "${page.layout}") does not render: ${res.status}`);
+      }
+      // What the server printed about them: each page's problems, with file and line.
+      return problems.length ? [...problems, ...printed.filter(l => l.startsWith("[storefront]") || l.startsWith("  - "))] : [];
+    } finally {
+      await server.close();
+    }
+  } catch (e) {
+    return [e instanceof Error ? e.message : String(e)];
+  } finally {
+    Object.assign(console, keep);
+  }
 }
 
 /**
