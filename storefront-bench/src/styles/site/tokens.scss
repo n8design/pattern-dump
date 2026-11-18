@@ -3,4 +3,10 @@
 :root {
   --wf-font: system-ui, sans-serif;
   --wf-measure: 60rem;
+
+  // The colours of the bench's symbol images (src/assets/symbols/). No color-scheme here: the wireframe stays light,
+  // so light-dark() gives the light value unless a page asks for dark.
+  --color-text: light-dark(#1b1b1f, #eceef2);
+  --color-line: light-dark(#4b5563, #b4bac4);
+  --color-fill: light-dark(#0b5cad, #7ab8ff);
 }

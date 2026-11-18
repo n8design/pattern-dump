@@ -1,6 +1,7 @@
 // A storefront page, assembled from the bench's own skin with the real renderer: what reaches the page,
 // what never does (the layouts' sample data), and every way a page fails, each fatal and listed escaped.
 // The <head>'s stylesheet links are the caller's (stubbed here; served pages are checked over HTTP).
+import { createSymbolService, type SymbolService } from "../src/symbol-service.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,6 +31,8 @@ let render: Render;
 let assets = "";
 /** The bench's own images, indexed as the server indexes them, for the pages' prose images. */
 let images: ImageService;
+/** The bench's symbol images, as the server indexes them. */
+let symbols: SymbolService;
 
 beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "pd-page-"));
@@ -45,6 +48,7 @@ beforeAll(async () => {
   images = createImageService({ assetRoots: [join(bench, "src", "assets")], assetRootNames: ["assets"],
     images: { quality: 75, effort: 4 }, build: false, warn: () => {} });
   await images.ready("bench");
+  symbols = createSymbolService({ assetRoots: [join(bench, "src", "assets")], live: false, shown: p => p });
 });
 afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
@@ -53,6 +57,7 @@ const assembly = (over: Partial<PageAssembly> = {}): PageAssembly => ({
   head: async (layoutId) => `<link rel="stylesheet" href="/_pd/head-for/${layoutId}">`,
   image: path => checkPageImage(path, [assets], ["assets"]),
   images: async () => images.lookup,
+  symbols: () => symbols.index(),
   ...over,
 });
 

@@ -26,6 +26,10 @@ Each markdown file in `pages/` is a page. A folder's `index.md` is the folder's 
 
 ![Colourful cable cars hanging from their cables against a clear sky](/assets/images/cable-cars.jpg)
 
+![A filled box points to an outlined box](#flow)
+
+![Two layers, the lower one fading out](#layers "Two layers, drawn from the bench's tokens")
+
 ## Layouts
 
 A page picks its layout in its frontmatter; the [callout](pattern:components/callout) shows how a live
