@@ -15,6 +15,8 @@
 // a cache, and it is why two concurrent clients interfere with each other.
 
 import type { SymbolService } from "./symbol-service.js";
+import { standaloneSvg } from "./symbols.js";
+import { baseTokens } from "./css-tokens.js";
 import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
@@ -404,6 +406,22 @@ async function routeRequest(
     // --- Responsive image variants (image-route.ts) ---
     if (pathname.startsWith(PD_ROUTE_PREFIX.images)) {
       return await serveImageVariant(pathname, (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase(), res, cfg);
+    }
+
+    // --- A symbol image's standalone file (symbols.ts): the base layer's token values written in ---
+    if (pathname.startsWith(PD_ROUTE_PREFIX.symbols) && ctx.symbols) {
+      const stem = /^([A-Za-z0-9][A-Za-z0-9_-]*)\.svg$/.exec(pathname.slice(PD_ROUTE_PREFIX.symbols.length))?.[1];
+      const entry = stem === undefined ? undefined : (await ctx.symbols.index()).entries.get(stem);
+      if (!entry) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end("Symbol not found"); return; }
+      const file = entry.ok ? standaloneSvg(entry.source, baseTokens(state.baseCss), cfg.symbolsCurrentColor) : { problems: entry.problem.problems };
+      if (!("svg" in file)) {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end(`${PD_ROUTE_PREFIX.symbols}${stem}.svg: ${file.problems.join("; ")}`);
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "image/svg+xml; charset=utf-8" });
+      res.end(file.svg);
+      return;
     }
 
     // --- Project asset serving (/assets/*) ---

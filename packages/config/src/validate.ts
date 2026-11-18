@@ -10,7 +10,7 @@ type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "host" | "plain-object" | "hbs-file"
+  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "plain-object" | "hbs-file"
   | "quality" | "effort" | "categories" | "tags" | "term-pages" | "skip-checks";
 type Shape = Readonly<Record<string, Rule>>;
 
@@ -44,6 +44,7 @@ const SHAPE: Shape = {
       strategy: { values: ["central"], unsupported: ["component-relative"] },
       dir: "string-or-strings",
       css: "strings",
+      symbols: { keys: { currentColor: "color-token" } },
     },
   },
   scriptsDir: "string",
@@ -204,6 +205,11 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     if (typeof value !== "string" || !/\.hbs$/.test(value) || /^(?:\/|[a-zA-Z]:)/.test(value)) {
       fail(`a Handlebars file relative to the project's root, such as "./head.hbs"`);
     }
+    return;
+  }
+  if (rule === "color-token") {
+    // A colour token of the document base layer; that the base layer declares it is checked when a symbol uses it.
+    if (typeof value !== "string" || !/^--color-[A-Za-z0-9_-]+$/.test(value)) fail(`a colour token's name, such as "--color-text"`);
     return;
   }
   if (rule === "asset-path") {

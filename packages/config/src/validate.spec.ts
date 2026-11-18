@@ -204,6 +204,14 @@ describe("configProblems — storefront", () => {
     }
   });
 
+  it("takes a colour token's name for assets.symbols.currentColor", () => {
+    const symbols = (currentColor: unknown) => configProblems({ ...valid, assets: { symbols: { currentColor } } });
+    for (const ok of ["--color-text", "--color-on_dark-2"]) expect(symbols(ok), ok).toEqual([]);
+    const message = `"assets.symbols.currentColor" must be a colour token's name, such as "--color-text"`;
+    for (const bad of ["color-text", "--text", "var(--color-text)", "#000", "", 7]) expect(symbols(bad), String(bad)).toEqual([message]);
+    expect(configProblems({ ...valid, assets: { symbols: { currentColour: "--color-text" } } })[0]).toMatch(/currentColour.*currentColor/);
+  });
+
   it("takes true or false for index", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, index: false })).toEqual([]);

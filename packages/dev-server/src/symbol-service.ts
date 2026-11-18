@@ -6,7 +6,7 @@
 import { createSymbolIndexer, type SymbolIndex } from "./symbols.js";
 
 export interface SymbolReport {
-  /** Every symbol, by stem, in name order. */
+  /** Every symbol that can be used, by stem, in name order. */
   stems: string[];
   /** A source that can't be used, one line each: the build fails on these. */
   problems: string[];
@@ -27,9 +27,10 @@ export function createSymbolService(o: {
   const indexer = createSymbolIndexer();
   const said = new Set<string>();
   const lines = (index: SymbolIndex): SymbolReport => {
-    const stems = [...index.entries.keys()].sort();
+    const all = [...index.entries.keys()].sort();
+    const stems = all.filter(stem => index.entries.get(stem)!.ok);
     const problems: string[] = [], warnings: string[] = [];
-    for (const stem of stems) {
+    for (const stem of all) {
       const e = index.entries.get(stem)!;
       if (!e.ok) problems.push(`${o.shown(e.problem.file)}: ${e.problem.problems.join("; ")}`);
       else if (e.source.warning) warnings.push(`${o.shown(e.source.file)}: ${e.source.warning}`);
