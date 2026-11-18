@@ -17,6 +17,8 @@ export interface Templates {
   storefront: TemplateFile[];
   /** With the website, when it follows the viewer's light or dark setting: the `system` theme, the skin's colours. */
   storefrontSystem: TemplateFile[];
+  /** A content-only website on an existing style guide package (`pd init --site`): pages, config, workflow. */
+  site: TemplateFile[];
   /** What the base templates' storefront placeholders become with a storefront; never files of their own. */
   storefrontFills: { config: string; readme: string; gitignore: string };
 }
@@ -34,8 +36,19 @@ export interface InitAnswers {
   search: boolean;
   /** With the website: the default theme `system` (`color-scheme: light dark`), and the skin's pages follow it. */
   systemTheme: boolean;
-  /** Dependency spec for the PD package: `^0.1.0`, `file:/abs/pattern-dump-0.1.0.tgz`, … */
+  /** Dependency spec for the PD package: `0.1.0`, `file:/abs/pattern-dump-0.1.0.tgz`, … */
   dependency: string;
+  /** `--site`: a content-only website on this style guide package, instead of a design system. */
+  site?: SiteAnswers;
+}
+
+export interface SiteAnswers {
+  /** The style guide's package name. */
+  name: string;
+  /** Its dependency spec: a range (`1.2.0`, `latest`) or `file:<path relative to the new project>`. */
+  spec: string;
+  /** Where the style guide's own workbench is published (storefront.workbenchUrl). */
+  workbenchUrl: string;
 }
 
 export interface ExistingProject {
@@ -47,6 +60,8 @@ export interface ExistingProject {
 
 export interface InitPlan {
   writes: TemplateFile[];
+  /** Folders the config names that have no template file of their own. */
+  dirs: string[];
   skipped: Array<{ path: string; reason: string }>;
   packageJson: { content: string; created: boolean; notes: string[] };
 }
@@ -102,6 +117,7 @@ export function planInit(
   if (existingConfig) {
     return { ok: false, reason: `${existingConfig} already exists: this folder is already a Pattern Dump project` };
   }
+  if (answers.site) return { ok: true, plan: planSite(templates, answers, answers.site, existing, packageName) };
 
   // A placeholder stands on a line of its own; without a storefront the line goes.
   const fills = templates.storefrontFills;
@@ -137,7 +153,44 @@ export function planInit(
     writes.push({ path, content: substitute(file.content) });
   }
 
-  return { ok: true, plan: { writes, skipped, packageJson: mergePackageJson(existing.packageJson, answers, packageName) } };
+  return { ok: true, plan: { writes, skipped, dirs: ["assets", "src/patterns"], packageJson: mergePackageJson(existing.packageJson, answers, packageName) } };
+}
+
+/** The README's publishing section for a site: its own workflow (a style guide from the registry), or a root build
+ *  that puts the style guide's workbench beside it (a style guide in a folder next to it). */
+const SITE_PUBLISH_README = {
+  workflow: "\n## Publish it\n\n`.github/workflows/pages.yml` builds the website and publishes it to GitHub Pages on every push to\n"
+    + "`main`: **Settings → Pages → Source:** \"GitHub Actions\". Set `storefront.url` to the site's address. The\n"
+    + "workflow installs with `npm ci`, so the style guide and `pattern-dump` must come from the npm registry.\n",
+  root: "\n## Publish it\n\nThe style guide is a folder next to this one, so the repository's root builds and publishes both: the\n"
+    + "website from this project's `npm run build`, the style guide's workbench into it at `storefront.workbenchUrl`.\n"
+    + "The [getting started guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/getting-started.md#a-content-only-website)\n"
+    + "has the root `package.json` and workflow.\n",
+};
+
+function planSite(templates: Templates, answers: InitAnswers, site: SiteAnswers, existing: ExistingProject, packageName: string): InitPlan {
+  const local = site.spec.startsWith("file:");
+  const substitute = (text: string): string => text
+    .replaceAll("__PD_SEARCH_NOTE__\n", answers.search ? SEARCH_NOTE.on : SEARCH_NOTE.off)
+    .replaceAll("__PD_SITE_PUBLISH_README__\n", local ? SITE_PUBLISH_README.root : SITE_PUBLISH_README.workflow)
+    .replaceAll("__PD_SITE_PACKAGE_JSON__", JSON.stringify(site.name))
+    .replaceAll("__PD_SITE_PACKAGE__", site.name)
+    .replaceAll("__PD_WORKBENCH_URL_JSON__", JSON.stringify(site.workbenchUrl))
+    .replaceAll("__PD_PACKAGE__", packageName)
+    .replaceAll("__PD_NAME__", answers.name)
+    .replaceAll("__PD_BRAND_JSON__", JSON.stringify(answers.brand));
+  const writes: TemplateFile[] = [];
+  const skipped: InitPlan["skipped"] = [];
+  // A style guide in a folder beside the site is published by the repository's root, which has the workflow.
+  for (const file of templates.site.filter(f => !(local && f.path.startsWith(".github/")))) {
+    const path = renamed(file.path);
+    if (existing.exists(path)) {
+      skipped.push({ path, reason: "already exists, left untouched" });
+      continue;
+    }
+    writes.push({ path, content: substitute(file.content) });
+  }
+  return { writes, skipped, dirs: [], packageJson: mergePackageJson(existing.packageJson, answers, packageName) };
 }
 
 /** The config's comment on search, as the project has Pagefind or not. */
@@ -182,8 +235,8 @@ function mergePackageJson(
     : structuredClone(current);
 
   const scripts = { ...(pkg.scripts as Record<string, string> | undefined) };
-  // The website is built with the workbench, by pd build.
-  const ours = answers.storefront ? { ...SCRIPTS, build: "pd build" } : SCRIPTS;
+  // The website is built with the workbench, by pd build; a content-only site has no scripts to type-check.
+  const ours = answers.site ? { dev: "pd dev", build: "pd build" } : answers.storefront ? { ...SCRIPTS, build: "pd build" } : SCRIPTS;
   for (const [name, command] of Object.entries(ours)) {
     if (scripts[name] === undefined) {
       scripts[name] = command;
@@ -205,14 +258,21 @@ function mergePackageJson(
   } else {
     devDeps[packageName] = answers.dependency;
   }
+  if (answers.site) {
+    const own = deps?.[answers.site.name] ?? devDeps[answers.site.name];
+    if (own === undefined) devDeps[answers.site.name] = answers.site.spec;
+    else if (own !== answers.site.spec) notes.push(`${answers.site.name} is already a dependency (${own}), left as is`);
+  }
   // The project's own TypeScript wins: its version may be pinned for a reason (another toolchain).
   const existingTs = deps?.typescript ?? devDeps.typescript;
-  if (existingTs === undefined) {
+  if (answers.site) {
+    // A content-only site has no scripts of its own: no TypeScript.
+  } else if (existingTs === undefined) {
     devDeps.typescript = TYPESCRIPT_RANGE;
   } else if (existingTs !== TYPESCRIPT_RANGE) {
     notes.push(`typescript is already a dependency (${existingTs}), left as is; the starter scripts expect ${TYPESCRIPT_RANGE}`);
   }
-  if (answers.search && answers.storefront) {
+  if (answers.search && (answers.storefront || answers.site)) {
     const existingPagefind = deps?.pagefind ?? devDeps.pagefind;
     if (existingPagefind === undefined) devDeps.pagefind = PAGEFIND_VERSION;
     else if (existingPagefind !== PAGEFIND_VERSION) notes.push(`pagefind is already a dependency (${existingPagefind}), left as is`);

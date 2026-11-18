@@ -27,6 +27,13 @@ const templates: Templates = {
     { path: "themes/system.theme.scss", content: '[data-theme="system"] { color-scheme: light dark; }\n' },
     { path: "src/styles/base/colors.scss", content: ":root { color-scheme: light dark; }\n" },
   ],
+  site: [
+    { path: "pattern-dump.config.ts", content: 'import { defineConfig } from "__PD_PACKAGE__";\npackages: [__PD_SITE_PACKAGE_JSON__],\nworkbenchUrl: __PD_WORKBENCH_URL_JSON__,\n__PD_SEARCH_NOTE__\nsite: { title: __PD_BRAND_JSON__ }\n' },
+    { path: "README.md", content: "# __PD_NAME__ on __PD_SITE_PACKAGE__\n__PD_SITE_PUBLISH_README__\n" },
+    { path: "pages/index.md", content: "---\ntitle: Home\n---\n" },
+    { path: "_gitignore", content: "node_modules\nsite\n" },
+    { path: ".github/workflows/pages.yml", content: "name: Pages\n" },
+  ],
   storefrontFills: { config: "storefront: { site: { title: __PD_BRAND_JSON__ } },\n", readme: "## The website\n", gitignore: "site\n_site\n" },
 };
 const answers: InitAnswers = { name: "my-ds", brand: "My DS", examples: true, storefront: false, search: false, systemTheme: false, dependency: "0.1.0" };
@@ -258,6 +265,45 @@ describe("planInit — search, install scripts, the system theme", () => {
   });
 });
 
+describe("planInit — a content-only site (--site)", () => {
+  const site = (spec: string, a: Partial<InitAnswers> = {}) =>
+    plan({ examples: false, search: true, ...a, site: { name: "@acme/styleguide", spec, workbenchUrl: "https://wb.example.com/" } });
+
+  it("writes the site's files only: config, pages, README, .gitignore, and a workflow for a style guide from the registry", () => {
+    const p = site("1.2.0");
+    expect(p.writes.map(w => w.path)).toEqual(["pattern-dump.config.ts", "README.md", "pages/index.md", ".gitignore", ".github/workflows/pages.yml"]);
+    expect(p.dirs).toEqual([]);
+    expect(content(p, "pattern-dump.config.ts")).toBe('import { defineConfig } from "pattern-dump";\npackages: ["@acme/styleguide"],\n'
+      + 'workbenchUrl: "https://wb.example.com/",\n    // Search: pd build indexes every page with Pagefind (a devDependency of this site); components/search is the\n'
+      + '    // search field. search: true makes a build without Pagefind stop, false turns it off.\nsite: { title: "My DS" }\n');
+    expect(content(p, "README.md")).toMatch(/^# my-ds on @acme\/styleguide\n\n## Publish it\n\n`\.github\/workflows\/pages\.yml` builds the website/);
+  });
+
+  it("a style guide in a folder: no workflow (the repository's root publishes both), and the README says so", () => {
+    const p = site("file:../styleguide");
+    expect(p.writes.map(w => w.path)).not.toContain(".github/workflows/pages.yml");
+    expect(content(p, "README.md")).toContain("The style guide is a folder next to this one, so the repository's root builds and publishes both");
+  });
+
+  it("package.json: dev and build, Pattern Dump, the style guide and Pagefind pinned, no TypeScript", () => {
+    expect(JSON.parse(site("file:../styleguide").packageJson.content)).toEqual({
+      name: "my-ds", version: "0.1.0", private: true, type: "module",
+      scripts: { dev: "pd dev", build: "pd build" },
+      devDependencies: { "pattern-dump": "0.1.0", "@acme/styleguide": "file:../styleguide", pagefind: PAGEFIND_VERSION },
+      allowScripts: { esbuild: true, "@parcel/watcher": true },
+    });
+    expect(JSON.parse(site("1.2.0", { search: false }).packageJson.content).devDependencies).toEqual({ "pattern-dump": "0.1.0", "@acme/styleguide": "1.2.0" });
+  });
+
+  it("keeps a project's own dependency on the style guide, and says so", () => {
+    const r = planInit(templates, { ...answers, site: { name: "@acme/styleguide", spec: "2.0.0", workbenchUrl: "/workbench/" } },
+      { packageJson: { name: "x", devDependencies: { "@acme/styleguide": "^1.0.0" } }, exists: () => false }, "pattern-dump");
+    if (!r.ok) throw new Error(r.reason);
+    expect(JSON.parse(r.plan.packageJson.content).devDependencies["@acme/styleguide"]).toBe("^1.0.0");
+    expect(r.plan.packageJson.notes).toContain("@acme/styleguide is already a dependency (^1.0.0), left as is");
+  });
+});
+
 describe("defaultName", () => {
   it("a generic folder name is scoped by its parent, which also titles it", () => {
     expect(defaultName("styleguide", "acme-web")).toEqual({ name: "@acme-web/styleguide", brand: "acme-web" });
@@ -274,6 +320,19 @@ describe("defaultName", () => {
 
 describe("planInit — the shipped templates", () => {
   const shipped = readTemplates(fileURLToPath(new URL("../../templates", import.meta.url)));
+  for (const spec of ["1.2.0", "file:../styleguide"]) {
+    for (const search of [false, true]) {
+      it(`leaves no placeholder in a site's files (${spec}, search ${search})`, async () => {
+        const r = planInit(await shipped, { ...answers, search, site: { name: "@acme/styleguide", spec, workbenchUrl: "/workbench/" } }, empty, "pattern-dump");
+        if (!r.ok) throw new Error(r.reason);
+        for (const w of r.plan.writes) expect(w.content, w.path).not.toMatch(/__PD_[A-Z_]+__/);
+        const config = r.plan.writes.find(w => w.path === "pattern-dump.config.ts")!.content;
+        expect(config).toContain(`packages: ["@acme/styleguide"]`);
+        expect(config).toContain(`build: { workbench: false }`);
+        expect(r.plan.writes.some(w => w.path.startsWith("src/") || w.path.startsWith("themes/"))).toBe(false);
+      });
+    }
+  }
   for (const storefront of [false, true]) {
     for (const examples of [false, true]) {
       it(`leaves no placeholder in any file it writes (storefront ${storefront}, examples ${examples})`, async () => {

@@ -16,7 +16,8 @@ export type Command =
   | { kind: "export"; root: string; configPath?: string; out?: string }
   | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean; browser?: boolean; checkWorkers?: number; skipChecks?: string[] }
   | { kind: "init"; target: string; yes: boolean; name?: string; brand?: string; examples?: boolean;
-      storefront?: boolean; search?: boolean; systemTheme?: boolean; install?: boolean; git?: boolean; pdSource?: string }
+      storefront?: boolean; search?: boolean; systemTheme?: boolean; install?: boolean; git?: boolean; pdSource?: string;
+      site?: string; workbenchUrl?: string }
   | { kind: "help"; topic?: string }
   | { kind: "error"; message: string };
 
@@ -143,6 +144,8 @@ function parseInit(rest: string[], cwd: string): Command {
       install: { type: "boolean" }, "no-install": { type: "boolean" },
       git: { type: "boolean" }, "no-git": { type: "boolean" },
       "pd-source": { type: "string" },
+      site: { type: "string" },
+      "workbench-url": { type: "string" },
       yes: { type: "boolean", short: "y" },
       help: { type: "boolean", short: "h" },
     },
@@ -171,6 +174,8 @@ function parseInit(rest: string[], cwd: string): Command {
     ...(toggles.install !== undefined ? { install: toggles.install } : {}),
     ...(toggles.git !== undefined ? { git: toggles.git } : {}),
     ...(values["pd-source"] !== undefined ? { pdSource: values["pd-source"] } : {}),
+    ...(values.site !== undefined ? { site: values.site } : {}),
+    ...(values["workbench-url"] !== undefined ? { workbenchUrl: values["workbench-url"] } : {}),
   };
 }
 
@@ -194,6 +199,11 @@ export const USAGE = `Usage: pd <command> [options]
                        writes the site's search index)
     --no-system-theme  With a website: the light theme as the default, and pages in light colours
                        (default: a system theme that follows the viewer's light or dark setting)
+    --site <package>   A website on an existing style guide instead: its npm name (@acme/styleguide,
+                       or @acme/styleguide@1.2.0) or its folder (../styleguide). Writes pages, a config
+                       and a package.json only; the components, styles and skin come from the package
+    --workbench-url <url>  With --site: where the style guide's workbench is published, a full address
+                       or a path on the site's host (default: /workbench/)
     --no-install       Skip npm install
     --git / --no-git   Run git init (default: yes, unless already inside a repository)
     --pd-source <src>  Where to install Pattern Dump from: a .tgz file or an npm spec
