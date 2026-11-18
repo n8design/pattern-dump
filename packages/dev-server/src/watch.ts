@@ -1205,7 +1205,7 @@ async function rebuildAndSignalTree(label: string): Promise<void> {
   // slice cache so the next /api/audit re-seeds (still a hash-delta vs disk — only genuinely-changed
   // components re-audit). Not surgical, but adds/removes are rare and reshape the graph.
   state.audit.invalidate();
-  await surfaceCollisions(dr.collisions, cwd, hotreloader);
+  await surfaceCollisions(dr.collisions, cwd, hotreloader, dr.orphanVariants);
   // Re-derive the flattening artifact — the node set changed — from the new discovery's registry, which
   // the next request then reuses.
   await surfaceFlattening(dr.discoveryMap, await compositionFor(state, dr, patternDirs), cwd);

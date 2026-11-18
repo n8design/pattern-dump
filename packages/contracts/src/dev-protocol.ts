@@ -944,6 +944,7 @@ export function generationBehind(a: string | undefined | null, b: string | undef
  *  - error         : a render or build failure, surfaced on the Console.
  *  - tree-changed  : a component was added or removed → re-fetch the tree.
  *  - collision     : a handle collision quarantined a component → surfaced on the Console.
+ *  - orphan-variant: a data variant has no base template, so it was left out → surfaced on the Console.
  *  - page-changed  : a storefront page (or the nav) changed → storefront pages reload. The
  *                    workbench shell receives it too and ignores it.
  *
@@ -996,6 +997,14 @@ export interface CollisionMessage {
   quarantinedPath: string;
 }
 
+/** A data-overlay variant was left out at discovery time: it has no base template to overlay (OrphanVariantEntry).
+ *  Both paths are named, so the author can add the template or remove the data file. */
+export interface OrphanVariantMessage {
+  type: "orphan-variant";
+  variantPath: string;
+  basePath: string;
+}
+
 /** A storefront page changed. `route` names the page ("/guides/setup/"); null means a page was added
  *  or removed, so the nav — and with it every page — changed. */
 export interface PageChangedMessage {
@@ -1005,7 +1014,8 @@ export interface PageChangedMessage {
   generation?: string;
 }
 
-export type HmrMessage = HelloMessage | ContentSwapMessage | ErrorMessage | CssLinkSwapMessage | TreeChangedMessage | CollisionMessage | PageChangedMessage;
+export type HmrMessage = HelloMessage | ContentSwapMessage | ErrorMessage | CssLinkSwapMessage | TreeChangedMessage | CollisionMessage
+  | OrphanVariantMessage | PageChangedMessage;
 
 /** First frame on every connection. Lets the shell detect a protocol mismatch with the server. */
 export interface HelloMessage {

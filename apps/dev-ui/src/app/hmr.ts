@@ -237,6 +237,10 @@ export function connectHmr(): void {
         `Handle collision: "${msg.handle}" is held by ${msg.incumbentPath}; ${msg.quarantinedPath} is quarantined until one is renamed`,
         "error",
       );
+    } else if (msg.type === "orphan-variant") {
+      // Left out of the tree like a quarantined component, and for the same reason said here: otherwise the
+      // variant simply never appears.
+      renderConsole(`Data variant left out: ${msg.variantPath} needs ${msg.basePath} to overlay, and there is none`, "error");
     } else if (msg.type === "page-changed") {
       // Storefront pages reload on this; the workbench shows no storefront page, so it ignores it.
     } else {

@@ -16,7 +16,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import type { CollisionEntry, CollisionMessage, DiscoveryMap } from "@pattern-dump/contracts";
+import type { CollisionEntry, CollisionMessage, DiscoveryMap, OrphanVariantEntry, OrphanVariantMessage } from "@pattern-dump/contracts";
 import type { HotReloader } from "@pattern-dump/hotreloader";
 import { detectFlattening, renderFlatteningReport, type FlatteningInput } from "./flattening.js";
 import type { CompositionRegistry } from "./composition.js";
@@ -24,7 +24,8 @@ import { pdScratchDir } from "./scratch.js";
 import { shadowedAssetRoots, type StyleRoot } from "./server-config.js";
 import { missingDocumentBase } from "./style-index.js";
 
-/** Emit CollisionMessage events to the hotreloader and write CONFLICTS.generated.md.
+/** Emit CollisionMessage and OrphanVariantMessage events to the hotreloader and write CONFLICTS.generated.md
+ *  (collisions only: an orphan variant is no conflict, it is named in the terminal and on the Console).
  *  Called after every buildDiscoveryMap pass (startup + every tree-changed rebuild).
  *  The current set is also RETAINED, so a browser that connects later — including after a startup
  *  pass, when no browser is connected yet — still sees every live collision. A resolved collision
@@ -33,15 +34,21 @@ import { missingDocumentBase } from "./style-index.js";
 export async function surfaceCollisions(
   collisions: CollisionEntry[],
   cwd: string,
-  hotreloader: Pick<HotReloader, "push" | "retain">
+  hotreloader: Pick<HotReloader, "push" | "retain">,
+  orphanVariants: OrphanVariantEntry[] = [],
 ): Promise<void> {
   const messages: CollisionMessage[] = collisions.map(col => (
     { type: "collision", handle: col.handle, incumbentPath: col.incumbentPath, quarantinedPath: col.quarantinedPath }
   ));
-  hotreloader.retain(messages);
+  const orphans: OrphanVariantMessage[] = orphanVariants.map(o => ({ type: "orphan-variant", variantPath: o.variantPath, basePath: o.basePath }));
+  hotreloader.retain([...messages, ...orphans]);
   for (const [i, col] of collisions.entries()) {
     hotreloader.push(messages[i]);
     console.warn(`[dev-server] HANDLE_COLLISION: "${col.handle}" · incumbent: ${col.incumbentPath} · quarantined: ${col.quarantinedPath}`);
+  }
+  for (const o of orphans) {
+    hotreloader.push(o);
+    console.warn(`[dev-server] ${o.variantPath}: a data variant needs ${o.basePath} to overlay, and there is none, so it is left out`);
   }
   if (collisions.length > 0) console.warn(`[dev-server] collisions listed in ${join(pdScratchDir(cwd), "CONFLICTS.generated.md")}`);
   const md = collisions.length === 0

@@ -326,7 +326,7 @@ export async function startDevServer(
   {
     const dr = await buildDiscoveryMap(patternRoots);
     setDiscovery(state, dr);
-    await surfaceCollisions(dr.collisions, cwd, hotreloader);
+    await surfaceCollisions(dr.collisions, cwd, hotreloader, dr.orphanVariants);
     for (const o of dr.overrides) {
       console.log(`[dev-server] ${o.id} overrides ${o.shadowedSource}'s component of the same handle ("${o.handle}")`);
     }

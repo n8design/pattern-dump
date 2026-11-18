@@ -259,6 +259,15 @@ export interface CollisionEntry {
   quarantinedId: string;
 }
 
+/** A data-overlay variant (`chip~danger.json`) with no base template to overlay: no `chip.hbs`, or a base made of
+ *  own-markup variants alone. It has no markup, so it is left out of discovery, and reported. */
+export interface OrphanVariantEntry {
+  /** The variant's data file. */
+  variantPath: string;
+  /** The base template it needs, which does not exist. */
+  basePath: string;
+}
+
 /** Return value of buildDiscoveryMap. */
 export interface DiscoveryResult {
   discoveryMap: DiscoveryMap;
@@ -272,6 +281,8 @@ export interface DiscoveryResult {
    *  replaced a later source's component with the same handle. Not an error — it is how a project
    *  overrides a library component — so the shadowed one is neither quarantined nor a collision. */
   overrides: OverrideEntry[];
+  /** Data-overlay variants left out for want of a base template, by variantPath. Reported like collisions. */
+  orphanVariants: OrphanVariantEntry[];
 }
 
 export interface OverrideEntry {
