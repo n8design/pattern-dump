@@ -16,9 +16,10 @@ export function baseComponentIds(dr: DiscoveryResult): Set<string> {
   return ids;
 }
 
-/** What the corpus audit renders: every component and every variant (`base~v`), each an entry of its own. */
+/** What the corpus audit renders: every component and every variant (`base~v`), each an entry of its own, and every
+ *  component a handle collision quarantined (left out of the tree, so the audit is where it is reported). */
 export function auditedComponentIds(dr: DiscoveryResult): Set<string> {
-  return new Set(dr.discoveryMap.keys());
+  return new Set([...dr.discoveryMap.keys(), ...dr.quarantineMap.keys()]);
 }
 
 /** The schema a component is placed with: its own, else, for a variant, its base's. A data-overlay variant renders

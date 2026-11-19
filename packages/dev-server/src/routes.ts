@@ -464,7 +464,7 @@ async function routeRequest(
             if (verboseTiming) console.time("[dev-server:timing] diagnostics seed");
             const inputs = await auditInputs({
               discoveryMap, handleMap: discovery.handleMap, composition: await compositionFor(state, discovery, patternDirs), globalData,
-              helperPaths: cfg.helperPaths,
+              helperPaths: cfg.helperPaths, quarantine: discovery.quarantineMap,
             });
             const r = await refreshDiagnosticsGraph(cwd, auditedComponentIds(discovery), render, discovery.quarantineMap, inputs);
             await testHook()?.("audit-seed", "built", () => {});

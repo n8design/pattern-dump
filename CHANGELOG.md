@@ -49,6 +49,10 @@
   the Audit tab and a rule's count of components: a data overlay with its data, a variant with markup of its own
   from its template. Until now only each component's default render was audited. **Heads-up:** an audit that passed
   in 0.7.0 can fail in 0.8.0 on a variant's defect, in CI too; the report names the variant.
+- **`pd audit` reports a component a handle collision left out.** It is an entry with a `HANDLE_COLLISION` defect
+  (an error) naming the handle and the component that keeps it, in the report and the Audit tab; before, the audit
+  never mentioned it. The audit's scope lists a Discovery row. Like a variant's defect, it can fail an audit that
+  passed in 0.7.0.
 - **Code colours reach 4.5:1 contrast,** in the workbench and on site pages: in light mode, strings, keywords and
   tags, function and attribute names, CSS properties and values, parameters and Handlebars expressions are darker;
   in dark mode, comments are lighter. Each keeps its hue.

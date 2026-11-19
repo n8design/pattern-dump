@@ -1147,7 +1147,7 @@ on("change", async (filePath) => {
           const current = await currentDiscovery(state, patternRoots);
           const inputs = await auditInputs({
             discoveryMap: current.discoveryMap, handleMap: current.handleMap, composition: await compositionFor(state, current, patternDirs),
-            globalData: rendering.current.globalData, helperPaths: cfg.helperPaths,
+            globalData: rendering.current.globalData, helperPaths: cfg.helperPaths, quarantine: current.quarantineMap,
           });
           const stale: string[] = [];
           for (const [id, slice] of slices) {

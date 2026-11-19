@@ -59,6 +59,7 @@ export async function runDiagnosticsAudit(
   const registry = await buildCompositionRegistry(patternDirs, discovery.handleMap, discovery.discoveryMap);
   const inputs = await auditInputs({
     discoveryMap: discovery.discoveryMap, handleMap: discovery.handleMap, composition: registry, globalData, helperPaths: cfg.helperPaths,
+    quarantine: discovery.quarantineMap,
   });
   const { graph, reaudited, reused } = await refreshDiagnosticsGraph(cwd, auditedComponentIds(discovery), render, discovery.quarantineMap, inputs);
   // Headless one-shot also emits the flattening side artifact.

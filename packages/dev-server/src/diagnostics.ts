@@ -279,6 +279,8 @@ export interface AuditInputs {
   text(path: string): Promise<string>;
   /** Every template, data and schema file of the design system, digested once for this pass. */
   everything(): Promise<string>;
+  /** The components a handle collision quarantined: a quarantined one's verdict depends on who keeps the handle. */
+  readonly quarantine?: ReadonlyMap<string, CollisionEntry>;
 }
 
 /** Every file under `path` (a file, or a folder read through), sorted. */
@@ -293,6 +295,7 @@ async function filesUnder(path: string): Promise<string[]> {
 export async function auditInputs(o: {
   discoveryMap: DiscoveryMap; handleMap: ReadonlyMap<string, string>; composition: CompositionRegistry;
   globalData: Record<string, unknown> | undefined; helperPaths?: readonly string[];
+  quarantine?: ReadonlyMap<string, CollisionEntry>;
 }): Promise<AuditInputs> {
   const texts = new Map<string, Promise<string>>();
   const text = (path: string): Promise<string> => {
@@ -314,7 +317,7 @@ export async function auditInputs(o: {
   return {
     discoveryMap: o.discoveryMap, handleMap: o.handleMap, composition: o.composition,
     digest: createHash("sha1").update(globalDataDigest(o.globalData)).update(" ").update(helpers.digest("hex")).digest("hex"),
-    text, everything,
+    text, everything, ...(o.quarantine ? { quarantine: o.quarantine } : {}),
   };
 }
 
@@ -355,6 +358,10 @@ export async function componentContentHash(
   id: string, inputs: AuditInputs, checkCode: string = checkCodeDigest(), includes: readonly string[] = [],
 ): Promise<string> {
   const h = createHash("sha1").update(id);
+  // A quarantined component is reported, not rendered: its verdict is the collision, which names the handle and the
+  // component that keeps it.
+  const q = inputs.quarantine?.get(id);
+  if (q) h.update(" quarantined ").update(q.handle).update(" ").update(q.incumbentId);
   let open = false;
   for (const member of includeClosure(id, inputs.composition, includes)) {
     const entry = inputs.discoveryMap.get(member);
