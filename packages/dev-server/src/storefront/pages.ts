@@ -353,23 +353,28 @@ export async function readPages(pagesDir: string, opts: {
   const homeWeight = weightOf(home);
   const top = ordered("/", home ? [{ route: "/", segment: "index", ...(homeWeight !== undefined ? { weight: homeWeight } : {}) }] : []);
 
+  // nav: false leaves a page out (a folder's index.md: its entry, and so its children). Any other value is listed;
+  // one that is not true or false is the page's problem (frontmatter-contract.ts).
+  const listed = (f: PageFile): boolean => f.frontmatter.values["nav"] !== "false";
   const nav: StorefrontNavItem[] = [];
+  // The nav's two levels in their order, each page whether listed or not: the order of `pages`, so nav: false
+  // moves no page there (llms.txt follows it).
+  const inOrder: string[] = [];
   for (const item of top) {
     const page = files.get(item.route);
     if (!page) continue; // a folder without index.md: reported above, no entry to link to
-    const children = folders.has(item.route) && item.route !== "/"
-      ? ordered(item.route).flatMap(c => {
-        const p = files.get(c.route);
-        return p ? [entryOf(p)] : [];
-      })
+    const under = folders.has(item.route) && item.route !== "/"
+      ? ordered(item.route).flatMap(c => { const p = files.get(c.route); return p ? [p] : []; })
       : [];
+    inOrder.push(item.route, ...under.map(p => p.route));
+    if (!listed(page)) continue;
+    const children = under.filter(listed).map(entryOf);
     nav.push({ ...entryOf(page), ...(children.length ? { children } : {}) });
   }
 
-  // Every page: in nav order first, then the ones the nav does not reach, by path.
-  const inNav = nav.flatMap(n => [n.route, ...(n.children ?? []).map(c => c.route)]);
-  const rest = [...files.keys()].filter(r => !inNav.includes(r)).sort();
-  const routes = [...inNav, ...rest];
+  // Every page: in that order first, then the ones the nav's two levels do not reach, by path.
+  const rest = [...files.keys()].filter(r => !inOrder.includes(r)).sort();
+  const routes = [...inOrder, ...rest];
   const pages = routes.map(r => pageOf(files.get(r)!));
   // A page where the same-host workbench is published.
   const { workbenchPath } = opts;

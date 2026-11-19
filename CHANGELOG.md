@@ -2,6 +2,15 @@
 
 ## 0.8.0 (unreleased)
 
+### Added
+
+- **A page can stay out of the navigation:** `nav: false` in its frontmatter. The page is left out of `nav` (and of
+  its folder's `children`) and out of `prev` and `next`: its own are empty, and its neighbours link past it. It still
+  renders, is searchable, is in the sitemap and `llms.txt`, and is reached by its links, such as a credits or legal
+  page linked from the footer. On a folder's `index.md` it leaves out the folder's entry and the folder's pages; in a
+  folder's `childDefaults` it applies to the folder's pages. Any value other than `true` or `false` is a problem on
+  the page, `nav must be true or false`. A layout still gets `nav`, the navigation, as before.
+
 ### Fixed
 
 - **A placed variant no longer asks for a value its data already gives.** `<pd-components-note~warning>` without a

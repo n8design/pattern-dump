@@ -65,6 +65,10 @@ pages/
   Files starting with a dot are ignored.
 - **Adding a page is adding a file.** A top-level page, or a page one folder deep, appears in the navigation
   with no other change; a page deeper than that is reached by its links, since the navigation is one level deep.
+  A page that should be reachable but not listed, such as a credits or legal page linked from the footer, sets
+  `nav: false`: it is left out of the navigation and of `prev` and `next`, and is still a page like any other,
+  rendered, searchable, in the sitemap and `llms.txt`, and reached by its links. On a folder's `index.md` it
+  leaves out the folder's entry, and the folder's pages with it.
 
 `pagesDir` is not the same as a `pages` folder among the patterns, such as `src/patterns/pages/` in `pd init`'s
 starter components: that is the page level of atomic design, page-sized components shown in the workbench,
@@ -272,6 +276,7 @@ lede: Three folders make a site.
 | `layout` | The layout the page renders with: `layouts/<name>` in the skin. Without it, its folder's `childLayout`, else `page`. See [A folder's default layout](#a-folders-default-layout) |
 | `childLayout` | On a folder's `index.md` only: the layout of the pages under it that name none. See [A folder's default layout](#a-folders-default-layout) |
 | `order` | Its position in the navigation, see [Pages](#pages) |
+| `nav` | `false` leaves the page out of the navigation (`nav`, and its folder's `children`) and out of `prev` and `next`, its own and its neighbours'. It still renders, and stays searchable and in the sitemap and `llms.txt`. On a folder's `index.md`, the folder's entry and its pages are left out. `true`, the default, lists it. The layout's `nav`, the navigation itself, is filled as before. See [Pages](#pages) |
 | `image` | Its link-preview image: a raster file in the assets (PNG, JPEG, GIF or WebP), such as `/assets/images/setup.png`. An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `storefront.image` |
 | `index` | `false` keeps the page out of search engines: `noindex`, and no sitemap entry |
 | `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. See [Redirects](#redirects) |
@@ -287,7 +292,8 @@ lede: Three folders make a site.
 
 `layout`, `childLayout`, `order`, `image`, `index`, `redirectFrom`, `date`, `updated`, `tags`, `categories`, `draft`,
 `sort`, `view` and `toc` belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
-them (a layout shows them through `page.date`, `page.updated`, `page.tags` and `page.categories`).
+them (a layout shows them through `page.date`, `page.updated`, `page.tags` and `page.categories`). `nav: true` or
+`false` belongs to the build as well; the layout still gets `nav`, the navigation, and may declare it.
 
 **The layout's schema is the frontmatter contract.** A layout is a component, and its
 `<name>.schema.json` lists the keys a page using it may set (`properties`) and must set (`required`). A
@@ -364,7 +370,8 @@ options for its `related` query, without writing them.
 - `layout` in `childDefaults` is `childLayout` written the long way. Use one: both on one `index.md` is a problem.
 - **What can't be a default:** what names one page (`title`, `order`, `redirectFrom`, `date`, `updated`), what
   belongs to a folder's own `index.md` (`sort`, `view`, `childLayout`, `childDefaults`), and what the storefront
-  fills (`body`, `nav`, `site`, `page`). Each is a problem on the `index.md`, at its line.
+  fills (`body`, `site`, `page`). Each is a problem on the `index.md`, at its line. `nav: false` can be a default:
+  it leaves the folder's pages out of the navigation, and not the `index.md` itself.
 - **Checked as if the page had written it.** Each page is checked against the layout it ends up with, its folder's
   values included, so a default its layout doesn't declare is a problem on that page. A problem about a value a
   folder set names the page and where the value came from:
@@ -467,7 +474,7 @@ A layout receives:
 |---|---|
 | each declared key | The page's value, or `null` when the page does not set it |
 | `body` | The page's markdown, rendered. Include it unescaped, `{{{body}}}`: it is the only value safe to, because the markdown renderer escapes everything an author writes. Every other value is included escaped, `{{…}}`. A layout can name another key for it ([below](#a-page-or-template-as-a-layout)) |
-| `nav` | The navigation: `{ route, title, description?, current?, children? }` per entry, `current: true` on the page's own entry |
+| `nav` | The navigation: `{ route, title, description?, current?, children? }` per entry, `current: true` on the page's own entry. A page with `nav: false` in its frontmatter is not in it |
 | `site` | The values of `storefront.site` |
 | `page` | What the storefront derives for the page, when the layout declares it (below) |
 
@@ -542,7 +549,7 @@ keys below, at any depth.
 | `headings` | Every heading of the page's markdown, in order: `{ level, text, anchor }`. `anchor` is the heading's `id`, GitHub's slug of its text (`## Getting started` is `#getting-started`, a second one `#getting-started-1`). A heading whose anchor the layout already uses as an id (`## Main` against `<main id="main">`) gets the next free suffix, `main-1`, and a note says so |
 | `section` | The top-level nav entry the page falls under, `{ route, title }`; a top-level page is its own section |
 | `breadcrumbs` | Home, then each folder above the page by its `index.md`, as `{ route, title }`; empty on the home page. They reach pages the one-level nav does not list |
-| `prev`, `next` | The pages before and after this one in the nav, read entry by entry with each folder's pages after it, across sections; `null` at either end and for a page the nav does not list |
+| `prev`, `next` | The pages before and after this one in the nav, read entry by entry with each folder's pages after it, across sections; `null` at either end and for a page the nav does not list, such as one with `nav: false`. A page with `nav: false` is no one's `prev` or `next` |
 | `created` | The page's first commit, from git: the author date, ISO 8601. A renamed page keeps the date it was first added |
 | `updated` | The page's `updated`, `YYYY-MM-DD`, else `null`. Never git's last commit, see [Dates](#dates) |
 | `children` | On a folder's `index.md`: the folder's pages, an entry each, sorted as its `sort` says (see [Collections](#collections)); `[]` on any other page |

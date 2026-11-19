@@ -2,7 +2,8 @@
 //
 // Fourteen keys belong to the build, not to a layout: `layout` (which layout; when absent, the `childLayout` of the
 // nearest folder above the page whose index.md sets one, else `page`), `childLayout` (on a folder's index.md), `order`
-// (where in the nav), the page's search and link-preview keys — `redirectFrom` (old routes that forward
+// (where in the nav), `nav` (`false` leaves the page out of the nav; the layout's `nav`, the tree, is filled as
+// before), the page's search and link-preview keys — `redirectFrom` (old routes that forward
 // here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
 // image, a raster file in the assets; checked against the files in page-image.ts) — and its listing keys
 // (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` and `view` on a
@@ -50,6 +51,8 @@ export interface BuildKeys {
   index?: boolean;
   /** true: the table of contents in its region (toc.ts); false: none, whatever the layout says. */
   toc?: boolean;
+  /** false: the page is left out of the nav, and so has no prev or next and is no neighbour's (pages.ts). */
+  nav?: boolean;
   /** A /assets/… path. */
   image?: string;
   /** The page's date, YYYY-MM-DD. */
@@ -87,6 +90,12 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
   if (toc !== undefined) {
     if (toc === "true" || toc === "false") out.toc = toc === "true";
     else at("toc", `toc must be true or false`);
+  }
+  // nav: true or false is the build's; the layout's nav (the tree, an assembly key) is another thing of the same name.
+  const nav = values["nav"];
+  if (nav !== undefined) {
+    if (nav === "true" || nav === "false") out.nav = nav === "true";
+    else at("nav", `nav must be true or false`);
   }
   const index = values["index"];
   if (index !== undefined) {
@@ -245,6 +254,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     if ((RESERVED_KEYS as readonly string[]).includes(key) || forQueries.includes(key)) continue;
+    if (key === "nav") continue; // nav: true or false, checked with the build's keys (checkBuildKeys)
     if (filled(key)) {
       at(key, key === bodySlot && key !== "body"
         ? `"${key}" is filled by the storefront with the page's markdown (x-pd-content of ${named}), not by a page`

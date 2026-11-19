@@ -140,9 +140,11 @@ describe("checkPageFrontmatter — keys", () => {
   });
 
   it("refuses the keys the storefront fills, and does not count them as missing", async () => {
+    // nav is a page's own key as well, true or false (nav: false leaves the page out of the nav), so a list there is
+    // that key's problem; the layout still gets the nav the storefront fills.
     expect((await check("---\ntitle: T\nbody: Mine\nnav: [a]\nsite: Mine\n---\n")).problems).toEqual([
+      P(4, `nav must be true or false`), // the build's keys are checked first
       P(3, `"body" is filled by the storefront, not by a page`),
-      P(4, `"nav" is filled by the storefront, not by a page`),
       P(5, `"site" is filled by the storefront, not by a page`),
     ]);
     // layouts/typed requires body: the storefront fills it, so a page without it is fine.
