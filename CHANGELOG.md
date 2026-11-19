@@ -26,19 +26,18 @@
   and dark toggle sets `color-scheme` too. `pd build` writes the file into the site's `_pd/`, with or without the
   workbench. The workbench uses the same properties. An additive contract change carries the address:
   `PD_ROUTES.codeCss`.
-
-### Changed
-
-- **Code colours reach 4.5:1 contrast,** in the workbench and on site pages: in light mode, strings, keywords and
-  tags, function and attribute names, CSS properties and values, parameters and Handlebars expressions are darker;
-  in dark mode, comments are lighter. Each keeps its hue.
-
 - **A page can stay out of the navigation:** `nav: false` in its frontmatter. The page is left out of `nav` (and of
   its folder's `children`) and out of `prev` and `next`: its own are empty, and its neighbours link past it. It still
   renders, is searchable, is in the sitemap and `llms.txt`, and is reached by its links, such as a credits or legal
   page linked from the footer. On a folder's `index.md` it leaves out the folder's entry and the folder's pages; in a
   folder's `childDefaults` it applies to the folder's pages. Any value other than `true` or `false` is a problem on
   the page, `nav must be true or false`. A layout still gets `nav`, the navigation, as before.
+
+### Changed
+
+- **Code colours reach 4.5:1 contrast,** in the workbench and on site pages: in light mode, strings, keywords and
+  tags, function and attribute names, CSS properties and values, parameters and Handlebars expressions are darker;
+  in dark mode, comments are lighter. Each keeps its hue.
 
 ### Fixed
 
