@@ -13,7 +13,7 @@ import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 
 const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
 const rootConfig = validateConfig(benchConfig, "storefront-bench");
-const subConfig = validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, url: "https://bench.example.test/sub" } }, "storefront-bench");
+const subConfig = validateConfig({ ...benchConfig, site: { ...benchConfig.site!, url: "https://bench.example.test/sub" } }, "storefront-bench");
 const SITE = rootConfig.storefront!.host ?? PD_HOSTS.storefront;
 let root: DevServer;
 let sub: DevServer;

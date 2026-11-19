@@ -10,7 +10,7 @@ import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
+import { validateConfig, type PatternDumpConfig, type SiteConfig } from "@pattern-dump/config";
 import { buildStaticSite, loadProjectPagefind } from "@pattern-dump/dev-server";
 import benchConfig from "../pattern-dump.config.js";
 import { save } from "../../test-support/save.js";
@@ -40,8 +40,8 @@ async function benchWithSearch(name: string): Promise<string> {
   return root;
 }
 
-const config = (over: Partial<NonNullable<PatternDumpConfig["storefront"]>> = {}): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, ...over } }, "test");
+const config = (over: Partial<SiteConfig> = {}): PatternDumpConfig =>
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, ...over } }, "test");
 
 /** A context that serves the built site's files at http://site.localhost/. */
 async function served(context: BrowserContext, site: string, base = "/"): Promise<void> {

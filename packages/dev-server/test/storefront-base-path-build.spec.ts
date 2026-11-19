@@ -32,7 +32,7 @@ async function benchCopy(): Promise<string> {
   return root;
 }
 const config = (url: string): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, url } }, "test");
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, url } }, "test");
 const build = (root: string, cfg: PatternDumpConfig) =>
   buildStaticSite(cfg, root, { outDir: join(root, "..", `wb-${n++}`), pdVersion: "0.0.0-test", now: NOW });
 

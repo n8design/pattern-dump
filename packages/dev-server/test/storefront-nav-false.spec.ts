@@ -185,7 +185,7 @@ describe("pd build: a page with nav: false", () => {
     const text = await readFile(about, "utf8");
     await save(about, text.replace("title: About\n", "title: About\nnav: false\n"));
     const cfg = validateConfig({
-      ...benchConfig, build: { workbench: false }, storefront: { ...benchConfig.storefront!, workbenchUrl: "/workbench/" },
+      ...benchConfig, build: { workbench: false }, site: { ...benchConfig.site!, workbenchUrl: "/workbench/" },
     }, "test");
     const report = await buildStaticSite(cfg, root, { outDir: join(tmp, "bench-out"), pdVersion: "0.0.0-test", now: new Date("2027-01-02T03:04:05.000Z") });
     expect(report.storefront?.pages).toBeGreaterThan(0);

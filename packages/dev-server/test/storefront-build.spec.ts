@@ -9,7 +9,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
+import { validateConfig, type PatternDumpConfig, type SiteConfig } from "@pattern-dump/config";
 import { buildStaticSite, startDevServer } from "@pattern-dump/dev-server";
 import { relativeUrls } from "../src/storefront/page.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
@@ -37,8 +37,8 @@ async function benchCopy(): Promise<string> {
   }
   return root;
 }
-const config = (over: Partial<NonNullable<PatternDumpConfig["storefront"]>> = {}): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, ...over } }, "test");
+const config = (over: Partial<SiteConfig> = {}): PatternDumpConfig =>
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, ...over } }, "test");
 const build = (root: string, out: string, cfg: PatternDumpConfig = config()) =>
   buildStaticSite(cfg, root, { outDir: out, pdVersion: "0.0.0-test", now: NOW });
 
@@ -290,7 +290,7 @@ describe("pd build — the storefront root", () => {
           .replace(/\n<script data-pd-live>[\s\S]*?<\/script>/, "\n")
           .replaceAll(`http://pd.localhost:${server.port}/`, WB)
           // pd dev's absolute URLs are the address the browser is on; the build's, storefront.url.
-          .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!);
+          .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.site!.url!);
         expect(normalized, route).toBe(files.get(file)!.bytes.toString("utf8"));
       }
       for (const file of ["robots.txt", "sitemap.xml", "setup/index.html", "start/index.html"]) {
@@ -301,7 +301,7 @@ describe("pd build — the storefront root", () => {
           });
           req.on("error", reject); req.end();
         });
-        expect(live.replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!), file).toBe(files.get(file)!.bytes.toString("utf8"));
+        expect(live.replaceAll(`http://live.localhost:${server.port}/`, benchConfig.site!.url!), file).toBe(files.get(file)!.bytes.toString("utf8"));
       }
       // The workbench's own robots.txt, on its host: searchable, its previews not.
       const workbench = await new Promise<string>((resolve, reject) => {
@@ -317,7 +317,7 @@ describe("pd build — the storefront root", () => {
   it("leaves the workbench snapshot exactly as a build without a storefront makes it, but for each layout's pages", async () => {
     // From the same copy: a compiled script's banner names its source path, so two copies' builds would
     // differ by where they are, whatever the storefront does.
-    const { storefront: _sf, ...noStorefront } = benchConfig;
+    const { site: _sf, ...noStorefront } = benchConfig;
     await buildStaticSite(validateConfig(noStorefront, "test"), root, { outDir: join(root, "..", "wb-none"), pdVersion: "0.0.0-test", now: NOW });
     const a = await tree(join(root, "..", "wb-good"));
     const b = await tree(join(root, "..", "wb-none"));
@@ -374,9 +374,9 @@ describe("pd build — a storefront with problems writes nothing", () => {
 
   it("lists a problem of the whole site once, not once for every page that shows it", async () => {
     const root = await benchCopy();
-    const site = { ...benchConfig.storefront!.site!, navigations: { footer: [{ page: "nope.md" }] } };
+    const site = { ...benchConfig.site!.globals!, navigations: { footer: [{ page: "nope.md" }] } };
     const out = join(root, "..", "wb-nav");
-    const error = await build(root, out, config({ site })).then(() => "", (e: Error) => e.message);
+    const error = await build(root, out, config({ globals: site })).then(() => "", (e: Error) => e.message);
     const problem = `site.globals.navigations.footer[0]: "nope.md" is not a page in the pages folder`;
     expect(error).toBe(`pd build: the storefront has problems, so nothing was written:\n  - ${problem}`);
     expect(await exists(out)).toBe(false);

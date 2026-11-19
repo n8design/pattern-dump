@@ -203,7 +203,7 @@ test("under a path, the image checks name an image by its site path, as at the r
 });
 
 test("the bench passes in a browser: no accessibility finding, every variant fits its box", async () => {
-  const cfg = validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, outDir: join(tmp, "bench-site") } }, "storefront-bench");
+  const cfg = validateConfig({ ...benchConfig, site: { ...benchConfig.site!, outDir: join(tmp, "bench-site") } }, "storefront-bench");
   const report = await buildStaticSite(cfg, bench, { outDir: join(tmp, "bench-wb"), pdVersion: "0.0.0-test", browser: true, loadPlaywright });
   expect(report.accessibility).toMatchObject({ browser: true, warnings: [] });
   expect(report.images).toEqual({ warnings: [] });

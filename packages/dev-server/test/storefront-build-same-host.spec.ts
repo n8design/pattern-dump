@@ -7,7 +7,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
+import { validateConfig, type PatternDumpConfig, type SiteConfig } from "@pattern-dump/config";
 import { buildStaticSite } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
@@ -30,8 +30,8 @@ async function benchCopy(): Promise<string> {
   }
   return root;
 }
-const config = (over: Partial<NonNullable<PatternDumpConfig["storefront"]>> = {}): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, ...over } }, "test");
+const config = (over: Partial<SiteConfig> = {}): PatternDumpConfig =>
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, ...over } }, "test");
 const build = (root: string, out: string, cfg: PatternDumpConfig = config()) =>
   buildStaticSite(cfg, root, { outDir: out, pdVersion: "0.0.0-test", now: NOW });
 const exists = (p: string) => stat(p).then(() => true, () => false);
@@ -82,7 +82,7 @@ describe("pd build — a workbench on the storefront's host", () => {
   const builtFor = (got: string) => `pd build: site.workbenchUrl is /workbench/, so the workbench must be built for /workbench/ `
     + `(build.basePath or --base); it is being built for ${got}`;
   const withBase = (basePath: string | undefined) => validateConfig({ ...benchConfig, ...(basePath ? { build: { basePath } } : {}),
-    storefront: { ...benchConfig.storefront!, workbenchUrl: "/workbench/" } }, "test");
+    site: { ...benchConfig.site!, workbenchUrl: "/workbench/" } }, "test");
 
   it("fails when the base path in the config is not the same-host workbench's path, and writes nothing", async () => {
     const root = await benchCopy();

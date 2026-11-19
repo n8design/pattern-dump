@@ -17,7 +17,7 @@ export default defineConfig({
   // Two preview themes, light by default. Pages link neither: a site's light and dark belong to its skin. A page's
   // data-theme reaches only its embedded previews (theme-sync.spec.ts).
   themes: { dir: "./themes", default: "light" },
-  storefront: {
+  site: {
     pagesDir: "./pages",
     outDir: "./.out/storefront",
     workbenchUrl: "https://workbench.example.test/",
@@ -34,10 +34,10 @@ export default defineConfig({
       images: { label: "Images", description: "Pictures, and how pages show them", aliases: ["pictures"] },
       layout: { label: "Layout" },
     },
-    // Search is left out (storefront.search): pd build indexes the site because the repository has Pagefind.
+    // Search is left out (site.search): pd build indexes the site because the repository has Pagefind.
     // The link-preview image of every page that names none of its own.
     image: "/assets/images/share.png",
-    site: {
+    globals: {
       title: "Storefront bench",
       tagline: "A website written in markdown",
       href: "/",

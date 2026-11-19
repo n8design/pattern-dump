@@ -30,7 +30,7 @@ async function benchCopy(): Promise<string> {
   return root;
 }
 const config = (checks?: Record<string, unknown>): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, ...(checks ? { checks } : {}) } }, "test");
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, ...(checks ? { checks } : {}) } }, "test");
 const build = (root: string, cfg: PatternDumpConfig = config()) =>
   buildStaticSite(cfg, root, { outDir: join(root, "..", `wb-${n++}`), pdVersion: "0.0.0-test", now: NOW });
 const append = async (path: string, text: string) => save(path, `${await readFile(path, "utf8")}${text}`);

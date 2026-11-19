@@ -74,7 +74,7 @@ async function pagesOf(files: Record<string, string>): Promise<string> {
 }
 // The bench's categories (its config's storefront.categories): its pages name them.
 const build = async (route: string, dir: string, over: Partial<PageAssembly> = {}) =>
-  assemblePage(route, await readPages(dir, { categories: benchConfig.storefront?.categories }), assembly(over));
+  assemblePage(route, await readPages(dir, { categories: benchConfig.site?.categories }), assembly(over));
 
 describe("assemblePage — the bench's pages", () => {
   it("renders the home page through its layout, with the storefront's nav, site and examples", async () => {

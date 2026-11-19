@@ -308,7 +308,7 @@ describe("checkPageFrontmatter — the storefront bench", () => {
   it("finds nothing wrong with any of its pages", async () => {
     const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
     const benchMap = (await buildDiscoveryMap(join(bench, "src", "patterns"))).discoveryMap;
-    const model = await readPages(join(bench, "pages"), { categories: benchConfig.storefront?.categories });
+    const model = await readPages(join(bench, "pages"), { categories: benchConfig.site?.categories });
     const checked = await Promise.all([...model.files.values()].map(f => checkPageFrontmatter(f, benchMap, model.categories)));
     expect(checked.flatMap(c => c.problems)).toEqual([]);
     expect(checked.map(c => c.layoutId)).toEqual(["layouts/home", "layouts/page", "layouts/doc", "layouts/doc",

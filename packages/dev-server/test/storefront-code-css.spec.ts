@@ -108,7 +108,7 @@ describe("pd build: code.css in the site's own _pd/", () => {
   }, 90_000);
 
   it("with build.workbench: false: the site has it", async () => {
-    const { site } = await built(config({ build: { workbench: false }, storefront: { ...benchConfig.storefront!, workbenchUrl: "/workbench/" } }));
+    const { site } = await built(config({ build: { workbench: false }, site: { ...benchConfig.site!, workbenchUrl: "/workbench/" } }));
     await expectSite(site);
   }, 90_000);
 });

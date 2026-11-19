@@ -27,7 +27,7 @@ let STATIC = "";
 
 test.beforeAll(async () => {
   tmp = await mkdtemp(join(tmpdir(), "pd-e2e-base-path-"));
-  const config = validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, url: SITE_URL, outDir: join(tmp, "site") } }, "storefront-bench");
+  const config = validateConfig({ ...benchConfig, site: { ...benchConfig.site!, url: SITE_URL, outDir: join(tmp, "site") } }, "storefront-bench");
   await buildStaticSite(config, bench, { outDir: join(tmp, "workbench"), pdVersion: "0.0.0-test" });
   dev = await startDevServer(config, bench, { port: 0, wsPort: 0, live: true });
   DEV = `http://live.localhost:${dev.port}`;

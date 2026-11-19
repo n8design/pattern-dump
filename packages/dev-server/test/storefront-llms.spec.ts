@@ -6,7 +6,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
+import { validateConfig, type PatternDumpConfig, type SiteConfig } from "@pattern-dump/config";
 import { buildStaticSite } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
@@ -29,8 +29,8 @@ async function benchCopy(): Promise<string> {
   }
   return root;
 }
-const config = (over: Partial<NonNullable<PatternDumpConfig["storefront"]>> = {}): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, ...over } }, "test");
+const config = (over: Partial<SiteConfig> = {}): PatternDumpConfig =>
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, ...over } }, "test");
 const build = (root: string, out: string, cfg: PatternDumpConfig = config()) =>
   buildStaticSite(cfg, root, { outDir: out, pdVersion: "0.0.0-test", now: NOW });
 const exists = (p: string) => stat(p).then(() => true, () => false);
@@ -65,8 +65,8 @@ describe("pd build — llms.txt", () => {
 
   it("without site.url: llms.txt links each page by its path from the site's root", async () => {
     const root = await benchCopy();
-    const { url: _u, ...rest } = benchConfig.storefront!;
-    await buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root, { outDir: join(root, "..", "wb-llms-nourl"), pdVersion: "x", now: NOW });
+    const { url: _u, ...rest } = benchConfig.site!;
+    await buildStaticSite(validateConfig({ ...benchConfig, site: rest }, "test"), root, { outDir: join(root, "..", "wb-llms-nourl"), pdVersion: "x", now: NOW });
     const llms = await readFile(join(root, ".out", "storefront", "llms.txt"), "utf8");
     expect(llms).toContain("- [About](/about/): What the bench is for.\n");
     expect(llms).not.toContain("https://");
