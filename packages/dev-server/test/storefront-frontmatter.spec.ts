@@ -144,8 +144,8 @@ describe("checkPageFrontmatter — keys", () => {
     // that key's problem; the layout still gets the nav the storefront fills.
     expect((await check("---\ntitle: T\nbody: Mine\nnav: [a]\nsite: Mine\n---\n")).problems).toEqual([
       P(4, `nav must be true or false`), // the build's keys are checked first
-      P(3, `"body" is filled by the site, not by a page`),
-      P(5, `"site" is filled by the site, not by a page`),
+      P(3, `"body" is filled by Pattern Dump, not by a page`),
+      P(5, `"site" is filled by Pattern Dump, not by a page`),
     ]);
     // layouts/typed requires body: the storefront fills it, so a page without it is fine.
     expect((await check("---\nlayout: typed\ntitle: T\n---\n")).problems).toEqual([]);

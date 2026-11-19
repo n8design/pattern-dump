@@ -70,7 +70,7 @@ describe("a marked pattern as a layout", () => {
   it("a page can't set the slot, and the slot is not required of it", async () => {
     const root = await project({ ...CASE_STUDY("templates"), "pages/work.md": "---\nlayout: case-study\ntitle: T\ncontent: mine\n---\n\nBody.\n" });
     const { page } = await assembled(root, "/work/");
-    expect(page.problems).toEqual([`work.md:4: "content" is filled by the site with the page's markdown (x-pd-content of layout "case-study"), not by a page`]);
+    expect(page.problems).toEqual([`work.md:4: "content" is filled by Pattern Dump with the page's markdown (x-pd-content of layout "case-study"), not by a page`]);
   });
 
   it("a slot that isn't markdown is a problem on the page", async () => {
