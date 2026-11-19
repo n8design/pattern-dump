@@ -9,13 +9,13 @@ export default defineConfig({
   styles: { strategy: "parallel", dir: "./src/styles" },
   assets: { dir: "./src/assets" },
   packages: ["@pattern-dump/skin-experimental"],
-  storefront: {
+  site: {
     pagesDir: "./pages",
-    outDir: "./.out/storefront",
+    outDir: "./.out/site",
     workbenchUrl: "https://workbench.example.test/",
     // The site's own address: canonical URLs, Open Graph, JSON-LD and the sitemap are built from it.
     url: "https://skin-experimental.example.test/",
-    site: {
+    globals: {
       title: "Storefront bench",
       tagline: "A website written in markdown",
       href: "/",
