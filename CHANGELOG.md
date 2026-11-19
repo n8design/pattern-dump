@@ -12,10 +12,12 @@
   site start with `[site]` instead of `[storefront]`. The guide and a new project's starter files say "site" too.
 - **`pd init --storefront` is now `--with-site`,** and `--no-storefront` is `--without-site`: two flags of their
   own, apart from `--site <package>`, which still makes a website on an existing style guide. The old flags still
-  work, with a warning, until 1.0, which removes them; `--with-site` with `--without-site` is an error. A new project's config uses the new names.
+  work, with a warning, until 1.0, which removes them; `--with-site` with `--without-site` is an error. A new
+  project's config uses the new names.
 - **Highlighted code has fixed class names.** Each token's class is its kind, `pd-code-keyword`, `pd-code-string` and
   so on, in place of a generated name such as `__shiki_17h8wv`, and a block is `<pre class="shiki">` with no inline
-  style. CSS written for the generated names no longer matches: set the kinds' colours instead (below).
+  style. CSS written for the generated names no longer matches: set the kinds' colours instead (below). If you link
+  `/_pd/shiki.css` yourself, link `/_pd/code.css` instead, or code loses its token colours.
 
 ### Added
 
@@ -38,7 +40,6 @@
   ../styleguide`) without a manual step. Only a `package.json` init creates gets it; one that exists is left as it is.
   For a style guide in a folder without the field, `pd init --site` prints the block to add, from the folders of the
   style guide's own config.
-
 - **Images in a page's markdown, like symbol images.** `![Alt](/assets/photo.jpg "Caption")` on a line of its own
   is a `<figure>` with the caption as its `<figcaption>`, instead of a `title` attribute (in a line of text, the
   title stays an attribute). A file named `photo-dark.jpg` next to `photo.jpg` makes the image a `<picture>` with a
@@ -54,6 +55,10 @@
   (an error) naming the handle and the component that keeps it, in the report and the Audit tab; before, the audit
   never mentioned it. The audit's scope lists a Discovery row. Like a variant's defect, it can fail an audit that
   passed in 0.7.0.
+- **The remaining wording says "site" or "Pattern Dump".** A key a page cannot set is `filled by Pattern Dump, not by
+  a page` (it said `filled by the site`), and the layouts `pd init` writes describe `page` as what Pattern Dump works
+  out for it. The Inspector names a generated page's setting as `site.<kind>Pages`, `pd dev` logs a change to
+  `site.globals` by that name, and `pd init` asks `Include a website`.
 - **Code colours reach 4.5:1 contrast,** in the workbench and on site pages: in light mode, strings, keywords and
   tags, function and attribute names, CSS properties and values, parameters and Handlebars expressions are darker;
   in dark mode, comments are lighter. Each keeps its hue.
