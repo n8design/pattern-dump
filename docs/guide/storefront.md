@@ -1165,8 +1165,9 @@ schema:
 - **A dark version:** a file named `<name>-dark.<ext>` next to the image (`cable-cars-dark.jpg` beside
   `cable-cars.jpg`) makes it a `<picture>`. Its `<source media="(prefers-color-scheme: dark)">` is the dark file, in
   the same widths as WebP variants with its own width and height; the `<img>` is the light one, lazy as before.
-  `pd build` writes the variants of both. The dark file is chosen by the viewer's operating system setting, not by
-  a theme toggle on the page. Name the `-dark` file itself in markdown to show it always.
+  `pd build` writes the variants of both. A `<name>-dark` image follows the system setting (`prefers-color-scheme`),
+  not a site's theme toggle: a page switched to dark by its toggle still shows the light image while the system is
+  light. Name the `-dark` file itself in markdown to show it always.
 - `sizes` describes the layout's text column. A lazy image is written with `sizes="auto, …"` (below).
 - `eager` (optional, default 0): how many of a page's first images load at once, with the declared `sizes` alone.
 - Alt text is required: a markdown image with an empty alt is a problem, since markdown can't tell a decorative
