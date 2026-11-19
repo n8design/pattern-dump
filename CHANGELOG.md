@@ -18,6 +18,9 @@
   so on, in place of a generated name such as `__shiki_17h8wv`, and a block is `<pre class="shiki">` with no inline
   style. CSS written for the generated names no longer matches: set the kinds' colours instead (below). If you link
   `/_pd/shiki.css` yourself, link `/_pd/code.css` instead, or code loses its token colours.
+- **The config's types are named `Site…`:** `SiteChecks`, `SiteTermPages`, `SiteTag`, `SiteCategory` and
+  `SiteNavEntry`, beside `SiteConfig`. Each `Storefront…` name still works as a deprecated alias until 1.0, which
+  removes them; `StorefrontConfig` stays the shape of the old `storefront` key.
 
 ### Added
 
