@@ -197,24 +197,24 @@ async function buildOnce(
   const storefront = cfg.storefront;
   if (storefront) {
     const sfOut = storefront.outDir;
-    if (inside(project, sfOut)) throw new Error(`pd build: storefront.outDir ${sfOut} would contain the project itself: choose a folder inside or beside it`);
+    if (inside(project, sfOut)) throw new Error(`pd build: site.outDir ${sfOut} would contain the project itself: choose a folder inside or beside it`);
     for (const source of [cfg.patternsDir, cfg.stylesDir, storefront.pagesDir, ...cfg.themeDirs, ...cfg.assetRoots]) {
       if (inside(sfOut, source) || inside(source, sfOut)) {
-        throw new Error(`pd build: storefront.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads: choose another folder`);
+        throw new Error(`pd build: site.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads: choose another folder`);
       }
     }
     if (buildWorkbench && (inside(sfOut, outDir) || inside(outDir, sfOut))) {
-      throw new Error(`pd build: storefront.outDir ${sfOut} and --out ${outDir} overlap: the storefront and the workbench each need a folder of their own`);
+      throw new Error(`pd build: site.outDir ${sfOut} and --out ${outDir} overlap: the storefront and the workbench each need a folder of their own`);
     }
     if (!storefront.workbenchUrl) {
-      throw new Error("pd build: storefront.workbenchUrl is required to build the storefront: its pages link into the workbench at that address");
+      throw new Error("pd build: site.workbenchUrl is required to build the storefront: its pages link into the workbench at that address");
     }
     // A workbench published on the storefront's own host is linked at its path, so it must be built for that
     // path: the base path this build uses (--base, else build.basePath, else /). A workbench another build writes
     // (build.workbench: false) is that build's to place.
     const sameHost = sameHostWorkbenchPath(storefront);
     if (buildWorkbench && sameHost !== undefined && sameHost !== basePath) {
-      throw new Error(`pd build: storefront.workbenchUrl is ${storefront.workbenchUrl}, so the workbench must be built for ${sameHost} `
+      throw new Error(`pd build: site.workbenchUrl is ${storefront.workbenchUrl}, so the workbench must be built for ${sameHost} `
         + `(build.basePath or --base); it is being built for ${basePath}`);
     }
   }
@@ -389,7 +389,7 @@ async function buildOnce(
       }));
       const classes = checkClasses({ pages: checkPages, stylesheets, templates: guide.templates, allow: storefront.checks.allowClasses });
       if (storefront.checks.classes === "error" && classes.length) {
-        await fail("the storefront uses classes outside the design system (storefront.checks.classes is \"error\")", classes);
+        await fail("the storefront uses classes outside the design system (site.checks.classes is \"error\")", classes);
       }
       classSummary = { severity: storefront.checks.classes, warnings: storefront.checks.classes === "warning" ? classes : [] };
     }
@@ -648,8 +648,8 @@ async function buildOnce(
           + `host's root. Where you can, add to the host's own robots.txt: ${rules.join("; ")}`);
       }
       if (storefront.url === undefined) {
-        report.notes.push("storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
-          + "and there is no sitemap: set storefront.url to the site's address, such as \"https://example.com/\"");
+        report.notes.push("site.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
+          + "and there is no sitemap: set site.url to the site's address, such as \"https://example.com/\"");
       }
       report.notes.push(...storefrontNotes, ...externalNotes);
       if (linkSummary) report.links = linkSummary;

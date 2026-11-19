@@ -42,7 +42,7 @@ describe("checkLinks", () => {
       <link rel="stylesheet" href="/sub/_pd/base.css?v=0123456789"> <a href="https://wb.test/components">workbench</a>
       <a href="/guides/">outside</a> <a href="/sub/sub/about/">doubled</a>`) }, { siteUrl: "https://site.test/sub/", basePath: "/sub/" });
     expect(r.problems).toEqual([
-      `/about/: <a href="/guides/">: /guides/ is outside /sub/, the path the site is published under (storefront.url)`,
+      `/about/: <a href="/guides/">: /guides/ is outside /sub/, the path the site is published under (site.url)`,
       `/about/: <a href="/sub/sub/about/">: no page or file is built at /sub/about/: the link is written with the site's path /sub/ already; `
         + "write it from the site's root, such as /about/, and the path is put in front of it",
     ]);

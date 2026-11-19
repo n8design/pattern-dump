@@ -161,7 +161,7 @@ describe("the starter project", () => {
   }, 60_000);
 });
 
-describe("the starter project with a website (--storefront, no examples)", () => {
+describe("the starter project with a website (--with-site, no examples)", () => {
   it("has a config that validates: a same-host workbench at /workbench/, built for that path", async () => {
     const config = await loadConfig(siteDir);
     expect(config.storefront).toMatchObject({ pagesDir: "./pages", outDir: "./site", workbenchUrl: "/workbench/",
@@ -309,7 +309,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
 
 // The README's "Try breaking it" step, done as it says on a running server: the page then shows the
 // problem with its place in the file, and comes back by itself once the value is saved back.
-describe("the starter project with the examples and a website (what --storefront -y writes)", () => {
+describe("the starter project with the examples and a website (what --with-site -y writes)", () => {
   let both = "";
   beforeAll(async () => { both = await scaffold(true, true); }, 60_000);
   afterAll(async () => { if (both) await rm(both, { recursive: true, force: true }); });

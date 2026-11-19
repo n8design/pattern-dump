@@ -1,6 +1,6 @@
   // The website: every markdown file in pages/ is a page, rendered with the skin in src/patterns/layouts
   // and src/patterns/partials. `npm run dev` prints its address, http://live.localhost:4000/.
-  storefront: {
+  site: {
     pagesDir: "./pages",
     outDir: "./site",
     // The workbench is published on the website's own host, under /workbench/ (and built for that path,
@@ -18,7 +18,7 @@
       notes: { label: "Notes", description: "Short articles about this site" },
     },
 __PD_SEARCH_NOTE__
-    site: { title: __PD_BRAND_JSON__, footer: "Made with Pattern Dump." },
+    globals: { title: __PD_BRAND_JSON__, footer: "Made with Pattern Dump." },
   },
   build: { basePath: "/workbench/" },
 

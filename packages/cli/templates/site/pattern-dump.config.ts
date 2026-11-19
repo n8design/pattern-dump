@@ -12,7 +12,7 @@ export default defineConfig({
 
   // The website: every markdown file in pages/ is a page. `npm run dev` prints its address,
   // http://live.localhost:4000/.
-  storefront: {
+  site: {
     pagesDir: "./pages",
     outDir: "./site",
     // Where the style guide's own workbench is published: a page's examples link to their component there. A full
@@ -21,7 +21,7 @@ export default defineConfig({
     // The site's address, once you know it: canonical URLs, link previews and the sitemap are built from it.
     // url: "https://www.example.com/",
 __PD_SEARCH_NOTE__
-    site: { title: __PD_BRAND_JSON__, footer: "Made with Pattern Dump." },
+    globals: { title: __PD_BRAND_JSON__, footer: "Made with Pattern Dump." },
   },
 
   // The style guide publishes its workbench itself, so pd build writes the website only (to site/).

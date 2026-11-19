@@ -13,7 +13,7 @@
     },
     "description": {
       "type": "string",
-      "description": "The category's description, when storefront.categories gives one"
+      "description": "The category's description, when site.categories gives one"
     },
     "page": {
       "type": "object",

@@ -14,23 +14,23 @@ workbench's own styles.
 The quickest start is a new project with a website already in it:
 
 ```bash
-npx pattern-dump init my-site --storefront
+npx pattern-dump init my-site --with-site
 ```
 
 It brings two pages, a small skin, one component the home page shows (in a live example and placed with a
 `pd-` tag), and a GitHub Pages workflow that publishes the website with the workbench under `/workbench/`
 ([cli.md](cli.md#pd-init)). Its README says how to publish it.
 
-To add a storefront to a project you have, add a `storefront` block to the config ([configuration.md](configuration.md#storefront)):
+To add a storefront to a project you have, add a `site` block to the config ([configuration.md](configuration.md#site)):
 
 ```ts
 export default defineConfig({
   // …
-  storefront: {
+  site: {
     pagesDir: "./pages",
     outDir: "./site",
     workbenchUrl: "https://workbench.example.com/",
-    site: { title: "Acme Design System", footer: "© Acme" },
+    globals: { title: "Acme Design System", footer: "© Acme" },
   },
 });
 ```
@@ -40,7 +40,7 @@ from a [pattern package](#skins), or write your own [layouts and partials](#writ
 
 ```bash
 npx pd dev     # the storefront at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/
-npx pd build   # the workbench snapshot in outDir, the storefront in storefront.outDir
+npx pd build   # the workbench snapshot in outDir, the storefront in site.outDir
 ```
 
 ---
@@ -133,7 +133,7 @@ On a storefront page this is a frame with the component's own preview, not a cop
 component is styled by its own CSS and nothing on the page can restyle it. With JavaScript on, the frame
 fits the preview's height. Beside the frame are a list of the component's variants, each a link to its
 preview, and a link that opens the component in the workbench (in `pd dev`, this server's workbench; in a
-build, `storefront.workbenchUrl`). With JavaScript off, the frame keeps the browser's default height (or the
+build, `site.workbenchUrl`). With JavaScript off, the frame keeps the browser's default height (or the
 height its component declares, below) and the links still work.
 
 #### The height an example starts at
@@ -194,7 +194,7 @@ setting, make the default theme follow it too, with `color-scheme: light dark`:
 }
 ```
 
-Its examples then follow the viewer with or without JavaScript, as the page does. `pd init --storefront` sets this
+Its examples then follow the viewer with or without JavaScript, as the page does. `pd init --with-site` sets this
 up unless given `--no-system-theme`: a `system` theme as the default, and the skin's own colours
 (`src/styles/base/colors.scss`) following the viewer too.
 
@@ -279,13 +279,13 @@ lede: Three folders make a site.
 | `childLayout` | On a folder's `index.md` only: the layout of the pages under it that name none. See [A folder's default layout](#a-folders-default-layout) |
 | `order` | Its position in the navigation, see [Pages](#pages) |
 | `nav` | `false` leaves the page out of the navigation (`nav`, and its folder's `children`) and out of `prev` and `next`, its own and its neighbours'. It still renders, and stays searchable and in the sitemap and `llms.txt`. On a folder's `index.md`, the folder's entry and its pages are left out. `true`, the default, lists it. The layout's `nav`, the navigation itself, is filled as before. See [Pages](#pages) |
-| `image` | Its link-preview image: a raster file in the assets (PNG, JPEG, GIF or WebP), such as `/assets/images/setup.png`. An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `storefront.image` |
+| `image` | Its link-preview image: a raster file in the assets (PNG, JPEG, GIF or WebP), such as `/assets/images/setup.png`. An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `site.image` |
 | `index` | `false` keeps the page out of search engines: `noindex`, and no sitemap entry |
 | `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. See [Redirects](#redirects) |
 | `date` | The page's date, a real calendar date written `YYYY-MM-DD`: what a listing sorts and shows, and its JSON-LD `datePublished`. Without it, the day git first saw the page. A date after today holds the page back from `pd build` until that day, see [Scheduled pages](#scheduled-pages). See [Collections](#collections) |
 | `updated` | The page's last real change, `YYYY-MM-DD`, set by its author: not before `date`. The only "last changed" date a reader or a search engine sees, see [Dates](#dates) |
-| `tags` | One tag or a list, each lowercase letters, digits and hyphens, none twice: `tags: [css, design-systems]`. When the config declares tags (`storefront.tags`), each is a declared one (or an old key of one). See [Tags](#tags) |
-| `categories` | One category or a list, each declared in `storefront.categories` (or an old key of one), none twice: `categories: [guides]`. See [Categories](#categories) |
+| `tags` | One tag or a list, each lowercase letters, digits and hyphens, none twice: `tags: [css, design-systems]`. When the config declares tags (`site.tags`), each is a declared one (or an old key of one). See [Tags](#tags) |
+| `categories` | One category or a list, each declared in `site.categories` (or an old key of one), none twice: `categories: [guides]`. See [Categories](#categories) |
 | `draft` | `true` shows the page in `pd dev` and leaves it out of `pd build`. See [Drafts](#drafts) |
 | `sort` | On a folder's `index.md` only: `date` lists the folder's pages newest first; `order`, the default, in the folder's order |
 | `view` | On a folder's `index.md` only: the view its listing is shown in, `views/<name>` in the skin. See [Listing views](#listing-views) |
@@ -414,7 +414,7 @@ It can live in the project's own patterns, or come from a [pattern package](patt
 ```ts
 export default defineConfig({
   packages: ["@pattern-dump/skin-experimental"],
-  storefront: { /* … */ },
+  site: { /* … */ },
 });
 ```
 
@@ -429,7 +429,7 @@ watched.
 | Component | Role |
 |---|---|
 | `layouts/<name>` | A layout a page can choose with `layout: <name>`. Its schema is the frontmatter contract. A page or template pattern can be a layout too ([below](#a-page-or-template-as-a-layout)) |
-| `partials/base` | The frame every layout is built on. Its schema's `site` property declares what `storefront.site` may hold |
+| `partials/base` | The frame every layout is built on. Its schema's `site` property declares what `site.globals` may hold |
 | `partials/head` | Optional: what the skin adds to every page's `<head>`, see below |
 | `partials/…` | Anything else the layouts include: header, navigation, footer |
 
@@ -447,7 +447,7 @@ some head content is the site's, not the skin's: an analytics script, a search e
 Handlebars file of the site's in the config:
 
 ```ts
-storefront: { …, head: "./head.hbs", site: { analyticsKey: "…" } },
+site: { …, head: "./head.hbs", site: { analyticsKey: "…" } },
 ```
 
 ```hbs
@@ -477,7 +477,7 @@ A layout receives:
 | each declared key | The page's value, or `null` when the page does not set it |
 | `body` | The page's markdown, rendered. Include it unescaped, `{{{body}}}`: it is the only value safe to, because the markdown renderer escapes everything an author writes. Every other value is included escaped, `{{…}}`. A layout can name another key for it ([below](#a-page-or-template-as-a-layout)) |
 | `nav` | The navigation: `{ route, title, description?, current?, children? }` per entry, `current: true` on the page's own entry. A page with `nav: false` in its frontmatter is not in it |
-| `site` | The values of `storefront.site` |
+| `site` | The values of `site.globals` |
 | `page` | What the storefront derives for the page, when the layout declares it (below) |
 
 ```hbs
@@ -659,13 +659,13 @@ The table of contents is the skin's `components/toc`, given `items: [{ text, hre
   `<pd-toc>` gets no derived one besides.
 - Asking for it without a `components/toc` in the skin is a problem naming it.
 
-The starter (`pd init --storefront`) has a `doc` layout with a sidebar that collapses to one column when it is empty,
+The starter (`pd init --with-site`) has a `doc` layout with a sidebar that collapses to one column when it is empty,
 and a `components/toc`: the about page uses `toc: true`, the guide lists its own links, and the search page has
 neither.
 
 ### Declared navigations
 
-Besides the nav built from the pages folder, `storefront.site.navigations` holds named lists of links a
+Besides the nav built from the pages folder, `site.globals.navigations` holds named lists of links a
 skin shows, such as a footer's. Each entry is a page, an external link or a group, and groups nest to any
 depth:
 
@@ -685,7 +685,7 @@ The shape is Pattern Dump's, so the skin does not declare it: `partials/base`'s 
 names it shows, under `site.properties.navigations.properties`, each with a description at most, and
 `required` for the ones it needs. A name the skin does not list, a page that is not in the pages folder, an
 entry that is none of the three forms or an unknown key is a problem with its place named
-(`storefront.site.navigations.footer[2].children[0]`), reported once for the whole site.
+(`site.globals.navigations.footer[2].children[0]`), reported once for the whole site.
 
 A layout gets `site.navigations.<name>` for every name the skin lists, resolved for the page: entries of
 `{ label, route }`, `{ label, href }` or `{ label, children }`, with `current: true` on the page's own entry
@@ -803,7 +803,7 @@ them like any component.
 - **Sample data:** a view's may set only `entries`, each an entry; its card's only an entry's fields.
 - **Styles and scripts** of the view and its card load on the page as those of a placed component do.
 
-The starter (`pd init --storefront`) ships four plain views, each with its card in `components/`: `list` (title,
+The starter (`pd init --with-site`) ships four plain views, each with its card in `components/`: `list` (title,
 date, teaser and tags), `grid` (cards with an image; every page needs one), `featured` (the first page large, the
 rest as the grid: with `sort: date`, the newest first) and `compact` (title and date only).
 
@@ -872,7 +872,7 @@ A picked draft or scheduled page fails `pd build`; in `pd dev` it is a warning, 
 In `pd dev`, an edit to what a query reads of a page (its date, tags, categories, title or draft) reloads every open
 page, as for a listing.
 
-The starter (`pd init --storefront`) shows both: the article layout's `related` (three, from the same folder, by
+The starter (`pd init --with-site`) shows both: the article layout's `related` (three, from the same folder, by
 relevance, in the compact view) and the home layout's `latest` (the three newest articles, in the list view).
 
 ### Categories
@@ -881,7 +881,7 @@ Categories say what a page is about, apart from the folder it is in: a page chan
 its URL stays. The config declares them, by key:
 
 ```ts
-storefront: {
+site: {
   categories: {
     "design-systems": { label: "Design systems", description: "How they are built", aliases: ["ds"] },
     guides: { label: "Guides" },
@@ -907,7 +907,7 @@ config can declare them, as it declares categories: then they are the list, so a
 mean"), and an old key builds as the tag it now is, with a warning.
 
 ```ts
-storefront: {
+site: {
   tags: {
     css: { label: "CSS", description: "Cascading style sheets", aliases: ["styles"] },
     "design-tokens": { label: "Design tokens" },
@@ -949,7 +949,7 @@ skin's layouts:
 
 - **Published pages only.** Drafts and scheduled pages never count, in `pd dev` either: a tag only they have gets no
   page, and isn't in the index.
-- **On and off:** `storefront.tagPages` and `storefront.categoryPages`. Left out, the pages are there when the skin has
+- **On and off:** `site.tagPages` and `site.categoryPages`. Left out, the pages are there when the skin has
   the layout (`layouts/tag`; the index when it has `layouts/tags` too), and a skin without it gets none, with no
   message. `false` turns them off. `true`, or `{ path, title }`, asks for them: a missing layout is then a problem.
   `path` is the URL segment (`{ path: "topics" }` gives `/topics/css/`), `title` the index's title.
@@ -959,10 +959,10 @@ skin's layouts:
   problem naming both; the two paths can't be the same.
 - They are in the sitemap (`lastmod`: the newest change of their pages) and have JSON-LD `CollectionPage`. They are
   not in the nav or any listing. The workbench lists them under their layout's pages, each naming what made it
-  (`from storefront.tagPages`).
+  (`from site.tagPages`).
 - No pagination yet: a tag page lists every page with the tag.
 
-The starter (`pd init --storefront`) has plain `tag`, `tags`, `category` and `categories` layouts.
+The starter (`pd init --with-site`) has plain `tag`, `tags`, `category` and `categories` layouts.
 
 ### Scheduled pages
 
@@ -1006,7 +1006,7 @@ stylesheet too (see [Styles](authoring.md#styles)). On a page that is a warning,
 the class and its owner:
 
 ```
-[storefront] warning: find.md: organisms/search uses class "search-field" from molecules/search-field, so
+[site] warning: find.md: organisms/search uses class "search-field" from molecules/search-field, so
 molecules/search-field's stylesheet is linked too: include molecules/search-field if it belongs here, or rename the class
 ```
 
@@ -1075,7 +1075,7 @@ npm install --save-dev pagefind
 `pd init` adds it with the website, pinned, unless given `--no-search`.
 
 - **Pagefind is the project's own**, as Playwright is for `--browser`; Pattern Dump does not depend on it.
-  `storefront.search` left out: the site is indexed when the project has Pagefind, and built without search, with no
+  `site.search` left out: the site is indexed when the project has Pagefind, and built without search, with no
   message, when it has none. `true` asks for it: without Pagefind the build stops before anything is built, naming the
   install. `false` turns it off.
 - **What is indexed is each page's own content:** its markdown and the components it places, with its title. The
@@ -1083,7 +1083,7 @@ npm install --save-dev pagefind
   and the copy buttons never match. The written pages are unchanged; they carry no Pagefind attributes.
 - **Left out:** the 404 page (it has no address of its own); tag and category pages and their indexes (their text is
   other pages' labels and teasers, so each page would match twice; the filters do their job); redirect stubs; and a
-  page with `index: false`, which keeps it out of site search as well as search engines. `storefront.index: false`
+  page with `index: false`, which keeps it out of site search as well as search engines. `site.index: false`
   does not: a site kept out of search engines still has its own search. Drafts and scheduled pages are never built.
 - **Filters:** `section`, the label of the page's collection (the folder that lists it, by its index page's title; a
   page at the top has none), `tag` and `category`, by their labels. **Meta:** `title`, and `teaser` (the listing
@@ -1093,7 +1093,7 @@ npm install --save-dev pagefind
 - **`pd dev` has no index,** so a save stays as fast as it is: search works on the built site, and `pd dev` says so
   when it starts.
 
-The starter (`pd init --storefront`) has a search page with a plain, accessible component, `components/search`: a
+The starter (`pd init --with-site`) has a search page with a plain, accessible component, `components/search`: a
 `<search>` landmark with a labelled field and a button, a status line screen readers announce (such as
 `2 results for "grid".`), and the results as a list of links with their section and the passage that matched. It searches as you
 type, keeps the words in the address (`?q=`), and adds a section list once the index is loaded. Without JavaScript
@@ -1178,7 +1178,7 @@ support it; other browsers skip `auto` and use the sizes after it, so those must
 ### The skin's image rule
 
 The width and height attributes set an image's aspect ratio. To let it shrink with its column while keeping that
-ratio, a skin needs this rule (the `pd init --storefront` skin has it):
+ratio, a skin needs this rule (the `pd init --with-site` skin has it):
 
 ```css
 img { max-inline-size: 100%; block-size: auto; }
@@ -1216,7 +1216,7 @@ shows it by its file name after `#`:
   A heading whose anchor would be a symbol's id gets the next free one, as with the layout's ids.
 - When two asset folders have a symbol of the same name, the first one wins (your own folders come before
   packages'), and `pd dev` and the build say which.
-- The skin keeps a symbol inside its column with the same rule as for images (the `pd init --storefront` skin
+- The skin keeps a symbol inside its column with the same rule as for images (the `pd init --with-site` skin
   has it):
 
   ```css
@@ -1272,7 +1272,7 @@ Not checked: SVG files, `og:image` and `twitter:image` (the link-preview image s
 Variants are encoded with [sharp](https://sharp.pixelplumbing.com/), which Pattern Dump installs with its
 prebuilt binaries. Each variant is encoded the first time it is asked for and kept in
 `node_modules/.cache/pattern-dump/images/`; a full `pd build` removes the ones no page uses any more. The quality
-and effort are set by `images` in the config, and a site can override them with `storefront.images`
+and effort are set by `images` in the config, and a site can override them with `site.images`
 ([Configuration](configuration.md)).
 
 When sharp can't be loaded (an install with `--omit=optional` leaves its binaries out), `pd dev` shows the
@@ -1283,7 +1283,7 @@ must be encoded.
 
 ## Search engines and link previews
 
-**The site's address.** `storefront.url` is where the site will be hosted, such as `https://example.com/`,
+**The site's address.** `site.url` is where the site will be hosted, such as `https://example.com/`,
 or with a path, such as `https://example.github.io/project/`, for a site published under one
 ([below](#publishing-under-a-path)). With it, every page carries:
 
@@ -1303,14 +1303,14 @@ one string, or a list for several) as the page's main entity. The date git gives
 it an article: every committed page has one.
 
 and `pd build` writes `sitemap.xml`. Without it, those are left out and `pd build` says so once. In `pd dev`
-the same tags carry the address the browser is on. Every page has `<html lang>` from `storefront.lang`
+the same tags carry the address the browser is on. Every page has `<html lang>` from `site.lang`
 (default `en`).
 
-**Images.** A page's image is its `image`, else `storefront.image`. Link previews show raster images only, so
+**Images.** A page's image is its `image`, else `site.image`. Link previews show raster images only, so
 an image must be a PNG, JPEG, GIF or WebP file in the assets.
 
 **Keeping pages out.** `index: false` on a page gives it `noindex` and leaves it out of the sitemap.
-`storefront.index: false` does that for the whole site, for a staging site: `robots.txt` then disallows
+`site.index: false` does that for the whole site, for a staging site: `robots.txt` then disallows
 everything and there is no sitemap.
 
 **`sitemap.xml`** lists every page in route order, except those with `index: false`, the 404 page and the
@@ -1319,13 +1319,13 @@ shallow clone, a `datePublished` git would give is left out of the JSON-LD and t
 check out with `fetch-depth: 0`). A layout that shows `page.created` still fails the build there.
 
 **`llms.txt`** ([llmstxt.org](https://llmstxt.org/)) gives a language model the site in one file: the site's title
-(`storefront.site.title`, else the home page's) and the home page's description as a quote, then a `## Pages` section
+(`site.globals.title`, else the home page's) and the home page's description as a quote, then a `## Pages` section
 with the top-level pages and one section per collection (every folder with an `index.md`, nested ones too, headed by
 its title, led by it and listing that folder's own pages), in the order of the pages folder. Each page is a line `- [title](url): teaser`, its description else its first paragraph. It lists
 the same pages as the sitemap (no draft, no scheduled page, none with `index: false`); tag and category pages are left
-out, since their pages are listed. URLs are absolute with `storefront.url`, else paths from the site's root. `pd
+out, since their pages are listed. URLs are absolute with `site.url`, else paths from the site's root. `pd
 build` writes it to the site's root (under a path, at `<path>llms.txt`); `pd dev` has none. On unless the site has
-`index: false`; `storefront.llms: false` turns it off.
+`index: false`; `site.llms: false` turns it off.
 
 **`robots.txt`.** Both output roots get one. The storefront's keeps crawlers out of `/preview/` (the live
 examples: component demos, not pages) and names the sitemap. The workbench's keeps them out of its
@@ -1373,7 +1373,7 @@ to open when it starts:
 
 | Address | Serves |
 |---|---|
-| `http://live.localhost:<port>/` | The storefront (`storefront.host` changes the name), under its path when `storefront.url` has one |
+| `http://live.localhost:<port>/` | The storefront (`site.host` changes the name), under its path when `site.url` has one |
 | `http://pd.localhost:<port>/` | The workbench |
 | `http://localhost:<port>/` | The workbench, as without a storefront |
 
@@ -1400,7 +1400,7 @@ to `127.0.0.1`, the storefront address does not load. The workaround is an entry
 127.0.0.1  live.localhost pd.localhost
 ```
 
-(with your `storefront.host` in place of `live.localhost` if you set one). This concerns `pd dev` only: a
+(with your `site.host` in place of `live.localhost` if you set one). This concerns `pd dev` only: a
 built site is plain files on a host of its own, with no `*.localhost` name involved.
 
 ---
@@ -1412,10 +1412,10 @@ built site is plain files on a host of its own, with no `*.localhost` name invol
 | Folder | Holds |
 |---|---|
 | `build.outDir` (or `--out`) | The workbench snapshot, exactly as a build without a storefront writes it ([static-build.md](static-build.md)) |
-| `storefront.outDir` | The storefront: one `index.html` per page, plus everything the pages use |
+| `site.outDir` | The storefront: one `index.html` per page, plus everything the pages use |
 
 The storefront folder has its own copy of every preview its pages show and of every stylesheet, script,
-font and image they reference, so it is complete on its own. It is served at `storefront.url`: the root of its
+font and image they reference, so it is complete on its own. It is served at `site.url`: the root of its
 host, or the path under it ([Publishing under a path](#publishing-under-a-path)). A
 page built here is the same page `pd dev` serves, apart from the live-reload script and the address of the
 workbench links.
@@ -1425,25 +1425,25 @@ site/
   index.html  about/index.html  guides/index.html  guides/setup/index.html
   404.html                                          the 404 page
   setup/index.html  start/index.html                pages that forward from old routes
-  robots.txt  sitemap.xml                           for crawlers (the sitemap with storefront.url)
+  robots.txt  sitemap.xml                           for crawlers (the sitemap with site.url)
   llms.txt                                          the site for language models
   preview/components/callout/index.html            the previews the pages show
   _pd/  assets/                                    what pages and previews reference
   .nojekyll
 ```
 
-`storefront.workbenchUrl` is required to build, since built pages link to the workbench at its own address.
+`site.workbenchUrl` is required to build, since built pages link to the workbench at its own address.
 
 ### Publishing under a path
 
 A site can be published under a path of its host, such as a GitHub project page at
-`https://<owner>.github.io/<repository>/`, without a domain of its own. Give `storefront.url` the full address:
+`https://<owner>.github.io/<repository>/`, without a domain of its own. Give `site.url` the full address:
 
 ```ts
-storefront: { pagesDir: "./pages", outDir: "./site", url: "https://example.github.io/project/", … },
+site: { pagesDir: "./pages", outDir: "./site", url: "https://example.github.io/project/", … },
 ```
 
-The path (`/project/`) is the site's base path. `storefront.outDir` holds what is served at it: copy the folder's
+The path (`/project/`) is the site's base path. `site.outDir` holds what is served at it: copy the folder's
 contents to the path, not to the host's root.
 
 **Links stay written from the site's root.** In pages, navigations, layouts and stylesheets, write `/guides/setup/`,
@@ -1453,7 +1453,7 @@ front of every such reference as it serves a page or stylesheet, in `pd dev` and
 `style` attributes, `<style>` and stylesheets (and `@import "…"`). A link written with the path already gets it twice,
 and the link check says so. Text and code examples are left as written, and so are `data-*` attributes, other
 hosts and relative links. The canonical URLs, Open Graph, JSON-LD and the sitemap carry the path, since they are
-built from `storefront.url`.
+built from `site.url`.
 
 **`pd dev` serves the site under its path too**, at `http://live.localhost:<port>/project/`; the host's root forwards
 there, and any other address outside the path is the 404 page. That way a URL that misses the path fails while you
@@ -1474,13 +1474,13 @@ page and the URL.
 
 **Search engines.** Crawlers read `robots.txt` only at a host's root, so a site under a path gets none. The build's
 notes say what to add to the host's own `robots.txt` where you can (its previews and its sitemap). Each preview
-the site shows carries a robots `noindex` tag instead, and with `storefront.index: false` every page does. The
+the site shows carries a robots `noindex` tag instead, and with `site.index: false` every page does. The
 sitemap is written at `<path>sitemap.xml`: submit it in the search engine's console.
 
 **The workbench beside it.** A workbench on the same host is built for its own full path:
 
 ```ts
-storefront: { …, url: "https://example.github.io/project/", workbenchUrl: "/project/workbench/" },
+site: { …, url: "https://example.github.io/project/", workbenchUrl: "/project/workbench/" },
 build: { basePath: "/project/workbench/" },
 ```
 
@@ -1496,10 +1496,10 @@ writes.
   that forwards from an old route (`redirectFrom`), or to a file (a stylesheet, an image, a preview).
 - A `#fragment` leads to an element with that `id` in the target page. Headings carry their anchors as ids, so a link
   to a heading is checked too.
-- A URL on the site's own address (`storefront.url`) is checked as its path.
+- A URL on the site's own address (`site.url`) is checked as its path.
 - On a site published under a path, a path outside it is broken, and so is one written with the path already
   (the build says how to write it).
-- A link into the workbench (`storefront.workbenchUrl`) leads to a component, a folder or a component's variants
+- A link into the workbench (`site.workbenchUrl`) leads to a component, a folder or a component's variants
   page the workbench snapshot has; its `#fragment` names one of the component's variants.
 - A link to another site is not fetched: the build lists each one in its notes, with the pages that use it.
   `mailto:` and `tel:` links are left alone.
@@ -1524,7 +1524,7 @@ person or an agent wrote it.
   from a value, such as `doc-toc-h{{level}}`, defines every class that starts that way. A page's own `<style>` counts
   too.
 - **Allowed:** state classes JavaScript adds (`is-`, `has-`, `js-`), the classes Pattern Dump writes itself (code
-  highlighting, the copy button, pattern links, live examples), and the names in `storefront.checks.allowClasses`
+  highlighting, the copy button, pattern links, live examples), and the names in `site.checks.allowClasses`
   (a trailing `*` for a prefix).
 - A page's markdown can't write HTML, so what the check finds is a value a component writes into a `class`
   attribute (`<pd-components-badge look="hero-big-title">`, a template with `class="{{look}}"`). It names the page's
@@ -1535,7 +1535,7 @@ person or an agent wrote it.
 [pd build]   warning: about.md:12: class "hero-big-title" isn't defined by any component or style
 ```
 
-A warning by default; with `storefront.checks.classes: "error"` it stops the build, and `"off"` skips the check.
+A warning by default; with `site.checks.classes: "error"` it stops the build, and `"off"` skips the check.
 
 ### Custom properties nothing defines
 
@@ -1547,13 +1547,13 @@ build, naming the file and line. Without the check it falls back to nothing, and
   preview the build writes (`style="--cols: {{cols}}"` in a template).
 - `var(--x, fallback)` is fine: it says what to show without `--x`. A name Sass builds (`var(--#{$name})`) and a
   `var()` in a comment are not checked. A package's own stylesheets are not checked: they are not the project's to fix.
-- A property JavaScript sets goes in `storefront.checks.allowProperties` (a trailing `*` for a prefix).
+- A property JavaScript sets goes in `site.checks.allowProperties` (a trailing `*` for a prefix).
 
 ```
 pd build: the skin reads custom properties nothing defines, so nothing was written:
   - src/styles/components/card.scss:42: var(--card-gap) reads a custom property nothing defines: define --card-gap
     in the skin, give it a fallback (var(--card-gap, ...)), or, if JavaScript sets it, list it in
-    storefront.checks.allowProperties
+    site.checks.allowProperties
 ```
 
 ### The accessibility check
@@ -1617,19 +1617,19 @@ workbench under a path. Set `workbenchUrl` to that path and build the workbench 
 ```ts
 export default defineConfig({
   // …
-  storefront: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "/workbench/" },
+  site: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "/workbench/" },
   build: { basePath: "/workbench/" },
 });
 ```
 
 `pd build` still writes two folders. Publish the storefront's at the host's root and the workbench's inside
 it at `/workbench/`; on GitHub Pages the workflow copies one into the other before it uploads them, as
-`pd init --storefront`'s does. Then:
+`pd init --with-site`'s does. Then:
 
 - the storefront's `robots.txt` also keeps crawlers out of the workbench's previews;
 - no page or `redirectFrom` may be at or under `/workbench/`, since the workbench would overwrite it there;
 - the build refuses to make the workbench for another base path than `workbenchUrl`'s (`build.basePath`,
   or `--base`): its pages would link to a workbench that isn't there.
 
-An absolute `workbenchUrl` on the origin of `storefront.url` (`https://example.com/workbench/` with
+An absolute `workbenchUrl` on the origin of `site.url` (`https://example.com/workbench/` with
 `url: "https://example.com/"`) counts as the same host too.

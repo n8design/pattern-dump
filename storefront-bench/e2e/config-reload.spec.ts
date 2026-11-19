@@ -34,7 +34,7 @@ test.afterEach(async ({ request }) => {
 });
 
 test.describe("the config file in pd dev", () => {
-  test("a storefront.site edit shows on the open page", async ({ page }) => {
+  test("a site.globals edit shows on the open page", async ({ page }) => {
     await open(page);
     await expect(page.locator(".site-footer p").first()).toHaveText(FOOTER);
     await save(config, original.replace(`footer: "${FOOTER}"`, `footer: "A footer edited while the page was open."`));
@@ -47,7 +47,7 @@ test.describe("the config file in pd dev", () => {
       .replace(`footer: "${FOOTER}"`, `footer: "Not taken."`)
       .replace(`outDir: "./.out/workbench"`, `outDir: "./.out/workbench-elsewhere"`));
     await expect(page.locator("[data-pd-live-notice] li")).toHaveText(
-      ["pattern-dump.config.ts changed: restart pd dev to load it (only storefront.site is taken without a restart)"], { timeout: 10_000 });
+      ["pattern-dump.config.ts changed: restart pd dev to load it (only site.globals is taken without a restart)"], { timeout: 10_000 });
     await expect(page.locator(".site-footer p").first()).toHaveText(FOOTER);
   });
 

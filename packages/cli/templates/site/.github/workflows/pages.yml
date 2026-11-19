@@ -1,5 +1,5 @@
-# Builds the website and publishes it to GitHub Pages, at the address in storefront.url. The style guide's
-# workbench is not part of it: the pages link to it at storefront.workbenchUrl, where the style guide publishes it.
+# Builds the website and publishes it to GitHub Pages, at the address in site.url. The style guide's
+# workbench is not part of it: the pages link to it at site.workbenchUrl, where the style guide publishes it.
 # Before the first run: Settings → Pages → Source: "GitHub Actions".
 name: Pages
 

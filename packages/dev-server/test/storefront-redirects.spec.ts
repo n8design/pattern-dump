@@ -46,8 +46,8 @@ describe("redirectProblems", () => {
 
   it("refuses an old route at or under the path of a workbench published on the same host", () => {
     const at = (old: string) => redirectProblems(site(file("a.md", "/a/", `title: A\nredirectFrom: ${old}\n`)), "/workbench/");
-    expect(at("/workbench/")).toEqual([`a.md:3: redirectFrom "/workbench/" is at /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`]);
-    expect(at("/workbench/components/note/")).toEqual([`a.md:3: redirectFrom "/workbench/components/note/" is under /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`]);
+    expect(at("/workbench/")).toEqual([`a.md:3: redirectFrom "/workbench/" is at /workbench/, where the workbench is published on this host (site.workbenchUrl), so the workbench would overwrite it there`]);
+    expect(at("/workbench/components/note/")).toEqual([`a.md:3: redirectFrom "/workbench/components/note/" is under /workbench/, where the workbench is published on this host (site.workbenchUrl), so the workbench would overwrite it there`]);
   });
 
   it("takes the workbench's path as whole segments, and checks nothing without one", () => {

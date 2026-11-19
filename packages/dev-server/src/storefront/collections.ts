@@ -101,7 +101,7 @@ export function checkCollections(
 ): { listed: string[]; problems: string[]; notes: string[] } {
   const problems: string[] = [], notes: string[] = [];
   if (configured && Object.hasOwn(configured, COLLECTIONS_KEY)) {
-    problems.push(`storefront.site.${COLLECTIONS_KEY} is filled by Pattern Dump from the pages folders: list the names in ${owner}'s schema, and don't set it in the config`);
+    problems.push(`site.globals.${COLLECTIONS_KEY} is filled by Pattern Dump from the pages folders: list the names in ${owner}'s schema, and don't set it in the config`);
   }
   if (!declared) return { listed: [], problems, notes };
   const names = isObject(declared["properties"]) ? declared["properties"] : {};

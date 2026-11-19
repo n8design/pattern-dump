@@ -173,7 +173,7 @@ test("under a path, a script's request outside it stops the build, naming the pa
     .then(() => "built", (e: Error) => e.message);
   expect(message).toContain("pd build: the storefront has problems in a browser, so nothing was written:");
   for (const page of ["/", "/about/"]) {
-    expect(message).toContain(`  - ${page}: a request to /data.json?v=1 is outside /sub/, the path the site is published under (storefront.url): `
+    expect(message).toContain(`  - ${page}: a request to /data.json?v=1 is outside /sub/, the path the site is published under (site.url): `
       + `a script that builds this URL needs the site's path, which <meta name="pd-base-path"> names (at 1000×720 and 390×844)`);
   }
   expect(existsSync(join(root, ".out"))).toBe(false);

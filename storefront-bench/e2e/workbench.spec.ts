@@ -68,11 +68,11 @@ test.describe("the skin in the workbench", () => {
       return page.locator(".rel-panel .rel-group-heading", { hasText: /^Pages$/ }).locator("xpath=following-sibling::ul[1]").locator(".rel-item");
     };
     await expect(await itemsOf("layouts/tag")).toHaveText([
-      `/tags/design/ (the page of the tag "design", from storefront.tagPages)`,
-      `/tags/images/ (the page of the tag "images", from storefront.tagPages)`,
-      `/tags/layout/ (the page of the tag "layout", from storefront.tagPages)`,
+      `/tags/design/ (the page of the tag "design", from site.tagPages)`,
+      `/tags/images/ (the page of the tag "images", from site.tagPages)`,
+      `/tags/layout/ (the page of the tag "layout", from site.tagPages)`,
     ]);
-    await expect(await itemsOf("layouts/categories")).toHaveText(["/categories/ (the index of the categories, from storefront.categoryPages)"]);
+    await expect(await itemsOf("layouts/categories")).toHaveText(["/categories/ (the index of the categories, from site.categoryPages)"]);
   });
 
   test("shows no Pages group on a component that is not a layout", async ({ page }) => {

@@ -37,8 +37,8 @@ export type CategoryIndex = TermIndex;
 
 /** How messages name a kind. */
 export const TERM_WORDS: Readonly<Record<TermKind, { one: string; many: string; config: string }>> = {
-  tag: { one: "tag", many: "tags", config: "storefront.tags" },
-  category: { one: "category", many: "categories", config: "storefront.categories" },
+  tag: { one: "tag", many: "tags", config: "site.tags" },
+  category: { one: "category", many: "categories", config: "site.categories" },
 };
 
 /** storefront.tags or storefront.categories (already checked by the config's validation), indexed. */
@@ -71,7 +71,7 @@ const isObject = (v: unknown): v is Obj => typeof v === "object" && v !== null &
 export function checkSiteCategories(declared: unknown, owner: string, configured: Obj | undefined): { listed: boolean; problems: string[] } {
   const problems: string[] = [];
   if (configured && Object.hasOwn(configured, CATEGORIES_KEY)) {
-    problems.push(`storefront.site.${CATEGORIES_KEY} is filled by Pattern Dump from storefront.categories: list it in ${owner}'s schema, and don't set it in storefront.site`);
+    problems.push(`site.globals.${CATEGORIES_KEY} is filled by Pattern Dump from site.categories: list it in ${owner}'s schema, and don't set it in site.globals`);
   }
   if (declared === undefined) return { listed: false, problems };
   const own = Object.keys(isObject(declared) ? declared : {}).filter(k => k !== "description" && k !== "title");

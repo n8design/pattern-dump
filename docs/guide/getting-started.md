@@ -36,7 +36,7 @@ npx --package=/path/to/pattern-dump-<version>.tgz pd init my-design-system --pd-
 | Package name | `--name <name>` | the folder name; a generic one is scoped by its parent folder (below) |
 | Title in the Nav Rail | `--brand <title>` | the name, or the parent folder's name for a scoped one |
 | Include the starter components? | `--no-examples` to skip | yes |
-| Include a website (storefront)? | `--storefront` | no |
+| Include a website (storefront)? | `--with-site` | no |
 | Include site search (Pagefind)? (with a website) | `--search` / `--no-search` | yes |
 | Follow the viewer's light or dark setting? (with a website) | `--system-theme` / `--no-system-theme` | yes |
 | Run `git init`? | `--git` / `--no-git` | yes, unless already inside a repository |
@@ -198,7 +198,7 @@ npx pattern-dump init site --site ../styleguide            # a folder next to it
 | File | What |
 |---|---|
 | `package.json` | `dev` and `build`; `pattern-dump`, the style guide and (with search) Pagefind as devDependencies |
-| `pattern-dump.config.ts` | `packages: ["<the style guide>"]`, the `storefront` block, and `build: { workbench: false }` |
+| `pattern-dump.config.ts` | `packages: ["<the style guide>"]`, the `site` block, and `build: { workbench: false }` |
 | `pages/index.md`, `pages/about.md` | two pages that name no layout, so they render with the style guide's `layouts/page` |
 | `.gitignore`, `README.md` | |
 | `.github/workflows/pages.yml` | for a style guide from the registry: builds the website and publishes it |
@@ -218,7 +218,7 @@ a pattern package:
 
 ```bash
 mkdir acme-web && cd acme-web
-npx pattern-dump init styleguide --storefront --no-git    # @acme-web/styleguide
+npx pattern-dump init styleguide --with-site --no-git    # @acme-web/styleguide
 ```
 
 Add the `patternDump` field to `styleguide/package.json`, naming the same folders as its config (a folder named in
@@ -268,7 +268,7 @@ await cp("site/site", "_site", { recursive: true });
 await cp("styleguide/dist", "_site/workbench", { recursive: true });
 ```
 
-The root's `.github/workflows/pages.yml` is the one `pd init --storefront` writes, with its build and copy steps
+The root's `.github/workflows/pages.yml` is the one `pd init --with-site` writes, with its build and copy steps
 replaced by `- run: npm run pages`. Run `npm install` at the root once, so there is one lockfile; add `_site` to
 the root's `.gitignore`. People who write content work in `site/pages/` only.
 

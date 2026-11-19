@@ -6,7 +6,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures.js";
 
-/** The built root the static host serves (storefront.outDir in the bench's config). */
+/** The built root the static host serves (site.outDir in the bench's config). */
 const ROOT = fileURLToPath(new URL("../.out/storefront/", import.meta.url));
 
 const NO_CACHE = { "Cache-Control": "no-cache", Pragma: "no-cache" };

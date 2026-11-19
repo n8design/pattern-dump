@@ -165,39 +165,42 @@ Defaults for `pd build`; the command line overrides each, except `build.workbenc
 | `build.outDir` | string | `outDir`, then `dist` | Output folder, relative to the root. Replaced as a whole once a build has passed every check; a build that stops leaves it as it was |
 | `build.basePath` | string | `/` | Where the site will be hosted, such as `/docs/` |
 | `build.audit` | boolean | `true` | Include the corpus audit and the Audit tab |
-| `build.workbench` | boolean | `true` | `false` writes the storefront only: for a site whose components come from a style guide package that publishes its own workbench, at `storefront.workbenchUrl`. `outDir` and the base path are then not used, and there must be a storefront |
+| `build.workbench` | boolean | `true` | `false` writes the storefront only: for a site whose components come from a style guide package that publishes its own workbench, at `site.workbenchUrl`. `outDir` and the base path are then not used, and there must be a storefront |
 
-### storefront
+### site
 
-A website of real HTML pages, written from markdown, beside the workbench. `pd dev` serves it on its own
+A website of real HTML pages, written from markdown, beside the workbench. Before 0.8.0 this object was called
+`storefront`, and `site.globals` was `storefront.site`. The old names still load, with a warning for each key
+(`storefront.pagesDir is now site.pagesDir`, `storefront.site is now site.globals`); setting both `site` and
+`storefront` is a config problem. Rename them when you next edit the config. `pd dev` serves it on its own
 host and the workbench on `pd.localhost`, both from `/`; `pd build` writes it to its own folder. A page
 renders with the layout `layouts/<name>` from your patterns (`layout:` in its frontmatter, `page` when
-it has none). `storefront.pagesDir`, `patternsDir` and `storefront.outDir` must be three separate folders:
+it has none). `site.pagesDir`, `patternsDir` and `site.outDir` must be three separate folders:
 none of them is another, and none is inside another. Pages, frontmatter, skins and building are described
 in [storefront.md](storefront.md).
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `storefront.pagesDir` | string | required | Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/` |
-| `storefront.outDir` | string | required | Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench snapshot |
-| `storefront.host` | string | `live.localhost` | The host name `pd dev` serves the storefront on. A bare name, with no scheme, port or path |
-| `storefront.workbenchUrl` | string | (none; `pd build` of a project with a storefront needs it, with `build.workbench: false` too) | Where the built workbench will be hosted: an absolute http(s) URL with no query or fragment, such as `https://workbench.example.com/`, or a path such as `/workbench/` for a workbench on the storefront's own host (see [storefront.md](storefront.md#building)). A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
-| `storefront.head` | string | (none) | A Handlebars file of the site's, such as `./head.hbs`, rendered with `site` into every page's head after the skin's `partials/head` ([storefront.md](storefront.md#skins)) |
-| `storefront.url` | string | (none) | The site's address, such as `https://example.com/`: an absolute http(s) URL with no query or fragment (loaded with one trailing slash). It may have a path, such as `https://example.github.io/project/`: the site is then published under it, in `pd dev` too ([storefront.md](storefront.md#publishing-under-a-path)). With it, pages get canonical URLs, Open Graph and JSON-LD, and `pd build` writes `sitemap.xml`; without it, those are left out ([storefront.md](storefront.md#search-engines-and-link-previews)) |
-| `storefront.lang` | string | `en` | The language of every page, for `<html lang>`: a language tag such as `de-AT` |
-| `storefront.index` | boolean | `true` | `false` keeps the whole site out of search engines, for a staging site: every page `noindex`, `robots.txt` disallows everything, no sitemap |
-| `storefront.image` | string | (none) | The link-preview image of every page that names none: a PNG, JPEG, GIF or WebP file in the assets, such as `/assets/images/share.png` |
-| `storefront.images` | object | (none) | The site's own `quality` and `effort` for its images, over `images` (above) |
-| `storefront.categories` | object | (none) | The categories a page's `categories:` may name, by key (lowercase letters, digits and hyphens): `{ guides: { label: "Guides", description: "…", aliases: ["how-to"] } }`. `label` is required; `aliases` are old keys kept after a rename. Independent of the folders, so a page changes category without changing its URL ([storefront.md](storefront.md#categories)) |
-| `storefront.tags` | object | (none) | The tags a page's `tags:` may name, declared as categories are: `{ css: { label: "CSS", aliases: ["styles"] } }`. Without it any tag works, labelled with its key ([storefront.md](storefront.md#tags)) |
-| `storefront.tagPages` | boolean or object | on when the skin has `layouts/tag` | A page per tag at `/tags/<key>/` and an index at `/tags/`. `false`: off; `true` or `{ path, title }`: on, and a missing layout is a problem ([storefront.md](storefront.md#tag-and-category-pages)) |
-| `storefront.categoryPages` | boolean or object | on when the skin has `layouts/category` | The same for categories, at `/categories/` |
-| `storefront.search` | boolean | on when the project has Pagefind | Search: `pd build` indexes every page's own content with Pagefind into `_pd/search/`. `true`: a build without Pagefind stops; `false`: off ([storefront.md](storefront.md#search)) |
-| `storefront.llms` | boolean | `true` (`false` with `index: false`) | `pd build` writes `llms.txt` at the site's root: the site's title and description and each page's title, link and teaser, by collection ([storefront.md](storefront.md#search-engines-and-link-previews)). `false`: none |
-| `storefront.checks.classes` | `"warning"`, `"error"` or `"off"` | `"warning"` | The class check: a class on a page that no component or style of the style guide defines is listed in the report, stops the build, or isn't checked ([storefront.md](storefront.md#the-class-check)) |
-| `storefront.checks.allowClasses` | list of strings | `[]` | Classes a page may carry anyway: names, or a prefix ending in `*` (`"chart-*"`) |
-| `storefront.checks.allowProperties` | list of strings | `[]` | Custom properties JavaScript sets, which the skin's `var()` may read with no definition in CSS: names, or a prefix ending in `*` (`"--chart-*"`). Any other `var()` without a fallback and without a definition stops the build ([storefront.md](storefront.md#custom-properties-nothing-defines)) |
-| `storefront.site` | object | (none) | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
+| `site.pagesDir` | string | required | Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/` |
+| `site.outDir` | string | required | Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench snapshot |
+| `site.host` | string | `live.localhost` | The host name `pd dev` serves the storefront on. A bare name, with no scheme, port or path |
+| `site.workbenchUrl` | string | (none; `pd build` of a project with a storefront needs it, with `build.workbench: false` too) | Where the built workbench will be hosted: an absolute http(s) URL with no query or fragment, such as `https://workbench.example.com/`, or a path such as `/workbench/` for a workbench on the storefront's own host (see [storefront.md](storefront.md#building)). A trailing slash is added if it has none. Links from storefront pages to the workbench start with it. Used by `pd build` only: in `pd dev` they always go to `http://pd.localhost:<port>` |
+| `site.head` | string | (none) | A Handlebars file of the site's, such as `./head.hbs`, rendered with `site` into every page's head after the skin's `partials/head` ([storefront.md](storefront.md#skins)) |
+| `site.url` | string | (none) | The site's address, such as `https://example.com/`: an absolute http(s) URL with no query or fragment (loaded with one trailing slash). It may have a path, such as `https://example.github.io/project/`: the site is then published under it, in `pd dev` too ([storefront.md](storefront.md#publishing-under-a-path)). With it, pages get canonical URLs, Open Graph and JSON-LD, and `pd build` writes `sitemap.xml`; without it, those are left out ([storefront.md](storefront.md#search-engines-and-link-previews)) |
+| `site.lang` | string | `en` | The language of every page, for `<html lang>`: a language tag such as `de-AT` |
+| `site.index` | boolean | `true` | `false` keeps the whole site out of search engines, for a staging site: every page `noindex`, `robots.txt` disallows everything, no sitemap |
+| `site.image` | string | (none) | The link-preview image of every page that names none: a PNG, JPEG, GIF or WebP file in the assets, such as `/assets/images/share.png` |
+| `site.images` | object | (none) | The site's own `quality` and `effort` for its images, over `images` (above) |
+| `site.categories` | object | (none) | The categories a page's `categories:` may name, by key (lowercase letters, digits and hyphens): `{ guides: { label: "Guides", description: "…", aliases: ["how-to"] } }`. `label` is required; `aliases` are old keys kept after a rename. Independent of the folders, so a page changes category without changing its URL ([storefront.md](storefront.md#categories)) |
+| `site.tags` | object | (none) | The tags a page's `tags:` may name, declared as categories are: `{ css: { label: "CSS", aliases: ["styles"] } }`. Without it any tag works, labelled with its key ([storefront.md](storefront.md#tags)) |
+| `site.tagPages` | boolean or object | on when the skin has `layouts/tag` | A page per tag at `/tags/<key>/` and an index at `/tags/`. `false`: off; `true` or `{ path, title }`: on, and a missing layout is a problem ([storefront.md](storefront.md#tag-and-category-pages)) |
+| `site.categoryPages` | boolean or object | on when the skin has `layouts/category` | The same for categories, at `/categories/` |
+| `site.search` | boolean | on when the project has Pagefind | Search: `pd build` indexes every page's own content with Pagefind into `_pd/search/`. `true`: a build without Pagefind stops; `false`: off ([storefront.md](storefront.md#search)) |
+| `site.llms` | boolean | `true` (`false` with `index: false`) | `pd build` writes `llms.txt` at the site's root: the site's title and description and each page's title, link and teaser, by collection ([storefront.md](storefront.md#search-engines-and-link-previews)). `false`: none |
+| `site.checks.classes` | `"warning"`, `"error"` or `"off"` | `"warning"` | The class check: a class on a page that no component or style of the style guide defines is listed in the report, stops the build, or isn't checked ([storefront.md](storefront.md#the-class-check)) |
+| `site.checks.allowClasses` | list of strings | `[]` | Classes a page may carry anyway: names, or a prefix ending in `*` (`"chart-*"`) |
+| `site.checks.allowProperties` | list of strings | `[]` | Custom properties JavaScript sets, which the skin's `var()` may read with no definition in CSS: names, or a prefix ending in `*` (`"--chart-*"`). Any other `var()` without a fallback and without a definition stops the build ([storefront.md](storefront.md#custom-properties-nothing-defines)) |
+| `site.globals` | object | (none) | Values every page shares, such as the site's title or footer line. Every layout gets them as `site`, and a page cannot set them. Their keys and types are what the `site` property of `partials/base`'s schema declares, and they are checked against it. One key is Pattern Dump's: `navigations`, named lists of links ([storefront.md](storefront.md#declared-navigations)) |
 
 ## When changes take effect
 

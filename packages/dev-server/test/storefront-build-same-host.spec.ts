@@ -74,12 +74,12 @@ describe("pd build — a workbench on the storefront's host", () => {
     await save(join(root, "pages", "workbench.md"), "---\ntitle: Workbench\n---\n\nA page in the workbench's place.\n");
     const out = join(root, "..", "wb-taken");
     await expect(buildAt(root, out, config({ workbenchUrl: "/workbench/" })))
-      .rejects.toThrow(`workbench.md: the page /workbench/ is at /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`);
+      .rejects.toThrow(`workbench.md: the page /workbench/ is at /workbench/, where the workbench is published on this host (site.workbenchUrl), so the workbench would overwrite it there`);
     expect(await exists(out)).toBe(false);
   }, 60_000);
 
   // A same-host workbench is linked at its path, so the build must make it for that path.
-  const builtFor = (got: string) => `pd build: storefront.workbenchUrl is /workbench/, so the workbench must be built for /workbench/ `
+  const builtFor = (got: string) => `pd build: site.workbenchUrl is /workbench/, so the workbench must be built for /workbench/ `
     + `(build.basePath or --base); it is being built for ${got}`;
   const withBase = (basePath: string | undefined) => validateConfig({ ...benchConfig, ...(basePath ? { build: { basePath } } : {}),
     storefront: { ...benchConfig.storefront!, workbenchUrl: "/workbench/" } }, "test");

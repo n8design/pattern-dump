@@ -26,7 +26,7 @@ test.describe("workbench links", () => {
     await expect(page.frameLocator("#preview-frame").locator(".callout-title")).toHaveText("Careful");
   });
 
-  test("in the built site, point exactly at storefront.workbenchUrl", async ({ page }, info) => {
+  test("in the built site, point exactly at site.workbenchUrl", async ({ page }, info) => {
     test.skip(isDev(info), "the built site only");
     await page.goto("/");
     await expect(page.locator("figure.doc-example figcaption a")).toHaveAttribute("href", `${BUILD_WORKBENCH_URL}components/callout`);

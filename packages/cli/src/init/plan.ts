@@ -160,10 +160,10 @@ export function planInit(
  *  that puts the style guide's workbench beside it (a style guide in a folder next to it). */
 const SITE_PUBLISH_README = {
   workflow: "\n## Publish it\n\n`.github/workflows/pages.yml` builds the website and publishes it to GitHub Pages on every push to\n"
-    + "`main`: **Settings → Pages → Source:** \"GitHub Actions\". Set `storefront.url` to the site's address. The\n"
+    + "`main`: **Settings → Pages → Source:** \"GitHub Actions\". Set `site.url` to the site's address. The\n"
     + "workflow installs with `npm ci`, so the style guide and `pattern-dump` must come from the npm registry.\n",
   root: "\n## Publish it\n\nThe style guide is a folder next to this one, so the repository's root builds and publishes both: the\n"
-    + "website from this project's `npm run build`, the style guide's workbench into it at `storefront.workbenchUrl`.\n"
+    + "website from this project's `npm run build`, the style guide's workbench into it at `site.workbenchUrl`.\n"
     + "The [getting started guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/getting-started.md#a-content-only-website)\n"
     + "has the root `package.json` and workflow.\n",
 };

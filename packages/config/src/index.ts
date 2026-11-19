@@ -2,7 +2,7 @@
 // Load and validate pattern-dump.config (.ts/.json, TS wins). Shared config types.
 import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/contracts";
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
-export { ConfigError, configProblems, sameHostWorkbenchPath, storefrontBasePath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
+export { ConfigError, configProblems, configWarnings, legacyKeys, sameHostWorkbenchPath, storefrontBasePath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
 export { withOwnManifest } from "./own-manifest.js";
 
 export interface AssetsConfig {
@@ -338,8 +338,24 @@ export type StorefrontNavEntry =
  * patterns and styles all come from pattern packages has none of its own). `validateConfig` fills them in
  * (`withSourceDefaults`), so everything that reads a loaded config gets all three.
  */
-export type PatternDumpConfigInput = Omit<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">
-  & Partial<Pick<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">>;
+export type PatternDumpConfigInput = Omit<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles" | "storefront">
+  & Partial<Pick<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">>
+  & {
+    /** The website: real HTML pages, written from markdown, beside the workbench. */
+    site?: SiteConfig;
+    /** @deprecated The old name of `site` (before 0.8.0), with `site.globals` as `site`. Still loaded, with a
+     *  warning per key; both at once is a problem. */
+    storefront?: StorefrontConfig;
+  };
+
+/** The website as a config writes it (`site`): the storefront's settings, with the values every page shares as
+ *  `globals`. Layouts read them as `site`, as before. */
+export type SiteConfig = Omit<StorefrontConfig, "site"> & {
+  /** Values every page of the site shares, such as its title or the line in its footer; every layout gets them as
+   *  `site`. Checked against the `site` property of `partials/base`'s schema. `navigations` is Pattern Dump's:
+   *  named lists of links (StorefrontNavEntry). */
+  globals?: StorefrontConfig["site"];
+};
 
 /**
  * Type checking for a config file; the object is returned unchanged. It fills in no defaults: what the config leaves

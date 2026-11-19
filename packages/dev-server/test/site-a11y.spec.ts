@@ -103,8 +103,8 @@ describe("the page basics in pd dev", () => {
         expect(status).toBe(200);
       }
       expect(log.mock.calls.map(c => String(c[0])).filter(s => s.includes("warning: index.md: the page"))).toEqual([
-        "[storefront] warning: index.md: the page has no <main>: the page's own content goes in one, so assistive technology can go straight to it",
-        "[storefront] warning: index.md: the page has no <h1>: one heading names the page",
+        "[site] warning: index.md: the page has no <main>: the page's own content goes in one, so assistive technology can go straight to it",
+        "[site] warning: index.md: the page has no <h1>: one heading names the page",
       ]);
     } finally {
       await server.close();

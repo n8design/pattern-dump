@@ -76,7 +76,7 @@ npx pd build --base /docs/htwoo/
 Every link, stylesheet, script and data file inside the build then points under `/docs/htwoo/`. A
 build made for one base path does not work under another. Rebuild when the address changes.
 
-A project with a storefront whose workbench is on the storefront's own host (`storefront.workbenchUrl` a
+A project with a storefront whose workbench is on the storefront's own host (`site.workbenchUrl` a
 path such as `/workbench/`, [storefront.md](storefront.md#building)) must build the workbench for that
 path; another base path is an error. When the storefront itself is at its host's root, the build's note about
 copying the workbench's `robots.txt` rule then doesn't appear: the storefront's own `robots.txt` carries it. With
@@ -223,8 +223,8 @@ assets are all included, and **Hide packages** works in the static site.
 
 ## With a storefront
 
-A project with a [storefront](storefront.md) gets a second folder from the same build,
-`storefront.outDir`, with one page per markdown file and its own copy of everything those pages use. The
+A project with a [site](storefront.md) gets a second folder from the same build,
+`site.outDir`, with one page per markdown file and its own copy of everything those pages use. The
 workbench snapshot is written exactly as it would be without one. Deploy each folder to its own host:
 
 ```
@@ -234,7 +234,7 @@ workbench snapshot is written exactly as it would be without one. Deploy each fo
 [pd build]   note: guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"
 ```
 
-The storefront is served at `storefront.url`: the root of its host, or a path under it, which the second line
+The storefront is served at `site.url`: the root of its host, or a path under it, which the second line
 names ([storefront.md](storefront.md#publishing-under-a-path)). Unlike a component that fails to render in the
 workbench, a problem on a storefront page fails the build, and then neither folder is written: each is replaced
 only once every check has passed, so a build that stops leaves both as they were.
@@ -272,6 +272,6 @@ How a live URL maps to a file (for example `/api/component/atoms/button?variant=
 | A preview shows a second workbench inside it | The host rewrites missing files to `index.html` (a "single-page app" setting), so a component that failed to render gets the workbench page as its preview. Turn the rewrite off; every route already has its own page. |
 | The site shows old content | Rebuild. The site is a snapshot; nothing updates on its own. |
 | `pd build: --out … overlaps …` | The output folder would overwrite folders Pattern Dump reads. Choose a separate folder such as `dist`. |
-| `pd build: storefront.workbenchUrl is /workbench/, so the workbench must be built for /workbench/` | The workbench is linked at that path on the storefront's host. Set `build.basePath` (or `--base`) to the same path. |
+| `pd build: site.workbenchUrl is /workbench/, so the workbench must be built for /workbench/` | The workbench is linked at that path on the storefront's host. Set `build.basePath` (or `--base`) to the same path. |
 | `[pd] Error: unknown command "build"` | The installed Pattern Dump predates `pd build`: update the `pattern-dump` dependency. |
 | Build is slow on a large design system | Most time goes into per-component checks. `--no-audit` skips the corpus audit; the rest scales with the number of components and variants (about 20 s for hTWOo's 261 components). |

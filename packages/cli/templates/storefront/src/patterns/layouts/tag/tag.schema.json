@@ -13,7 +13,7 @@
     },
     "description": {
       "type": "string",
-      "description": "The tag's description, when storefront.tags gives one"
+      "description": "The tag's description, when site.tags gives one"
     },
     "page": {
       "type": "object",

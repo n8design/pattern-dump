@@ -55,7 +55,7 @@ describe("pd build — llms.txt", () => {
     expect(llms).toContain("- [About](https://bench.example.test/about/)");
   }, 60_000);
 
-  it("writes no llms.txt with storefront.llms: false, or for a site with index: false", async () => {
+  it("writes no llms.txt with site.llms: false, or for a site with index: false", async () => {
     const root = await benchCopy();
     await build(root, join(root, "..", "wb-llms-off"), config({ llms: false }));
     expect(await exists(join(root, ".out", "storefront", "llms.txt"))).toBe(false);
@@ -63,7 +63,7 @@ describe("pd build — llms.txt", () => {
     expect(await exists(join(root, ".out", "storefront", "llms.txt"))).toBe(false);
   }, 60_000);
 
-  it("without storefront.url: llms.txt links each page by its path from the site's root", async () => {
+  it("without site.url: llms.txt links each page by its path from the site's root", async () => {
     const root = await benchCopy();
     const { url: _u, ...rest } = benchConfig.storefront!;
     await buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root, { outDir: join(root, "..", "wb-llms-nourl"), pdVersion: "x", now: NOW });

@@ -26,26 +26,26 @@ describe("classifyConfigChange", () => {
     expect(classifyConfigChange(base(), next)).toBe("none");
   });
 
-  it("is site when only a storefront.site value differs", () => {
+  it("is site when only a site.globals value differs", () => {
     const next = base();
     next.storefront!.site = { ...next.storefront!.site, footer: "New footer" };
     expect(classifyConfigChange(base(), next)).toBe("site");
   });
 
-  it("is site when a nested storefront.site value differs", () => {
+  it("is site when a nested site.globals value differs", () => {
     const next = base();
     next.storefront!.site = { ...next.storefront!.site, links: { home: "/start/" } };
     expect(classifyConfigChange(base(), next)).toBe("site");
   });
 
-  it("is site when storefront.site is added or removed", () => {
+  it("is site when site.globals is added or removed", () => {
     const without = base();
     delete without.storefront!.site;
     expect(classifyConfigChange(without, base())).toBe("site");
     expect(classifyConfigChange(base(), without)).toBe("site");
   });
 
-  it("is other when anything outside storefront.site differs", () => {
+  it("is other when anything outside site.globals differs", () => {
     const next = base();
     next.outDir = "./.out2";
     expect(classifyConfigChange(base(), next)).toBe("other");
@@ -57,7 +57,7 @@ describe("classifyConfigChange", () => {
     expect(classifyConfigChange(base(), next)).toBe("other");
   });
 
-  it("is other when storefront.site and something else both differ", () => {
+  it("is other when site.globals and something else both differ", () => {
     const next = base();
     next.outDir = "./.out2";
     next.storefront!.site = { ...next.storefront!.site, footer: "New footer" };

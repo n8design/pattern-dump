@@ -151,7 +151,7 @@ export async function renderPanel(): Promise<void> {
         if (p.source === "generated") {
           const kind = p.generated.kind;
           const what = p.generated.term !== undefined ? `the page of the ${kind} "${p.generated.term}"` : `the index of the ${kind === "tag" ? "tags" : "categories"}`;
-          return `${p.route} (${what}, from storefront.${kind}Pages)`;
+          return `${p.route} (${what}, from site.${kind}Pages)`;
         }
         return `${p.path} (${
           p.source === "own" ? "its own layout" : p.source === "default" ? "the default layout" : `childLayout of ${p.from ?? "its folder"}`

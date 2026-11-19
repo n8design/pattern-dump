@@ -142,13 +142,13 @@ describe("the index", () => {
   });
 });
 
-describe("storefront.search", () => {
+describe("site.search", () => {
   const none = async () => undefined;
   it("true without Pagefind stops, naming the install", async () => {
     const e = await searchPagefind(true, "/nowhere", none).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(SearchUnavailableError);
-    expect((e as Error).message).toBe("pd build: storefront.search is on, and this project has no Pagefind to build the index with: "
-      + "npm install --save-dev pagefind (or set storefront.search to false)");
+    expect((e as Error).message).toBe("pd build: site.search is on, and this project has no Pagefind to build the index with: "
+      + "npm install --save-dev pagefind (or set site.search to false)");
   });
 
   it("left out: Pagefind when the project has it, else no search and no stop; false never loads it", async () => {

@@ -246,7 +246,7 @@ function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
         // compile, a file that can't be read) is reported and asked again by the next page.
         if (status !== 404) {
           if (hashes.get(path) === lookup) hashes.delete(path);
-          console.error(`[storefront] ${path} could not be stamped: ${status} ${held.body().toString("utf8").split("\n")[0]!.slice(0, 160)}`);
+          console.error(`[site] ${path} could not be stamped: ${status} ${held.body().toString("utf8").split("\n")[0]!.slice(0, 160)}`);
         }
         return undefined;
       });
@@ -771,13 +771,13 @@ async function routeRequest(
         themes: { names: themesDir ? [...state.themeCss.keys()] : [], switch: cfg.themeSwitch },
       });
       if (page.search && ctx.onSearchRecord) ctx.onSearchRecord(page.search);
-      if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
+      if (page.problems.length) console.error(`[site] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
       for (const note of page.notes) {
         if (ctx.onStorefrontNote) { ctx.onStorefrontNote(note); continue; }
         // In pd dev each note is printed once per server, not on every request for the page.
         const printed = printedNotes.get(ctx) ?? new Set<string>();
         printedNotes.set(ctx, printed);
-        if (!printed.has(note)) { printed.add(note); console.log(`[storefront] ${note}`); }
+        if (!printed.has(note)) { printed.add(note); console.log(`[site] ${note}`); }
       }
       res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });
       res.end(page.html);

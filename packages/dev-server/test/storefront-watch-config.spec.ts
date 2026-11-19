@@ -65,7 +65,7 @@ const reloads = (messages: string[]) => messages.filter(m => m.startsWith(`{"typ
 const errors = (messages: string[]) => messages.filter(m => m.startsWith(`{"type":"error"`)).map(m => (JSON.parse(m) as { message: string }).message);
 
 describe("the config file in pd dev", () => {
-  it("takes a storefront.site change live: every page reloads, and renders the new value", async () => {
+  it("takes a site.globals change live: every page reloads, and renders the new value", async () => {
     expect(await footer()).toBe("Built with Pattern Dump from the storefront bench.");
     const r = await b.step(() => writeConfig(withSite({ footer: "A new footer." })));
     expect(reloads(r.messages)).toEqual([`{"type":"page-changed","route":null}`]);
@@ -82,7 +82,7 @@ describe("the config file in pd dev", () => {
   it("asks for a restart for any other change, and takes none of it", async () => {
     const r = await b.step(() => writeConfig({ ...withSite({ footer: "Not taken." }), outDir: "./.out/elsewhere" }));
     expect(reloads(r.messages)).toEqual([]);
-    expect(errors(r.messages)).toEqual([`${CONFIG} changed: restart pd dev to load it (only storefront.site is taken without a restart)`]);
+    expect(errors(r.messages)).toEqual([`${CONFIG} changed: restart pd dev to load it (only site.globals is taken without a restart)`]);
     expect(await footer()).toBe("A new footer.");
   }, 60_000);
 

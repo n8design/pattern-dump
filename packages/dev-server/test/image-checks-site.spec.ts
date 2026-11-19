@@ -89,8 +89,8 @@ describe("the image checks on a storefront page", () => {
     for (let i = 0; i < 2; i++) expect((await get(dev, "/")).status).toBe(200);
     const said = log.mock.calls.map(c => String(c[0]));
     for (const p of [REMOTE_SIZE, LOGO_SIZE, LOGO_RASTER]) {
-      expect(said.filter(s => s === `[storefront] warning: ${p}`)).toHaveLength(1);
+      expect(said.filter(s => s === `[site] warning: ${p}`)).toHaveLength(1);
     }
-    expect(said.filter(s => s === `[storefront] ${EXTERNAL("index.md", "https://example.com/a.jpg")}`)).toHaveLength(1);
+    expect(said.filter(s => s === `[site] ${EXTERNAL("index.md", "https://example.com/a.jpg")}`)).toHaveLength(1);
   });
 });

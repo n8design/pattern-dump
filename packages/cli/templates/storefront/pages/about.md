@@ -24,4 +24,4 @@ workbench shows each part of it:
 
 ## Settings
 
-The site's name and footer are `storefront.site` in `pattern-dump.config.ts`.
+The site's name and footer are `site.globals` in `pattern-dump.config.ts`.

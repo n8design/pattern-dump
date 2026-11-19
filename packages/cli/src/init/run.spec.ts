@@ -84,7 +84,7 @@ describe("runInit", () => {
     });
     expect(await runInit(init(target, { name: "acme", install: false }), io)).toBe(0);
     expect(asked).toEqual(["A website on an existing style guide package? Its npm name or folder (empty: a new design system)",
-      "Title in the Nav Rail", "Include starter components", "Include a website (storefront)", "Initialise a git repository"]);
+      "Title in the Nav Rail", "Include starter components", "Include a website", "Initialise a git repository"]);
     expect(await readFile(join(target, "pattern-dump.config.ts"), "utf8")).toContain('title: "Acme"');
     expect(existsSync(join(target, "src/patterns/atoms"))).toBe(false);
     expect(calls).toEqual(["git rev-parse --is-inside-work-tree"]);
@@ -94,20 +94,27 @@ describe("runInit", () => {
     root = await mkdtemp(join(tmpdir(), "pd-init-"));
     const asked = fakeIO({ interactive: true });
     expect(await runInit(init(join(root, "no"), { install: false, git: false }), asked.io)).toBe(0);
-    expect(asked.asked.slice(3, 5)).toEqual(["Include starter components", "Include a website (storefront)"]);
+    expect(asked.asked.slice(3, 5)).toEqual(["Include starter components", "Include a website"]);
     expect(existsSync(join(root, "no", "pages"))).toBe(false);
 
-    const yes = fakeIO({ interactive: true, answers: { "Include a website (storefront)": true } });
+    const yes = fakeIO({ interactive: true, answers: { "Include a website": true } });
     expect(await runInit(init(join(root, "yes"), { install: false, git: false }), yes.io)).toBe(0);
     expect(existsSync(join(root, "yes", "pages", "index.md"))).toBe(true);
     expect(await readFile(join(root, "yes", "pattern-dump.config.ts"), "utf8")).toContain(`workbenchUrl: "/workbench/"`);
   });
 
-  it("--storefront writes the website without asking, and the next steps name both addresses", async () => {
+  it("prints each flag given by its old name, first", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    const { io, logs } = fakeIO();
+    expect(await runInit(init(join(root, "ds"), { install: false, git: false, storefront: true, warnings: ["--storefront is now --with-site"] }), io)).toBe(0);
+    expect(logs[0]).toBe("! --storefront is now --with-site");
+  });
+
+  it("--with-site writes the website without asking, and the next steps name both addresses", async () => {
     root = await mkdtemp(join(tmpdir(), "pd-init-"));
     const { io, asked, logs } = fakeIO({ interactive: true });
     expect(await runInit(init(join(root, "ds"), { storefront: true, install: false, git: false }), io)).toBe(0);
-    expect(asked).not.toContain("Include a website (storefront)");
+    expect(asked).not.toContain("Include a website");
     expect(existsSync(join(root, "ds", ".github", "workflows", "pages.yml"))).toBe(true);
     expect(logs.at(-1)).toBe("  npm run dev      # the website at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/");
     // Search and the system theme are asked for with the website, both yes by default.
@@ -133,7 +140,7 @@ describe("runInit", () => {
     for (const extra of [{ search: true }, { systemTheme: false }]) {
       const { io, logs } = fakeIO();
       expect(await runInit(init(join(root, "ds"), { yes: true, ...extra }), io)).toBe(1);
-      expect(logs.at(-1)).toMatch(/^✗ --(no-)?(search|system-theme) is a choice for a website: add --storefront\. Nothing was written\.$/);
+      expect(logs.at(-1)).toMatch(/^✗ --(no-)?(search|system-theme) is a choice for a website: add --with-site\. Nothing was written\.$/);
       expect(existsSync(join(root, "ds"))).toBe(false);
     }
   });
@@ -320,7 +327,7 @@ describe("runInit --site", () => {
     const config = await readFile(join(target, "pattern-dump.config.ts"), "utf8");
     expect(config).toContain(`packages: ["@acme-web/styleguide"]`);
     expect(config).toContain(`workbenchUrl: "/workbench/"`);
-    expect(config).toContain(`site: { title: "acme-web", footer: "Made with Pattern Dump." }`);
+    expect(config).toContain(`globals: { title: "acme-web", footer: "Made with Pattern Dump." }`);
     expect(config).toContain(`build: { workbench: false }`);
     for (const none of ["src", "themes", "assets", ".github"]) expect(existsSync(join(target, none)), none).toBe(false);
     expect(existsSync(join(target, "pages", "index.md"))).toBe(true);
@@ -377,7 +384,8 @@ describe("runInit --site", () => {
   it("refuses, writing nothing: a design-system flag with --site, --workbench-url without it, a bad address, a bad name", async () => {
     root = await mkdtemp(join(tmpdir(), "pd-init-"));
     const cases: Array<[Record<string, unknown>, RegExp]> = [
-      [{ site: "@acme/ui", storefront: true }, /^✗ --site writes a website on an existing style guide, so --storefront has nothing to choose/],
+      [{ site: "@acme/ui", storefront: true }, /^✗ --site writes a website on an existing style guide, so --with-site has nothing to choose/],
+      [{ site: "@acme/ui", storefront: false }, /^✗ --site writes a website on an existing style guide, so --without-site has nothing to choose/],
       [{ site: "@acme/ui", examples: false, systemTheme: true }, /so --no-examples and --system-theme has nothing to choose/],
       [{ workbenchUrl: "/workbench/" }, /^✗ --workbench-url is where a style guide's workbench is published, for a site on it: add --site/],
       [{ site: "@acme/ui", workbenchUrl: "workbench" }, /^✗ "workbench" is not where a workbench can be/],

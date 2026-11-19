@@ -163,12 +163,12 @@ describe("assemblePage — every problem is fatal, and listed escaped", () => {
     expect(page.status).toBe(500);
     expect(page.problems).toEqual([
       `index.md:3: "bogus" is not declared by layout "page"`,
-      "storefront.site.title is required by partials/base",
+      "site.globals.title is required by partials/base",
       "index.md: pattern:components/gone: there is no such component",
       "index.md: pattern components/nope: there is no such component",
     ]);
     // The site's problem is marked as the whole site's (a build lists it once); the page's own are not.
-    const siteWide = new Set(["storefront.site.title is required by partials/base"]);
+    const siteWide = new Set(["site.globals.title is required by partials/base"]);
     for (const p of page.problems) {
       expect(page.html).toContain(`<li${siteWide.has(p) ? " data-pd-site" : ""}>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`);
     }
@@ -211,10 +211,10 @@ describe("assemblePage — the link-preview image", () => {
     expect(r.problems).toEqual([`index.md:3: image "/assets/logo.svg" is an SVG; link previews need a raster image (PNG, JPEG, GIF or WebP)`]);
   });
 
-  it("fails every page on a bad storefront.image, as the whole site's problem, unless the page names its own", async () => {
+  it("fails every page on a bad site.image, as the whole site's problem, unless the page names its own", async () => {
     const dir = await pagesOf({ "index.md": page(), "about.md": page("/assets/share.png") });
     const home = await build("/", dir, { siteImage: "/assets/missing.png" });
-    const message = `storefront.image: image "/assets/missing.png" does not exist in the assets`;
+    const message = `site.image: image "/assets/missing.png" does not exist in the assets`;
     expect(home.problems).toEqual([message]);
     expect(home.html).toContain(`<li data-pd-site>${message}</li>`);
     expect((await build("/about/", dir, { siteImage: "/assets/missing.png" })).problems).toEqual([]);

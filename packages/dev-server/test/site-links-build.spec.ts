@@ -98,8 +98,8 @@ describe("the link check in pd dev", () => {
       }
       const said = log.mock.calls.map(c => String(c[0])).filter(s => s.includes("warning: index.md: <a"));
       expect(said).toEqual([
-        `[storefront] warning: index.md: <a href="/guids/">: no page or file is built at /guids/`,
-        `[storefront] warning: index.md: <a href="#gone">: / has no element with id "gone"`,
+        `[site] warning: index.md: <a href="/guids/">: no page or file is built at /guids/`,
+        `[site] warning: index.md: <a href="#gone">: / has no element with id "gone"`,
       ]);
     } finally {
       await server.close();

@@ -165,7 +165,7 @@ export function checkLinks(site: LinkSite): LinkCheck {
         if (why) say(why);
         continue;
       }
-      if (!served.startsWith(base)) { say(`${served} is outside ${base}, the path the site is published under (storefront.url)`); continue; }
+      if (!served.startsWith(base)) { say(`${served} is outside ${base}, the path the site is published under (site.url)`); continue; }
       const path = `/${served.slice(base.length)}`;
       if (site.pagesOnly && /^\/(?:_pd|assets|preview)\//.test(path)) continue;
       const target = builtAs(path);

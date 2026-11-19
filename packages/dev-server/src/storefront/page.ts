@@ -496,7 +496,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (imageCheck && !imageCheck.ok) {
     if (checked.build.image !== undefined) problems.push(`${placeOf(page, "image")}: ${imageCheck.message}`);
     else {
-      const p = `storefront.image: ${imageCheck.message}`;
+      const p = `site.image: ${imageCheck.message}`;
       siteWide = [...siteWide, p];
       problems.push(p);
     }
@@ -856,7 +856,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   // The site's own head additions (storefront.head), after the skin's: rendered with the site's values, checked alike.
   let siteHead = "";
   if (a.siteHead) {
-    const label = `storefront.head (${a.siteHead.name})`;
+    const label = `site.head (${a.siteHead.name})`;
     let source: string;
     try { source = await readFile(a.siteHead.path, "utf8"); } catch {
       const p = `${label}: there is no such file`;

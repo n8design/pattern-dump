@@ -139,7 +139,7 @@ export async function runBrowserChecks(o: {
           // The browser's own favicon request is not the page's.
           if (url.pathname !== "/favicon.ico") {
             const text = `${current}: a request to ${url.pathname}${url.search} is outside ${base}, the path the site is published under `
-              + `(storefront.url): a script that builds this URL needs the site's path, which <meta name="pd-base-path"> names`;
+              + `(site.url): a script that builds this URL needs the site's path, which <meta name="pd-base-path"> names`;
             note("error", `outside ${text}`, text, vp.name);
           }
           await route.fulfill({ status: 404, body: Buffer.from("") });

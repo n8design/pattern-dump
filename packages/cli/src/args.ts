@@ -17,7 +17,9 @@ export type Command =
   | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean; browser?: boolean; checkWorkers?: number; skipChecks?: string[] }
   | { kind: "init"; target: string; yes: boolean; name?: string; brand?: string; examples?: boolean;
       storefront?: boolean; search?: boolean; systemTheme?: boolean; install?: boolean; git?: boolean; pdSource?: string;
-      site?: string; workbenchUrl?: string }
+      site?: string; workbenchUrl?: string;
+      /** Flags given by their names before 0.8.0, each as "<old> is now <new>". */
+      warnings?: string[] }
   | { kind: "help"; topic?: string }
   | { kind: "error"; message: string };
 
@@ -138,6 +140,10 @@ function parseInit(rest: string[], cwd: string): Command {
       name: { type: "string" },
       brand: { type: "string" },
       examples: { type: "boolean" }, "no-examples": { type: "boolean" },
+      // A website beside the design system: --with-site and --without-site, two flags of their own rather than a
+      // --no- pair, so neither reads as the negation of --site <package> (a website on an existing style guide).
+      // --storefront and --no-storefront are their names before 0.8.0, still taken, with a warning.
+      "with-site": { type: "boolean" }, "without-site": { type: "boolean" },
       storefront: { type: "boolean" }, "no-storefront": { type: "boolean" },
       search: { type: "boolean" }, "no-search": { type: "boolean" },
       "system-theme": { type: "boolean" }, "no-system-theme": { type: "boolean" },
@@ -153,14 +159,17 @@ function parseInit(rest: string[], cwd: string): Command {
   if (values.help) return { kind: "help", topic: "init" };
   if (positionals.length > 1) return { kind: "error", message: `init takes one folder (got ${positionals.join(", ")})` };
 
-  const names = ["examples", "storefront", "search", "system-theme", "install", "git"] as const;
-  const toggles: Record<(typeof names)[number], boolean | undefined> =
+  const names = ["examples", "search", "system-theme", "install", "git"] as const;
+  const toggles: Record<(typeof names)[number] | "storefront", boolean | undefined> =
     { examples: undefined, storefront: undefined, search: undefined, "system-theme": undefined, install: undefined, git: undefined };
   for (const name of names) {
     const t = toggle(values, name);
     if (t instanceof Error) return { kind: "error", message: t.message };
     toggles[name] = t;
   }
+  const site = websiteFlags(values);
+  if (site instanceof Error) return { kind: "error", message: site.message };
+  toggles.storefront = site.value;
   return {
     kind: "init",
     target: resolve(cwd, positionals[0] ?? "."),
@@ -176,7 +185,22 @@ function parseInit(rest: string[], cwd: string): Command {
     ...(values["pd-source"] !== undefined ? { pdSource: values["pd-source"] } : {}),
     ...(values.site !== undefined ? { site: values.site } : {}),
     ...(values["workbench-url"] !== undefined ? { workbenchUrl: values["workbench-url"] } : {}),
+    ...(site.warnings.length ? { warnings: site.warnings } : {}),
   };
+}
+
+/** Whether to write a website beside the design system: --with-site or --without-site, or their old names. Flags
+ *  that say both is an error, naming them as given; each old name gives a warning. */
+function websiteFlags(values: Record<string, unknown>): { value: boolean | undefined; warnings: string[] } | Error {
+  const given = (["with-site", "storefront", "without-site", "no-storefront"] as const).filter(f => values[f] === true);
+  const on = given.filter(f => f === "with-site" || f === "storefront");
+  const off = given.filter(f => f === "without-site" || f === "no-storefront");
+  if (on.length && off.length) return new Error(`--${on[0]} and --${off[0]} cannot both be given`);
+  const warnings = [
+    ...(values["storefront"] === true ? ["--storefront is now --with-site"] : []),
+    ...(values["no-storefront"] === true ? ["--no-storefront is now --without-site"] : []),
+  ];
+  return { value: on.length ? true : off.length ? false : undefined, warnings };
 }
 
 function base(values: { root?: string; config?: string }, cwd: string): { root: string; configPath?: string } {
@@ -194,7 +218,8 @@ export const USAGE = `Usage: pd <command> [options]
     --brand <title>    Title shown in the Nav Rail; with --site, the site's title (default: the name,
                        or the parent folder's for a scoped one)
     --no-examples      Structure, config and themes only, no starter components
-    --storefront       Also a website: pages, a skin, and a GitHub Pages workflow (default: no)
+    --with-site        Also a website: pages, a skin, and a GitHub Pages workflow (default: no;
+                       --without-site to say no without being asked)
     --no-search        With a website: leave Pagefind out (default: a devDependency, so pd build
                        writes the site's search index)
     --no-system-theme  With a website: the light theme as the default, and pages in light colours
@@ -228,14 +253,14 @@ export const USAGE = `Usage: pd <command> [options]
     --out <dir>        Output folder, relative to the root (default: build.outDir, outDir, or dist)
     --base <path>      Where it will be hosted: / or a subpath such as /docs/ (default: build.basePath,
                        then /)
-    --browser          Also check the storefront's pages in Chromium: contrast and the accessibility
+    --browser          Also check the site's pages in Chromium: contrast and the accessibility
                        rules that need a rendered page, and each image's variant against its size.
                        Uses the project's own Playwright (npm install --save-dev playwright)
     --no-audit         Leave the corpus audit out: it is not run, and the site has no Audit tab
                        (default: build.audit in the config; --audit forces it back in)
-    --check-workers <n>  Threads that check the storefront's pages for accessibility; 1 checks them in
+    --check-workers <n>  Threads that check the site's pages for accessibility; 1 checks them in
                        one (default: the cores less one, at most 8, within a quarter of the memory)
-    --skip-checks=a11y,html  Leave checks out, for a quick local build: a11y, the storefront pages'
+    --skip-checks=a11y,html  Leave checks out, for a quick local build: a11y, the site pages'
                        accessibility; html, the components' markup against HTML's content model.
                        The report says so. Default: every check runs (build.skipChecks)
 

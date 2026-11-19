@@ -184,7 +184,7 @@ describe("pd build — the storefront root", () => {
     expect(missing).toEqual([]);
   });
 
-  it("links into the workbench at storefront.workbenchUrl, and carries no live-reload client and no shell CSS", () => {
+  it("links into the workbench at site.workbenchUrl, and carries no live-reload client and no shell CSS", () => {
     const setup = files.get("guides/setup/index.html")!.bytes.toString("utf8");
     expect(setup).toContain(`href="${WB}components/callout#warning"`);
     expect(setup).not.toContain("pd.localhost");
@@ -194,8 +194,8 @@ describe("pd build — the storefront root", () => {
     }
   });
 
-  it("with storefront.url: canonical and og:url on every page at the configured address, and no note about it", () => {
-    expect(report.notes.some(n => n.startsWith("storefront.url is not set"))).toBe(false);
+  it("with site.url: canonical and og:url on every page at the configured address, and no note about it", () => {
+    expect(report.notes.some(n => n.startsWith("site.url is not set"))).toBe(false);
     for (const [route, file] of [["", "index.html"], ["about/", "about/index.html"], ["guides/setup/", "guides/setup/index.html"]]) {
       const html = files.get(file)!.bytes.toString("utf8");
       expect(html, file).toContain(`<link rel="canonical" href="https://bench.example.test/${route}">`);
@@ -377,7 +377,7 @@ describe("pd build — a storefront with problems writes nothing", () => {
     const site = { ...benchConfig.storefront!.site!, navigations: { footer: [{ page: "nope.md" }] } };
     const out = join(root, "..", "wb-nav");
     const error = await build(root, out, config({ site })).then(() => "", (e: Error) => e.message);
-    const problem = `storefront.site.navigations.footer[0]: "nope.md" is not a page in the pages folder`;
+    const problem = `site.globals.navigations.footer[0]: "nope.md" is not a page in the pages folder`;
     expect(error).toBe(`pd build: the storefront has problems, so nothing was written:\n  - ${problem}`);
     expect(await exists(out)).toBe(false);
   }, 120_000);

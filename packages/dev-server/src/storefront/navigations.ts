@@ -21,7 +21,7 @@ import type { PropertySchema } from "./declared-values.js";
 import type { PageModel } from "./pages.js";
 
 export const NAVIGATIONS_KEY = "navigations";
-const AT = "storefront.site.navigations";
+const AT = "site.globals.navigations";
 const KEYS = ["page", "href", "label", "children"];
 
 /** One entry of a navigation as a layout gets it. */

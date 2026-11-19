@@ -51,6 +51,7 @@ async function insideGitRepo(target: string, io: InitIO): Promise<boolean> {
 
 export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   const target = cmd.target;
+  for (const w of cmd.warnings ?? []) io.log(`! ${w}`);
 
   // Settle where PD installs from FIRST, so a dead end is reported before any question or write.
   let dependency: string;
@@ -85,8 +86,9 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   const prompt = io.interactive && !cmd.yes;
   // --site: a website on an existing style guide package, with nothing of a design system (site.ts). Asked first,
   // unless a flag already chose a design system.
-  const designFlags = ([["--examples", cmd.examples], ["--storefront", cmd.storefront], ["--system-theme", cmd.systemTheme]] as const)
-    .filter(([, v]) => v !== undefined).map(([flag, v]) => v ? flag : flag.replace("--", "--no-"));
+  const designFlags = ([["--examples", cmd.examples], ["--with-site", cmd.storefront], ["--system-theme", cmd.systemTheme]] as const)
+    .filter(([, v]) => v !== undefined)
+    .map(([flag, v]) => v ? flag : flag === "--with-site" ? "--without-site" : flag.replace("--", "--no-"));
   const siteInput = cmd.site ?? (prompt && designFlags.length === 0
     ? (await io.ask("A website on an existing style guide package? Its npm name or folder (empty: a new design system)", "")).trim() || undefined
     : undefined);
@@ -114,10 +116,10 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   const brandDefault = name === suggested.name ? suggested.brand : name;
   const brand = cmd.brand ?? (prompt ? await io.ask(site ? "Title of the site" : "Title in the Nav Rail", brandDefault) : brandDefault);
   const examples = !site && (cmd.examples ?? (prompt ? await io.confirm("Include starter components", true) : true));
-  const storefront = !site && (cmd.storefront ?? (prompt ? await io.confirm("Include a website (storefront)", false) : false));
+  const storefront = !site && (cmd.storefront ?? (prompt ? await io.confirm("Include a website", false) : false));
   for (const [flag, given] of [["--search", cmd.search], ["--system-theme", cmd.systemTheme]] as const) {
     if (given !== undefined && !storefront && !(site && flag === "--search")) {
-      io.log(`✗ ${given ? flag : flag.replace("--", "--no-")} is a choice for a website: add --storefront. Nothing was written.`);
+      io.log(`✗ ${given ? flag : flag.replace("--", "--no-")} is a choice for a website: add --with-site. Nothing was written.`);
       return 1;
     }
   }
@@ -230,7 +232,7 @@ async function settleSite(site: { name: string; spec: string }, target: string, 
   }
   io.log(`  ! The pages don't render with ${site.name} yet:`);
   for (const p of problems) io.log(`    ${p.startsWith("  - ") ? p.trim() : `- ${p}`}`);
-  io.log("  A style guide for a website brings its skin: layouts/page and partials/base, as pd init --storefront writes them.");
+  io.log("  A style guide for a website brings its skin: layouts/page and partials/base, as pd init --with-site writes them.");
   io.log("  The site is in place; once the style guide has them, npm run dev shows its pages.");
 }
 

@@ -15,7 +15,7 @@ If Safari can't open the address, add this line to `/etc/hosts`: `127.0.0.1  liv
 | Path | What lives there |
 |---|---|
 | `pages/` | the pages, in markdown: `pages/about.md` is `/about/` |
-| `pattern-dump.config.ts` | the style guide package (`packages`), the site's name and footer (`storefront.site`), where the style guide's workbench is published (`storefront.workbenchUrl`) |
+| `pattern-dump.config.ts` | the style guide package (`packages`), the site's name and footer (`site.globals`), where the style guide's workbench is published (`site.workbenchUrl`) |
 
 `npm run dev` also serves a workbench, at http://pd.localhost:4000/: the style guide's components as this site
 has them installed. Work on the components in the style guide itself; its own `npm run dev` is where they change.

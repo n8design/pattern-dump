@@ -92,18 +92,18 @@ describe("checkSite — values partials/base declares", () => {
   it("tries a union's types in order", async () => {
     expect((await checkSite({ title: "Docs", version: "beta" }, maps.full)).problems).toEqual([]);
     expect((await checkSite({ title: "Docs", version: 3 }, maps.full)).problems).toEqual([]);
-    expect((await checkSite({ title: "Docs", version: true }, maps.full)).problems).toEqual(["storefront.site.version must be a number (got true)"]);
+    expect((await checkSite({ title: "Docs", version: true }, maps.full)).problems).toEqual(["site.globals.version must be a number (got true)"]);
   });
 
   it("checks an enum", async () => {
-    expect((await checkSite({ title: "Docs", theme: "sepia" }, maps.full)).problems).toEqual([`storefront.site.theme must be one of "light", "dark" (got "sepia")`]);
+    expect((await checkSite({ title: "Docs", theme: "sepia" }, maps.full)).problems).toEqual([`site.globals.theme must be one of "light", "dark" (got "sepia")`]);
   });
 
   it("coerces nothing: a config value must already be its declared type", async () => {
     expect((await checkSite({ title: 7, year: "2026", links: "a" }, maps.full)).problems).toEqual([
-      "storefront.site.title must be text (got 7)",
-      `storefront.site.year must be a whole number (got "2026")`,
-      `storefront.site.links must be a list (got "a")`,
+      "site.globals.title must be text (got 7)",
+      `site.globals.year must be a whole number (got "2026")`,
+      `site.globals.links must be a list (got "a")`,
     ]);
   });
 
@@ -111,9 +111,9 @@ describe("checkSite — values partials/base declares", () => {
     expect(vp(await checkSite({ titel: "Docs", colour: "red" }, maps.full))).toEqual({
       values: {},
       problems: [
-        `storefront.site.titel is not declared by partials/base: did you mean "title"?`,
-        "storefront.site.colour is not declared by partials/base",
-        "storefront.site.title is required by partials/base",
+        `site.globals.titel is not declared by partials/base: did you mean "title"?`,
+        "site.globals.colour is not declared by partials/base",
+        "site.globals.title is required by partials/base",
       ],
     });
   });
@@ -123,24 +123,24 @@ describe("checkSite — inside objects and lists", () => {
   const check = async (site: Record<string, unknown>) => (await checkSite(site, maps.nested)).problems;
 
   it("checks a nested value's type, with its path", async () => {
-    expect(await check({ home: { page: 5, label: "Home" } })).toEqual(["storefront.site.home.page must be text (got 5)"]);
+    expect(await check({ home: { page: 5, label: "Home" } })).toEqual(["site.globals.home.page must be text (got 5)"]);
   });
 
   it("refuses a nested key it does not declare, suggesting the one probably meant", async () => {
     expect(await check({ home: { pgae: "/", label: "Home" } }))
-      .toEqual([`storefront.site.home.pgae is not declared by partials/base: did you mean "page"?`]);
+      .toEqual([`site.globals.home.pgae is not declared by partials/base: did you mean "page"?`]);
   });
 
   it("requires a nested key the schema requires", async () => {
-    expect(await check({ home: { page: "/" } })).toEqual(["storefront.site.home.label is required by partials/base"]);
+    expect(await check({ home: { page: "/" } })).toEqual(["site.globals.home.label is required by partials/base"]);
   });
 
   it("checks every item of a list, with its index", async () => {
     expect(await check({ links: [{ label: "A", href: "/a" }, { label: 2, href: "/b" }], tags: ["a", "c"] })).toEqual([
-      "storefront.site.links[1].label must be text (got 2)",
-      `storefront.site.tags[1] must be one of "a", "b" (got "c")`,
+      "site.globals.links[1].label must be text (got 2)",
+      `site.globals.tags[1] must be one of "a", "b" (got "c")`,
     ]);
-    expect(await check({ links: ["/a"] })).toEqual([`storefront.site.links[0] must be an object (got "/a")`]);
+    expect(await check({ links: ["/a"] })).toEqual([`site.globals.links[0] must be an object (got "/a")`]);
   });
 
   it("reports every problem, not only the first", async () => {
@@ -148,12 +148,12 @@ describe("checkSite — inside objects and lists", () => {
     expect(vp(r)).toEqual({
       values: {},
       problems: [
-        "storefront.site.home.page must be text (got 5)",
-        "storefront.site.home.label is required by partials/base",
-        "storefront.site.links[0].label must be text (got 2)",
-        `storefront.site.links[1].lable is not declared by partials/base: did you mean "label"?`,
-        "storefront.site.meta.note must be text (got 1)",
-        "storefront.site.titel is not declared by partials/base",
+        "site.globals.home.page must be text (got 5)",
+        "site.globals.home.label is required by partials/base",
+        "site.globals.links[0].label must be text (got 2)",
+        `site.globals.links[1].lable is not declared by partials/base: did you mean "label"?`,
+        "site.globals.meta.note must be text (got 1)",
+        "site.globals.titel is not declared by partials/base",
       ],
     });
   });
@@ -161,7 +161,7 @@ describe("checkSite — inside objects and lists", () => {
   it("passes nested values through as they are, and takes an object that declares nothing inside as closed", async () => {
     const site = { home: { page: "/", label: "Home" }, links: [{ label: "A", href: "/a" }], tags: ["b"], meta: { note: "n" }, social: {} };
     expect(vp(await checkSite(site, maps.nested))).toEqual({ values: site, problems: [] });
-    expect(await check({ social: { x: "@pd" } })).toEqual(["storefront.site.social.x is not declared by partials/base"]);
+    expect(await check({ social: { x: "@pd" } })).toEqual(["site.globals.social.x is not declared by partials/base"]);
   });
 });
 
@@ -175,9 +175,9 @@ describe("checkSite — navigations", () => {
 
   it("reports a navigation's problem once, by its own check, beside the other values' problems", async () => {
     expect((await checkSite({ title: 3, navigations: { footer: [{ page: 5 }], legal: [] } }, maps.navs!, PAGES)).problems).toEqual([
-      "storefront.site.title must be text (got 3)",
-      `storefront.site.navigations.footer[0].page must be the path of a page in the pages folder, such as "about.md" (got 5)`,
-      `storefront.site.navigations.legal is not a navigation partials/base lists (it lists "footer")`,
+      "site.globals.title must be text (got 3)",
+      `site.globals.navigations.footer[0].page must be the path of a page in the pages folder, such as "about.md" (got 5)`,
+      `site.globals.navigations.legal is not a navigation partials/base lists (it lists "footer")`,
     ]);
   });
 
@@ -187,15 +187,15 @@ describe("checkSite — navigations", () => {
 });
 
 describe("checkSite — when there is nothing to check against", () => {
-  it("requires storefront.site when partials/base requires a site", async () => {
-    expect(vp(await checkSite(undefined, maps.full))).toEqual({ values: {}, problems: ["storefront.site is required by partials/base"] });
+  it("requires site.globals when partials/base requires a site", async () => {
+    expect(vp(await checkSite(undefined, maps.full))).toEqual({ values: {}, problems: ["site.globals is required by partials/base"] });
     expect(vp(await checkSite(undefined, maps.optional))).toEqual({ values: {}, problems: [] });
   });
 
   it("refuses a site that nothing declares", async () => {
-    expect((await checkSite({ title: "Docs" }, maps.noSchema)).problems).toEqual(["storefront.site is set, but partials/base declares no site, so no layout can use it"]);
-    expect((await checkSite({ title: "Docs" }, maps.noSite)).problems).toEqual(["storefront.site is set, but partials/base declares no site, so no layout can use it"]);
-    expect((await checkSite({ title: "Docs" }, maps.noBase)).problems).toEqual(["storefront.site is set, but there is no partials/base to declare what it holds"]);
+    expect((await checkSite({ title: "Docs" }, maps.noSchema)).problems).toEqual(["site.globals is set, but partials/base declares no site, so no layout can use it"]);
+    expect((await checkSite({ title: "Docs" }, maps.noSite)).problems).toEqual(["site.globals is set, but partials/base declares no site, so no layout can use it"]);
+    expect((await checkSite({ title: "Docs" }, maps.noBase)).problems).toEqual(["site.globals is set, but there is no partials/base to declare what it holds"]);
   });
 
   it("is fine with no site where none is declared", async () => {

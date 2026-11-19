@@ -83,8 +83,8 @@ export async function searchPagefind(setting: boolean | undefined, root: string,
   if (setting === false) return undefined;
   const pagefind = await load(root);
   if (!pagefind && setting === true) {
-    throw new SearchUnavailableError(`pd build: storefront.search is on, and this project has no Pagefind to build the index with: ${PAGEFIND_INSTALL} `
-      + `(or set storefront.search to false)`);
+    throw new SearchUnavailableError(`pd build: site.search is on, and this project has no Pagefind to build the index with: ${PAGEFIND_INSTALL} `
+      + `(or set site.search to false)`);
   }
   return pagefind;
 }

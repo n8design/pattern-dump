@@ -47,7 +47,7 @@ without one (in CI, or with input piped in) it takes every default without askin
 | `--name <name>` | Package name. Default: the folder name; a generic one (`styleguide`, `site`, `docs` and the like) is scoped by its parent folder, `@<parent>/<folder>` |
 | `--brand <title>` | Title shown in the Nav Rail; with `--site`, the site's title. Default: the name, or the parent folder's name for a scoped one |
 | `--no-examples` | Structure, config and themes only, without starter components |
-| `--storefront` | Also a website: two pages, a small skin, a component of its own and a GitHub Pages workflow ([storefront.md](storefront.md#quick-start)). Default: no |
+| `--with-site` | Also a website: two pages, a small skin, a component of its own and a GitHub Pages workflow ([storefront.md](storefront.md#quick-start)). Default: no |
 | `--search` / `--no-search` | With a website: Pagefind as a devDependency, pinned, so `pd build` writes the search index. Default: yes |
 | `--system-theme` / `--no-system-theme` | With a website: the default theme `system`, which follows the viewer's light or dark setting, and the skin's pages with it. Default: yes |
 | `--site <package or folder>` | A content-only website on an existing style guide instead of a design system ([getting-started.md](getting-started.md#a-content-only-website)) |
@@ -62,12 +62,12 @@ overwritten, an existing script name gets a `pd:` variant instead, and existing 
 `typescript` versions are kept. It refuses a folder that already has a Pattern Dump config.
 
 It adds these scripts: `dev` (`pd dev`), `audit` (`pd audit`), `typecheck` (`tsc --noEmit`) and
-`build:scripts` (`tsc`), and with `--storefront` also `build` (`pd build`); with `--site`, `dev` and `build` only.
+`build:scripts` (`tsc`), and with `--with-site` also `build` (`pd build`); with `--site`, `dev` and `build` only.
 `pattern-dump` and Pagefind are pinned to exact versions (`npm install --save-dev --save-exact pattern-dump@<version>`
 moves the pin), and `allowScripts` allows the install scripts of esbuild and `@parcel/watcher`, Pattern Dump's own
 dependencies; a denial the project already has (`false`) is kept.
 
-With `--storefront`, the skin (`src/patterns/layouts/`, `src/patterns/partials/` and their styles) is written
+With `--with-site`, the skin (`src/patterns/layouts/`, `src/patterns/partials/` and their styles) is written
 as a whole or not at all: if one of its files is already there, `pd init` leaves the skin out and says so,
 so it is never mixed with a skin the project has. When Pattern Dump is installed from a local `.tgz`, it
 warns that the GitHub Pages workflow can't install it (`npm ci` runs on GitHub's machines).
@@ -143,7 +143,7 @@ Writes a static snapshot of the workbench: plain files for any static host.
 | Option | Description |
 |---|---|
 | `--out <dir>` | Output folder, relative to the root. Default: `build.outDir`, `outDir`, then `dist`. Replaced as a whole once every check has passed; a build that stops leaves it as it was |
-| `--base <path>` | Where it will be hosted: `/` or a subpath such as `/docs/`. Default: `build.basePath`, then `/` (a project made with `pd init --storefront` sets `/workbench/`) |
+| `--base <path>` | Where it will be hosted: `/` or a subpath such as `/docs/`. Default: `build.basePath`, then `/` (a project made with `pd init --with-site` sets `/workbench/`) |
 | `--browser` | Also check the storefront's pages in Chromium: contrast and the other accessibility rules that need a rendered page, and each image's variant against its box ([storefront.md](storefront.md#checks-in-a-browser-pd-build---browser)). Needs the project's own Playwright |
 | `--no-audit` / `--audit` | Leave the corpus audit out (it is not run, and there is no Audit tab), or force it in. Default: `build.audit` |
 | `--check-workers <n>` | Threads that check the storefront's pages for accessibility. Default: the cores less one, at most 8, within a quarter of the memory; `1` checks them in one thread. The findings are the same with any number |

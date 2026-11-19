@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { configProblems, sameHostWorkbenchPath, storefrontBasePath, validateConfig } from "./validate.js";
+import { configProblems, configWarnings, sameHostWorkbenchPath, storefrontBasePath, validateConfig } from "./validate.js";
 import { defineConfig } from "./index.js";
 
 const valid = {
@@ -53,7 +53,7 @@ describe("configProblems", () => {
       `"images.effort" must be a whole number from 0 to 6 (WebP effort: 0 fastest, 6 smallest)`,
     ]);
     expect(storefront({ ...valid.storefront, images: { quality: 101 } })).toEqual([
-      `"storefront.images.quality" must be a whole number from 1 to 100 (WebP quality)`,
+      `"site.images.quality" must be a whole number from 1 to 100 (WebP quality)`,
     ]);
     expect(configProblems({ ...valid, images: { qualty: 80 } })[0]).toMatch(/"images\.qualty"/);
   });
@@ -139,20 +139,20 @@ describe("configProblems — storefront", () => {
   });
 
   it("names a missing required key, and the typo that probably meant it", () => {
-    expect(storefront({ outDir: "./www" })).toEqual([`missing required "storefront.pagesDir"`]);
+    expect(storefront({ outDir: "./www" })).toEqual([`missing required "site.pagesDir"`]);
     expect(storefront({ pageDir: "./pages", outDir: "./www" }))
-      .toEqual([`missing required "storefront.pagesDir" (found "storefront.pageDir": did you mean "storefront.pagesDir"?)`]);
+      .toEqual([`missing required "site.pagesDir" (found "site.pageDir": did you mean "site.pagesDir"?)`]);
   });
 
   it("has no layouts key: layouts are the fixed layouts/ folder of the patterns", () => {
     expect(storefront({ pagesDir: "./pages", outDir: "./www", layouts: "skin/layouts" }))
-      .toEqual([`unknown key "storefront.layouts"`]);
+      .toEqual([`unknown key "site.layouts"`]);
   });
 
   it("reports wrong value types by path", () => {
     expect(storefront({ pagesDir: 3, outDir: ["./www"] })).toEqual([
-      `"storefront.pagesDir" must be a string`,
-      `"storefront.outDir" must be a string`,
+      `"site.pagesDir" must be a string`,
+      `"site.outDir" must be a string`,
     ]);
   });
 
@@ -163,7 +163,7 @@ describe("configProblems — storefront", () => {
       "/workbench/", "/workbench", "/docs/workbench/", "/Docs/v2.1/work_bench~x/"]) {
       expect(storefront({ ...base, workbenchUrl: ok }), ok).toEqual([]);
     }
-    const message = `"storefront.workbenchUrl" must be an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the storefront's host, such as "/workbench/"`;
+    const message = `"site.workbenchUrl" must be an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the storefront's host, such as "/workbench/"`;
     for (const bad of ["workbench.example.com", "ftp://example.com", "javascript:alert(1)", "", 42,
       "https://htwoo.io/workbench/?v=1", "https://htwoo.io/workbench/#top", "https://htwoo.io/workbench?",
       // Paths: "//host/" is another host to a browser; a relative path depends on the page; "/" is the storefront.
@@ -179,7 +179,7 @@ describe("configProblems — storefront", () => {
       "https://example.com/docs/", "https://example.com/docs", "https://n8design.github.io/pattern-dump-demo/", "https://example.com/a/b/"]) {
       expect(storefront({ ...base, url: ok }), ok).toEqual([]);
     }
-    const message = `"storefront.url" must be the site's absolute http(s) address, with no query or fragment, such as "https://example.com/", or "https://example.github.io/project/" for a site published under a path`;
+    const message = `"site.url" must be the site's absolute http(s) address, with no query or fragment, such as "https://example.com/", or "https://example.github.io/project/" for a site published under a path`;
     for (const bad of ["example.com", "/", "/docs/", "ftp://example.com", "", 42, "https://example.com/?v=1", "https://example.com/#top",
       "https://example.com?", "https://example.com/docs/?v=1", "https://example.com/docs#top", "https://example.com/a//b/"]) {
       expect(storefront({ ...base, url: bad }), String(bad)).toEqual([message]);
@@ -189,7 +189,7 @@ describe("configProblems — storefront", () => {
   it("takes a Handlebars file relative to the root for head", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     for (const ok of ["./head.hbs", "head.hbs", "site/head.hbs"]) expect(storefront({ ...base, head: ok }), ok).toEqual([]);
-    const message = `"storefront.head" must be a Handlebars file relative to the project's root, such as "./head.hbs"`;
+    const message = `"site.head" must be a Handlebars file relative to the project's root, such as "./head.hbs"`;
     for (const bad of ["./head.html", "/abs/head.hbs", "", 42]) expect(storefront({ ...base, head: bad }), String(bad)).toEqual([message]);
   });
 
@@ -198,7 +198,7 @@ describe("configProblems — storefront", () => {
     for (const ok of ["en", "de", "de-AT", "zh-Hant-TW", "es-419", "sl-rozaj", "de-CH-1901"]) {
       expect(storefront({ ...base, lang: ok }), ok).toEqual([]);
     }
-    const message = `"storefront.lang" must be a language tag, such as "en", "de-AT" or "zh-Hant-TW"`;
+    const message = `"site.lang" must be a language tag, such as "en", "de-AT" or "zh-Hant-TW"`;
     for (const bad of ["", "english", "e", "de_AT", "de-", "-de", "de AT", 7]) {
       expect(storefront({ ...base, lang: bad }), String(bad)).toEqual([message]);
     }
@@ -216,13 +216,13 @@ describe("configProblems — storefront", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, index: false })).toEqual([]);
     expect(storefront({ ...base, index: true })).toEqual([]);
-    expect(storefront({ ...base, index: "no" })).toEqual([`"storefront.index" must be true or false`]);
+    expect(storefront({ ...base, index: "no" })).toEqual([`"site.index" must be true or false`]);
   });
 
   it("takes a path to a file in the assets for image", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, image: "/assets/images/share.png" })).toEqual([]);
-    const message = `"storefront.image" must be a path to a file in the assets, such as "/assets/images/share.png"`;
+    const message = `"site.image" must be a path to a file in the assets, such as "/assets/images/share.png"`;
     for (const bad of ["images/share.png", "/images/share.png", "https://example.com/share.png", "/assets/", "/assets/images/",
       "/assets/share.png?v=1", 3]) {
       expect(storefront({ ...base, image: bad }), String(bad)).toEqual([message]);
@@ -237,7 +237,7 @@ describe("configProblems — storefront", () => {
     } })).toEqual([]);
     expect(storefront({ ...base, categories: {} })).toEqual([]);
     expect(storefront({ ...base, categories: ["guides"] })).toEqual([
-      `"storefront.categories" must be an object of categories by key, such as { guides: { label: "Guides" } }`,
+      `"site.categories" must be an object of categories by key, such as { guides: { label: "Guides" } }`,
     ]);
     expect(storefront({ ...base, categories: {
       Guides: { label: "Guides" },
@@ -245,12 +245,12 @@ describe("configProblems — storefront", () => {
       css: { label: 3, description: false, aliases: "style" },
       tools: { label: "Tools", title: "Tools" },
     } })).toEqual([
-      `"storefront.categories.Guides": a category's key is part of a URL, so it is lowercase letters, digits and hyphens only`,
-      `missing required "storefront.categories.news.label"`,
-      `"storefront.categories.css.label" must be a string`,
-      `"storefront.categories.css.description" must be a string`,
-      `"storefront.categories.css.aliases" must be a list of strings`,
-      `unknown key "storefront.categories.tools.title"`,
+      `"site.categories.Guides": a category's key is part of a URL, so it is lowercase letters, digits and hyphens only`,
+      `missing required "site.categories.news.label"`,
+      `"site.categories.css.label" must be a string`,
+      `"site.categories.css.description" must be a string`,
+      `"site.categories.css.aliases" must be a list of strings`,
+      `unknown key "site.categories.tools.title"`,
     ]);
   });
 
@@ -261,9 +261,9 @@ describe("configProblems — storefront", () => {
       news: { label: "News", aliases: ["updates"] },
       blog: { label: "Blog", aliases: ["updates"] },
     } })).toEqual([
-      `"storefront.categories.guides.aliases": "How To" is not a key: an old key is lowercase letters, digits and hyphens, as a key is`,
-      `"storefront.categories.guides.aliases": "news" is a category of its own, so it can't be an old key of "guides"`,
-      `"storefront.categories.blog.aliases": "updates" is an old key of "news" already: one old key leads to one category`,
+      `"site.categories.guides.aliases": "How To" is not a key: an old key is lowercase letters, digits and hyphens, as a key is`,
+      `"site.categories.guides.aliases": "news" is a category of its own, so it can't be an old key of "guides"`,
+      `"site.categories.blog.aliases": "updates" is an old key of "news" already: one old key leads to one category`,
     ]);
   });
 
@@ -271,12 +271,12 @@ describe("configProblems — storefront", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, tags: { css: { label: "CSS", aliases: ["styles"] }, "design-tokens": { label: "Design tokens" } } })).toEqual([]);
     expect(storefront({ ...base, tags: ["css"] })).toEqual([
-      `"storefront.tags" must be an object of tags by key, such as { css: { label: "CSS" } }`,
+      `"site.tags" must be an object of tags by key, such as { css: { label: "CSS" } }`,
     ]);
     expect(storefront({ ...base, tags: { CSS: { label: "CSS" }, js: {}, html: { label: "HTML", aliases: ["js"] } } })).toEqual([
-      `"storefront.tags.CSS": a tag's key is part of a URL, so it is lowercase letters, digits and hyphens only`,
-      `missing required "storefront.tags.js.label"`,
-      `"storefront.tags.html.aliases": "js" is a tag of its own, so it can't be an old key of "html"`,
+      `"site.tags.CSS": a tag's key is part of a URL, so it is lowercase letters, digits and hyphens only`,
+      `missing required "site.tags.js.label"`,
+      `"site.tags.html.aliases": "js" is a tag of its own, so it can't be an old key of "html"`,
     ]);
   });
 
@@ -284,22 +284,22 @@ describe("configProblems — storefront", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, search: true })).toEqual([]);
     expect(storefront({ ...base, search: false })).toEqual([]);
-    expect(storefront({ ...base, search: "pagefind" })).toEqual([`"storefront.search" must be true or false`]);
+    expect(storefront({ ...base, search: "pagefind" })).toEqual([`"site.search" must be true or false`]);
   });
 
   it("takes llms: true or false", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, llms: false })).toEqual([]);
-    expect(storefront({ ...base, llms: "no" })).toEqual([`"storefront.llms" must be true or false`]);
+    expect(storefront({ ...base, llms: "no" })).toEqual([`"site.llms" must be true or false`]);
   });
 
   it("takes checks: classes warning, error or off, and lists of allowed classes and properties", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     expect(storefront({ ...base, checks: { classes: "error", allowClasses: ["chart-*"], allowProperties: ["--x"] } })).toEqual([]);
     expect(storefront({ ...base, checks: { classes: "strict", allowClasses: "chart-*", allowProperty: [] } })).toEqual([
-      `unknown key "storefront.checks.allowProperty": did you mean "storefront.checks.allowProperties"?`,
-      `"storefront.checks.classes" must be "warning" or "error" or "off"`,
-      `"storefront.checks.allowClasses" must be a list of strings`,
+      `unknown key "site.checks.allowProperty": did you mean "site.checks.allowProperties"?`,
+      `"site.checks.classes" must be "warning" or "error" or "off"`,
+      `"site.checks.allowClasses" must be a list of strings`,
     ]);
   });
 
@@ -310,17 +310,17 @@ describe("configProblems — storefront", () => {
       expect(storefront({ ...base, categoryPages: ok }), JSON.stringify(ok)).toEqual([]);
     }
     expect(storefront({ ...base, tagPages: "yes" })).toEqual([
-      `"storefront.tagPages" must be true, false, or { path, title }, such as { path: "topics" }`,
+      `"site.tagPages" must be true, false, or { path, title }, such as { path: "topics" }`,
     ]);
     expect(storefront({ ...base, categoryPages: { path: "Topics/x", slug: 1 } })).toEqual([
-      `"storefront.categoryPages.path": the pages' first URL segment, so lowercase letters, digits and hyphens only, such as "topics"`,
-      `unknown key "storefront.categoryPages.slug"`,
+      `"site.categoryPages.path": the pages' first URL segment, so lowercase letters, digits and hyphens only, such as "topics"`,
+      `unknown key "site.categoryPages.slug"`,
     ]);
     expect(storefront({ ...base, tagPages: { path: "topics" }, categoryPages: { path: "topics" } })).toEqual([
-      `"storefront.tagPages.path" and "storefront.categoryPages.path" are both "topics": tag pages and category pages need a path each`,
+      `"site.tagPages.path" and "site.categoryPages.path" are both "topics": tag pages and category pages need a path each`,
     ]);
     expect(storefront({ ...base, categoryPages: { path: "tags" } })).toEqual([
-      `"storefront.tagPages.path" and "storefront.categoryPages.path" are both "tags": tag pages and category pages need a path each`,
+      `"site.tagPages.path" and "site.categoryPages.path" are both "tags": tag pages and category pages need a path each`,
     ]);
   });
 
@@ -330,13 +330,13 @@ describe("configProblems — storefront", () => {
     expect(storefront({ ...base, workbenchUrl: "https://htwoo.io/workbench" })).toEqual([]);
   });
 
-  // storefront.pagesDir, patternsDir ("./src/patterns" in the fixture) and storefront.outDir must be
+  // site.pagesDir, patternsDir ("./src/patterns" in the fixture) and site.outDir must be
   // pairwise disjoint: for each pair, the same folder or either one inside the other is a problem.
   const same = (a: string, va: string, b: string, vb: string) =>
     `"${a}" ("${va}") and "${b}" ("${vb}") are the same folder: each needs a folder of its own`;
   const nested = (a: string, va: string, b: string, vb: string) =>
     `"${a}" ("${va}") is inside "${b}" ("${vb}"): each needs a folder of its own, outside the other`;
-  const P = "storefront.pagesDir", T = "patternsDir", O = "storefront.outDir", PATTERNS = "./src/patterns";
+  const P = "site.pagesDir", T = "patternsDir", O = "site.outDir", PATTERNS = "./src/patterns";
 
   const cases: Array<[label: string, pagesDir: string, outDir: string, problem: string]> = [
     // pagesDir and patternsDir
@@ -385,7 +385,7 @@ describe("configProblems — storefront", () => {
     for (const ok of [{}, { title: "A" }, { title: "A", nested: { x: [1, 2] }, flag: true }]) {
       expect(storefront({ ...base, site: ok }), JSON.stringify(ok)).toEqual([]);
     }
-    const message = `"storefront.site" must be an object of the site's values, such as { title: "My site" }`;
+    const message = `"site.globals" must be an object of the site's values, such as { title: "My site" }`;
     for (const bad of [[], ["title"], "My site", 3, null, true]) {
       expect(storefront({ ...base, site: bad }), JSON.stringify(bad)).toEqual([message]);
     }
@@ -396,7 +396,7 @@ describe("configProblems — storefront", () => {
     for (const ok of ["live.localhost", "docs.localhost", "localhost", "my-site.example.com"]) {
       expect(storefront({ ...base, host: ok }), ok).toEqual([]);
     }
-    const message = `"storefront.host" must be a host name with no scheme, port or path, such as "live.localhost"`;
+    const message = `"site.host" must be a host name with no scheme, port or path, such as "live.localhost"`;
     for (const bad of ["http://live.localhost", "live.localhost:4000", "live.localhost/x", "-live.localhost", "", "live..localhost", 7]) {
       expect(storefront({ ...base, host: bad }), String(bad)).toEqual([message]);
     }
@@ -416,7 +416,7 @@ describe("sameHostWorkbenchPath — a workbench published on the storefront's ow
     expect(path("/workbench/", "https://example.com/")).toBe("/workbench/");
   });
 
-  it("is the path of an absolute workbenchUrl on the origin of storefront.url", () => {
+  it("is the path of an absolute workbenchUrl on the origin of site.url", () => {
     expect(path("https://example.com/workbench", "https://example.com")).toBe("/workbench/");
     expect(path("https://example.com/", "https://example.com/")).toBe("/");
   });
@@ -438,7 +438,7 @@ describe("sameHostWorkbenchPath — a workbench published on the storefront's ow
   });
 });
 
-describe("validateConfig — storefront.workbenchUrl is stored with exactly one trailing slash", () => {
+describe("validateConfig: site.workbenchUrl is stored with exactly one trailing slash", () => {
   const load = (workbenchUrl: string) =>
     validateConfig({ ...valid, storefront: { pagesDir: "./pages", outDir: "./www", workbenchUrl } }, "test").storefront?.workbenchUrl;
 
@@ -474,7 +474,7 @@ describe("validateConfig — storefront.workbenchUrl is stored with exactly one 
   });
 });
 
-describe("validateConfig — storefront.url is stored as its origin and path with one trailing slash", () => {
+describe("validateConfig: site.url is stored as its origin and path with one trailing slash", () => {
   const load = (url: string) =>
     validateConfig({ ...valid, storefront: { pagesDir: "./pages", outDir: "./www", url } }, "test").storefront?.url;
 
@@ -512,11 +512,51 @@ describe("validateConfig", () => {
   });
 });
 
+describe("site: the website's settings, and their names before 0.8.0 (storefront)", () => {
+  const { storefront: old, ...rest } = valid;
+  const { site: globals, ...keys } = old!;
+  const renamed = { ...rest, site: { ...keys, globals } };
+
+  it("with the new names: loads silently, as the same config the old names give", () => {
+    expect(configWarnings(renamed)).toEqual([]);
+    expect(configProblems(renamed)).toEqual([]);
+    expect(validateConfig(renamed, "x")).toEqual(validateConfig(valid, "x"));
+    expect(validateConfig(renamed, "x").storefront?.site).toEqual({ title: "Docs", footer: "Made here", social: { links: ["a"] } });
+  });
+
+  it("with the old names: loads, with one warning per old key", () => {
+    expect(configProblems(valid)).toEqual([]);
+    expect(configWarnings(valid)).toEqual([
+      "storefront.pagesDir is now site.pagesDir", "storefront.outDir is now site.outDir", "storefront.host is now site.host",
+      "storefront.workbenchUrl is now site.workbenchUrl", "storefront.site is now site.globals", "storefront.images is now site.images",
+    ]);
+  });
+
+  it("with both: a config problem", () => {
+    const both = { ...renamed, storefront: old };
+    expect(configProblems(both)).toEqual([`both "site" and "storefront" are set: storefront is the old name of site, keep site only`]);
+    expect(() => validateConfig(both, "x")).toThrow(/both "site" and "storefront" are set/);
+  });
+
+  it("names a problem by the new path, whichever name the config uses", () => {
+    expect(configProblems({ ...rest, site: { pagesDir: "./pages", outDir: 3 } })).toEqual([`"site.outDir" must be a string`]);
+    expect(configProblems({ ...rest, storefront: { pagesDir: "./pages", outDir: 3 } })).toEqual([`"site.outDir" must be a string`]);
+    expect(configProblems({ ...rest, site: { pagesDir: "./pages", outDir: "./www", site: {} } })).toEqual([`unknown key "site.site"`]);
+    expect(configProblems({ ...rest, site: { pagesDir: "./pages", outDir: "./www", globals: 1 } }))
+      .toEqual([`"site.globals" must be an object of the site's values, such as { title: "My site" }`]);
+  });
+
+  it("refuses storefront.globals: the new key under the old name", () => {
+    expect(configProblems({ ...rest, storefront: { pagesDir: "./pages", outDir: "./www", globals: {} } }))
+      .toEqual([`"storefront.globals" is not a key of the old storefront: write the website under site, and its globals there`]);
+  });
+});
+
 describe("storefrontBasePath — the path the site is published under", () => {
   const base = (url?: string) => storefrontBasePath(validateConfig({ ...valid, storefront: { pagesDir: "./pages", outDir: "./www",
     ...(url !== undefined ? { url } : {}) } }, "test").storefront);
 
-  it("is the path of storefront.url, with one trailing slash", () => {
+  it("is the path of site.url, with one trailing slash", () => {
     expect(base("https://example.github.io/project")).toBe("/project/");
     expect(base("https://example.com/a/b/")).toBe("/a/b/");
   });

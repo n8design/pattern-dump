@@ -17,7 +17,7 @@ import { save } from "../../../test-support/save.js";
 describe("ownHosts, isOwnHost, isOwnOrigin", () => {
   const withStorefront = ownHosts("docs.localhost");
 
-  it("are the workbench's names, and storefront.host when there is a storefront", () => {
+  it("are the workbench's names, and site.host when there is a storefront", () => {
     expect([...ownHosts(undefined)].sort()).toEqual(["127.0.0.1", "localhost", "pd.localhost"]);
     expect([...withStorefront].sort()).toEqual(["127.0.0.1", "docs.localhost", "localhost", "pd.localhost"]);
   });
@@ -91,7 +91,7 @@ describe("pd dev's live-reload socket", () => {
     return { port: server.port, wsPort };
   };
 
-  it("accepts pages from its own hosts at its port, with a custom storefront.host, and a handshake with no Origin", async () => {
+  it("accepts pages from its own hosts at its port, with a custom site.host, and a handshake with no Origin", async () => {
     const { port, wsPort } = await start(config(true, "docs.localhost"));
     for (const host of ["localhost", "127.0.0.1", "pd.localhost", "docs.localhost"]) {
       expect(await handshake(wsPort, `http://${host}:${port}`), host).toBe("hello");
@@ -107,7 +107,7 @@ describe("pd dev's live-reload socket", () => {
     }
   }, 60_000);
 
-  it("HTTP: answers its own hosts at its port, the storefront on a custom storefront.host", async () => {
+  it("HTTP: answers its own hosts at its port, the storefront on a custom site.host", async () => {
     const { port } = await start(config(true, "docs.localhost"));
     for (const host of ["localhost", "127.0.0.1", "pd.localhost", "docs.localhost"]) {
       expect((await get(port, "/api/version", `${host}:${port}`)).status, host).toBe(200);

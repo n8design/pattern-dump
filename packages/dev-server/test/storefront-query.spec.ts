@@ -132,7 +132,7 @@ describe("a query's pages", () => {
     expect((await assemble("/articles/a/", site("related:\n  categories: [design, guides]\n  match: all\n"))).titles).toEqual(["Charlie"]);
     const old = await assemble("/articles/a/", site("related:\n  categories: ds\n"));
     expect(old.titles).toEqual(["Charlie", "Bravo"]);
-    expect(old.notes).toContain(`warning: articles/a.md:7: category "ds" is now "design" (renamed in storefront.categories): write "design"`);
+    expect(old.notes).toContain(`warning: articles/a.md:7: category "ds" is now "design" (renamed in site.categories): write "design"`);
   });
 
   it("is off with related: false: no pages, no listing", async () => {

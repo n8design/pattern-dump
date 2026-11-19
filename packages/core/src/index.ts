@@ -11,7 +11,7 @@ import { basename, join, dirname, resolve, relative, isAbsolute } from "node:pat
 import { tmpdir } from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
-import { ConfigError, validateConfig, withOwnManifest, type PatternDumpConfig } from "@pattern-dump/config";
+import { ConfigError, configWarnings, validateConfig, withOwnManifest, type PatternDumpConfig } from "@pattern-dump/config";
 
 export async function runDev(
   root: string,
@@ -59,7 +59,7 @@ export async function checkSitePages(root: string): Promise<string[]> {
         if (res.status !== 200) problems.push(`${page.route} (layout "${page.layout}") does not render: ${res.status}`);
       }
       // What the server printed about them: each page's problems, with file and line.
-      return problems.length ? [...problems, ...printed.filter(l => l.startsWith("[storefront]") || l.startsWith("  - "))] : [];
+      return problems.length ? [...problems, ...printed.filter(l => l.startsWith("[site]") || l.startsWith("  - "))] : [];
     } finally {
       await server.close();
     }
@@ -94,7 +94,7 @@ export async function runBuild(
   });
   const mb = (report.bytes / 1024 / 1024).toFixed(1);
   if (report.workbench === false) {
-    console.log(`[pd build] workbench: not built (build.workbench: false); the pages link to it at ${config.storefront?.workbenchUrl ?? "storefront.workbenchUrl"}`);
+    console.log(`[pd build] workbench: not built (build.workbench: false); the pages link to it at ${config.storefront?.workbenchUrl ?? "site.workbenchUrl"}`);
   } else {
     console.log(`[pd build] ${report.components} components → ${report.files} files, ${mb} MB in ${report.ms} ms`);
     console.log(`[pd build] ${report.outDir}  (served from ${report.basePath})`);
@@ -330,15 +330,21 @@ export async function loadConfig(root: string, configPath?: string): Promise<Pat
     if (!existsSync(configPath)) {
       throw new ConfigError(`--config file not found: ${configPath}`);
     }
-    return validateConfig(await withRootManifest(root, await readConfigFile(configPath), configPath), configPath);
+    return loaded(await withRootManifest(root, await readConfigFile(configPath), configPath), configPath);
   }
 
   const path = configFileOf(root);
-  if (path) return validateConfig(await withRootManifest(root, await readConfigFile(path), basename(path)), basename(path));
+  if (path) return loaded(await withRootManifest(root, await readConfigFile(path), basename(path)), basename(path));
 
   throw new ConfigError(
     `No pattern-dump.config.ts or pattern-dump.config.json found in ${root} (and no --config given)`
   );
+}
+
+/** The config, validated, after a warning for each key it writes with its name before 0.8.0 (storefront is now site). */
+function loaded(raw: unknown, source: string): PatternDumpConfig {
+  for (const w of configWarnings(raw)) console.warn(`[pd] warning: ${source}: ${w}`);
+  return validateConfig(raw, source);
 }
 
 /** A project that is also a pattern package takes the folders its config doesn't name from its own package.json's
