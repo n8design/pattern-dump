@@ -50,7 +50,7 @@ export default defineConfig({
   }, {
     // Built before any spec writes into the bench, then served as plain files from /.
     command: `node ${path.join(repo, "packages/cli/dist/index.js")} build --out "${WORKBENCH_OUT}"`
-      + ` && node ${path.join(repo, "apps/dev-ui/e2e/static-server.mjs")} --dir "${path.join(bench, ".out", "storefront")}" --base / --port ${STATIC_PORT}`,
+      + ` && node ${path.join(repo, "apps/dev-ui/e2e/static-server.mjs")} --dir "${path.join(bench, ".out", "site")}" --base / --port ${STATIC_PORT}`,
     cwd: bench,
     url: `http://127.0.0.1:${STATIC_PORT}/`,
     reuseExistingServer: false,

@@ -49,7 +49,7 @@ describe("pd build — a workbench on the storefront's host", () => {
   it("a workbench at a path on the storefront's host: robots.txt keeps its previews out, and the build asks nothing", async () => {
     const root = await benchCopy();
     const report = await buildAt(root, join(root, "..", "wb-samehost"), config({ workbenchUrl: "/workbench/" }));
-    expect(await readFile(join(root, ".out", "storefront", "robots.txt"), "utf8"))
+    expect(await readFile(join(root, ".out", "site", "robots.txt"), "utf8"))
       .toBe("User-agent: *\nDisallow: /preview/\nDisallow: /workbench/preview/\n\nSitemap: https://bench.example.test/sitemap.xml\n");
     expect(report.notes).not.toContain(sameHostNote);
   }, 60_000);
@@ -57,14 +57,14 @@ describe("pd build — a workbench on the storefront's host", () => {
   it("an absolute workbenchUrl on the site's own origin counts as the same host", async () => {
     const root = await benchCopy();
     const report = await buildAt(root, join(root, "..", "wb-sameorigin"), config({ workbenchUrl: "https://bench.example.test/workbench/" }));
-    expect(await readFile(join(root, ".out", "storefront", "robots.txt"), "utf8")).toContain("Disallow: /workbench/preview/\n");
+    expect(await readFile(join(root, ".out", "site", "robots.txt"), "utf8")).toContain("Disallow: /workbench/preview/\n");
     expect(report.notes).not.toContain(sameHostNote);
   }, 60_000);
 
   it("a workbench on a host of its own: no line for it, and the build still says where its rule must go", async () => {
     const root = await benchCopy();
     const report = await buildAt(root, join(root, "..", "wb-ownhost"), config({ workbenchUrl: "https://workbench.example.test/workbench/" }));
-    expect(await readFile(join(root, ".out", "storefront", "robots.txt"), "utf8"))
+    expect(await readFile(join(root, ".out", "site", "robots.txt"), "utf8"))
       .toBe("User-agent: *\nDisallow: /preview/\n\nSitemap: https://bench.example.test/sitemap.xml\n");
     expect(report.notes).toContain(sameHostNote);
   }, 60_000);

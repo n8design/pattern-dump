@@ -62,7 +62,7 @@ describe("pd build — a storefront under a path", () => {
     const [a, b] = [await benchCopy(), await benchCopy()];
     await build(a, config("https://bench.example.test/"));
     report = await build(b, config("https://bench.example.test/sub/"));
-    [atRoot, underPath] = await Promise.all([files(join(a, ".out", "storefront")), files(join(b, ".out", "storefront"))]);
+    [atRoot, underPath] = await Promise.all([files(join(a, ".out", "site")), files(join(b, ".out", "site"))]);
   }, 180_000);
 
   it("writes the same files as at the root, by site path, but robots.txt", () => {

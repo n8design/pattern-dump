@@ -41,8 +41,8 @@ const exists = (p: string) => stat(p).then(() => true, () => false);
  *  nor add to it unless it finishes, and then replaces it whole. */
 async function earlierOutputs(root: string): Promise<void> {
   await save(join(root, ".out", "workbench", "index.html"), "<p>the earlier workbench</p>\n");
-  await save(join(root, ".out", "storefront", "index.html"), "<p>the earlier site</p>\n");
-  await save(join(root, ".out", "storefront", "stale.html"), "<p>only the earlier site had this</p>\n");
+  await save(join(root, ".out", "site", "index.html"), "<p>the earlier site</p>\n");
+  await save(join(root, ".out", "site", "stale.html"), "<p>only the earlier site had this</p>\n");
 }
 
 /** A build of a fresh copy, with `during` run once the build has started. */
@@ -94,7 +94,7 @@ describe("pd build: a file changed while it runs", () => {
     });
     await expect(result).rejects.toThrow(/^pd build: the project changed while it was being built, so nothing was written\. Run pd build again once the files are saved:\n  - pages\/about\.md \(changed\)$/);
     expect(await exists(out)).toBe(false);
-    expect(await exists(join(root, ".out", "storefront"))).toBe(false);
+    expect(await exists(join(root, ".out", "site"))).toBe(false);
   }, 120_000);
 
   it("names an added component file and a removed page", async () => {
@@ -112,12 +112,12 @@ describe("pd build: a file changed while it runs", () => {
   for (const [part, atLog] of [["the workbench", " folder overviews ("], ["the site", "… site: "]] as const) {
     it(`leaves both folders as they were when a file changes after ${part} is written`, async () => {
       const { root, out, result } = await buildChangingAboutAt(atLog);
-      const sfOut = join(root, ".out", "storefront");
+      const sfOut = join(root, ".out", "site");
       await expect(result).rejects.toThrow(/^pd build: the project changed while it was being built, so nothing was written\. Run pd build again once the files are saved:\n  - pages\/about\.md \(changed\)$/);
       expect(await contents(out)).toEqual({ "index.html": "<p>the earlier workbench</p>\n" });
       expect(await contents(sfOut)).toEqual({ "index.html": "<p>the earlier site</p>\n", "stale.html": "<p>only the earlier site had this</p>\n" });
       // Nothing of the build is left beside them.
-      expect((await readdir(join(root, ".out"))).sort()).toEqual(["storefront", "workbench"]);
+      expect((await readdir(join(root, ".out"))).sort()).toEqual(["site", "workbench"]);
     }, 120_000);
   }
 
@@ -127,8 +127,8 @@ describe("pd build: a file changed while it runs", () => {
     expect(report.storefront?.pages).toBeGreaterThan(0);
     expect(await exists(join(out, "index.html"))).toBe(true);
     expect(await readFile(join(out, "index.html"), "utf8")).not.toContain("the earlier workbench");
-    expect(await readFile(join(root, ".out", "storefront", "index.html"), "utf8")).not.toContain("the earlier site");
-    expect(await exists(join(root, ".out", "storefront", "stale.html"))).toBe(false);
-    expect((await readdir(join(root, ".out"))).sort()).toEqual(["storefront", "workbench"]);
+    expect(await readFile(join(root, ".out", "site", "index.html"), "utf8")).not.toContain("the earlier site");
+    expect(await exists(join(root, ".out", "site", "stale.html"))).toBe(false);
+    expect((await readdir(join(root, ".out"))).sort()).toEqual(["site", "workbench"]);
   }, 120_000);
 });

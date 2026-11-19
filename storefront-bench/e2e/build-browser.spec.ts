@@ -43,10 +43,11 @@ let tmp = "";
 test.beforeAll(async () => { tmp = await mkdtemp(join(tmpdir(), "pd-build-browser-")); });
 test.afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
 
-const config = validateConfig(defineConfig({
+const raw = defineConfig({
   outDir: "./.out/wb", assets: { dir: "./assets" },
-  storefront: { pagesDir: "./pages", outDir: "./.out/site", workbenchUrl: "https://wb.test/" },
-}), "test");
+  site: { pagesDir: "./pages", outDir: "./.out/site", workbenchUrl: "https://wb.test/" },
+});
+const config = validateConfig(raw, "test");
 async function project(name: string, files: Record<string, string | Buffer>): Promise<string> {
   const root = join(tmp, name);
   for (const [rel, text] of Object.entries({
@@ -158,7 +159,7 @@ test("an image whose slot says it is narrower than it is shown is a warning, and
 
 const underPath = validateConfig(defineConfig({
   outDir: "./.out/wb", assets: { dir: "./assets" },
-  storefront: { pagesDir: "./pages", outDir: "./.out/site", workbenchUrl: "https://wb.test/", url: "https://site.test/sub/" },
+  site: { pagesDir: "./pages", outDir: "./.out/site", workbenchUrl: "https://wb.test/", url: "https://site.test/sub/" },
 }), "test");
 const scripted = (script: string) => project(`script-${script.length}`, {
   "src/patterns/layouts/page/page.hbs": `<header><p>Site</p></header><main class="page"><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n`
@@ -217,7 +218,7 @@ test("with search, a search field that shows no result for a word the index has 
     "pages/index.md": "---\ntitle: Home\n---\n\nText.\n",
     "pages/harbour.md": "---\ntitle: Harbour\n---\n\nBoats.\n",
   });
-  const cfg = validateConfig({ ...config, storefront: { ...config.storefront!, search: true } }, "test");
+  const cfg = validateConfig(defineConfig({ ...raw, site: { ...raw.site!, search: true } }), "test");
   const message = await buildStaticSite(cfg, root, {
     outDir: join(root, ".out", "wb"), pdVersion: "0.0.0-test", browser: true, loadPlaywright, loadPagefind: () => loadProjectPagefind(bench),
   }).then(() => "built", (e: Error) => e.message);

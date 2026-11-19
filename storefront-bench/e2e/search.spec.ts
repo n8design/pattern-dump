@@ -64,7 +64,7 @@ test.describe("search on the built bench", () => {
     // Every page of the site but the 404 page and the tag and category pages; never the draft.
     expect(report.search).toMatchObject({ pages: 8 });
     expect(report.drafts).toEqual(["articles/zz-draft.md"]);
-    site = join(root, ".out", "storefront");
+    site = join(root, ".out", "site");
     // Only Pagefind's search files: its own UIs are not written.
     const files = await readdir(join(site, "_pd", "search"));
     expect(files).toContain("pagefind.js");
@@ -137,7 +137,7 @@ test("under a path: the index is under it, and results link under it", async ({ 
     outDir: join(root, ".out", "workbench"), pdVersion: "0.0.0-test", loadPagefind,
   });
   const context = await browser.newContext();
-  await served(context, join(root, ".out", "storefront"), "/sub/");
+  await served(context, join(root, ".out", "site"), "/sub/");
   const page = await context.newPage();
   await page.goto("http://site.localhost/sub/search/?q=photograph");
   await expect(page.getByRole("status")).toHaveText(`1 result for "photograph".`);
@@ -151,9 +151,9 @@ test("without Pagefind the component says search works on the built site", async
     outDir: join(root, ".out", "workbench"), pdVersion: "0.0.0-test", loadPagefind: async () => undefined,
   });
   expect(report.search).toBeUndefined();
-  expect(existsSync(join(root, ".out", "storefront", "_pd", "search"))).toBe(false);
+  expect(existsSync(join(root, ".out", "site", "_pd", "search"))).toBe(false);
   const context = await browser.newContext();
-  await served(context, join(root, ".out", "storefront"));
+  await served(context, join(root, ".out", "site"));
   const page = await context.newPage();
   await page.goto("http://site.localhost/search/?q=photograph");
   await expect(page.getByRole("status")).toHaveText("Search works on the built site: this one has no search index.");

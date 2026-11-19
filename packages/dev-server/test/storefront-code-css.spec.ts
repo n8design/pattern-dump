@@ -92,7 +92,7 @@ describe("pd build: code.css in the site's own _pd/", () => {
     const root = await benchCopy();
     const workbench = join(root, "..", `${n}-workbench-out`);
     await buildStaticSite(cfg, root, { outDir: workbench, pdVersion: "0.0.0-test", now: NOW });
-    return { site: join(root, ".out", "storefront"), workbench };
+    return { site: join(root, ".out", "site"), workbench };
   }
   async function expectSite(site: string): Promise<void> {
     expect(await readFile(join(site, "_pd", "code.css"), "utf8")).toBe(getCodeCSS());

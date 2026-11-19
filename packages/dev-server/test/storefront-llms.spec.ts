@@ -47,7 +47,7 @@ describe("pd build — llms.txt", () => {
     // After the build's day (NOW): scheduled, so left out.
     await edit("articles/plain.md", "date: 2026-10-02", "date: 2027-03-01");
     await build(root, join(root, "..", "wb-llms-out"));
-    const llms = await readFile(join(root, ".out", "storefront", "llms.txt"), "utf8");
+    const llms = await readFile(join(root, ".out", "site", "llms.txt"), "utf8");
     expect(llms).not.toMatch(/\/guides\/setup\/|\/articles\/harbour\/|\/articles\/plain\//);
     // The rest is there.
     expect(llms).toContain("## Guides\n\n- [Guides](https://bench.example.test/guides/): Longer texts about the bench.\n\n");
@@ -58,16 +58,16 @@ describe("pd build — llms.txt", () => {
   it("writes no llms.txt with site.llms: false, or for a site with index: false", async () => {
     const root = await benchCopy();
     await build(root, join(root, "..", "wb-llms-off"), config({ llms: false }));
-    expect(await exists(join(root, ".out", "storefront", "llms.txt"))).toBe(false);
+    expect(await exists(join(root, ".out", "site", "llms.txt"))).toBe(false);
     await build(root, join(root, "..", "wb-llms-staging"), config({ index: false }));
-    expect(await exists(join(root, ".out", "storefront", "llms.txt"))).toBe(false);
+    expect(await exists(join(root, ".out", "site", "llms.txt"))).toBe(false);
   }, 60_000);
 
   it("without site.url: llms.txt links each page by its path from the site's root", async () => {
     const root = await benchCopy();
     const { url: _u, ...rest } = benchConfig.site!;
     await buildStaticSite(validateConfig({ ...benchConfig, site: rest }, "test"), root, { outDir: join(root, "..", "wb-llms-nourl"), pdVersion: "x", now: NOW });
-    const llms = await readFile(join(root, ".out", "storefront", "llms.txt"), "utf8");
+    const llms = await readFile(join(root, ".out", "site", "llms.txt"), "utf8");
     expect(llms).toContain("- [About](/about/): What the bench is for.\n");
     expect(llms).not.toContain("https://");
   }, 60_000);

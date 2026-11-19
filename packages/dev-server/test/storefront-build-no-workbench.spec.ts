@@ -52,7 +52,7 @@ describe("pd build — build.workbench: false", () => {
     expect(report.storefront?.pages).toBeGreaterThan(0);
     expect(await readFile(join(out, "kept.txt"), "utf8")).toBe("an earlier build's file\n");
     expect(await exists(join(out, "index.html"))).toBe(false);
-    const site = join(root, ".out", "storefront");
+    const site = join(root, ".out", "site");
     expect(await exists(join(site, "index.html"))).toBe(true);
     // The pages still link into the workbench at its address, and its previews stay out of search engines.
     expect(await readFile(join(site, "robots.txt"), "utf8")).toContain("Disallow: /workbench/preview/\n");

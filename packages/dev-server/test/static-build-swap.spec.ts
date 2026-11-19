@@ -58,13 +58,13 @@ describe("pd build: leftovers of a build that was killed", () => {
   it("removes every one whose process no longer runs, puts a moved-aside output back, and keeps a running build's", async () => {
     const root = await benchCopy();
     const out = join(root, ".out", "workbench");
-    const sfOut = join(root, ".out", "storefront");
+    const sfOut = join(root, ".out", "site");
     const dead = deadPid();
     // A killed build that had moved the workbench aside and not yet replaced it, and one that was writing the storefront.
     await save(join(root, ".out", `.workbench.pd-build-${dead}.earlier`, "index.html"), "<p>the earlier workbench</p>\n");
-    await save(join(root, ".out", `.storefront.pd-build-${dead}`, "half.html"), "<p>half written</p>\n");
+    await save(join(root, ".out", `.site.pd-build-${dead}`, "half.html"), "<p>half written</p>\n");
     // A build that still runs (this test's parent process).
-    await save(join(root, ".out", `.storefront.pd-build-${process.ppid}`, "busy.html"), "<p>being written</p>\n");
+    await save(join(root, ".out", `.site.pd-build-${process.ppid}`, "busy.html"), "<p>being written</p>\n");
     // Stop this build at its first check, so the outputs show what the clean-up left.
     const result = buildStaticSite(config, root, {
       outDir: out, pdVersion: "0.0.0-test", now: NOW,
@@ -77,7 +77,7 @@ describe("pd build: leftovers of a build that was killed", () => {
     await expect(result).rejects.toThrow(/so nothing was written/);
     expect(await readFile(join(out, "index.html"), "utf8")).toBe("<p>the earlier workbench</p>\n");
     expect(await exists(sfOut)).toBe(false);
-    expect((await readdir(join(root, ".out"))).sort()).toEqual([`.storefront.pd-build-${process.ppid}`, "workbench"]);
+    expect((await readdir(join(root, ".out"))).sort()).toEqual([`.site.pd-build-${process.ppid}`, "workbench"]);
   }, 120_000);
 });
 
@@ -85,7 +85,7 @@ describe("pd build: the storefront can't take its place", () => {
   it("says the workbench and the storefront are out of step, and the storefront keeps its earlier output", async () => {
     const root = await benchCopy();
     const out = join(root, ".out", "workbench");
-    const sfOut = join(root, ".out", "storefront");
+    const sfOut = join(root, ".out", "site");
     await save(join(out, "index.html"), "<p>the earlier workbench</p>\n");
     await save(join(sfOut, "index.html"), "<p>the earlier site</p>\n");
     failing.renameTo = sfOut;
@@ -97,6 +97,6 @@ describe("pd build: the storefront can't take its place", () => {
     }
     expect(await readFile(join(out, "index.html"), "utf8")).not.toContain("the earlier workbench");
     expect(await readFile(join(sfOut, "index.html"), "utf8")).toBe("<p>the earlier site</p>\n");
-    expect((await readdir(join(root, ".out"))).sort()).toEqual(["storefront", "workbench"]);
+    expect((await readdir(join(root, ".out"))).sort()).toEqual(["site", "workbench"]);
   }, 120_000);
 });
