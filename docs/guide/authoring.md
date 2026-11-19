@@ -168,7 +168,9 @@ and a prompt with its output as `console` or `shell-session`. Any other language
 block. Every code block is written the same way wherever its markdown is (a
 component's docs, a storefront page, the content of a component placed on a page), a fence and an indented block
 alike: highlighted where its language is one of these, with a copy button, and focusable (`tabindex="0"`), so a block that scrolls sideways can be
-scrolled from the keyboard. Style it with `overflow-x: auto` rather than wrapping its lines. On a storefront page the
+scrolled from the keyboard. Style it with `overflow-x: auto` rather than wrapping its lines. Each token's class
+names its kind (`pd-code-keyword`), coloured by a custom property a site can set from its own tokens
+(`--pd-code-keyword`, see [Code colours](storefront.md#code-colours)). On a storefront page the
 copy button is added by a small script of the page's own, and only where the browser can copy: with scripting off,
 or without a clipboard, the page has no button at all, so a skin's CSS can't show one that does nothing. "Copied"
 is also said in a polite live region, for screen readers.

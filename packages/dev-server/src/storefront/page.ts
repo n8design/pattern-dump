@@ -888,6 +888,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published, article,
         ...(generated ? { collection: true } : {}) })]
       : []),
+    // Code token colours, before every stylesheet of the site's: the pd-code layer is then declared first, so any rule
+    // of the site's wins, layered or not (code.css, highlight.ts getCodeCSS).
+    ...(html.includes(`class="shiki-container"`) ? [`<link rel="stylesheet" href="${PD_ROUTES.codeCss}">`] : []),
     ...(headExtra ? [headExtra] : []),
     ...(siteHead ? [siteHead] : []),
     await a.head(checked.layoutId, html, pageComponents),

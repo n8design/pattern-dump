@@ -660,7 +660,11 @@ export const PD_ROUTES = {
   axeCore: "/_pd/axe-core.js",
   /** GET → RuleTiers */
   ruleTiers: "/_pd/rule-tiers.json",
+  /** The workbench's code-block frame: background, padding, font, and the OS's light or dark for its code. */
   shikiCss: "/_pd/shiki.css",
+  /** Code token colours (`--pd-code-<kind>`, PD's defaults in `@layer pd-code`): linked by the workbench and by
+   *  every site page that shows code; `pd build` writes it into the site's own `_pd/`. */
+  codeCss: "/_pd/code.css",
   /** Document-base layer (reset + font-face). */
   baseCss: "/_pd/base.css",
 } as const;

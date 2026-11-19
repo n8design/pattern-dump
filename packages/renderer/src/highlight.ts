@@ -1,11 +1,11 @@
-// Shiki-based syntax highlighter — render-time, class-based output, dual light/dark themes.
-// M4.1: one shared highlighter + one shared transformerStyleToClass instance so CSS
-// accumulates across all highlight() calls and getShikiCSS() returns the complete sheet.
-// No inline style= on spans — all colours are class-referenced CSS variables.
-import { createHighlighter, type Highlighter } from "shiki";
-import { transformerStyleToClass } from "@shikijs/transformers";
-import { mcmDark } from "./themes/mcm-dark.js";
-import { monokaiLight } from "./themes/monokai-light.js";
+// Shiki-based syntax highlighter: render-time, class-based output, light and dark.
+// Each token is highlighted with both of PD's themes, then named by the kind its two colours stand for
+// (`pd-code-keyword`): a fixed class per kind, coloured by a custom property of the same name (--pd-code-keyword)
+// in /_pd/code.css (getCodeCSS). PD's colours are the properties' defaults, in their own cascade layer, so a site
+// sets every kind from its own tokens and any rule of its wins. No inline style= on spans.
+import { createHighlighter, type Highlighter, type ShikiTransformer } from "shiki";
+import { mcmDark, mcmDarkPalette } from "./themes/mcm-dark.js";
+import { monokaiLight, monokaiLightPalette } from "./themes/monokai-light.js";
 
 // Fixed grammar set (bundle discipline). Shell: `shellscript` for scripts and commands, `shellsession` for a prompt
 // with its output. `text` (and any other name) stays a plain block on purpose.
@@ -32,37 +32,17 @@ const LANG_SET = new Set<string>([...SUPPORTED_LANGS, ...Object.keys(LANG_ALIASE
 
 let _highlighter: Highlighter | null = null;
 
-// One shared transformer — accumulates the class→style mapping across all highlight() calls.
-// getCSS() stays additive: once a token type is seen it never disappears.
-const _transformer = transformerStyleToClass();
-
 // ---- Public API ----
 
 /** Initialise the shared Shiki highlighter. Idempotent — safe to call multiple times. */
 export async function initHighlighter(): Promise<void> {
   if (_highlighter) return;
   _highlighter = await createHighlighter({
-    // Custom pair: light = Monokai-Light-derived, dark = warm MCM. Dual-variable output via
-    // defaultColor:false and the OS-bound @media switch are unchanged (drop-in theme objects).
+    // Custom pair: light = Monokai-Light-derived, dark = warm MCM. Both colour every token (defaultColor: false);
+    // kindClasses turns the two into the token's kind.
     themes: [monokaiLight, mcmDark],
     langs: [...SUPPORTED_LANGS],
   });
-  // Warm up: run a token-rich sample per grammar so transformerStyleToClass accumulates
-  // all colour→class mappings before the first /assets/shiki.css request is served.
-  // Single-char "x" only generates a couple of classes; real snippets hit keywords,
-  // strings, comments, numbers, operators and punctuation.
-  const WARMUP: Partial<Record<SupportedLang, string>> = {
-    handlebars: `{{> header}}\n<div class="{{mod}}">\n{{#each items}}<span data-id="{{id}}">{{title}}</span>{{/each}}\n{{#if ok}}yes{{else}}no{{/if}}\n</div>`,
-    typescript: `import { x } from "./y";\n// comment\nconst s: string = "hi";\ntype T = { n: number; ok: boolean };\nfunction f(a: number): T | null { return a > 0 ? { n: a, ok: true } : null; }`,
-    scss: `.a { color: #fff; font-size: 1rem; &:hover { background: var(--c); } }\n@mixin m($v: 0) { margin: $v; }\n@media (max-width: 768px) { .a { display: none; } }`,
-    json: `{"k":"v","n":42,"b":true,"x":null,"a":[1,"two",false]}`,
-    html: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head><body class="c"><!-- note --><p data-x="1">hi</p></body></html>`,
-    shellscript: `#!/usr/bin/env bash\n# comment\nexport NAME="world" N=42\nif [ -n "$NAME" ]; then echo "hi \${NAME}" | tr a-z A-Z; fi\nnpm install --save-dev pattern-dump`,
-    shellsession: `$ npm run build\n> built in 2s\n$ echo "done"`,
-  };
-  for (const [lang, code] of Object.entries(WARMUP)) {
-    _highlightRaw(code, lang);
-  }
 }
 
 /**
@@ -74,25 +54,104 @@ export function highlight(code: string, lang: string): string {
   return _highlightRaw(code, lang);
 }
 
+/** The kinds of token a code block names, each a class `pd-code-<kind>` and a custom property `--pd-code-<kind>`.
+ *  `text` is the block's own colour: its tokens carry no class. */
+export const CODE_KINDS = [
+  "text", "comment", "string", "keyword", "storage", "constant", "value", "tag", "attribute", "function", "support",
+  "property", "parameter", "expression",
+] as const;
+export type CodeKind = typeof CODE_KINDS[number];
+
+type LightIntent = keyof typeof monokaiLightPalette;
+type DarkIntent = Exclude<keyof typeof mcmDarkPalette, "background">;
+
+/** Each kind as the intents it has in PD's light and dark themes: its default colours. */
+const KIND_INTENTS: Record<CodeKind, [LightIntent, DarkIntent]> = {
+  text: ["base", "base"],
+  comment: ["comment", "comment"],
+  string: ["string", "string"],
+  keyword: ["keyword", "keyword"],
+  storage: ["support", "keyword"],    // const, function, interface
+  constant: ["constant", "constant"],
+  value: ["support", "constant"],     // CSS keyword values: auto, none, system-ui
+  tag: ["keyword", "tag"],
+  attribute: ["name", "attr"],
+  function: ["name", "base"],
+  support: ["support", "base"],       // CSS property names, built-in types
+  property: ["support", "string"],    // JSON keys
+  parameter: ["varParam", "base"],
+  expression: ["hbExpr", "hbExpr"],   // a Handlebars {{expression}}
+};
+/** Pairs the two themes give that no kind has: the kind each is shown as, measured over the repository's own code:
+ *  a function name is dark "constant" where declared as a const and "string" in some calls; a JSDoc type
+ *  is dark "comment". */
+const OTHER_PAIRS: Array<[LightIntent, DarkIntent, CodeKind]> = [
+  ["name", "constant", "function"],
+  ["name", "string", "function"],
+  ["name", "comment", "comment"],
+];
+
+const hex = (s: string) => s.toLowerCase();
+const KIND_OF_PAIR = new Map<string, CodeKind>();
+for (const [kind, [l, d]] of Object.entries(KIND_INTENTS) as Array<[CodeKind, [LightIntent, DarkIntent]]>) {
+  KIND_OF_PAIR.set(`${hex(monokaiLightPalette[l])} ${hex(mcmDarkPalette[d])}`, kind);
+}
+for (const [l, d, kind] of OTHER_PAIRS) {
+  const key = `${hex(monokaiLightPalette[l])} ${hex(mcmDarkPalette[d])}`;
+  if (!KIND_OF_PAIR.has(key)) KIND_OF_PAIR.set(key, kind);
+}
+/** A pair no rule names (a grammar change could make one): the kind its light colour has, else text. */
+const KIND_OF_LIGHT = new Map<string, CodeKind>();
+for (const [kind, [l]] of Object.entries(KIND_INTENTS) as Array<[CodeKind, [LightIntent, DarkIntent]]>) {
+  if (!KIND_OF_LIGHT.has(hex(monokaiLightPalette[l]))) KIND_OF_LIGHT.set(hex(monokaiLightPalette[l]), kind);
+}
+
+/** The kind a token's light and dark colours stand for. */
+export function codeKindOf(light: string | undefined, dark: string | undefined): CodeKind {
+  if (!light || !dark) return "text";
+  return KIND_OF_PAIR.get(`${hex(light)} ${hex(dark)}`) ?? KIND_OF_LIGHT.get(hex(light)) ?? "text";
+}
+
+/** Each token's two colours become its kind's class; the block's inline colours and theme classes go. */
+const kindClasses: ShikiTransformer = {
+  name: "pd-code-kinds",
+  pre(node) {
+    node.properties["class"] = "shiki";
+    delete node.properties["style"];
+  },
+  span(node) {
+    const style = String(node.properties["style"] ?? "");
+    delete node.properties["style"];
+    const kind = codeKindOf(/--shiki-light:\s*(#[0-9a-f]+)/i.exec(style)?.[1], /--shiki-dark:\s*(#[0-9a-f]+)/i.exec(style)?.[1]);
+    if (kind !== "text") node.properties["class"] = `pd-code-${kind}`;
+  },
+};
+
 /**
- * The one Shiki stylesheet both the source tab and the docs fences share.
- * Defines CSS variable pairs per class and applies them via prefers-color-scheme.
- * Serve this at `/assets/shiki.css`; the shell links it once in <head>.
+ * /_pd/code.css: every kind's colour. PD's defaults are custom properties on :root, light-dark() of the two themes'
+ * colours, so they follow the color-scheme of the element that shows them; they and the rules that apply them are in
+ * the `pd-code` cascade layer, so any rule of a site's (unlayered, or in a layer declared before this sheet is
+ * linked) wins. A site sets `--pd-code-string: var(--color-code-string)` and the like on :root.
+ */
+export function getCodeCSS(): string {
+  const props = CODE_KINDS.map(kind => {
+    const [l, d] = KIND_INTENTS[kind];
+    return `--pd-code-${kind}:light-dark(${hex(monokaiLightPalette[l])},${hex(mcmDarkPalette[d])});`;
+  }).join("");
+  const rules = CODE_KINDS.filter(k => k !== "text").map(k => `.pd-code-${k}{color:var(--pd-code-${k})}`).join("");
+  return `@layer pd-code{:root{${props}}.shiki{color:var(--pd-code-text)}${rules}}\n`;
+}
+
+/**
+ * /_pd/shiki.css: the workbench's code-block frame, which site pages never link (a site styles its own blocks).
+ * Its blocks follow the OS's light or dark (color-scheme: light dark), as before the shell's own dark pass, while the
+ * shell itself is pinned light.
  */
 export function getShikiCSS(): string {
-  const vars = _transformer.getCSS();
-  // Base rules that wire the CSS variables to actual colour properties.
-  // prefers-color-scheme: dark selects the dark palette — no JS, no sessionStorage.
-  const base = [
-    ".shiki{background-color:var(--shiki-light-bg);overflow-x:auto}",
+  return [
+    `.shiki{color-scheme:light dark;background-color:light-dark(${hex(monokaiLight.colors["editor.background"])},${hex(mcmDarkPalette.background)});overflow-x:auto}`,
     ".shiki code{display:block;padding:.75em 1em;font-family:monospace;font-size:1rem;line-height:1.6;white-space:pre;tab-size:2}",
-    ".shiki span{color:var(--shiki-light)}",
-    "@media(prefers-color-scheme:dark){",
-    ".shiki{background-color:var(--shiki-dark-bg)}",
-    ".shiki span{color:var(--shiki-dark)}",
-    "}",
-  ].join("");
-  return vars + base;
+  ].join("") + "\n";
 }
 
 /**
@@ -123,7 +182,7 @@ function _highlightRaw(code: string, lang: string): string {
       lang: resolved,
       themes: { light: "pd-monokai-light", dark: "pd-mcm-dark" },
       defaultColor: false,
-      transformers: [_transformer],
+      transformers: [kindClasses],
     });
   } catch {
     return _plainPre(code); // highlight failure → never propagates

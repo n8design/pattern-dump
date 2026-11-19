@@ -108,7 +108,7 @@ if (failures.length === 0) {
     check(JSON.stringify(ids) === JSON.stringify(["atoms/button", "molecules/search-field", "molecules/search-field/input", "pages/example"]),
       "the starter tree", JSON.stringify(ids));
 
-    for (const [route, min] of [["/_pd/main.js", 10_000], ["/_pd/main.css", 1_000], ["/_pd/axe-core.js", 100_000], ["/_pd/rule-tiers.json", 50], ["/_pd/shiki.css", 1]]) {
+    for (const [route, min] of [["/_pd/main.js", 10_000], ["/_pd/main.css", 1_000], ["/_pd/axe-core.js", 100_000], ["/_pd/rule-tiers.json", 50], ["/_pd/shiki.css", 1], ["/_pd/code.css", 500]]) {
       const res = await get(route);
       const size = (await res.arrayBuffer()).byteLength;
       check(res.ok && size >= min, `serves ${route}`, `${res.status}, ${size} bytes`);

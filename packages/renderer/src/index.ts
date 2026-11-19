@@ -5,7 +5,7 @@
 // M6: collectComponents (old folder-per-component walk) replaced by DiscoveryMap from RendererOptions.
 //     When RendererOptions.discoveryMap is absent the renderer calls buildDiscoveryMap(patternsDir)
 //     from @pattern-dump/discovery — never the old walk. No path reconstruction anywhere.
-export { initHighlighter, highlight, getShikiCSS, wrapWithCopyButton } from "./highlight";
+export { initHighlighter, highlight, getShikiCSS, getCodeCSS, codeKindOf, CODE_KINDS, wrapWithCopyButton, type CodeKind } from "./highlight";
 export { unescapedOutputs, type UnescapedOutput } from "./unescaped";
 export { itemsWrittenAsText, type ItemAsText } from "./item-text";
 export { checkSchemaExtensions, QUERY_OPTIONS, readExampleHeight, readLayoutMarker, readPreviewMode, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";

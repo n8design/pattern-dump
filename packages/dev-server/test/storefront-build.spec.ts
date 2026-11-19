@@ -72,6 +72,8 @@ describe("pd build — the storefront root", () => {
       // The bench has no 404.md: the built-in page, through layouts/page.
       "404.html",
       "_pd/base.css",
+      // The code colours: guides/setup.md and the home page show code (code.css, highlight.ts).
+      "_pd/code.css",
       "_pd/components/components/callout.css",
       "_pd/components/components/card.css",
       // The about page places the icon label.
@@ -138,7 +140,7 @@ describe("pd build — the storefront root", () => {
       "tags/layout/index.html",
       "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 56, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 57, bytes: expect.any(Number) });
     // llms.txt lists six pages: every page of the folder but the home page, whose title and description head it.
     expect(report.llms).toEqual({ pages: 6 });
   });

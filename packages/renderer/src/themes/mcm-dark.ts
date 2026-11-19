@@ -12,16 +12,16 @@
 import { computePalette, type Oklch } from "./oklch.js";
 
 // OKLCH source of truth for the dark palette.
-const INTENTS: Record<string, Oklch> = {
+const INTENTS = {
   tag:      { l: 0.76, c: 0.11,  h: 190 }, // teal      — HTML tag names
   keyword:  { l: 0.78, c: 0.145, h: 78  }, // gold-amber — keywords/storage + Handlebars #each/#if/else
   attr:     { l: 0.72, c: 0.09,  h: 100 }, // khaki     — attribute names (the quiet rung)
   string:   { l: 0.88, c: 0.15,  h: 122 }, // olive     — strings (brightest, the CVD "up" rung)
   hbExpr:   { l: 0.68, c: 0.155, h: 48  }, // terracotta — {{expression}} identifier
   constant: { l: 0.74, c: 0.10,  h: 265 }, // periwinkle — constants/numbers (distinct cool rung)
-  comment:  { l: 0.55, c: 0.025, h: 70  }, // warm-grey  — comments
+  comment:  { l: 0.651, c: 0.025, h: 70 }, // warm-grey: comments (was 0.55, under 4.5:1 on the ground; 0.8.0)
   base:     { l: 0.86, c: 0.015, h: 80  }, // warm off-white — base fg / punctuation / muted
-};
+} satisfies Record<string, Oklch>;
 
 const c = computePalette("pd-mcm-dark", INTENTS);
 
@@ -52,3 +52,6 @@ export const mcmDark = {
 
 /** The computed hex per intent — exported for the verify/report step. */
 export const mcmDarkHex = c;
+
+/** Every intent's colour, by name, with the block's ground: the code kinds' dark defaults (highlight.ts). */
+export const mcmDarkPalette = { ...c, background: "#22292E" };

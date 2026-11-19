@@ -2,7 +2,28 @@
 
 ## 0.8.0 (unreleased)
 
+### Upgrading from 0.7.0
+
+- **Highlighted code has fixed class names.** Each token's class is its kind, `pd-code-keyword`, `pd-code-string` and
+  so on, in place of a generated name such as `__shiki_17h8wv`, and a block is `<pre class="shiki">` with no inline
+  style. CSS written for the generated names no longer matches: set the kinds' colours instead (below).
+
 ### Added
+
+- **Code on site pages is highlighted, in the site's colours.** A page with code links `/_pd/code.css`, which colours
+  each kind of token from a custom property, `--pd-code-keyword`, `--pd-code-string`, `--pd-code-comment` and eleven
+  more, with Pattern Dump's colours as the defaults. A site sets them from its own tokens
+  (`--pd-code-string: var(--color-code-string)`), with no colour values of its own; the defaults are in their own
+  cascade layer, `pd-code`, so any rule of the site's wins. Light and dark follow the page's `color-scheme`: a light
+  and dark toggle sets `color-scheme` too. `pd build` writes the file into the site's `_pd/`, with or without the
+  workbench. The workbench uses the same properties. An additive contract change carries the address:
+  `PD_ROUTES.codeCss`.
+
+### Changed
+
+- **Code colours reach 4.5:1 contrast,** in the workbench and on site pages: in light mode, strings, keywords and
+  tags, function and attribute names, CSS properties and values, parameters and Handlebars expressions are darker;
+  in dark mode, comments are lighter. Each keeps its hue.
 
 - **A page can stay out of the navigation:** `nav: false` in its frontmatter. The page is left out of `nav` (and of
   its folder's `children`) and out of `prev` and `next`: its own are empty, and its neighbours link past it. It still

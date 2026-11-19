@@ -182,6 +182,8 @@ An example is a preview, though, and a preview is drawn in one of the workbench'
 - With themes that switch by stylesheet (`themes.switch: "stylesheet"`), each example loads the page theme's
   stylesheet instead of the default one.
 
+A toggle sets `color-scheme` with its attribute, so the page's code follows it too ([Code colours](#code-colours)).
+
 Without JavaScript an example stays in the default theme. For a site that follows the viewer's light or dark
 setting, make the default theme follow it too, with `color-scheme: light dark`:
 
@@ -1009,6 +1011,55 @@ molecules/search-field's stylesheet is linked too: include molecules/search-fiel
 ```
 
 Two components that use the same class name for different things are the usual cause: rename one.
+
+### Code colours
+
+A page that shows code (a code block in its markdown, or in a placed component's content) also links
+`/_pd/code.css`, the colours of its highlighted code, as its first stylesheet. A page without code doesn't.
+`pd build` writes the file into the site's own `_pd/`, whether or not it builds the workbench.
+
+Each token of a highlighted block has a kind, written as its class, `pd-code-<kind>`, and coloured by the custom
+property of the same name, `--pd-code-<kind>`:
+
+| Kind | Colours |
+|---|---|
+| `text` | Everything else: the block's own colour, `.shiki` (its tokens carry no class) |
+| `comment` | Comments |
+| `string` | Strings |
+| `keyword` | Keywords: `import`, `return`, `if`, a Handlebars `#each` |
+| `storage` | Declarations: `const`, `function`, `interface` |
+| `constant` | Numbers, `true`, `null` |
+| `value` | CSS keyword values: `auto`, `none`, `system-ui` |
+| `tag` | HTML tag names |
+| `attribute` | HTML attribute names |
+| `function` | Function, class and type names |
+| `support` | CSS property names, built-in types |
+| `property` | JSON keys |
+| `parameter` | A function's parameters |
+| `expression` | A Handlebars `{{expression}}` |
+
+The file sets Pattern Dump's colours as the properties' defaults on `:root`, light and dark, each with a contrast of
+at least 4.5:1 on a white or near-white block (light) and on a dark slate one (dark), in a cascade layer of its own,
+`pd-code`. The workbench uses the same defaults. Linked before every stylesheet of the site's, the layer comes first, so any rule of the site's
+wins over it, in a layer or not. A site sets the kinds from its own tokens, with no colour values of its own:
+
+```scss
+:root {
+  --pd-code-keyword: var(--color-code-keyword);
+  --pd-code-string: var(--color-code-string);
+  --pd-code-comment: var(--color-code-comment);
+}
+```
+
+A kind it leaves alone keeps Pattern Dump's colour. The file colours tokens only: the block's background, padding
+and font are the skin's (`pre.shiki`, `.shiki-container`).
+
+**Light and dark follow the page's `color-scheme`.** The defaults are `light-dark()` pairs, so they take the dark
+colours where the page, or the block, has `color-scheme: dark`, and the light ones otherwise. A `color-scheme: light
+dark` theme follows the viewer's setting. A light and dark toggle must set `color-scheme` as well as its own
+attribute (`[data-theme="dark"] { color-scheme: dark; }`); a toggle that only switches the skin's colours leaves the
+code in the colours of the page's `color-scheme`. A site whose code blocks are dark in both modes gives them
+`color-scheme: dark` (`pre.shiki { color-scheme: dark; }`), or sets the properties from its dark tokens.
 
 ---
 

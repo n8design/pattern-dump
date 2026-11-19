@@ -475,7 +475,7 @@ async function buildOnce(
     // ---- 1 to 6: the workbench, unless another build writes it (build.workbench: false) ----
     if (buildWorkbench) {
       // ---- 1. Fixed resources ----
-      for (const url of [PD_ROUTES.mainJs, PD_ROUTES.mainCss, PD_ROUTES.shikiCss, PD_ROUTES.baseCss,
+      for (const url of [PD_ROUTES.mainJs, PD_ROUTES.mainCss, PD_ROUTES.shikiCss, PD_ROUTES.codeCss, PD_ROUTES.baseCss,
         PD_ROUTES.axeCore, PD_ROUTES.ruleTiers, PD_ROUTES.config, PD_ROUTES.version]) {
         await capture(url);
       }

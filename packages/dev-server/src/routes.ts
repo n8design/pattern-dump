@@ -26,7 +26,7 @@ import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
 } from "@pattern-dump/contracts";
-import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
+import { getCodeCSS, getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import { sameHostWorkbenchPath } from "@pattern-dump/config";
 import type { ResolvedConfig } from "./server-config.js";
@@ -336,9 +336,14 @@ async function routeRequest(
       return;
     }
     if (pathname === PD_ROUTES.shikiCss) {
-      const css = getShikiCSS();
       res.writeHead(200, { "Content-Type": "text/css" });
-      res.end(css);
+      res.end(getShikiCSS());
+      return;
+    }
+    // Code token colours: the workbench's, and a site page's when it shows code (page.ts links it).
+    if (pathname === PD_ROUTES.codeCss) {
+      res.writeHead(200, { "Content-Type": "text/css" });
+      res.end(getCodeCSS());
       return;
     }
 

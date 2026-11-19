@@ -108,6 +108,7 @@ export function buildShellHtml(runtime: ShellRuntime, brand?: ShellBrandConfig):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(workbenchTitle(brand))}</title>
+<link rel="stylesheet" href="${PD_ROUTES.codeCss}">
 <link rel="stylesheet" href="${PD_ROUTES.mainCss}">
 <link rel="stylesheet" href="${PD_ROUTES.shikiCss}">
 </head>
