@@ -3,6 +3,8 @@
 // No filesystem, no prompts, no processes; run.ts does all of that. Everything a user could lose —
 // an overwritten file, a clobbered script — is decided here, so it is all unit-testable.
 
+import { initManifestSource, manifestOf } from "./manifest.js";
+
 export interface TemplateFile {
   /** Path relative to the project root, as stored in the template (`_gitignore` → `.gitignore`). */
   path: string;
@@ -125,7 +127,7 @@ export function planInit(
   const substitute = (text: string): string => text
     .replaceAll("__PD_STOREFRONT__\n", answers.storefront ? fills.config : "")
     .replaceAll("__PD_SEARCH_NOTE__\n", answers.search ? SEARCH_NOTE.on : SEARCH_NOTE.off)
-    .replaceAll("__PD_THEME_DEFAULT__", system ? "system" : "light")
+    .replaceAll("__PD_THEME_DEFAULT__", themeDefault(answers))
     .replaceAll("__PD_STOREFRONT_README__\n", answers.storefront ? fills.readme : "")
     .replaceAll("__PD_STOREFRONT_GITIGNORE__\n", answers.storefront ? fills.gitignore : "")
     .replaceAll("__PD_PACKAGE__", packageName)
@@ -192,6 +194,9 @@ function planSite(templates: Templates, answers: InitAnswers, site: SiteAnswers,
   }
   return { writes, skipped, dirs: [], packageJson: mergePackageJson(existing.packageJson, answers, packageName) };
 }
+
+/** The default theme of a design system's config: `system` with a website that follows the viewer's setting. */
+const themeDefault = (answers: InitAnswers): string => (answers.storefront && answers.systemTheme ? "system" : "light");
 
 /** The config's comment on search, as the project has Pagefind or not. */
 const SEARCH_NOTE = {
@@ -286,6 +291,10 @@ function mergePackageJson(
     else if (allow[name] === false) notes.push(`allowScripts denies ${name}, left as is: Pattern Dump needs its install script`);
   }
   pkg.allowScripts = allow;
+
+  // A design system is a pattern package from the start, so a website can use it: the field names the same folders
+  // as the config init writes. Only in a package.json init creates; one that exists is the project's to change.
+  if (created && !answers.site) pkg.patternDump = manifestOf(initManifestSource(themeDefault(answers)));
 
   return { content: JSON.stringify(pkg, null, 2) + "\n", created, notes };
 }

@@ -157,7 +157,12 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
   for (const note of plan.packageJson.notes) io.log(`  · ${note}`);
   for (const s of plan.skipped) io.log(`  · ${s.path}: ${s.reason}`);
   if (site) io.log(`✓ a website on ${site.name} (${site.spec}); its workbench is linked at ${siteAnswers!.workbenchUrl}`);
-  for (const w of siteSource?.ok ? siteSource.warnings : []) io.log(`  ! ${w}`);
+  for (const w of siteSource?.ok ? siteSource.warnings : []) {
+    // A warning may carry a block to paste: its lines indented under it.
+    const [first, ...rest] = w.split("\n");
+    io.log(`  ! ${first}`);
+    for (const line of rest) io.log(`    ${line}`);
+  }
   const workflow = plan.writes.some(w => w.path === ".github/workflows/pages.yml");
   if (workflow && dependency.startsWith("file:")) {
     // The workflow runs npm ci on GitHub's runners, where this machine's file is not.

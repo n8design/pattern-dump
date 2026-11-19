@@ -19,6 +19,7 @@ import { componentCssUrl, componentUrl, PD_ROUTES, type ComponentDetailResponse,
 import { loadConfig } from "@pattern-dump/core";
 import { runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { applyPlan, readTemplates } from "./files.js";
+import { manifestOf } from "./manifest.js";
 import { planInit } from "./plan.js";
 import { save } from "../../../../test-support/save.js";
 
@@ -159,6 +160,19 @@ describe("the starter project", () => {
   it("type-checks without the examples too (src/scripts is never empty)", async () => {
     expect(await typecheck(bareDir)).toEqual({ code: 0, output: "" });
   }, 60_000);
+});
+
+// A design system init makes is a pattern package: its package.json's patternDump field names the folders of the config
+// it writes. Loading the config applies the field (a folder named in both must be the same, or loading fails), and the
+// field names exactly the config's folders.
+describe("the starter project's patternDump field", () => {
+  it("names the config's folders, with and without the examples and the website", async () => {
+    for (const project of [dir, bareDir, siteDir]) {
+      const pkg = JSON.parse(await readFile(join(project, "package.json"), "utf8")) as { patternDump?: unknown };
+      expect(pkg.patternDump, project).toBeDefined();
+      expect(manifestOf(await loadConfig(project)), project).toEqual(pkg.patternDump);
+    }
+  });
 });
 
 describe("the starter project with a website (--with-site, no examples)", () => {

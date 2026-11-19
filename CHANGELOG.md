@@ -32,6 +32,11 @@
   page linked from the footer. On a folder's `index.md` it leaves out the folder's entry and the folder's pages; in a
   folder's `childDefaults` it applies to the folder's pages. Any value other than `true` or `false` is a problem on
   the page, `nav must be true or false`. A layout still gets `nav`, the navigation, as before.
+- **A design system made by `pd init` is a pattern package from the start.** Its `package.json` gets the
+  `patternDump` field, naming the same folders as its config, so a website can use it (`pd init site --site
+  ../styleguide`) without a manual step. Only a `package.json` init creates gets it; one that exists is left as it is.
+  For a style guide in a folder without the field, `pd init --site` prints the block to add, from the folders of the
+  style guide's own config.
 
 ### Changed
 

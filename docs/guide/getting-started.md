@@ -206,6 +206,9 @@ npx pattern-dump init site --site ../styleguide            # a folder next to it
 - **The style guide is checked.** After `npm install`, init asks the site's dev server for every page. A package
   without a skin (`layouts/page` and `partials/base`) or without a `patternDump` field is named then, with what is
   missing; the site is written either way.
+- **A style guide in a folder without the `patternDump` field** gets the block to add, printed by init: the folders
+  its `pattern-dump.config.ts` names, ready to paste into its `package.json`. A style guide made by `pd init` has the
+  field already.
 - **Its workbench is the style guide's.** `--workbench-url` (default `/workbench/`) says where the style guide
   publishes its own workbench; the pages' examples link there. `build.workbench: false` makes `pd build` write the
   website only, to `site/`.
@@ -213,16 +216,15 @@ npx pattern-dump init site --site ../styleguide            # a folder next to it
 
 ### A style guide and its site in one repository
 
-Two inits and a root `package.json`. The style guide is a design system with a website starter (for its skin), made
-a pattern package:
+Two inits and a root `package.json`. The style guide is a design system with a website starter (for its skin):
 
 ```bash
 mkdir acme-web && cd acme-web
 npx pattern-dump init styleguide --with-site --no-git    # @acme-web/styleguide
 ```
 
-Add the `patternDump` field to `styleguide/package.json`, naming the same folders as its config (a folder named in
-both must be the same in both):
+Init writes the `patternDump` field into `styleguide/package.json`, naming the same folders as its config (a folder
+named in both must be the same in both), so the style guide is a pattern package from the start:
 
 ```json
 "patternDump": {

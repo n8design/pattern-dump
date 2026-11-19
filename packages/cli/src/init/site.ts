@@ -5,6 +5,8 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
+import { configFileOf, loadConfig } from "@pattern-dump/core";
+import { manifestBlock, manifestOf } from "./manifest.js";
 
 export interface SiteSource {
   /** The style guide's package name. */
@@ -45,10 +47,7 @@ export async function resolveSitePackage(input: string, cwd: string, target: str
     if (typeof pkg.name !== "string" || !NPM_NAME.test(pkg.name)) {
       return { ok: false, reason: `${join(given, "package.json")} has no package name, so the site can't depend on it: give it a "name"` };
     }
-    const warnings = pkg.patternDump === undefined
-      ? [`${pkg.name} has no "patternDump" field in its package.json yet, so Pattern Dump can't read its patterns, styles `
-        + `and themes: add one (see "A content-only website" in the getting started guide)`]
-      : [];
+    const warnings = pkg.patternDump === undefined ? [await missingManifest(pkg.name, dir, given)] : [];
     const path = relative(target, dir).split(sep).join("/");
     return { ok: true, site: { name: pkg.name, spec: `file:${path}`, dir }, warnings };
   }
@@ -59,4 +58,20 @@ export async function resolveSitePackage(input: string, cwd: string, target: str
     return { ok: false, reason: `"${given}" is neither a folder nor an npm package name (such as @acme/styleguide or @acme/styleguide@1.2.0)` };
   }
   return { ok: true, site: { name, spec: range }, warnings: [] };
+}
+
+/** The warning for a style guide without the `patternDump` field: with the block to add, from its own config's folders
+ *  (manifest.ts), or, without a config Pattern Dump can read, what the block names. */
+async function missingManifest(name: string, dir: string, given: string): Promise<string> {
+  const head = `${name} has no "patternDump" field in its package.json yet, so Pattern Dump can't read its patterns, styles `
+    + "and themes";
+  if (configFileOf(dir) !== undefined) {
+    try {
+      const block = manifestBlock(manifestOf(await loadConfig(dir)));
+      return `${head}. Add this to ${join(given, "package.json")} (the folders of its config):\n${block}`;
+    } catch {
+      // A config that doesn't load: its folders are unknown, as without one.
+    }
+  }
+  return `${head}: add one naming its folders (see "A content-only website" in the getting started guide)`;
 }

@@ -406,6 +406,18 @@ describe("runInit --site", () => {
     expect(await runInit(init(join(root, "acme-web", "site"), { yes: true, install: false, git: false, site: "./styleguide" }), io)).toBe(0);
     expect(logs).toEqual(expect.arrayContaining([expect.stringMatching(/^ {2}! @acme-web\/styleguide has no "patternDump" field/)]));
   });
+
+  it("a style guide with a config but without the field: the block to add, indented under the warning", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-init-"));
+    await styleguide({ patternDump: undefined });
+    await save(join(root, "acme-web", "styleguide", "pattern-dump.config.json"),
+      JSON.stringify({ outDir: "./dist", patternsDir: "./src/patterns", themes: { dir: "./themes", default: "light" } }));
+    const { io, logs } = fakeIO({ cwd: join(root, "acme-web") });
+    expect(await runInit(init(join(root, "acme-web", "site"), { yes: true, install: false, git: false, site: "./styleguide" }), io)).toBe(0);
+    const at = logs.findIndex(l => l.startsWith("  ! @acme-web/styleguide has no"));
+    expect(logs[at]).toMatch(/Add this to styleguide\/package\.json \(the folders of its config\):$/);
+    expect(logs.slice(at + 1, at + 4)).toEqual(['    "patternDump": {', '      "patterns": "src/patterns",', '      "styles": {']);
+  });
 });
 
 describe("dependencySpec", () => {

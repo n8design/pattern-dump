@@ -335,8 +335,8 @@ if (failures.length === 0 && tmp) {
 }
 
 // A content-only website on the starter above (`pd init --site ../website`), as the getting started guide sets one
-// up: the style guide becomes a pattern package (the patternDump field, the same folders as its config), and the site
-// is pages and a config. Init checks its pages with the style guide; its build writes the website only
+// up: the style guide is a pattern package as init made it (its patternDump field, the same folders as its config),
+// and the site is pages and a config. Init checks its pages with the style guide; its build writes the website only
 // (build.workbench: false), checked as always, with its search index.
 if (failures.length === 0 && tmp) {
   const cliVersion = JSON.parse(await readFile(join(repo, "packages/cli/package.json"), "utf8")).version;
@@ -344,16 +344,18 @@ if (failures.length === 0 && tmp) {
   const source = join(repo, ".pd-pack", `${name}-${cliVersion}.tgz`);
   const guide = join(tmp, "website");
   const manifest = JSON.parse(await readFile(join(guide, "package.json"), "utf8"));
-  manifest.patternDump = {
+  const expected = {
     patterns: "src/patterns", styles: { dir: "src/styles", documentBase: ["base"] },
     themes: { dir: "themes", default: "system", switch: "attribute" }, scripts: "src/scripts", assets: ["assets"],
   };
-  await writeFile(join(guide, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
+  check(JSON.stringify(manifest.patternDump) === JSON.stringify(expected), "pd init writes the patternDump field, naming its config's folders",
+    JSON.stringify(manifest.patternDump));
   const siteDir = join(tmp, "site");
   const inited = spawnSync("npx", ["--yes", `--package=${source}`, "pd", "init", "site", "--site", "./website", "--yes", "--no-git", "--pd-source", source],
     { cwd: tmp, encoding: "utf8" });
   const initLog = `${inited.stdout}${inited.stderr}`;
   check(inited.status === 0, "pd init --site + npm install", initLog.slice(-800));
+  check(!initLog.includes(`has no "patternDump" field`), "pd init --site on a style guide init made: no warning about the field", initLog.slice(-800));
   // The folder name "website" is generic, so the style guide's package is scoped by the folder it is in.
   check(initLog.includes(`✓ every page renders with ${manifest.name}`), "pd init --site checks the pages with the style guide", initLog.slice(-800));
   const sitePkg = JSON.parse(await readFile(join(siteDir, "package.json"), "utf8").catch(() => "{}"));

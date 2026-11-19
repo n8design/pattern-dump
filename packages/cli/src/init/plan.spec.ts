@@ -76,7 +76,21 @@ describe("planInit — a new folder", () => {
       scripts: { dev: "pd dev", audit: "pd audit", typecheck: "tsc --noEmit", "build:scripts": "tsc" },
       devDependencies: { "pattern-dump": "file:/tmp/pattern-dump-0.1.0.tgz", typescript: "^5.9.0" },
       allowScripts: { esbuild: true, "@parcel/watcher": true },
+      patternDump: {
+        patterns: "src/patterns",
+        styles: { dir: "src/styles", documentBase: ["base"] },
+        themes: { dir: "themes", default: "light", switch: "attribute" },
+        scripts: "src/scripts",
+        assets: ["assets"],
+      },
     });
+  });
+
+  it("the patternDump field's default theme is the config's: system with a website that follows the viewer", () => {
+    const themes = (a: Partial<InitAnswers>) => JSON.parse(plan(a).packageJson.content).patternDump.themes.default;
+    expect(themes({ storefront: true, systemTheme: true })).toBe("system");
+    expect(themes({ storefront: true, systemTheme: false })).toBe("light");
+    expect(themes({ storefront: false, systemTheme: true })).toBe("light");
   });
 });
 
