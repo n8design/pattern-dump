@@ -256,7 +256,7 @@ export const USAGE = `Usage: pd <command> [options]
     --browser          Also check the site's pages in Chromium: contrast and the accessibility
                        rules that need a rendered page, and each image's variant against its size.
                        Uses the project's own Playwright (npm install --save-dev playwright)
-    --no-audit         Leave the corpus audit out: it is not run, and the site has no Audit tab
+    --no-audit         Leave the corpus audit out: it is not run, and the workbench has no Audit tab
                        (default: build.audit in the config; --audit forces it back in)
     --check-workers <n>  Threads that check the site's pages for accessibility; 1 checks them in
                        one (default: the cores less one, at most 8, within a quarter of the memory)

@@ -167,8 +167,8 @@ export interface PatternDumpConfig {
   /**
    * `pd build` — the static snapshot. `outDir` (relative to the root) defaults to the top-level
    * `outDir`; `basePath` is where the snapshot will be hosted ("/" at a domain root, "/docs/" under a
-   * subpath) and defaults to "/". `audit: false` leaves the corpus audit out — it is not run, and the
-   * static site has no Audit tab. All three can be overridden on the command line. `skipChecks` names checks the
+   * subpath) and defaults to "/". `audit: false` leaves the corpus audit out: it is not run, and the
+   * workbench snapshot has no Audit tab. All three can be overridden on the command line. `skipChecks` names checks the
    * build leaves out (SKIPPABLE_CHECKS), for a quick local build: none by default, and the build report names each
    * one skipped. `--skip-checks` on the command line replaces it. `workbench: false` writes the site only:
    * for a site whose components come from a style guide package that publishes its own workbench, at
