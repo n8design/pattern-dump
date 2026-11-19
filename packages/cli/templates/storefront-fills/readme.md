@@ -31,7 +31,7 @@ returns by itself. How `pd-` tags work:
 | `src/patterns/components/note/` | the component the home page shows |
 | `src/patterns/views/` | the ways a listing can be shown: `list`, `grid`, `featured`, `compact` |
 | `src/patterns/components/*-card/` | the card each view shows a page as; its schema says which fields a page needs |
-| `pattern-dump.config.ts` | `storefront`: the website's name and footer (`site`), and where it is published |
+| `pattern-dump.config.ts` | `site`: the website's name and footer (`globals`), and where it is published |
 
 `pages/articles/` is a collection: its `index.md` (layout `listing`, `sort: date`) lists every page in the folder,
 newest first, by its `date`, in the listing layout's default view (`list`). Copy `hello.md` to write another; `draft: true` keeps one out of the
@@ -43,7 +43,7 @@ and changed per page under the query's name (`related:`, with `limit: 5` indente
 
 A page that doesn't exist shows a built-in 404 page; write `pages/404.md` to change it. A page that moved
 can forward from its old address (`redirectFrom: [/old/]`), and `index: false` keeps a page out of search
-engines. All of it is in the [storefront guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/storefront.md).
+engines. All of it is in the [site guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/storefront.md).
 
 ### Build it
 
@@ -57,7 +57,7 @@ what the GitHub Pages workflow does.
 or as a project page.
 
 **As a project page** (`https://<owner>.github.io/<repository>/`, no domain needed): in
-`pattern-dump.config.ts`, set `storefront.url` to that address, and `storefront.workbenchUrl` and
+`pattern-dump.config.ts`, set `site.url` to that address, and `site.workbenchUrl` and
 `build.basePath` to `/<repository>/workbench/`. Then **Settings → Pages → Source:** "GitHub Actions".
 
 **At a custom domain**, once, in the repository on GitHub:
@@ -69,7 +69,7 @@ or as a project page.
    `185.199.110.153` and `185.199.111.153`; for a subdomain (`www.example.com`), a `CNAME` record to
    `<your-user>.github.io`, without the repository name.
 4. **Enforce HTTPS** in the same settings, once GitHub offers it (it can take up to a day).
-5. **`storefront.url`** in `pattern-dump.config.ts`: the same address, for canonical URLs, link previews and
+5. **`site.url`** in `pattern-dump.config.ts`: the same address, for canonical URLs, link previews and
    the sitemap.
 
 The workflow writes no `CNAME` file: with a GitHub Actions deploy, the custom domain is the setting in

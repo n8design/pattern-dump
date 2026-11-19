@@ -7,7 +7,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig, validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
+import { validateConfig, type PatternDumpConfig, type SiteConfig } from "@pattern-dump/config";
 import { buildStaticSite } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
@@ -30,8 +30,8 @@ async function benchCopy(): Promise<string> {
   }
   return root;
 }
-const config = (over: Partial<NonNullable<PatternDumpConfig["storefront"]>> = {}): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, ...over } }, "test");
+const config = (over: Partial<SiteConfig> = {}): PatternDumpConfig =>
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, ...over } }, "test");
 const build = (root: string, out: string, cfg: PatternDumpConfig = config()) =>
   buildStaticSite(cfg, root, { outDir: out, pdVersion: "0.0.0-test", now: NOW });
 
@@ -50,22 +50,22 @@ async function tree(dir: string): Promise<Map<string, { bytes: Buffer; mtimeMs: 
 const exists = (p: string) => stat(p).then(() => true, () => false);
 
 describe("pd build — the storefront's settings", () => {
-  it("needs storefront.workbenchUrl, and writes nothing without it", async () => {
+  it("needs site.workbenchUrl, and writes nothing without it", async () => {
     const root = await benchCopy();
-    const { workbenchUrl: _w, ...rest } = benchConfig.storefront!;
+    const { workbenchUrl: _w, ...rest } = benchConfig.site!;
     const out = join(root, "..", "wb-nourl");
-    await expect(buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root, { outDir: out, pdVersion: "x" }))
-      .rejects.toThrow("pd build: storefront.workbenchUrl is required to build the storefront: its pages link into the workbench at that address");
+    await expect(buildStaticSite(validateConfig({ ...benchConfig, site: rest }, "test"), root, { outDir: out, pdVersion: "x" }))
+      .rejects.toThrow("pd build: site.workbenchUrl is required to build the site: its pages link into the workbench at that address");
     expect(await exists(out)).toBe(false);
   });
 
-  it("without storefront.url: no canonical, Open Graph or card, and one note for the whole build", async () => {
+  it("without site.url: no canonical, Open Graph or card, and one note for the whole build", async () => {
     const root = await benchCopy();
-    const { url: _u, ...rest } = benchConfig.storefront!;
-    const report = await buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root,
+    const { url: _u, ...rest } = benchConfig.site!;
+    const report = await buildStaticSite(validateConfig({ ...benchConfig, site: rest }, "test"), root,
       { outDir: join(root, "..", "wb-nosite"), pdVersion: "x", now: NOW });
-    const note = `storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, `
-      + `and there is no sitemap: set storefront.url to the site's address, such as "https://example.com/"`;
+    const note = `site.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, `
+      + `and there is no sitemap: set site.url to the site's address, such as "https://example.com/"`;
     expect(report.notes.filter(n => n === note)).toHaveLength(1);
     const pages = await tree(join(root, ".out", "storefront"));
     for (const [file, { bytes }] of pages) {
@@ -111,10 +111,10 @@ describe("pd build — the storefront's settings", () => {
     expect(await readFile(join(out, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /\n");
   }, 60_000);
 
-  it("without storefront.url: no sitemap, and robots.txt names none", async () => {
+  it("without site.url: no sitemap, and robots.txt names none", async () => {
     const root = await benchCopy();
-    const { url: _u, ...rest } = benchConfig.storefront!;
-    await buildStaticSite(validateConfig({ ...benchConfig, storefront: rest }, "test"), root, { outDir: join(root, "..", "wb-nourl2"), pdVersion: "x", now: NOW });
+    const { url: _u, ...rest } = benchConfig.site!;
+    await buildStaticSite(validateConfig({ ...benchConfig, site: rest }, "test"), root, { outDir: join(root, "..", "wb-nourl2"), pdVersion: "x", now: NOW });
     const out = join(root, ".out", "storefront");
     expect(await exists(join(out, "sitemap.xml"))).toBe(false);
     expect(await readFile(join(out, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /preview/\n");
@@ -122,12 +122,14 @@ describe("pd build — the storefront's settings", () => {
 
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
     const root = await benchCopy();
-    await expect(build(root, join(root, ".out", "storefront"))).rejects.toThrow(/and --out .* overlap: the storefront and the workbench each need a folder of their own/);
-    await expect(build(root, join(root, "..", "wb-x"), config({ outDir: "./src/styles/out" }))).rejects.toThrow(/storefront\.outDir .* overlaps .*styles, which Pattern Dump reads/);
+    await expect(build(root, join(root, ".out", "storefront"))).rejects.toThrow(/and --out .* overlap: the site and the workbench each need a folder of their own/);
+    await expect(build(root, join(root, "..", "wb-x"), config({ outDir: "./src/styles/out" }))).rejects.toThrow(/site\.outDir .* overlaps .*styles, which Pattern Dump reads/);
     // An output root that contains the project is already refused by the config (it holds the pages and the
     // patterns); the build refuses it too, for a config that never went through validation.
-    expect(() => config({ outDir: "." })).toThrow(/"storefront\.pagesDir" \("\.\/pages"\) is inside "storefront\.outDir" \("\."\)/);
-    const unvalidated = defineConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, outDir: "." } });
-    await expect(build(root, join(root, "..", "wb-y"), unvalidated)).rejects.toThrow(/storefront\.outDir .* would contain the project itself/);
+    expect(() => config({ outDir: "." })).toThrow(/"site\.pagesDir" \("\.\/pages"\) is inside "site\.outDir" \("\."\)/);
+    // The build reads a config in its validated shape (the site under `storefront`): one with outDir "." set after.
+    const valid = config();
+    const unvalidated: PatternDumpConfig = { ...valid, storefront: { ...valid.storefront!, outDir: "." } };
+    await expect(build(root, join(root, "..", "wb-y"), unvalidated)).rejects.toThrow(/site\.outDir .* would contain the project itself/);
   });
 });

@@ -52,7 +52,7 @@ The command line wins.
 | `--out <dir>` | `build.outDir` | `outDir`, then `dist` | Output folder, relative to the project root. **Replaced as a whole once the build has passed every check**; a build that stops leaves it as it was. |
 | `--base <path>` | `build.basePath` | `/` | Where the site will be hosted: `/` at a domain root, or a subpath such as `/docs/htwoo/` |
 | `--no-audit` / `--audit` | `build.audit` | `true` | Include the corpus audit |
-| `--check-workers <n>` | (none) | cores less one, at most 8 | Threads that check the storefront's pages for accessibility |
+| `--check-workers <n>` | (none) | cores less one, at most 8 | Threads that check the site's pages for accessibility |
 | `--skip-checks=a11y,html` | `build.skipChecks` | none | [Leave a check out](#leaving-a-check-out) |
 | `--root <path>` | (none) | current folder | Build another project |
 | `--config <path>` | (none) | `pattern-dump.config.ts` in the root | Use a config file outside the root |
@@ -76,11 +76,11 @@ npx pd build --base /docs/htwoo/
 Every link, stylesheet, script and data file inside the build then points under `/docs/htwoo/`. A
 build made for one base path does not work under another. Rebuild when the address changes.
 
-A project with a storefront whose workbench is on the storefront's own host (`storefront.workbenchUrl` a
+A project with a site whose workbench is on the site's own host (`site.workbenchUrl` a
 path such as `/workbench/`, [storefront.md](storefront.md#building)) must build the workbench for that
-path; another base path is an error. When the storefront itself is at its host's root, the build's note about
-copying the workbench's `robots.txt` rule then doesn't appear: the storefront's own `robots.txt` carries it. With
-the storefront under a path, the note still appears, since that `robots.txt` isn't at the host's root.
+path; another base path is an error. When the site itself is at its host's root, the build's note about
+copying the workbench's `robots.txt` rule then doesn't appear: the site's own `robots.txt` carries it. With
+the site under a path, the note still appears, since that `robots.txt` isn't at the host's root.
 
 ### Leaving the audit out
 
@@ -106,7 +106,7 @@ npx pd build --skip-checks=a11y,html
 
 | Name | The check |
 |---|---|
-| `a11y` | The accessibility of the storefront's pages: axe's rules that jsdom decides, and one main landmark and one `<h1>` per page |
+| `a11y` | The accessibility of the site's pages: axe's rules that jsdom decides, and one main landmark and one `<h1>` per page |
 | `html` | Each component's markup against HTML's content model (html-validate). Skipped, the workbench's Diagnostics tab and the Audit tab show no HTML findings |
 
 The build's last line names what it did not check:
@@ -193,7 +193,7 @@ dist/
   preview/<id>/~<variant>.html
   source/<id>/rendered.html           highlighted rendered HTML (and data.html, per variant)
   _pd/                                the workbench (main.js, main.css), component and theme CSS, scripts
-  _pd/symbols/<name>.svg              each symbol image as a file of its own (also in the storefront's output)
+  _pd/symbols/<name>.svg              each symbol image as a file of its own (also in the site's output)
   assets/                             the project's asset folders, as served by pd dev
   .nojekyll
 ```
@@ -221,22 +221,22 @@ assets are all included, and **Hide packages** works in the static site.
 
 ---
 
-## With a storefront
+## With a site
 
-A project with a [storefront](storefront.md) gets a second folder from the same build,
-`storefront.outDir`, with one page per markdown file and its own copy of everything those pages use. The
+A project with a [site](storefront.md) gets a second folder from the same build,
+`site.outDir`, with one page per markdown file and its own copy of everything those pages use. The
 workbench snapshot is written exactly as it would be without one. Deploy each folder to its own host:
 
 ```
 [pd build] 8 components → 69 files, 1.0 MB in 983 ms
 [pd build] /path/to/dist  (served from /)
-[pd build] storefront: 4 pages → 14 files in /path/to/site  (served from /)
+[pd build] site: 4 pages → 14 files in /path/to/site  (served from /)
 [pd build]   note: guides/setup.md: heading "Main" is #main-1, because the layout uses id="main"
 ```
 
-The storefront is served at `storefront.url`: the root of its host, or a path under it, which the second line
+The site is served at `site.url`: the root of its host, or a path under it, which the second line
 names ([storefront.md](storefront.md#publishing-under-a-path)). Unlike a component that fails to render in the
-workbench, a problem on a storefront page fails the build, and then neither folder is written: each is replaced
+workbench, a problem on a site page fails the build, and then neither folder is written: each is replaced
 only once every check has passed, so a build that stops leaves both as they were.
 
 **"note"** lines are about pages that were built as they are: nothing is left out for them. A heading's
@@ -272,6 +272,6 @@ How a live URL maps to a file (for example `/api/component/atoms/button?variant=
 | A preview shows a second workbench inside it | The host rewrites missing files to `index.html` (a "single-page app" setting), so a component that failed to render gets the workbench page as its preview. Turn the rewrite off; every route already has its own page. |
 | The site shows old content | Rebuild. The site is a snapshot; nothing updates on its own. |
 | `pd build: --out … overlaps …` | The output folder would overwrite folders Pattern Dump reads. Choose a separate folder such as `dist`. |
-| `pd build: storefront.workbenchUrl is /workbench/, so the workbench must be built for /workbench/` | The workbench is linked at that path on the storefront's host. Set `build.basePath` (or `--base`) to the same path. |
+| `pd build: site.workbenchUrl is /workbench/, so the workbench must be built for /workbench/` | The workbench is linked at that path on the site's host. Set `build.basePath` (or `--base`) to the same path. |
 | `[pd] Error: unknown command "build"` | The installed Pattern Dump predates `pd build`: update the `pattern-dump` dependency. |
 | Build is slow on a large design system | Most time goes into per-component checks. `--no-audit` skips the corpus audit; the rest scales with the number of components and variants (about 20 s for hTWOo's 261 components). |

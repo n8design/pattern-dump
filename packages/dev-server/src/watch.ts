@@ -1011,7 +1011,7 @@ async function handleConfig(filePath: string): Promise<boolean> {
   const change = classifyConfigChange(runningConfig, next);
   if (change === "none") { console.log(`[dev-server] Config saved: ${name}, nothing pd dev reads changed`); return true; }
   if (change === "other") {
-    const message = `${name} changed: restart pd dev to load it (only storefront.site is taken without a restart)`;
+    const message = `${name} changed: restart pd dev to load it (only site.globals is taken without a restart)`;
     hmr.push({ type: "error", scope: "build", message });
     console.error(`[dev-server] ${message}`);
     return true;
@@ -1019,7 +1019,7 @@ async function handleConfig(filePath: string): Promise<boolean> {
   runningConfig = next;
   site.replace(next.storefront?.site);
   hmr.push({ type: "page-changed", route: null });
-  console.log(`[dev-server] Config changed: ${name}, storefront.site → page-changed (every page)`);
+  console.log(`[dev-server] Config changed: ${name}, site.globals → page-changed (every page)`);
   return true;
 }
 
@@ -1147,7 +1147,7 @@ on("change", async (filePath) => {
           const current = await currentDiscovery(state, patternRoots);
           const inputs = await auditInputs({
             discoveryMap: current.discoveryMap, handleMap: current.handleMap, composition: await compositionFor(state, current, patternDirs),
-            globalData: rendering.current.globalData, helperPaths: cfg.helperPaths,
+            globalData: rendering.current.globalData, helperPaths: cfg.helperPaths, quarantine: current.quarantineMap,
           });
           const stale: string[] = [];
           for (const [id, slice] of slices) {

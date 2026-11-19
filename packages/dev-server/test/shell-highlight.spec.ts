@@ -53,9 +53,11 @@ function get(path: string, host: string): Promise<string> {
   });
 }
 
-/** Each code block's <pre>, in order: highlighted ones carry Shiki's spans, plain ones are shiki-plain. */
+/** Each code block's <pre>, in order: highlighted ones went through Shiki (a span per line; a token of a kind other
+ *  than text carries pd-code-<kind>, and a block of text alone, such as "$ npm run build", carries none), plain ones
+ *  are shiki-plain with no line spans. */
 const blocks = (html: string): string[] => html.match(/<pre class="shiki[^"]*"[\s\S]*?<\/pre>/g) ?? [];
-const highlighted = (pre: string) => !pre.includes("shiki-plain") && /<span class="__shiki_/.test(pre);
+const highlighted = (pre: string) => !pre.includes("shiki-plain") && pre.includes(`<span class="line">`);
 
 describe.each([
   ["a storefront page's markdown", () => get("/", PD_HOSTS.storefront)],

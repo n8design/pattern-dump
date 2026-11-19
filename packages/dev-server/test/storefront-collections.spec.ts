@@ -275,7 +275,7 @@ describe("checkCollections: the names partials/base lists under site.collections
     expect(checkCollections({ type: "array", properties: {} }, owner, folders, [], undefined).problems).toEqual([
       `partials/base declares a shape for site.collections: the shape of an entry is Pattern Dump's, so list the folders' names under properties only`]);
     expect(checkCollections({ properties: { articles: {} } }, owner, folders, [], { collections: { articles: [] } }).problems).toEqual([
-      `storefront.site.collections is filled by Pattern Dump from the pages folders: list the names in partials/base's schema, and don't set it in the config`]);
+      `site.globals.collections is filled by Pattern Dump from the pages folders: list the names in partials/base's schema, and don't set it in the config`]);
   });
 });
 

@@ -178,7 +178,7 @@ async function buildOnce(
   const outDir = resolve(opts.outDir);
   const cfg = resolveServerConfig(config, root, {}, loadPatternPackages(config.packages, root));
   if (!buildWorkbench && !cfg.storefront) {
-    throw new Error("pd build: build.workbench is false and the project has no storefront, so there is nothing to build");
+    throw new Error("pd build: build.workbench is false and the project has no site, so there is nothing to build");
   }
 
   // The output folder is emptied first, so it must not be — or contain — anything PD reads.
@@ -197,24 +197,24 @@ async function buildOnce(
   const storefront = cfg.storefront;
   if (storefront) {
     const sfOut = storefront.outDir;
-    if (inside(project, sfOut)) throw new Error(`pd build: storefront.outDir ${sfOut} would contain the project itself: choose a folder inside or beside it`);
+    if (inside(project, sfOut)) throw new Error(`pd build: site.outDir ${sfOut} would contain the project itself: choose a folder inside or beside it`);
     for (const source of [cfg.patternsDir, cfg.stylesDir, storefront.pagesDir, ...cfg.themeDirs, ...cfg.assetRoots]) {
       if (inside(sfOut, source) || inside(source, sfOut)) {
-        throw new Error(`pd build: storefront.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads: choose another folder`);
+        throw new Error(`pd build: site.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads: choose another folder`);
       }
     }
     if (buildWorkbench && (inside(sfOut, outDir) || inside(outDir, sfOut))) {
-      throw new Error(`pd build: storefront.outDir ${sfOut} and --out ${outDir} overlap: the storefront and the workbench each need a folder of their own`);
+      throw new Error(`pd build: site.outDir ${sfOut} and --out ${outDir} overlap: the site and the workbench each need a folder of their own`);
     }
     if (!storefront.workbenchUrl) {
-      throw new Error("pd build: storefront.workbenchUrl is required to build the storefront: its pages link into the workbench at that address");
+      throw new Error("pd build: site.workbenchUrl is required to build the site: its pages link into the workbench at that address");
     }
     // A workbench published on the storefront's own host is linked at its path, so it must be built for that
     // path: the base path this build uses (--base, else build.basePath, else /). A workbench another build writes
     // (build.workbench: false) is that build's to place.
     const sameHost = sameHostWorkbenchPath(storefront);
     if (buildWorkbench && sameHost !== undefined && sameHost !== basePath) {
-      throw new Error(`pd build: storefront.workbenchUrl is ${storefront.workbenchUrl}, so the workbench must be built for ${sameHost} `
+      throw new Error(`pd build: site.workbenchUrl is ${storefront.workbenchUrl}, so the workbench must be built for ${sameHost} `
         + `(build.basePath or --base); it is being built for ${basePath}`);
     }
   }
@@ -310,9 +310,9 @@ async function buildOnce(
   const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles, sfBase) : null;
   if (sfCrawl && sfCrawl.problems.length) {
     await server.close();
-    throw new Error(`pd build: the storefront has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
+    throw new Error(`pd build: the site has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
   }
-  if (sfCrawl) log(`… storefront checked: ${sfCrawl.urls.length} files`);
+  if (sfCrawl) log(`… site checked: ${sfCrawl.urls.length} files`);
   // The search index, from the pages the crawl served, in memory: checked in Chromium with --browser, written with the
   // site.
   const searchFiles = pagefind && sfCrawl
@@ -356,7 +356,7 @@ async function buildOnce(
     });
     if (links.problems.length) {
       await server.close();
-      throw new Error(`pd build: the storefront has broken links, so nothing was written:\n${links.problems.map(p => `  - ${p}`).join("\n")}`);
+      throw new Error(`pd build: the site has broken links, so nothing was written:\n${links.problems.map(p => `  - ${p}`).join("\n")}`);
     }
     for (const [url, on] of links.external) externalNotes.push(`an external link, not checked: ${url} (on ${on.join(", ")})`);
     linkSummary = { pages: pages.length, references: links.references, external: links.external.size };
@@ -389,7 +389,7 @@ async function buildOnce(
       }));
       const classes = checkClasses({ pages: checkPages, stylesheets, templates: guide.templates, allow: storefront.checks.allowClasses });
       if (storefront.checks.classes === "error" && classes.length) {
-        await fail("the storefront uses classes outside the design system (storefront.checks.classes is \"error\")", classes);
+        await fail("the site uses classes outside the design system (site.checks.classes is \"error\")", classes);
       }
       classSummary = { severity: storefront.checks.classes, warnings: storefront.checks.classes === "warning" ? classes : [] };
     }
@@ -427,7 +427,7 @@ async function buildOnce(
     }
     if (errors.length) {
       await server.close();
-      throw new Error(`pd build: the storefront has accessibility problems, so nothing was written:\n${errors.map(e => `  - ${e}`).join("\n")}`);
+      throw new Error(`pd build: the site has accessibility problems, so nothing was written:\n${errors.map(e => `  - ${e}`).join("\n")}`);
     }
     // --browser: the rules that need a rendered page, and the images against their boxes (browser-checks.ts).
     let imageWarnings: string[] | undefined;
@@ -436,7 +436,7 @@ async function buildOnce(
       const checked = await runBrowserChecks({ pages, get: sfGet, playwright, basePath: sfBase, ...(searchFiles ? { search: { files: searchFiles, word: searchWord([...searchRecords.values()]) } } : {}) }).catch(async (e: unknown) => { await server.close(); throw e; });
       if (checked.errors.length) {
         await server.close();
-        throw new Error(`pd build: the storefront has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
+        throw new Error(`pd build: the site has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
       }
       browserWarnings.push(...checked.a11yWarnings);
       imageWarnings = checked.images;
@@ -464,7 +464,7 @@ async function buildOnce(
     ...(buildWorkbench ? {} : { workbench: false as const }) };
   report.warnings.push(...symbols.warnings);
   report.notes.push(...symbols.infos);
-  if (opts.browser && !storefront) report.notes.push("--browser checks a storefront's pages in Chromium, and this project has no storefront: nothing was checked");
+  if (opts.browser && !storefront) report.notes.push("--browser checks a site's pages in Chromium, and this project has no site: nothing was checked");
   const { capture, store } = createSnapshotWriter({ outDir: wbStage, basePath, origin, report });
 
   /** Every /_pd/ stylesheet and script a document references. */
@@ -475,7 +475,7 @@ async function buildOnce(
     // ---- 1 to 6: the workbench, unless another build writes it (build.workbench: false) ----
     if (buildWorkbench) {
       // ---- 1. Fixed resources ----
-      for (const url of [PD_ROUTES.mainJs, PD_ROUTES.mainCss, PD_ROUTES.shikiCss, PD_ROUTES.baseCss,
+      for (const url of [PD_ROUTES.mainJs, PD_ROUTES.mainCss, PD_ROUTES.shikiCss, PD_ROUTES.codeCss, PD_ROUTES.baseCss,
         PD_ROUTES.axeCore, PD_ROUTES.ruleTiers, PD_ROUTES.config, PD_ROUTES.version]) {
         await capture(url);
       }
@@ -607,7 +607,7 @@ async function buildOnce(
       }
       for (const [url, svg] of symbolFiles) await sf.store(url, svg);
       if (sf.failures.length) {
-        throw new Error(`pd build: the storefront changed while it was being written:\n${sf.failures.map(f => `  - ${f}`).join("\n")}`);
+        throw new Error(`pd build: the site changed while it was being written:\n${sf.failures.map(f => `  - ${f}`).join("\n")}`);
       }
       await writeFile(join(sfOut, ".nojekyll"), "");
       counts.files++;
@@ -648,8 +648,8 @@ async function buildOnce(
           + `host's root. Where you can, add to the host's own robots.txt: ${rules.join("; ")}`);
       }
       if (storefront.url === undefined) {
-        report.notes.push("storefront.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
-          + "and there is no sitemap: set storefront.url to the site's address, such as \"https://example.com/\"");
+        report.notes.push("site.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
+          + "and there is no sitemap: set site.url to the site's address, such as \"https://example.com/\"");
       }
       report.notes.push(...storefrontNotes, ...externalNotes);
       if (linkSummary) report.links = linkSummary;
@@ -664,7 +664,7 @@ async function buildOnce(
         report.draftsByDefaults = [...by].sort(([a], [b]) => a < b ? -1 : 1).map(([from, pages]) => ({ from, pages }));
       }
       if (scheduled.length) report.scheduled = scheduled;
-      log(`… storefront: ${pages} pages, ${counts.files} files`);
+      log(`… site: ${pages} pages, ${counts.files} files`);
     }
 
     if (storefront) await assertUnchanged("nothing was written");
@@ -675,8 +675,8 @@ async function buildOnce(
     if (storefront && sfStage) {
       await putInPlace(sfStage, storefront.outDir).catch((e: unknown) => {
         if (!buildWorkbench) throw e;
-        throw new Error(`pd build: the workbench in ${outDir} is this build's, but the storefront could not take its place in `
-          + `${storefront.outDir}: the two are out of step. The storefront in it is the earlier one; run pd build again.\n`
+        throw new Error(`pd build: the workbench in ${outDir} is this build's, but the site could not take its place in `
+          + `${storefront.outDir}: the two are out of step. The site in it is the earlier one; run pd build again.\n`
           + `  ${e instanceof Error ? e.message : String(e)}`, { cause: e });
       });
     }

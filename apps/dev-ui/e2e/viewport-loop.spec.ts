@@ -87,5 +87,9 @@ test.describe("centered layout with a viewport-relative height (no growth loop)"
     // Without the fix this is 33554428 (Blink's layout ceiling), and the readout reads it back.
     expect(frameH, "the frame must not balloon").toBeLessThanOrEqual(stageH * 4);
     expect(marked, "the preview is marked circular so the Console can say why").toBe(true);
+    // Said as a warning: the frame works, it just can't fit the content.
+    const note = page.locator('#dock-panel-console .console p[data-level="warn"]', { hasText: "height depends on the preview's own height" });
+    await expect(note.first()).toBeAttached();
+    await expect(note.first()).toHaveText(/^Warning: atoms\/button: height depends/);
   });
 });

@@ -86,7 +86,7 @@ describe("a missing helper", () => {
   it("in pd build: fatal for a storefront page, listed with every other problem, and nothing written", async () => {
     const out = join(tmp, "wb");
     await expect(buildStaticSite(config, root, { outDir: out, pdVersion: "0.0.0-test" })).rejects.toThrow(
-      `pd build: the storefront has problems, so nothing was written:\n  - /: index.md: ${WHISPER}`,
+      `pd build: the site has problems, so nothing was written:\n  - /: index.md: ${WHISPER}`,
     );
     expect([existsSync(out), existsSync(join(root, "site"))]).toEqual([false, false]);
   });

@@ -48,7 +48,7 @@ export function redirectProblems(files: ReadonlyMap<string, PageFile>, workbench
 /** Where a route stands to the same-host workbench's path, which it is at or under (both end in "/"). */
 export function workbenchPlace(route: string, workbenchPath: string): string {
   return `${route === workbenchPath ? "at" : "under"} ${workbenchPath}, where the workbench is published on this host `
-    + `(storefront.workbenchUrl), so the workbench would overwrite it there`;
+    + `(site.workbenchUrl), so the workbench would overwrite it there`;
 }
 
 /** The page at an old route: forwards to `route` at once. */

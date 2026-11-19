@@ -3,6 +3,8 @@
 // No filesystem, no prompts, no processes; run.ts does all of that. Everything a user could lose —
 // an overwritten file, a clobbered script — is decided here, so it is all unit-testable.
 
+import { initManifestSource, manifestOf } from "./manifest.js";
+
 export interface TemplateFile {
   /** Path relative to the project root, as stored in the template (`_gitignore` → `.gitignore`). */
   path: string;
@@ -125,7 +127,7 @@ export function planInit(
   const substitute = (text: string): string => text
     .replaceAll("__PD_STOREFRONT__\n", answers.storefront ? fills.config : "")
     .replaceAll("__PD_SEARCH_NOTE__\n", answers.search ? SEARCH_NOTE.on : SEARCH_NOTE.off)
-    .replaceAll("__PD_THEME_DEFAULT__", system ? "system" : "light")
+    .replaceAll("__PD_THEME_DEFAULT__", themeDefault(answers))
     .replaceAll("__PD_STOREFRONT_README__\n", answers.storefront ? fills.readme : "")
     .replaceAll("__PD_STOREFRONT_GITIGNORE__\n", answers.storefront ? fills.gitignore : "")
     .replaceAll("__PD_PACKAGE__", packageName)
@@ -139,7 +141,7 @@ export function planInit(
   const skin = storefront.filter(f => isSkin(renamed(f.path)));
   const skinTaken = skin.map(f => renamed(f.path)).find(p => existing.exists(p));
   if (skinTaken) {
-    skipped.push({ path: skinTaken, reason: `already exists: the storefront skin (${skin.length} files in src/patterns/layouts, `
+    skipped.push({ path: skinTaken, reason: `already exists: the site skin (${skin.length} files in src/patterns/layouts, `
       + `src/patterns/partials, src/patterns/views and their styles) was left out as a whole, so it isn't mixed with the skin already here` });
   }
   const files = [...templates.base, ...(answers.examples ? templates.examples : []),
@@ -160,10 +162,10 @@ export function planInit(
  *  that puts the style guide's workbench beside it (a style guide in a folder next to it). */
 const SITE_PUBLISH_README = {
   workflow: "\n## Publish it\n\n`.github/workflows/pages.yml` builds the website and publishes it to GitHub Pages on every push to\n"
-    + "`main`: **Settings → Pages → Source:** \"GitHub Actions\". Set `storefront.url` to the site's address. The\n"
+    + "`main`: **Settings → Pages → Source:** \"GitHub Actions\". Set `site.url` to the site's address. The\n"
     + "workflow installs with `npm ci`, so the style guide and `pattern-dump` must come from the npm registry.\n",
   root: "\n## Publish it\n\nThe style guide is a folder next to this one, so the repository's root builds and publishes both: the\n"
-    + "website from this project's `npm run build`, the style guide's workbench into it at `storefront.workbenchUrl`.\n"
+    + "website from this project's `npm run build`, the style guide's workbench into it at `site.workbenchUrl`.\n"
     + "The [getting started guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/getting-started.md#a-content-only-website)\n"
     + "has the root `package.json` and workflow.\n",
 };
@@ -192,6 +194,9 @@ function planSite(templates: Templates, answers: InitAnswers, site: SiteAnswers,
   }
   return { writes, skipped, dirs: [], packageJson: mergePackageJson(existing.packageJson, answers, packageName) };
 }
+
+/** The default theme of a design system's config: `system` with a website that follows the viewer's setting. */
+const themeDefault = (answers: InitAnswers): string => (answers.storefront && answers.systemTheme ? "system" : "light");
 
 /** The config's comment on search, as the project has Pagefind or not. */
 const SEARCH_NOTE = {
@@ -286,6 +291,10 @@ function mergePackageJson(
     else if (allow[name] === false) notes.push(`allowScripts denies ${name}, left as is: Pattern Dump needs its install script`);
   }
   pkg.allowScripts = allow;
+
+  // A design system is a pattern package from the start, so a website can use it: the field names the same folders
+  // as the config init writes. Only in a package.json init creates; one that exists is the project's to change.
+  if (created && !answers.site) pkg.patternDump = manifestOf(initManifestSource(themeDefault(answers)));
 
   return { content: JSON.stringify(pkg, null, 2) + "\n", created, notes };
 }

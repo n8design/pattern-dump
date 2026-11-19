@@ -25,8 +25,8 @@ export interface JsonLdPage {
   collection?: boolean;
 }
 
-/** The page's JSON-LD as a <script> element. Every "<" in it is written <, so no value can end the
- *  element ("</script>") or open a comment. */
+/** The page's JSON-LD as a <script> element. Every "<" in it is written as the JSON escape \u003c, so no value can
+ *  end the element ("</script>") or open a comment. */
 export function jsonLdScript(p: JsonLdPage): string {
   const abs = (route: string) => new URL(route.replace(/^\//, ""), p.siteUrl).href;
   const site = `${p.siteUrl}#website`;

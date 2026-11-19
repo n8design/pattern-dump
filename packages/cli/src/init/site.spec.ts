@@ -1,8 +1,9 @@
 // Which style guide `pd init --site` names: a folder (read for its package name) or an npm name, with a range or not.
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadConfig } from "@pattern-dump/core";
 import { resolveSitePackage } from "./site.js";
 import { save } from "../../../../test-support/save.js";
 
@@ -25,6 +26,47 @@ describe("resolveSitePackage", () => {
     const r = await resolveSitePackage("./ui", root, join(root, "site"));
     expect(r).toMatchObject({ ok: true, site: { name: "acme-ui", spec: "file:../ui" } });
     expect(r.ok && r.warnings).toEqual([expect.stringContaining(`acme-ui has no "patternDump" field in its package.json yet`)]);
+  });
+
+  // The block is built from the style guide's own config, so pasting it makes the package readable and agrees with the
+  // config (a folder named in both must be the same in both, or loading the config fails).
+  it("a style guide with a config but without the field: the exact block to add, from the config's folders", async () => {
+    root = await mkdtemp(join(tmpdir(), "pd-site-"));
+    const ui = join(root, "ui");
+    await save(join(ui, "package.json"), JSON.stringify({ name: "acme-ui", version: "1.0.0" }, null, 2));
+    await save(join(ui, "pattern-dump.config.json"), JSON.stringify({
+      sourceDir: "./lib", patternsDir: "./lib/patterns", outDir: "./dist", styles: { strategy: "parallel", dir: "./lib/styles/" },
+      documentBase: ["reset"], themes: { dir: "./tokens", default: "dark", switch: "stylesheet" },
+      scriptsDir: "./lib/js", assets: { strategy: "central", dir: "./static" },
+    }));
+    const r = await resolveSitePackage("./ui", root, join(root, "site"));
+    const block = [
+      `"patternDump": {`,
+      `  "patterns": "lib/patterns",`,
+      `  "styles": {`,
+      `    "dir": "lib/styles",`,
+      `    "documentBase": [`,
+      `      "reset"`,
+      `    ]`,
+      `  },`,
+      `  "themes": {`,
+      `    "dir": "tokens",`,
+      `    "default": "dark",`,
+      `    "switch": "stylesheet"`,
+      `  },`,
+      `  "scripts": "lib/js",`,
+      `  "assets": [`,
+      `    "static"`,
+      `  ]`,
+      `}`,
+    ].join("\n");
+    expect(r.ok && r.warnings).toEqual([`acme-ui has no "patternDump" field in its package.json yet, so Pattern Dump can't `
+      + `read its patterns, styles and themes. Add this to ${join("./ui", "package.json")} (the folders of its config):\n${block}`]);
+
+    const pkg = await readFile(join(ui, "package.json"), "utf8");
+    await save(join(ui, "package.json"), pkg.replace(/\n}\s*$/, `,\n  ${block.split("\n").join("\n  ")}\n}\n`));
+    expect(await resolveSitePackage("./ui", root, join(root, "site"))).toMatchObject({ ok: true, warnings: [] });
+    await expect(loadConfig(ui)).resolves.toMatchObject({ patternsDir: "./lib/patterns" });
   });
 
   it("refuses a folder without a package.json or a name, and the site's own folder", async () => {

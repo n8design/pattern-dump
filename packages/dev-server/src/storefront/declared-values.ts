@@ -216,25 +216,30 @@ export interface PlacedContext {
   markdown(text: string): string;
 }
 
-/** A component's placed values, checked: the values to render it with, and every problem. */
+/** A component's placed values, checked: the values to render it with, and every problem. `given`: top-level keys
+ *  that count as set although the tag leaves them out, because something else brings them (a placed variant's data,
+ *  placed.ts); a required one of them is not reported. Their values are filled in by the caller. */
 export async function checkPlaced(
   componentId: string, values: Placed & { kind: "keys" }, where: string, ctx: PlacedContext,
+  o: { given?: ReadonlySet<string> } = {},
 ): Promise<{ value: Record<string, unknown>; problems: PlacedProblem[] }> {
   const problems: PlacedProblem[] = [];
-  const value = await placedComponent(componentId, values, where, ctx, problems);
+  const value = await placedComponent(componentId, values, where, ctx, problems, o.given);
   return { value, problems };
 }
 
 async function placedComponent(
   id: string, node: Placed & { kind: "keys" }, where: string, ctx: PlacedContext, problems: PlacedProblem[],
+  given?: ReadonlySet<string>,
 ): Promise<Record<string, unknown>> {
   const schema = await ctx.schemaOf(id);
   if (!schema) { problems.push({ at: node.at, message: `${where}: ${id} has no schema, so it cannot be placed with values` }); return {}; }
-  return placedKeys(schema, node, where, id, ctx, problems);
+  return placedKeys(schema, node, where, id, ctx, problems, given);
 }
 
 async function placedKeys(
   schema: ObjectSchema, node: Placed & { kind: "keys" }, where: string, owner: string, ctx: PlacedContext, problems: PlacedProblem[],
+  given?: ReadonlySet<string>,
 ): Promise<Record<string, unknown>> {
   const declared = schema.properties ?? {};
   const out: Record<string, unknown> = {};
@@ -252,7 +257,7 @@ async function placedKeys(
     if (v !== undefined) out[e.key] = v;
   }
   for (const key of schema.required ?? []) {
-    if (!seen.has(key)) problems.push({ at: node.at, message: `${where}: "${ctx.label(key)}" is required by ${owner}` });
+    if (!seen.has(key) && !given?.has(key)) problems.push({ at: node.at, message: `${where}: "${ctx.label(key)}" is required by ${owner}` });
   }
   for (const key of Object.keys(declared)) if (!(key in out)) out[key] = null;
   return out;

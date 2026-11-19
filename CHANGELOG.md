@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.8.0 (unreleased)
+
+### Upgrading from 0.7.0
+
+- **Rename your config: `storefront` is now `site`, and `storefront.site` is now `site.globals`.** Templates keep
+  reading `{{site.…}}`; only the config changes. The old names still load, with one warning per key
+  (`storefront.pagesDir is now site.pagesDir`), until 1.0, which removes them; setting both `site` and `storefront`
+  is a config problem. Messages name the new paths (`site.globals.navigations.footer[0]: …`) and say "site" where
+  they said "storefront" (`pd build: the site has problems, so nothing was written`), and terminal lines about the
+  site start with `[site]` instead of `[storefront]`. The guide and a new project's starter files say "site" too.
+- **`pd init --storefront` is now `--with-site`,** and `--no-storefront` is `--without-site`: two flags of their
+  own, apart from `--site <package>`, which still makes a website on an existing style guide. The old flags still
+  work, with a warning, until 1.0, which removes them; `--with-site` with `--without-site` is an error. A new project's config uses the new names.
+- **Highlighted code has fixed class names.** Each token's class is its kind, `pd-code-keyword`, `pd-code-string` and
+  so on, in place of a generated name such as `__shiki_17h8wv`, and a block is `<pre class="shiki">` with no inline
+  style. CSS written for the generated names no longer matches: set the kinds' colours instead (below).
+
+### Added
+
+- **Code on site pages is highlighted, in the site's colours.** A page with code links `/_pd/code.css`, which colours
+  each kind of token from a custom property, `--pd-code-keyword`, `--pd-code-string`, `--pd-code-comment` and eleven
+  more, with Pattern Dump's colours as the defaults. A site sets them from its own tokens
+  (`--pd-code-string: var(--color-code-string)`), with no colour values of its own; the defaults are in their own
+  cascade layer, `pd-code`, so any rule of the site's wins. Light and dark follow the page's `color-scheme`: a light
+  and dark toggle sets `color-scheme` too. `pd build` writes the file into the site's `_pd/`, with or without the
+  workbench. The workbench uses the same properties. An additive contract change carries the address:
+  `PD_ROUTES.codeCss`.
+- **A page can stay out of the navigation:** `nav: false` in its frontmatter. The page is left out of `nav` (and of
+  its folder's `children`) and out of `prev` and `next`: its own are empty, and its neighbours link past it. It still
+  renders, is searchable, is in the sitemap and `llms.txt`, and is reached by its links, such as a credits or legal
+  page linked from the footer. On a folder's `index.md` it leaves out the folder's entry and the folder's pages; in a
+  folder's `childDefaults` it applies to the folder's pages. Any value other than `true` or `false` is a problem on
+  the page, `nav must be true or false`. A layout still gets `nav`, the navigation, as before.
+- **A design system made by `pd init` is a pattern package from the start.** Its `package.json` gets the
+  `patternDump` field, naming the same folders as its config, so a website can use it (`pd init site --site
+  ../styleguide`) without a manual step. Only a `package.json` init creates gets it; one that exists is left as it is.
+  For a style guide in a folder without the field, `pd init --site` prints the block to add, from the folders of the
+  style guide's own config.
+
+- **Images in a page's markdown, like symbol images.** `![Alt](/assets/photo.jpg "Caption")` on a line of its own
+  is a `<figure>` with the caption as its `<figcaption>`, instead of a `title` attribute (in a line of text, the
+  title stays an attribute). A file named `photo-dark.jpg` next to `photo.jpg` makes the image a `<picture>` with a
+  `(prefers-color-scheme: dark)` source, both written as WebP variants with their width and height, lazy as before.
+
+### Changed
+
+- **`pd audit` checks every variant.** Each variant is an entry of its own (`atoms/button~secondary`) in the report,
+  the Audit tab and a rule's count of components: a data overlay with its data, a variant with markup of its own
+  from its template. Until now only each component's default render was audited. **Heads-up:** an audit that passed
+  in 0.7.0 can fail in 0.8.0 on a variant's defect, in CI too; the report names the variant.
+- **`pd audit` reports a component a handle collision left out.** It is an entry with a `HANDLE_COLLISION` defect
+  (an error) naming the handle and the component that keeps it, in the report and the Audit tab; before, the audit
+  never mentioned it. The audit's scope lists a Discovery row. Like a variant's defect, it can fail an audit that
+  passed in 0.7.0.
+- **Code colours reach 4.5:1 contrast,** in the workbench and on site pages: in light mode, strings, keywords and
+  tags, function and attribute names, CSS properties and values, parameters and Handlebars expressions are darker;
+  in dark mode, comments are lighter. Each keeps its hue.
+
+### Fixed
+
+- **The Console has a warning level.** A data variant left out for want of a base template, and a preview whose
+  height depends on the frame's, are warnings now: the line starts with `Warning:` and has an orange mark at its left
+  edge, its text in the normal colour. The variant was shown in red, like a broken build. Errors stay red.
+- **A failed `npm install` in `pd init` says what failed.** It said `pattern-dump may not be published yet` and
+  suggested installing a local build, whatever the cause. It now repeats npm's error lines (`npm error code E404`,
+  `npm error 404 Not Found - GET …`) and says how to install again: `cd <folder> && npm install`. When npm wrote no
+  error, it gives npm's exit code, and when npm could not be started, says so.
+- **A placed variant no longer asks for a value its data already gives.** `<pd-components-note~warning>` without a
+  `heading` stopped the page with `"heading" is required by components/note~warning`, although `note~warning.json`
+  sets one. A required key the variant's data sets now counts as given, and the page shows the variant's value. A key
+  the variant's `.json` leaves out, or has the same value for as the base's `.json`, is still required on the tag,
+  with the same message as before.
+
 ## 0.7.0 (2026-11-18)
 
 Diagrams that follow the site's colours: symbol images, drawn once with colour tokens, shown on site pages in light

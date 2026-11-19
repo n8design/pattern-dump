@@ -16,8 +16,8 @@
 //   3. The `pattern` fence is the ONE deliberately-unescaped path (the self-trust boundary). Its
 //      asymmetry with `src-html` is intentional; "consistently" escaping it would kill live embeds.
 //
-// A NOTE ON SELECTORS: Shiki emits randomised per-render class names (`__shiki_1qoj64`). Never
-// assert on those — assert on the stable wrappers (`shiki-container`, `copy-btn`, `data-raw`).
+// A NOTE ON SELECTORS: a token's class names its kind (`pd-code-keyword`, highlight.ts); the wrappers
+// (`shiki-container`, `copy-btn`, `data-raw`) are stable too.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fileURLToPath } from "node:url";
@@ -158,7 +158,8 @@ describe("docs rendering — characterisation", () => {
     });
 
     it("highlights ordinary fences through the shared Shiki pipeline", () => {
-      expect(specimen).toContain('class="shiki shiki-themes');
+      expect(specimen).toContain('<pre class="shiki" tabindex="0">');
+      expect(specimen).toMatch(/<span class="pd-code-[a-z]+">/);
       expect(specimen).toContain('<button class="copy-btn"');
     });
 

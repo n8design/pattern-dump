@@ -496,7 +496,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (imageCheck && !imageCheck.ok) {
     if (checked.build.image !== undefined) problems.push(`${placeOf(page, "image")}: ${imageCheck.message}`);
     else {
-      const p = `storefront.image: ${imageCheck.message}`;
+      const p = `site.image: ${imageCheck.message}`;
       siteWide = [...siteWide, p];
       problems.push(p);
     }
@@ -856,7 +856,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   // The site's own head additions (storefront.head), after the skin's: rendered with the site's values, checked alike.
   let siteHead = "";
   if (a.siteHead) {
-    const label = `storefront.head (${a.siteHead.name})`;
+    const label = `site.head (${a.siteHead.name})`;
     let source: string;
     try { source = await readFile(a.siteHead.path, "utf8"); } catch {
       const p = `${label}: there is no such file`;
@@ -888,6 +888,9 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published, article,
         ...(generated ? { collection: true } : {}) })]
       : []),
+    // Code token colours, before every stylesheet of the site's: the pd-code layer is then declared first, so any rule
+    // of the site's wins, layered or not (code.css, highlight.ts getCodeCSS).
+    ...(html.includes(`class="shiki-container"`) ? [`<link rel="stylesheet" href="${PD_ROUTES.codeCss}">`] : []),
     ...(headExtra ? [headExtra] : []),
     ...(siteHead ? [siteHead] : []),
     await a.head(checked.layoutId, html, pageComponents),

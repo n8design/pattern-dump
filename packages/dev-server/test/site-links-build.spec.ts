@@ -53,7 +53,7 @@ describe("the link check in pd build", () => {
     });
     const out = join(root, ".out", "wb");
     await expect(buildStaticSite(config("https://wb.test/"), root, { outDir: out, pdVersion: "0.0.0-test" })).rejects.toThrow([
-      "pd build: the storefront has broken links, so nothing was written:",
+      "pd build: the site has broken links, so nothing was written:",
       `  - /: <a href="/guids/">: no page or file is built at /guids/`,
       `  - /: <a href="/about/#nowhere">: /about/ has no element with id "nowhere"`,
       `  - /: <a href="#gone">: / has no element with id "gone"`,
@@ -98,8 +98,8 @@ describe("the link check in pd dev", () => {
       }
       const said = log.mock.calls.map(c => String(c[0])).filter(s => s.includes("warning: index.md: <a"));
       expect(said).toEqual([
-        `[storefront] warning: index.md: <a href="/guids/">: no page or file is built at /guids/`,
-        `[storefront] warning: index.md: <a href="#gone">: / has no element with id "gone"`,
+        `[site] warning: index.md: <a href="/guids/">: no page or file is built at /guids/`,
+        `[site] warning: index.md: <a href="#gone">: / has no element with id "gone"`,
       ]);
     } finally {
       await server.close();

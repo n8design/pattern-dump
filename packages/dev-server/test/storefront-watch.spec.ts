@@ -143,7 +143,7 @@ describe("a pages folder beside the patterns, with a name that starts the same",
   it("is still the pages folder, not part of the patterns", async () => {
     const root = await benchCopy("sibling");
     await rename(join(root, "pages"), join(root, "src", "patterns-site"));
-    const cfg = validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, pagesDir: "./src/patterns-site" } }, "sibling");
+    const cfg = validateConfig({ ...benchConfig, site: { ...benchConfig.site!, pagesDir: "./src/patterns-site" } }, "sibling");
     const messages = await watch(root, cfg);
     const sent = await after(messages, () => append(join(root, "src", "patterns-site", "about.md"), "\nMore.\n"), m => pageChanged(m) || m.type === "tree-changed");
     expect(sent).toEqual([{ type: "page-changed", route: "/about/" }]);

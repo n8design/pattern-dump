@@ -46,6 +46,7 @@ Cool = region boundaries + text. Never carries signal.
 | ----------------- | --------- | ------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--pd-accent`     | `#CD0B0B` | 53.6 · 0.216 · 28.7 | **Sole live accent: state only**           | Mirror's Edge Catalyst UI active-node red, sampled from the progression screen (the deeper UI red, not the brighter banner red: "does not scream error")  |
 | `--pd-accent-ink` | `white`   | n/a                 | Text/glyph placed _on_ the accent          | White clears AA on `#CD0B0B` (5.76:1). Exists as a token so a themed brand color can flip it to dark (see Theming).                                       |
+| `--pd-warning`    | `#E78C08` | 72 · 0.16 · 65      | Warning signal: marks, never text          | About 2.4:1 on the surface, so it is never a text colour. A Console warning (`p[data-level="warn"]`) keeps the ink and gets a 3px left border in it; the word "Warning:" leading the line carries the meaning. CVD-separable from the accent by luminance. |
 | `--pd-warm-sand`  | `#E0CCC5` | 86 · 0.025 · ~40    | Internal divider hairline (warm structure) | Braun orange desaturated: orange's lineage living quietly in the structure rather than as a second signal                                                 |
 
 ### Accent contrast (sampled value, on the new surface)

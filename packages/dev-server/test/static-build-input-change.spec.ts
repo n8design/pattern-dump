@@ -104,12 +104,12 @@ describe("pd build: a file changed while it runs", () => {
     });
     const message = await result.then(() => "", (e: Error) => e.message);
     // The removed page fails the storefront's checks first; the change is what is reported, with what the build said.
-    expect(message).toContain("pd build: the project changed while it was being built, so the build stopped (it said: pd build: the storefront has problems, so nothing was written)");
+    expect(message).toContain("pd build: the project changed while it was being built, so the build stopped (it said: pd build: the site has problems, so nothing was written)");
     expect(message).toContain("  - pages/about.md (removed)");
     expect(message).toContain("  - src/patterns/components/zz-added.hbs (added)");
   }, 120_000);
 
-  for (const [part, atLog] of [["the workbench", " folder overviews ("], ["the storefront", "… storefront: "]] as const) {
+  for (const [part, atLog] of [["the workbench", " folder overviews ("], ["the site", "… site: "]] as const) {
     it(`leaves both folders as they were when a file changes after ${part} is written`, async () => {
       const { root, out, result } = await buildChangingAboutAt(atLog);
       const sfOut = join(root, ".out", "storefront");

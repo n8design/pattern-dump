@@ -89,10 +89,21 @@ describe("pd export", () => {
 });
 
 describe("pd init", () => {
-  it("reads --storefront and --no-storefront, and leaves the answer open without either", () => {
-    expect(parseCommand(["init", "--storefront"], cwd)).toMatchObject({ kind: "init", storefront: true });
-    expect(parseCommand(["init", "--no-storefront"], cwd)).toMatchObject({ kind: "init", storefront: false });
+  it("reads --with-site and --without-site, and leaves the answer open without either", () => {
+    expect(parseCommand(["init", "--with-site"], cwd)).toEqual({ kind: "init", target: cwd, yes: false, storefront: true });
+    expect(parseCommand(["init", "--without-site"], cwd)).toEqual({ kind: "init", target: cwd, yes: false, storefront: false });
     expect(parseCommand(["init"], cwd)).not.toHaveProperty("storefront");
+  });
+
+  it("takes --storefront and --no-storefront, their names before 0.8.0, with a warning each", () => {
+    expect(parseCommand(["init", "--storefront"], cwd)).toMatchObject({ kind: "init", storefront: true, warnings: ["--storefront is now --with-site"] });
+    expect(parseCommand(["init", "--no-storefront"], cwd)).toMatchObject({ kind: "init", storefront: false, warnings: ["--no-storefront is now --without-site"] });
+    expect(parseCommand(["init", "--with-site", "--storefront"], cwd)).toMatchObject({ storefront: true, warnings: ["--storefront is now --with-site"] });
+    expect(parseCommand(["init", "--with-site"], cwd)).not.toHaveProperty("warnings");
+  });
+
+  it("--with-site is not --site: --site <package> keeps its meaning", () => {
+    expect(parseCommand(["init", "--site", "../styleguide"], cwd)).toEqual({ kind: "init", target: cwd, yes: false, site: "../styleguide" });
   });
 
   it("reads --search / --no-search and --system-theme / --no-system-theme, open without either", () => {
@@ -120,6 +131,8 @@ describe("pd init", () => {
 
   it("rejects contradictory toggles and more than one folder", () => {
     expect(parseCommand(["init", "--git", "--no-git"], cwd)).toEqual({ kind: "error", message: "--git and --no-git cannot both be given" });
+    expect(parseCommand(["init", "--with-site", "--without-site"], cwd)).toEqual({ kind: "error", message: "--with-site and --without-site cannot both be given" });
+    expect(parseCommand(["init", "--storefront", "--without-site"], cwd)).toEqual({ kind: "error", message: "--storefront and --without-site cannot both be given" });
     expect(parseCommand(["init", "--storefront", "--no-storefront"], cwd)).toEqual({ kind: "error", message: "--storefront and --no-storefront cannot both be given" });
     expect(parseCommand(["init", "a", "b"], cwd)).toMatchObject({ kind: "error" });
   });

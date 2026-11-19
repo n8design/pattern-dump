@@ -185,6 +185,7 @@ describe("pd audit — report formats (--format md|text|json)", () => {
       - **HTML content model:** invalid nesting and content that isn't permitted where it appears (html-validate).
       - **Structural accessibility:** labels, accessible names, ARIA attributes, roles and image alternatives (the axe-core rules that don't need layout).
       - **Schema:** missing required fields and values of the wrong type, checked against each component's \`<name>.schema.json\`.
+      - **Discovery:** a component left out of the tree by a handle collision, reported as a HANDLE_COLLISION defect naming the handle and the component that keeps it.
       - **Render outcome:** whether each component rendered, rendered empty or failed. It is reported with the component, not counted as a defect.
 
       Not covered:

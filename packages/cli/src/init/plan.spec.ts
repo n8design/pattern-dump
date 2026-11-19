@@ -76,7 +76,21 @@ describe("planInit — a new folder", () => {
       scripts: { dev: "pd dev", audit: "pd audit", typecheck: "tsc --noEmit", "build:scripts": "tsc" },
       devDependencies: { "pattern-dump": "file:/tmp/pattern-dump-0.1.0.tgz", typescript: "^5.9.0" },
       allowScripts: { esbuild: true, "@parcel/watcher": true },
+      patternDump: {
+        patterns: "src/patterns",
+        styles: { dir: "src/styles", documentBase: ["base"] },
+        themes: { dir: "themes", default: "light", switch: "attribute" },
+        scripts: "src/scripts",
+        assets: ["assets"],
+      },
     });
+  });
+
+  it("the patternDump field's default theme is the config's: system with a website that follows the viewer", () => {
+    const themes = (a: Partial<InitAnswers>) => JSON.parse(plan(a).packageJson.content).patternDump.themes.default;
+    expect(themes({ storefront: true, systemTheme: true })).toBe("system");
+    expect(themes({ storefront: true, systemTheme: false })).toBe("light");
+    expect(themes({ storefront: false, systemTheme: true })).toBe("light");
   });
 });
 
@@ -118,7 +132,7 @@ describe("planInit — the storefront", () => {
     const paths = p.writes.map(w => w.path);
     for (const s of SKIN) expect(paths, s).not.toContain(s);
     expect(paths).toEqual(expect.arrayContaining(REST));
-    expect(p.skipped).toEqual([{ path: "src/patterns/partials/base/base.hbs", reason: "already exists: the storefront skin (7 files in src/patterns/layouts, "
+    expect(p.skipped).toEqual([{ path: "src/patterns/partials/base/base.hbs", reason: "already exists: the site skin (7 files in src/patterns/layouts, "
       + "src/patterns/partials, src/patterns/views and their styles) was left out as a whole, so it isn't mixed with the skin already here" }]);
   });
 

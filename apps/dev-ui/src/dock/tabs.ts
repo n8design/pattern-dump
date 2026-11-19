@@ -182,9 +182,11 @@ export async function fetchAndShowData(): Promise<void> {
 }
 
 
-export function renderConsole(message: string, level: "info" | "error" = "info"): void {
+/** A Console line. A warning is something the author should fix that does not break a render: it is led by the word
+ *  "Warning:", so the meaning is never colour alone, and the line keeps the normal text colour (styles: the marker). */
+export function renderConsole(message: string, level: "info" | "warn" | "error" = "info"): void {
   const p = document.createElement("p");
-  p.textContent = message;
+  p.textContent = level === "warn" ? `Warning: ${message}` : message;
   // data-level, matching the [data-severity] convention the dock tabs already use, rather than a
   // bookkeeping class — see docs/development/styling.md §2/§3.
   if (level !== "info") p.dataset.level = level;

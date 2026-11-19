@@ -36,7 +36,7 @@ npx --package=/path/to/pattern-dump-<version>.tgz pd init my-design-system --pd-
 | Package name | `--name <name>` | the folder name; a generic one is scoped by its parent folder (below) |
 | Title in the Nav Rail | `--brand <title>` | the name, or the parent folder's name for a scoped one |
 | Include the starter components? | `--no-examples` to skip | yes |
-| Include a website (storefront)? | `--storefront` | no |
+| Include a website? | `--with-site` | no |
 | Include site search (Pagefind)? (with a website) | `--search` / `--no-search` | yes |
 | Follow the viewer's light or dark setting? (with a website) | `--system-theme` / `--no-system-theme` | yes |
 | Run `git init`? | `--git` / `--no-git` | yes, unless already inside a repository |
@@ -62,6 +62,10 @@ npm install --save-dev --save-exact pattern-dump@<version>
 The `package.json` also allows the install scripts of Pattern Dump's own dependencies, esbuild and
 `@parcel/watcher` (`allowScripts`, which npm 11.19 asks for), so `npm install` has nothing to warn about. `--yes` accepts every default without asking. In a folder that already has a `package.json`, `pd init`
 adds to the project and never overwrites a file; a script name that is taken gets a `pd:` prefix instead.
+
+If `npm install` fails, the project's files are already written: `pd init` repeats npm's error lines after npm's
+own output and says how to install again (`cd <folder> && npm install`). Fix what npm names, then run that; running
+`pd init` again would find the project already there.
 
 A global install (`npm install --global pattern-dump`) also works for creating projects, but each
 project still uses its own local copy; see [global or local](cli.md#global-or-local).
@@ -108,7 +112,7 @@ The workbench has four regions:
 | **Nav Rail** (left) | The component tree and search; the theme picker; **Accessibility** (colour-vision simulation); viewport sizes (fit, fit content, mobile, tablet, desktop); buttons to show or hide the Inspector and Console; **Show private**; **Hide packages** when pattern packages are used |
 | **Stage** (centre) | The live preview of the selected component or variant, a gallery of all variants, or a folder gallery |
 | **Inspector** (right) | **Docs** (the component's `.md`), **Relationships** (what it uses and what uses it, including borrowed CSS classes), **Audit** (defects across all components) |
-| **Console** (bottom) | **Source** (template, data, schema), **HTML** (the rendered markup), **Diagnostics** (render, schema, HTML validation and accessibility findings), **Console** (messages from the server) |
+| **Console** (bottom) | **Source** (template, data, schema), **HTML** (the rendered markup), **Diagnostics** (render, schema, HTML validation and accessibility findings), **Console** (messages from the server; a warning starts with `Warning:` and has an orange mark at its left edge, an error is red) |
 
 Every view has its own address, so links, reloads and the browser's Back button work. PatternLab-style
 links (`/#/atoms/button`) open the same view, and an address that names nothing says so and links the
@@ -168,7 +172,7 @@ The full set of conventions is in [authoring.md](authoring.md).
 npm run audit
 ```
 
-`pd audit` renders every component with its own data and reports defects: render errors, schema mismatches,
+`pd audit` renders every component and variant with its own data and reports defects: render errors, schema mismatches,
 HTML validation and structural accessibility checks. The same results appear in the workbench's
 **Audit** tab. See [cli.md](cli.md#pd-audit) for the report formats.
 
@@ -194,7 +198,7 @@ npx pattern-dump init site --site ../styleguide            # a folder next to it
 | File | What |
 |---|---|
 | `package.json` | `dev` and `build`; `pattern-dump`, the style guide and (with search) Pagefind as devDependencies |
-| `pattern-dump.config.ts` | `packages: ["<the style guide>"]`, the `storefront` block, and `build: { workbench: false }` |
+| `pattern-dump.config.ts` | `packages: ["<the style guide>"]`, the `site` block, and `build: { workbench: false }` |
 | `pages/index.md`, `pages/about.md` | two pages that name no layout, so they render with the style guide's `layouts/page` |
 | `.gitignore`, `README.md` | |
 | `.github/workflows/pages.yml` | for a style guide from the registry: builds the website and publishes it |
@@ -202,6 +206,9 @@ npx pattern-dump init site --site ../styleguide            # a folder next to it
 - **The style guide is checked.** After `npm install`, init asks the site's dev server for every page. A package
   without a skin (`layouts/page` and `partials/base`) or without a `patternDump` field is named then, with what is
   missing; the site is written either way.
+- **A style guide in a folder without the `patternDump` field** gets the block to add, printed by init: the folders
+  its `pattern-dump.config.ts` names, ready to paste into its `package.json`. A style guide made by `pd init` has the
+  field already.
 - **Its workbench is the style guide's.** `--workbench-url` (default `/workbench/`) says where the style guide
   publishes its own workbench; the pages' examples link there. `build.workbench: false` makes `pd build` write the
   website only, to `site/`.
@@ -209,16 +216,15 @@ npx pattern-dump init site --site ../styleguide            # a folder next to it
 
 ### A style guide and its site in one repository
 
-Two inits and a root `package.json`. The style guide is a design system with a website starter (for its skin), made
-a pattern package:
+Two inits and a root `package.json`. The style guide is a design system with a website starter (for its skin):
 
 ```bash
 mkdir acme-web && cd acme-web
-npx pattern-dump init styleguide --storefront --no-git    # @acme-web/styleguide
+npx pattern-dump init styleguide --with-site --no-git    # @acme-web/styleguide
 ```
 
-Add the `patternDump` field to `styleguide/package.json`, naming the same folders as its config (a folder named in
-both must be the same in both):
+Init writes the `patternDump` field into `styleguide/package.json`, naming the same folders as its config (a folder
+named in both must be the same in both), so the style guide is a pattern package from the start:
 
 ```json
 "patternDump": {
@@ -264,7 +270,7 @@ await cp("site/site", "_site", { recursive: true });
 await cp("styleguide/dist", "_site/workbench", { recursive: true });
 ```
 
-The root's `.github/workflows/pages.yml` is the one `pd init --storefront` writes, with its build and copy steps
+The root's `.github/workflows/pages.yml` is the one `pd init --with-site` writes, with its build and copy steps
 replaced by `- run: npm run pages`. Run `npm install` at the root once, so there is one lockfile; add `_site` to
 the root's `.gitignore`. People who write content work in `site/pages/` only.
 

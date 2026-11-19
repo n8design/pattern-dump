@@ -79,7 +79,7 @@ describe("images when sharp can't be loaded", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       await expect(buildStaticSite(config, root, { outDir: join(root, "workbench-out"), pdVersion: "0.0.0-test" }))
-        .rejects.toThrow(/pd build: the storefront has problems, so nothing was written:[\s\S]*Pattern Dump could not load sharp/);
+        .rejects.toThrow(/pd build: the site has problems, so nothing was written:[\s\S]*Pattern Dump could not load sharp/);
     } finally {
       error.mockRestore();
     }

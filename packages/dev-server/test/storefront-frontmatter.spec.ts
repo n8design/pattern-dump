@@ -140,10 +140,12 @@ describe("checkPageFrontmatter — keys", () => {
   });
 
   it("refuses the keys the storefront fills, and does not count them as missing", async () => {
+    // nav is a page's own key as well, true or false (nav: false leaves the page out of the nav), so a list there is
+    // that key's problem; the layout still gets the nav the storefront fills.
     expect((await check("---\ntitle: T\nbody: Mine\nnav: [a]\nsite: Mine\n---\n")).problems).toEqual([
-      P(3, `"body" is filled by the storefront, not by a page`),
-      P(4, `"nav" is filled by the storefront, not by a page`),
-      P(5, `"site" is filled by the storefront, not by a page`),
+      P(4, `nav must be true or false`), // the build's keys are checked first
+      P(3, `"body" is filled by Pattern Dump, not by a page`),
+      P(5, `"site" is filled by Pattern Dump, not by a page`),
     ]);
     // layouts/typed requires body: the storefront fills it, so a page without it is fine.
     expect((await check("---\nlayout: typed\ntitle: T\n---\n")).problems).toEqual([]);
@@ -306,7 +308,7 @@ describe("checkPageFrontmatter — the storefront bench", () => {
   it("finds nothing wrong with any of its pages", async () => {
     const bench = fileURLToPath(new URL("../../../storefront-bench/", import.meta.url));
     const benchMap = (await buildDiscoveryMap(join(bench, "src", "patterns"))).discoveryMap;
-    const model = await readPages(join(bench, "pages"), { categories: benchConfig.storefront?.categories });
+    const model = await readPages(join(bench, "pages"), { categories: benchConfig.site?.categories });
     const checked = await Promise.all([...model.files.values()].map(f => checkPageFrontmatter(f, benchMap, model.categories)));
     expect(checked.flatMap(c => c.problems)).toEqual([]);
     expect(checked.map(c => c.layoutId)).toEqual(["layouts/home", "layouts/page", "layouts/doc", "layouts/doc",

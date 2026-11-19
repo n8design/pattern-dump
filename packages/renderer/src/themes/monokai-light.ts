@@ -23,21 +23,25 @@
 import { computePalette, type Oklch } from "./oklch.js";
 
 // The two tokens we author (OKLCH → gamut-checked hex). Everything else is faithful literal.
-const CONTROLLED: Record<string, Oklch> = {
-  varParam: { l: 0.74, c: 0.14, h: 58 }, // lightened args — breaks the deuteranopia collapse → #ec9247
-  hbExpr:   { l: 0.62, c: 0.15, h: 48 }, // {{expression}} light terracotta → #cc6526
-};
+// Every colour reaches 4.5:1 (WCAG AA) on white and on the block's #fafafa: the ones below it were darkened, hue and
+// chroma kept, lightness lowered (0.8.0). The args' lightness rung (0.74) did not survive: at 4.5:1 they sit beside
+// strings and names again, so the deuteranopia collapse described above is back. Follow-up: "Code colours: separate
+// the warm kinds by lightness under deuteranopia", with every colour kept at 4.5:1 or above.
+const CONTROLLED = {
+  varParam: { l: 0.564, c: 0.135, h: 57.5 }, // args: was 0.74 (#ec9247), darkened for AA → #af5d02
+  hbExpr:   { l: 0.568, c: 0.15, h: 48 },    // {{expression}} terracotta: was 0.62 (#cc6526), darkened for AA → #ba550c
+} satisfies Record<string, Oklch>;
 const c = computePalette("pd-monokai-light", CONTROLLED);
 
-// Faithful Monokai Light values (from the MIT JSON).
+// Monokai Light values (from the MIT JSON), four of them darkened for AA (the faithful value in each comment).
 const M = {
   base:       "#49483e", // base/global fg + variables + punctuation + {{ }} delimiters
   comment:    "#75715E",
-  string:     "#998f2f",
+  string:     "#7f7403", // faithful #998f2f
   constant:   "#684d99", // numeric / language / other constants
-  keyword:    "#f9005a", // keyword / storage / tag (hot pink — loud, cool; flagged for warm-tune)
-  support:    "#0089b3", // storage.type / support.function/constant/type (teal-blue)
-  name:       "#679c00", // class/type/function names + attribute names (olive-green)
+  keyword:    "#e40052", // keyword / storage / tag (hot pink, flagged for warm-tune); faithful #f9005a
+  support:    "#007ca3", // storage.type / support.function/constant/type (teal-blue); faithful #0089b3
+  name:       "#537f00", // class/type/function names + attribute names (olive-green); faithful #679c00
 } as const;
 
 export const monokaiLight = {
@@ -67,3 +71,6 @@ export const monokaiLight = {
 
 /** Computed hex for the two OKLCH-authored tokens — exported for the verify/report step. */
 export const monokaiLightHex = c;
+
+/** Every intent's colour, by name: the code kinds' light defaults (highlight.ts) are read from here. */
+export const monokaiLightPalette = { ...M, varParam: c.varParam, hbExpr: c.hbExpr };

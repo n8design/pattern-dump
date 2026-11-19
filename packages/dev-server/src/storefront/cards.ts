@@ -68,7 +68,7 @@ const HINTS: Readonly<Record<string, string>> = {
   updated: "updated: YYYY-MM-DD",
   description: "description: one sentence, or a first paragraph in its body",
   tags: "tags: [a-tag]",
-  categories: "categories: [a-category], declared in storefront.categories",
+  categories: "categories: [a-category], declared in site.categories",
 };
 
 const missing = (v: unknown): boolean => v === null || v === undefined || (Array.isArray(v) && v.length === 0);

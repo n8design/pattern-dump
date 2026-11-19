@@ -60,9 +60,10 @@ const SHAPE: Shape = {
   exclude: "strings",
   build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks", workbench: "boolean" } },
   images: IMAGES,
-  storefront: {
+  // The website. Written `storefront` before 0.8.0, with `globals` as `site` (legacyKeys reads the old names).
+  site: {
     keys: {
-      pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", site: "plain-object",
+      pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", globals: "plain-object",
       url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES, head: "hbs-file",
       categories: "categories", tags: "tags", tagPages: "term-pages", categoryPages: "term-pages", search: "boolean",
       llms: "boolean",
@@ -175,7 +176,7 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
         ok = /^https?:$/.test(url.protocol) && url.search === "" && url.hash === "" && !/[?#]/.test(value);
       } catch { ok = false; }
     }
-    if (!ok) fail(`an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the storefront's host, such as "/workbench/"`);
+    if (!ok) fail(`an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the site's host, such as "/workbench/"`);
     return;
   }
   if (rule === "site-url") {
@@ -315,23 +316,23 @@ export class ConfigError extends Error {
 
 /** Checks across keys, run once every key has the right type. */
 function checkRelations(raw: Record<string, unknown>, problems: string[]): void {
-  const sf = raw.storefront;
+  const sf = raw.site;
   if (!isObject(sf)) return;
   // Tag pages and category pages each under a path of their own (when both are on).
   const pathOf = (v: unknown, fallback: string): string | undefined =>
     v === false ? undefined : isObject(v) && typeof v.path === "string" ? v.path : fallback;
   const tagPath = pathOf(sf.tagPages, "tags"), categoryPath = pathOf(sf.categoryPages, "categories");
   if (tagPath !== undefined && tagPath === categoryPath) {
-    problems.push(`"storefront.tagPages.path" and "storefront.categoryPages.path" are both "${tagPath}": tag pages and category pages need a path each`);
+    problems.push(`"site.tagPages.path" and "site.categoryPages.path" are both "${tagPath}": tag pages and category pages need a path each`);
   }
   // Three folders that must not share files, so they are pairwise disjoint: not the same folder, and
   // neither inside the other. Pages are markdown that is not component docs (under patternsDir the
   // watcher could not tell which an edit belongs to, and the reverse puts component docs among the
   // pages); the storefront output is emptied and written by `pd build`, so it must hold neither.
   const folders: Array<[name: string, value: unknown]> = [
-    ["storefront.pagesDir", sf.pagesDir],
+    ["site.pagesDir", sf.pagesDir],
     ["patternsDir", raw.patternsDir],
-    ["storefront.outDir", sf.outDir],
+    ["site.outDir", sf.outDir],
   ];
   // All are relative to the project root, so they are compared resolved against the same (any) root.
   const root = resolve(sep, "pd-root");
@@ -352,13 +353,51 @@ function checkRelations(raw: Record<string, unknown>, problems: string[]): void 
   }
 }
 
+/**
+ * The config with the website under its own name, `site`, whichever name it was written with: before 0.8.0 it was
+ * `storefront`, and its `site` (the values every page shares) is now `site.globals`. The old names still load, each
+ * old key with a warning; both names at once is a problem. Nothing else is changed.
+ */
+export function legacyKeys(raw: Record<string, unknown>): { raw: Record<string, unknown>; warnings: string[]; problems: string[] } {
+  if (raw["storefront"] === undefined) return { raw, warnings: [], problems: [] };
+  if (raw["site"] !== undefined) {
+    return { raw, warnings: [], problems: ["both \"site\" and \"storefront\" are set: storefront is the old name of site, keep site only"] };
+  }
+  const { storefront, ...rest } = raw;
+  if (!isObject(storefront)) return { raw: { ...rest, site: storefront }, warnings: ["storefront is now site"], problems: [] };
+  const warnings = Object.keys(storefront).map(k => k === "site" ? "storefront.site is now site.globals" : `storefront.${k} is now site.${k}`);
+  if (Object.hasOwn(storefront, "globals")) {
+    return { raw, warnings, problems: ["\"storefront.globals\" is not a key of the old storefront: write the website under site, and its globals there"] };
+  }
+  const { site: globals, ...keys } = storefront;
+  return { raw: { ...rest, site: { ...keys, ...(globals !== undefined ? { globals } : {}) } }, warnings: warnings.length ? warnings : ["storefront is now site"], problems: [] };
+}
+
+/** The warnings a loaded config gives: each key written with its old name (legacyKeys). */
+export function configWarnings(raw: unknown): string[] {
+  return isObject(raw) ? legacyKeys(raw).warnings : [];
+}
+
 /** The problems with a loaded config, one line each; empty when it is valid. */
 export function configProblems(raw: unknown): string[] {
   if (!isObject(raw)) return ["the config must be an object (a .ts config must `export default defineConfig({ … })`)"];
+  const legacy = legacyKeys(raw);
+  if (legacy.problems.length) return legacy.problems;
   const problems: string[] = [];
-  checkObject(raw, SHAPE, REQUIRED, "", problems);
-  if (problems.length === 0) checkRelations(raw, problems);
+  checkObject(legacy.raw, SHAPE, REQUIRED, "", problems);
+  if (problems.length === 0) checkRelations(legacy.raw, problems);
   return problems;
+}
+
+/** The website as the code reads it: `storefront`, with the values every page shares as `site` (its name before
+ *  0.8.0, kept inside Pattern Dump until its own names change). */
+function internalShape(raw: Record<string, unknown>): Record<string, unknown> {
+  // Written with the old name, or with no website: already the shape the code reads, returned as it is.
+  if (raw["site"] === undefined) return raw;
+  const { site, ...rest } = raw;
+  if (!isObject(site)) return rest;
+  const { globals, ...keys } = site;
+  return { ...rest, storefront: { ...keys, ...(globals !== undefined ? { site: globals } : {}) } };
 }
 
 /** A URL that other paths are appended to: exactly one trailing slash. */
@@ -386,7 +425,7 @@ export function validateConfig(raw: unknown, source: string): PatternDumpConfig 
   if (problems.length > 0) {
     throw new ConfigError(`${source}: invalid config\n${problems.map(p => `  - ${p}`).join("\n")}`);
   }
-  const config = withSourceDefaults(raw as PatternDumpConfigInput);
+  const config = withSourceDefaults(internalShape(raw as Record<string, unknown>) as PatternDumpConfigInput);
   // Normalized here, once, so every reader gets the same form: links are `<workbenchUrl><path>`.
   // The input is never changed: a config that needs no normalizing is returned as it is, one that does
   // is returned as a copy.

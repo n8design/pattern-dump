@@ -124,7 +124,7 @@ describe("the message of a change to the shared model", () => {
     const model = await createPagesCache(pages, true).get("a", () => readPages(pages));
     let thrown: unknown;
     try { model.files.clear(); } catch (e) { thrown = e; }
-    expect(renderError(thrown)).toMatch(/^Cannot clear in a read-only Map\. The storefront's page data is shared/);
+    expect(renderError(thrown)).toMatch(/^Cannot clear in a read-only Map\. The site's page data is shared/);
   });
 
   it("adds nothing to a message the renderer has explained already", () => {

@@ -95,7 +95,7 @@ describe("pd build with several check workers", () => {
     const root = await project("errors", true);
     const message = async (workers: number) => build(root, workers).then(() => "", (e: Error) => e.message);
     const one = await message(1);
-    expect(one).toMatch(/^pd build: the storefront has accessibility problems, so nothing was written:\n {2}- \/page-04\/: link-name .*\n {2}- \/page-10\/: link-name /);
+    expect(one).toMatch(/^pd build: the site has accessibility problems, so nothing was written:\n {2}- \/page-04\/: link-name .*\n {2}- \/page-10\/: link-name /);
     expect(await message(3)).toBe(one);
   }, 120_000);
 });

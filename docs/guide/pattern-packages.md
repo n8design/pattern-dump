@@ -60,7 +60,7 @@ packages: ["@acme/styleguide"],
 
 `pd dev` uses a linked package from its real folder, `vendor/styleguide`, and watches it like the project's
 own files. An edit there, or through `node_modules/@acme/styleguide`, which is the same file, reloads the
-open workbench preview and storefront pages. A workspace package in a monorepo is linked the same way.
+open workbench preview and site pages. A workspace package in a monorepo is linked the same way.
 
 If the package's helpers are TypeScript, run its `watch:helpers` beside `pd dev` (see
 [Helpers ship compiled](#helpers-ship-compiled)).
@@ -71,11 +71,11 @@ The same for the project and for every linked package, while `pd dev` runs:
 
 | You change | `pd dev` |
 |---|---|
-| A template, its data or docs, a stylesheet (the base layer too), a theme, a behaviour script, an asset, global data | Reloads the open workbench preview and storefront pages |
-| A component added or removed | Updates the workbench's tree, and reloads storefront pages |
+| A template, its data or docs, a stylesheet (the base layer too), a theme, a behaviour script, an asset, global data | Reloads the open workbench preview and site pages |
+| A component added or removed | Updates the workbench's tree, and reloads site pages |
 | A helper module (your own, or a package's compiled `.js`) | Reloads it in place, and the open pages |
 | A file a helper module imports | Asks for a restart: a helper's own imports are not reloaded |
-| A data or helper file that does not load (invalid JSON, a syntax error, a module that throws when it loads or when it registers its helpers) | Keeps the last good version, and lists the problem in the terminal, the workbench's Console and a notice on storefront pages, until you fix it |
+| A data or helper file that does not load (invalid JSON, a syntax error, a module that throws when it loads or when it registers its helpers) | Keeps the last good version, and lists the problem in the terminal, the workbench's Console and a notice on site pages, until you fix it |
 | `pattern-dump.config.ts`, a package installed, updated or added, or a file in an installed copy | Needs a restart |
 
 ## How sources combine
@@ -125,7 +125,8 @@ List the second as a `peerDependency` of the first; Pattern Dump follows peer de
 Make sure the folders named in `patternDump` are included in the package's `files`.
 
 **A package with a workbench of its own.** A style guide that you design in its own `pd dev` and publish for sites
-to use describes its folders once, in `patternDump`. Its `pattern-dump.config.ts` takes every folder it doesn't
+to use describes its folders once, in `patternDump`. (`pd init` writes the field into a `package.json` it
+creates, naming the folders of the config it writes.) Its `pattern-dump.config.ts` takes every folder it doesn't
 name from there: `patterns` (as `patternsDir`), `data`, `helpers`, `assets` (as `assets.dir`), `styles` (with
 `entry` and `documentBase`), `themes`, `scripts` (as `scriptsDir`), `globalScripts` and `exclude`. Its config then
 holds only what is about the workbench, such as `outDir` and `build`:
@@ -172,5 +173,5 @@ An asset folder is served under its own name, `/assets/<folder name>/…`, and a
 name hides a package's. Give a package's asset folder a name of its own, such as the package's
 (`assets/acme-design-system/`), and reference its files by that path.
 
-A package can also be a [storefront skin](storefront.md#skins): its layouts and partials are patterns like
+A package can also be a [site skin](storefront.md#skins): its layouts and partials are patterns like
 any other.

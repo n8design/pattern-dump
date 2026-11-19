@@ -7,7 +7,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
+import { validateConfig, type PatternDumpConfig, type SiteConfig } from "@pattern-dump/config";
 import { buildStaticSite } from "@pattern-dump/dev-server";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
@@ -30,14 +30,14 @@ async function benchCopy(): Promise<string> {
   }
   return root;
 }
-const config = (over: Partial<NonNullable<PatternDumpConfig["storefront"]>> = {}): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, ...over } }, "test");
+const config = (over: Partial<SiteConfig> = {}): PatternDumpConfig =>
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, ...over } }, "test");
 const build = (root: string, out: string, cfg: PatternDumpConfig = config()) =>
   buildStaticSite(cfg, root, { outDir: out, pdVersion: "0.0.0-test", now: NOW });
 const exists = (p: string) => stat(p).then(() => true, () => false);
 
 const noWorkbench = (over: Partial<PatternDumpConfig> = {}): PatternDumpConfig => validateConfig({
-  ...benchConfig, build: { workbench: false }, storefront: { ...benchConfig.storefront!, workbenchUrl: "/workbench/" }, ...over,
+  ...benchConfig, build: { workbench: false }, site: { ...benchConfig.site!, workbenchUrl: "/workbench/" }, ...over,
 }, "test");
 
 describe("pd build — build.workbench: false", () => {
@@ -61,9 +61,9 @@ describe("pd build — build.workbench: false", () => {
 
   it("refuses a project without a storefront: there is nothing to build", async () => {
     const root = await benchCopy();
-    const { storefront: _, ...rest } = benchConfig;
+    const { site: _, ...rest } = benchConfig;
     const cfg = validateConfig({ ...rest, build: { workbench: false } }, "test");
     await expect(build(root, join(root, "..", "nowb-none"), cfg))
-      .rejects.toThrow("pd build: build.workbench is false and the project has no storefront, so there is nothing to build");
+      .rejects.toThrow("pd build: build.workbench is false and the project has no site, so there is nothing to build");
   }, 60_000);
 });

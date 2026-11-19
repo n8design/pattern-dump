@@ -16,7 +16,7 @@ import type { PatternDumpConfig } from "@pattern-dump/config";
 import type { DiagnosticsGraph } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
-import { baseComponentIds } from "./discovery-index.js";
+import { auditedComponentIds } from "./discovery-index.js";
 import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 import { buildCompositionRegistry } from "./composition.js";
 import { surfaceFlattening } from "./surfacing.js";
@@ -59,8 +59,9 @@ export async function runDiagnosticsAudit(
   const registry = await buildCompositionRegistry(patternDirs, discovery.handleMap, discovery.discoveryMap);
   const inputs = await auditInputs({
     discoveryMap: discovery.discoveryMap, handleMap: discovery.handleMap, composition: registry, globalData, helperPaths: cfg.helperPaths,
+    quarantine: discovery.quarantineMap,
   });
-  const { graph, reaudited, reused } = await refreshDiagnosticsGraph(cwd, baseComponentIds(discovery), render, discovery.quarantineMap, inputs);
+  const { graph, reaudited, reused } = await refreshDiagnosticsGraph(cwd, auditedComponentIds(discovery), render, discovery.quarantineMap, inputs);
   // Headless one-shot also emits the flattening side artifact.
   await surfaceFlattening(discovery.discoveryMap, registry, cwd);
   return { graph, reaudited, reused, artifactPath: graphArtifactPath(cwd), ...(imageWarning ? { imageWarning } : {}) };

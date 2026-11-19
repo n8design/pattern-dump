@@ -206,29 +206,32 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps, page: 
   const regionFrom = tagRegion !== undefined ? fromTag : `<${block.root.name}> (${id}'s default region, x-pd-region)`;
   const broken = await schemaProblems(id, block.root.at, deps);
   if (broken.length) return { problems: [...problems, ...broken] };
+  // A variant's data comes first, so a required key it sets counts as given (note~warning sets heading).
+  const variant = id.includes("~") ? await variantData(id, deps.discoveryMap) : {};
   const checked = await checkPlaced(id, values, `<${block.root.name}>`, {
     schemaOf: deps.schemaOf,
     label: kebab,
     // Placed content is a storefront page's: its code blocks get their copy buttons from the page's script (code-blocks.ts).
     markdown: text => contentMd.render(text, { pdCodeBlocks: { storefront: true } }),
-  });
+  }, { given: new Set(Object.keys(variant)) });
   problems.push(...checked.problems, ...await unsafeOutputs(id, block.root.at, deps), ...await sampleDataProblems(id, block.root.at, deps));
   const where = region !== undefined ? { region, regionFrom } : {};
   if (problems.length) return { problems, ...where };
   // A placement that fails to render (an image that can't be served as variants, a helper that isn't registered)
   // is a problem of the page at the tag, listed and escaped like any other, never an unhandled 500.
   try {
-    const data = id.includes("~") ? await withVariantData(id, checked.value, deps.discoveryMap) : checked.value;
+    const data = { ...checked.value };
+    for (const [key, v] of Object.entries(variant)) if (Object.hasOwn(data, key) && data[key] === null) data[key] = v;
     return { html: (await deps.render({ component: id, data })).html, problems, ...where };
   } catch (e) {
     return { problems: [{ at: block.root.at, message: `<${block.root.name}>: ${e instanceof Error ? e.message : String(e)}` }] };
   }
 }
 
-/** A data-overlay variant's placed values with the data that makes it the variant: each top-level key whose value in
- *  the variant's .json differs from the base's .json, and that the tag left unset (null), takes the variant's value.
- *  Keys the two share are sample text and stay null, as every unset key of a placement does (declared-values.ts). */
-async function withVariantData(id: string, value: Record<string, unknown>, discoveryMap: DiscoveryMap): Promise<Record<string, unknown>> {
+/** The data that makes a data-overlay variant the variant: each top-level key whose value in the variant's .json
+ *  differs from the base's .json. A key the tag leaves unset (null) takes this value, and a required one counts as
+ *  given. Keys the two share are sample text and stay out, as every unset key of a placement does (declared-values.ts). */
+async function variantData(id: string, discoveryMap: DiscoveryMap): Promise<Record<string, unknown>> {
   const readData = async (path: string | undefined): Promise<Record<string, unknown>> => {
     if (!path) return {};
     const parsed = parseJson(await designFiles(discoveryMap).text(path).catch(() => ""));
@@ -237,11 +240,7 @@ async function withVariantData(id: string, value: Record<string, unknown>, disco
   };
   const own = await readData(discoveryMap.get(id)?.jsonPath);
   const base = await readData(discoveryMap.get(id.split("~")[0]!)?.jsonPath);
-  const out = { ...value };
-  for (const [key, v] of Object.entries(own)) {
-    if (Object.hasOwn(out, key) && out[key] === null && !isDeepStrictEqual(v, base[key])) out[key] = v;
-  }
-  return out;
+  return Object.fromEntries(Object.entries(own).filter(([key, v]) => !isDeepStrictEqual(v, base[key])));
 }
 
 /** The table of contents (toc.ts), placed with `items`: from the tag's links, or derived from the page's headings. */

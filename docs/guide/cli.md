@@ -47,7 +47,7 @@ without one (in CI, or with input piped in) it takes every default without askin
 | `--name <name>` | Package name. Default: the folder name; a generic one (`styleguide`, `site`, `docs` and the like) is scoped by its parent folder, `@<parent>/<folder>` |
 | `--brand <title>` | Title shown in the Nav Rail; with `--site`, the site's title. Default: the name, or the parent folder's name for a scoped one |
 | `--no-examples` | Structure, config and themes only, without starter components |
-| `--storefront` | Also a website: two pages, a small skin, a component of its own and a GitHub Pages workflow ([storefront.md](storefront.md#quick-start)). Default: no |
+| `--with-site` | Also a website: two pages, a small skin, a component of its own and a GitHub Pages workflow ([storefront.md](storefront.md#quick-start)). Default: no |
 | `--search` / `--no-search` | With a website: Pagefind as a devDependency, pinned, so `pd build` writes the search index. Default: yes |
 | `--system-theme` / `--no-system-theme` | With a website: the default theme `system`, which follows the viewer's light or dark setting, and the skin's pages with it. Default: yes |
 | `--site <package or folder>` | A content-only website on an existing style guide instead of a design system ([getting-started.md](getting-started.md#a-content-only-website)) |
@@ -62,12 +62,12 @@ overwritten, an existing script name gets a `pd:` variant instead, and existing 
 `typescript` versions are kept. It refuses a folder that already has a Pattern Dump config.
 
 It adds these scripts: `dev` (`pd dev`), `audit` (`pd audit`), `typecheck` (`tsc --noEmit`) and
-`build:scripts` (`tsc`), and with `--storefront` also `build` (`pd build`); with `--site`, `dev` and `build` only.
+`build:scripts` (`tsc`), and with `--with-site` also `build` (`pd build`); with `--site`, `dev` and `build` only.
 `pattern-dump` and Pagefind are pinned to exact versions (`npm install --save-dev --save-exact pattern-dump@<version>`
 moves the pin), and `allowScripts` allows the install scripts of esbuild and `@parcel/watcher`, Pattern Dump's own
 dependencies; a denial the project already has (`false`) is kept.
 
-With `--storefront`, the skin (`src/patterns/layouts/`, `src/patterns/partials/` and their styles) is written
+With `--with-site`, the skin (`src/patterns/layouts/`, `src/patterns/partials/` and their styles) is written
 as a whole or not at all: if one of its files is already there, `pd init` leaves the skin out and says so,
 so it is never mixed with a skin the project has. When Pattern Dump is installed from a local `.tgz`, it
 warns that the GitHub Pages workflow can't install it (`npm ci` runs on GitHub's machines).
@@ -95,17 +95,19 @@ shown.
 
 ## `pd audit`
 
-Renders every component once, with its own data, and reports defects across the whole design system:
+Renders every component and every variant, each with its own data, and reports defects across the whole design
+system:
 
 - render errors;
 - data and schema checks (`UNFILLED_REQUIRED`, `SHAPE_MISMATCH`, `DATA_INVALID`, `SCHEMA_INVALID`, `HELPER_SHADOW`);
 - HTML validation;
-- structural accessibility checks (axe-core rules that don't need layout or colour).
+- structural accessibility checks (axe-core rules that don't need layout or colour);
+- discovery: a component left out of the tree by a handle collision is an entry with a `HANDLE_COLLISION` defect,
+  naming the handle and the component that keeps it.
 
-Variants are not part of the audit: each variant is checked on its own page in the workbench (the Console's
-**Diagnostics** tab), and `pd build` checks every variant it writes. A component left out of the tree by a handle
-collision is not in the audit either: the collision is named in the terminal, on the Console, and on that
-component's Diagnostics tab.
+Each variant is an entry of its own, `atoms/button~secondary`, in the report and in a rule's count of components: a
+data overlay is checked with its data, a variant with markup of its own from its template. A handle collision is
+also named in the terminal, on the Console, and on that component's Diagnostics tab.
 
 | Option | Description |
 |---|---|
@@ -124,7 +126,7 @@ Results are cached per component and reused when nothing changed, or when nothin
 changed.
 
 `pd audit` fails (exit code `1`) when it finds an error, so a CI step that runs it stops there. (`pd build` does
-not fail on component findings, its own audit's included; it fails on its storefront and schema checks.) Warnings alone leave it at `0`; with `--strict`, any finding fails it. The
+not fail on component findings, its own audit's included; it fails on its site and schema checks.) Warnings alone leave it at `0`; with `--strict`, any finding fails it. The
 last line says why it failed:
 
 ```
@@ -143,11 +145,11 @@ Writes a static snapshot of the workbench: plain files for any static host.
 | Option | Description |
 |---|---|
 | `--out <dir>` | Output folder, relative to the root. Default: `build.outDir`, `outDir`, then `dist`. Replaced as a whole once every check has passed; a build that stops leaves it as it was |
-| `--base <path>` | Where it will be hosted: `/` or a subpath such as `/docs/`. Default: `build.basePath`, then `/` (a project made with `pd init --storefront` sets `/workbench/`) |
-| `--browser` | Also check the storefront's pages in Chromium: contrast and the other accessibility rules that need a rendered page, and each image's variant against its box ([storefront.md](storefront.md#checks-in-a-browser-pd-build---browser)). Needs the project's own Playwright |
+| `--base <path>` | Where it will be hosted: `/` or a subpath such as `/docs/`. Default: `build.basePath`, then `/` (a project made with `pd init --with-site` sets `/workbench/`) |
+| `--browser` | Also check the site's pages in Chromium: contrast and the other accessibility rules that need a rendered page, and each image's variant against its box ([storefront.md](storefront.md#checks-in-a-browser-pd-build---browser)). Needs the project's own Playwright |
 | `--no-audit` / `--audit` | Leave the corpus audit out (it is not run, and there is no Audit tab), or force it in. Default: `build.audit` |
-| `--check-workers <n>` | Threads that check the storefront's pages for accessibility. Default: the cores less one, at most 8, within a quarter of the memory; `1` checks them in one thread. The findings are the same with any number |
-| `--skip-checks=a11y,html` | Leave checks out, for a quick local build: `a11y`, the accessibility of the storefront's pages; `html`, the components' markup against HTML's content model. The build's last line says what was not checked. Default: `build.skipChecks`, else every check runs; `--skip-checks=` runs every check |
+| `--check-workers <n>` | Threads that check the site's pages for accessibility. Default: the cores less one, at most 8, within a quarter of the memory; `1` checks them in one thread. The findings are the same with any number |
+| `--skip-checks=a11y,html` | Leave checks out, for a quick local build: `a11y`, the accessibility of the site's pages; `html`, the components' markup against HTML's content model. The build's last line says what was not checked. Default: `build.skipChecks`, else every check runs; `--skip-checks=` runs every check |
 
 Full guide: [static-build.md](static-build.md).
 

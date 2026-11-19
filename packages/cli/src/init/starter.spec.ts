@@ -19,6 +19,7 @@ import { componentCssUrl, componentUrl, PD_ROUTES, type ComponentDetailResponse,
 import { loadConfig } from "@pattern-dump/core";
 import { runDiagnosticsAudit, startDevServer } from "@pattern-dump/dev-server";
 import { applyPlan, readTemplates } from "./files.js";
+import { manifestOf } from "./manifest.js";
 import { planInit } from "./plan.js";
 import { save } from "../../../../test-support/save.js";
 
@@ -105,7 +106,8 @@ describe("the starter project", () => {
       graph.components.map(c => [c.id, "ok"]),
     );
     expect(graph.components.map(c => c.id).sort()).toEqual([
-      "atoms/button", "molecules/search-field", "molecules/search-field/input", "pages/example",
+      "atoms/button", "atoms/button~icon", "atoms/button~secondary", "molecules/search-field", "molecules/search-field/input",
+      "pages/example",
     ]);
   }, 120_000);
 
@@ -161,7 +163,20 @@ describe("the starter project", () => {
   }, 60_000);
 });
 
-describe("the starter project with a website (--storefront, no examples)", () => {
+// A design system init makes is a pattern package: its package.json's patternDump field names the folders of the config
+// it writes. Loading the config applies the field (a folder named in both must be the same, or loading fails), and the
+// field names exactly the config's folders.
+describe("the starter project's patternDump field", () => {
+  it("names the config's folders, with and without the examples and the website", async () => {
+    for (const project of [dir, bareDir, siteDir]) {
+      const pkg = JSON.parse(await readFile(join(project, "package.json"), "utf8")) as { patternDump?: unknown };
+      expect(pkg.patternDump, project).toBeDefined();
+      expect(manifestOf(await loadConfig(project)), project).toEqual(pkg.patternDump);
+    }
+  });
+});
+
+describe("the starter project with a website (--with-site, no examples)", () => {
   it("has a config that validates: a same-host workbench at /workbench/, built for that path", async () => {
     const config = await loadConfig(siteDir);
     expect(config.storefront).toMatchObject({ pagesDir: "./pages", outDir: "./site", workbenchUrl: "/workbench/",
@@ -174,7 +189,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
     const { graph } = await runDiagnosticsAudit(config, siteDir);
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
-      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"], ["components/search", "ok"], ["components/toc", "ok"],
+      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"], ["components/note~warning", "ok"], ["components/search", "ok"], ["components/toc", "ok"],
         ["layouts/article", "ok"], ["layouts/categories", "ok"], ["layouts/category", "ok"], ["layouts/doc", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"],
         ["layouts/tag", "ok"], ["layouts/tags", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
         ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
@@ -309,7 +324,7 @@ describe("the starter project with a website (--storefront, no examples)", () =>
 
 // The README's "Try breaking it" step, done as it says on a running server: the page then shows the
 // problem with its place in the file, and comes back by itself once the value is saved back.
-describe("the starter project with the examples and a website (what --storefront -y writes)", () => {
+describe("the starter project with the examples and a website (what --with-site -y writes)", () => {
   let both = "";
   beforeAll(async () => { both = await scaffold(true, true); }, 60_000);
   afterAll(async () => { if (both) await rm(both, { recursive: true, force: true }); });

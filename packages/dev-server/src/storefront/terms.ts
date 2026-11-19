@@ -43,8 +43,8 @@ export interface GeneratedPage {
 export interface TermSource { route: string; path: string; tags: string[]; categories: string[]; date: string | null; updated: string | null; redirectFrom: string[] }
 
 const KINDS: Readonly<Record<TermKind, { term: string; index: string; path: string; title: string; config: string; many: string }>> = {
-  tag: { term: "tag", index: "tags", path: "tags", title: "Tags", config: "storefront.tagPages", many: "tags" },
-  category: { term: "category", index: "categories", path: "categories", title: "Categories", config: "storefront.categoryPages", many: "categories" },
+  tag: { term: "tag", index: "tags", path: "tags", title: "Tags", config: "site.tagPages", many: "tags" },
+  category: { term: "category", index: "categories", path: "categories", title: "Categories", config: "site.categoryPages", many: "categories" },
 };
 
 export interface TermPagesInput {

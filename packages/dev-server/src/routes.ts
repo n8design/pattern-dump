@@ -26,7 +26,7 @@ import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
 } from "@pattern-dump/contracts";
-import { getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
+import { getCodeCSS, getShikiCSS, highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 
 import { sameHostWorkbenchPath } from "@pattern-dump/config";
 import type { ResolvedConfig } from "./server-config.js";
@@ -35,7 +35,7 @@ import { createDisplayPath } from "./display-path.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 import { buildShellHtml, json, mimeType, serveFile, servesShell, workbenchTitle } from "./http-utils.js";
-import { baseComponentIds } from "./discovery-index.js";
+import { auditedComponentIds, baseComponentIds } from "./discovery-index.js";
 import { buildComponentTree } from "./component-tree.js";
 import { buildComponentDetail, previewTitle } from "./detail.js";
 import { buildFolderOverview } from "./overview.js";
@@ -246,7 +246,7 @@ function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
         // compile, a file that can't be read) is reported and asked again by the next page.
         if (status !== 404) {
           if (hashes.get(path) === lookup) hashes.delete(path);
-          console.error(`[storefront] ${path} could not be stamped: ${status} ${held.body().toString("utf8").split("\n")[0]!.slice(0, 160)}`);
+          console.error(`[site] ${path} could not be stamped: ${status} ${held.body().toString("utf8").split("\n")[0]!.slice(0, 160)}`);
         }
         return undefined;
       });
@@ -336,9 +336,14 @@ async function routeRequest(
       return;
     }
     if (pathname === PD_ROUTES.shikiCss) {
-      const css = getShikiCSS();
       res.writeHead(200, { "Content-Type": "text/css" });
-      res.end(css);
+      res.end(getShikiCSS());
+      return;
+    }
+    // Code token colours: the workbench's, and a site page's when it shows code (page.ts links it).
+    if (pathname === PD_ROUTES.codeCss) {
+      res.writeHead(200, { "Content-Type": "text/css" });
+      res.end(getCodeCSS());
       return;
     }
 
@@ -459,9 +464,9 @@ async function routeRequest(
             if (verboseTiming) console.time("[dev-server:timing] diagnostics seed");
             const inputs = await auditInputs({
               discoveryMap, handleMap: discovery.handleMap, composition: await compositionFor(state, discovery, patternDirs), globalData,
-              helperPaths: cfg.helperPaths,
+              helperPaths: cfg.helperPaths, quarantine: discovery.quarantineMap,
             });
-            const r = await refreshDiagnosticsGraph(cwd, baseComponentIds(discovery), render, discovery.quarantineMap, inputs);
+            const r = await refreshDiagnosticsGraph(cwd, auditedComponentIds(discovery), render, discovery.quarantineMap, inputs);
             await testHook()?.("audit-seed", "built", () => {});
             // The deviation from lazy.ts's rule that a value an invalidation overtook is never stored: a
             // seed is long on a large corpus, and a save during every seed would otherwise repeat the whole
@@ -766,13 +771,13 @@ async function routeRequest(
         themes: { names: themesDir ? [...state.themeCss.keys()] : [], switch: cfg.themeSwitch },
       });
       if (page.search && ctx.onSearchRecord) ctx.onSearchRecord(page.search);
-      if (page.problems.length) console.error(`[storefront] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
+      if (page.problems.length) console.error(`[site] ${route}:\n${page.problems.map(p => `  - ${p}`).join("\n")}`);
       for (const note of page.notes) {
         if (ctx.onStorefrontNote) { ctx.onStorefrontNote(note); continue; }
         // In pd dev each note is printed once per server, not on every request for the page.
         const printed = printedNotes.get(ctx) ?? new Set<string>();
         printedNotes.set(ctx, printed);
-        if (!printed.has(note)) { printed.add(note); console.log(`[storefront] ${note}`); }
+        if (!printed.has(note)) { printed.add(note); console.log(`[site] ${note}`); }
       }
       res.writeHead(page.status, { "Content-Type": "text/html; charset=utf-8" });
       res.end(page.html);

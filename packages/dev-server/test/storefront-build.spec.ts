@@ -9,7 +9,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
+import { validateConfig, type PatternDumpConfig, type SiteConfig } from "@pattern-dump/config";
 import { buildStaticSite, startDevServer } from "@pattern-dump/dev-server";
 import { relativeUrls } from "../src/storefront/page.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
@@ -37,8 +37,8 @@ async function benchCopy(): Promise<string> {
   }
   return root;
 }
-const config = (over: Partial<NonNullable<PatternDumpConfig["storefront"]>> = {}): PatternDumpConfig =>
-  validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, ...over } }, "test");
+const config = (over: Partial<SiteConfig> = {}): PatternDumpConfig =>
+  validateConfig({ ...benchConfig, site: { ...benchConfig.site!, ...over } }, "test");
 const build = (root: string, out: string, cfg: PatternDumpConfig = config()) =>
   buildStaticSite(cfg, root, { outDir: out, pdVersion: "0.0.0-test", now: NOW });
 
@@ -72,6 +72,8 @@ describe("pd build — the storefront root", () => {
       // The bench has no 404.md: the built-in page, through layouts/page.
       "404.html",
       "_pd/base.css",
+      // The code colours: guides/setup.md and the home page show code (code.css, highlight.ts).
+      "_pd/code.css",
       "_pd/components/components/callout.css",
       "_pd/components/components/card.css",
       // The about page places the icon label.
@@ -138,7 +140,7 @@ describe("pd build — the storefront root", () => {
       "tags/layout/index.html",
       "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 56, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 57, bytes: expect.any(Number) });
     // llms.txt lists six pages: every page of the folder but the home page, whose title and description head it.
     expect(report.llms).toEqual({ pages: 6 });
   });
@@ -182,7 +184,7 @@ describe("pd build — the storefront root", () => {
     expect(missing).toEqual([]);
   });
 
-  it("links into the workbench at storefront.workbenchUrl, and carries no live-reload client and no shell CSS", () => {
+  it("links into the workbench at site.workbenchUrl, and carries no live-reload client and no shell CSS", () => {
     const setup = files.get("guides/setup/index.html")!.bytes.toString("utf8");
     expect(setup).toContain(`href="${WB}components/callout#warning"`);
     expect(setup).not.toContain("pd.localhost");
@@ -192,8 +194,8 @@ describe("pd build — the storefront root", () => {
     }
   });
 
-  it("with storefront.url: canonical and og:url on every page at the configured address, and no note about it", () => {
-    expect(report.notes.some(n => n.startsWith("storefront.url is not set"))).toBe(false);
+  it("with site.url: canonical and og:url on every page at the configured address, and no note about it", () => {
+    expect(report.notes.some(n => n.startsWith("site.url is not set"))).toBe(false);
     for (const [route, file] of [["", "index.html"], ["about/", "about/index.html"], ["guides/setup/", "guides/setup/index.html"]]) {
       const html = files.get(file)!.bytes.toString("utf8");
       expect(html, file).toContain(`<link rel="canonical" href="https://bench.example.test/${route}">`);
@@ -288,7 +290,7 @@ describe("pd build — the storefront root", () => {
           .replace(/\n<script data-pd-live>[\s\S]*?<\/script>/, "\n")
           .replaceAll(`http://pd.localhost:${server.port}/`, WB)
           // pd dev's absolute URLs are the address the browser is on; the build's, storefront.url.
-          .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!);
+          .replaceAll(`http://live.localhost:${server.port}/`, benchConfig.site!.url!);
         expect(normalized, route).toBe(files.get(file)!.bytes.toString("utf8"));
       }
       for (const file of ["robots.txt", "sitemap.xml", "setup/index.html", "start/index.html"]) {
@@ -299,7 +301,7 @@ describe("pd build — the storefront root", () => {
           });
           req.on("error", reject); req.end();
         });
-        expect(live.replaceAll(`http://live.localhost:${server.port}/`, benchConfig.storefront!.url!), file).toBe(files.get(file)!.bytes.toString("utf8"));
+        expect(live.replaceAll(`http://live.localhost:${server.port}/`, benchConfig.site!.url!), file).toBe(files.get(file)!.bytes.toString("utf8"));
       }
       // The workbench's own robots.txt, on its host: searchable, its previews not.
       const workbench = await new Promise<string>((resolve, reject) => {
@@ -315,7 +317,7 @@ describe("pd build — the storefront root", () => {
   it("leaves the workbench snapshot exactly as a build without a storefront makes it, but for each layout's pages", async () => {
     // From the same copy: a compiled script's banner names its source path, so two copies' builds would
     // differ by where they are, whatever the storefront does.
-    const { storefront: _sf, ...noStorefront } = benchConfig;
+    const { site: _sf, ...noStorefront } = benchConfig;
     await buildStaticSite(validateConfig(noStorefront, "test"), root, { outDir: join(root, "..", "wb-none"), pdVersion: "0.0.0-test", now: NOW });
     const a = await tree(join(root, "..", "wb-good"));
     const b = await tree(join(root, "..", "wb-none"));
@@ -362,7 +364,7 @@ describe("pd build — a storefront with problems writes nothing", () => {
     await brokenHome(root);
     const out = join(root, "..", "wb-fail");
     await expect(build(root, out)).rejects.toThrow(
-      "pd build: the storefront has problems, so nothing was written:\n"
+      "pd build: the site has problems, so nothing was written:\n"
       + `  - /: index.md:4: "bogus" is not declared by layout "home"\n`
       + "  - /about/: about.md: pattern components/nope: there is no such component",
     );
@@ -372,11 +374,11 @@ describe("pd build — a storefront with problems writes nothing", () => {
 
   it("lists a problem of the whole site once, not once for every page that shows it", async () => {
     const root = await benchCopy();
-    const site = { ...benchConfig.storefront!.site!, navigations: { footer: [{ page: "nope.md" }] } };
+    const site = { ...benchConfig.site!.globals!, navigations: { footer: [{ page: "nope.md" }] } };
     const out = join(root, "..", "wb-nav");
-    const error = await build(root, out, config({ site })).then(() => "", (e: Error) => e.message);
-    const problem = `storefront.site.navigations.footer[0]: "nope.md" is not a page in the pages folder`;
-    expect(error).toBe(`pd build: the storefront has problems, so nothing was written:\n  - ${problem}`);
+    const error = await build(root, out, config({ globals: site })).then(() => "", (e: Error) => e.message);
+    const problem = `site.globals.navigations.footer[0]: "nope.md" is not a page in the pages folder`;
+    expect(error).toBe(`pd build: the site has problems, so nothing was written:\n  - ${problem}`);
     expect(await exists(out)).toBe(false);
   }, 120_000);
 
@@ -386,7 +388,7 @@ describe("pd build — a storefront with problems writes nothing", () => {
     await build(root, out);
     const before = { wb: await tree(out), sf: await tree(join(root, ".out", "storefront")) };
     await breakPage(root);
-    await expect(build(root, out)).rejects.toThrow("pd build: the storefront has problems, so nothing was written:");
+    await expect(build(root, out)).rejects.toThrow("pd build: the site has problems, so nothing was written:");
     const after = { wb: await tree(out), sf: await tree(join(root, ".out", "storefront")) };
     for (const which of ["wb", "sf"] as const) {
       expect([...after[which].keys()].sort(), which).toEqual([...before[which].keys()].sort());

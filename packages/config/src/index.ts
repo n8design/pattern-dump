@@ -2,7 +2,7 @@
 // Load and validate pattern-dump.config (.ts/.json, TS wins). Shared config types.
 import type { ShellBrandConfig, SwatchSlots, ThemeSwitch } from "@pattern-dump/contracts";
 export type { ShellBrandConfig, SwatchSlots, ThemeSwitch };
-export { ConfigError, configProblems, sameHostWorkbenchPath, storefrontBasePath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
+export { ConfigError, configProblems, configWarnings, legacyKeys, sameHostWorkbenchPath, storefrontBasePath, suggest, validateConfig, withSourceDefaults } from "./validate.js";
 export { withOwnManifest } from "./own-manifest.js";
 
 export interface AssetsConfig {
@@ -170,13 +170,13 @@ export interface PatternDumpConfig {
    * subpath) and defaults to "/". `audit: false` leaves the corpus audit out — it is not run, and the
    * static site has no Audit tab. All three can be overridden on the command line. `skipChecks` names checks the
    * build leaves out (SKIPPABLE_CHECKS), for a quick local build: none by default, and the build report names each
-   * one skipped. `--skip-checks` on the command line replaces it. `workbench: false` writes the storefront only:
+   * one skipped. `--skip-checks` on the command line replaces it. `workbench: false` writes the site only:
    * for a site whose components come from a style guide package that publishes its own workbench, at
-   * `storefront.workbenchUrl` (default: true). `outDir` and `basePath` are then not used.
+   * `site.workbenchUrl` (default: true). `outDir` and `basePath` are then not used.
    */
   build?: { outDir?: string; basePath?: string; audit?: boolean; skipChecks?: SkippableCheck[]; workbench?: boolean };
   /** How responsive image variants are encoded (WebP). Defaults: quality 75, effort 4. A site can override
-   *  either in `storefront.images`. */
+   *  either in `site.images`. */
   images?: ImageSettings;
   /** The storefront: a website of real HTML pages, written from markdown, beside the workbench. */
   storefront?: StorefrontConfig;
@@ -200,17 +200,17 @@ export interface StorefrontConfig {
    *  `pagesDir`, `patternsDir` and `outDir` are three separate folders: none is another, and none is inside
    *  another. */
   pagesDir: string;
-  /** Where `pd build` writes the storefront, relative to the root. Its own folder, apart from the workbench
+  /** Where `pd build` writes the site, relative to the root. Its own folder, apart from the workbench
    *  snapshot, and separate from `pagesDir` and `patternsDir` (see `pagesDir`). */
   outDir: string;
-  /** The host name `pd dev` serves the storefront on. Default: `live.localhost`. */
+  /** The host name `pd dev` serves the site on. Default: `live.localhost`. */
   host?: string;
   /**
    * Where the built workbench will be hosted: an absolute http(s) URL with no query or fragment, e.g.
-   * `https://workbench.example.com/`, or, for a workbench on the storefront's own host, a path such as
-   * `/workbench/` (then built with that base path, and its previews kept out of the storefront's
+   * `https://workbench.example.com/`, or, for a workbench on the site's own host, a path such as
+   * `/workbench/` (then built with that base path, and its previews kept out of the site's
    * `robots.txt`; an absolute URL on `url`'s origin counts as the same host too). Loaded with exactly
-   * one trailing slash, whether written with one or not; links from storefront pages to the workbench are
+   * one trailing slash, whether written with one or not; links from site pages to the workbench are
    * this value followed by a path. Used by `pd build` only: in `pd dev` those links always go to
    * `http://pd.localhost:<port>`, the workbench of the same process.
    */
@@ -289,7 +289,7 @@ export interface StorefrontConfig {
   checks?: StorefrontChecks;
 }
 
-/** storefront.checks: what pd build checks the site's classes and custom properties against. */
+/** site.checks: what pd build checks the site's classes and custom properties against. */
 export interface StorefrontChecks {
   /**
    * A class on a page that no component or style of the style guide defines: `"warning"` (the default) lists it in
@@ -303,7 +303,7 @@ export interface StorefrontChecks {
   allowProperties?: string[];
 }
 
-/** storefront.tagPages and storefront.categoryPages as an object. */
+/** site.tagPages and site.categoryPages as an object. */
 export interface StorefrontTermPages {
   /** The pages' first URL segment: lowercase letters, digits and hyphens. */
   path?: string;
@@ -311,10 +311,10 @@ export interface StorefrontTermPages {
   title?: string;
 }
 
-/** A declared tag (`storefront.tags.<key>`): the same shape as a category. */
+/** A declared tag (`site.tags.<key>`): the same shape as a category. */
 export type StorefrontTag = StorefrontCategory;
 
-/** A declared category (`storefront.categories.<key>`). */
+/** A declared category (`site.categories.<key>`). */
 export interface StorefrontCategory {
   label: string;
   description?: string;
@@ -323,7 +323,7 @@ export interface StorefrontCategory {
 }
 
 /**
- * One entry of a declared navigation (`storefront.site.navigations.<name>`):
+ * One entry of a declared navigation (`site.globals.navigations.<name>`):
  * - a page, by its path in the pages folder (`"guides/setup.md"`), labelled with its title unless `label`;
  * - an external link: `href` is `https:`, `http:` or `mailto:`, or a path from the site's root (`/feed.xml`);
  * - a group: a `label` and its `children`, entries of any of the three kinds.
@@ -338,8 +338,24 @@ export type StorefrontNavEntry =
  * patterns and styles all come from pattern packages has none of its own). `validateConfig` fills them in
  * (`withSourceDefaults`), so everything that reads a loaded config gets all three.
  */
-export type PatternDumpConfigInput = Omit<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">
-  & Partial<Pick<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">>;
+export type PatternDumpConfigInput = Omit<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles" | "storefront">
+  & Partial<Pick<PatternDumpConfig, "sourceDir" | "patternsDir" | "styles">>
+  & {
+    /** The website: real HTML pages, written from markdown, beside the workbench. */
+    site?: SiteConfig;
+    /** @deprecated The old name of `site` (before 0.8.0), with `site.globals` as `site`. Still loaded until 1.0,
+     *  with a warning per key; both at once is a problem. */
+    storefront?: StorefrontConfig;
+  };
+
+/** The website as a config writes it (`site`), with the values every page shares as
+ *  `globals`. Layouts read them as `site`, as before. */
+export type SiteConfig = Omit<StorefrontConfig, "site"> & {
+  /** Values every page of the site shares, such as its title or the line in its footer; every layout gets them as
+   *  `site`. Checked against the `site` property of `partials/base`'s schema. `navigations` is Pattern Dump's:
+   *  named lists of links (StorefrontNavEntry). */
+  globals?: StorefrontConfig["site"];
+};
 
 /**
  * Type checking for a config file; the object is returned unchanged. It fills in no defaults: what the config leaves

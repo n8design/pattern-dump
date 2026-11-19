@@ -37,9 +37,12 @@ switch (command.kind) {
       },
       log: message => console.log(message),
       checkSite: root => checkSitePages(root),
-      run: (cmd, args, cwd) => new Promise(resolve => {
+      run: (cmd, args, cwd, onStderr) => new Promise(resolve => {
         const quiet = cmd === "git" && args[0] === "rev-parse";
-        const child = spawn(cmd, args, { cwd, stdio: quiet ? "ignore" : "inherit", shell: process.platform === "win32" });
+        const stdio = quiet ? "ignore" : onStderr ? ["inherit", "inherit", "pipe"] as const : "inherit";
+        const child = spawn(cmd, args, { cwd, stdio: stdio as never, shell: process.platform === "win32" });
+        // Shown as it comes, and handed over for the message after a failure.
+        child.stderr?.on("data", (chunk: Buffer) => { process.stderr.write(chunk); onStderr?.(chunk.toString("utf8")); });
         child.on("error", () => resolve(null));
         child.on("close", code => resolve(code));
       }),

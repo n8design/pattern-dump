@@ -255,6 +255,7 @@ export const AUDIT_SCOPE: AuditScope = {
     { name: "HTML content model", detail: "invalid nesting and content that isn't permitted where it appears (html-validate)." },
     { name: "Structural accessibility", detail: "labels, accessible names, ARIA attributes, roles and image alternatives (the axe-core rules that don't need layout)." },
     { name: "Schema", detail: "missing required fields and values of the wrong type, checked against each component's `<name>.schema.json`." },
+    { name: "Discovery", detail: "a component left out of the tree by a handle collision, reported as a HANDLE_COLLISION defect naming the handle and the component that keeps it." },
     { name: "Render outcome", detail: "whether each component rendered, rendered empty or failed. It is reported with the component, not counted as a defect." },
   ],
   notCovered: [
@@ -660,7 +661,11 @@ export const PD_ROUTES = {
   axeCore: "/_pd/axe-core.js",
   /** GET → RuleTiers */
   ruleTiers: "/_pd/rule-tiers.json",
+  /** The workbench's code-block frame: background, padding, font, and the OS's light or dark for its code. */
   shikiCss: "/_pd/shiki.css",
+  /** Code token colours (`--pd-code-<kind>`, PD's defaults in `@layer pd-code`): linked by the workbench and by
+   *  every site page that shows code; `pd build` writes it into the site's own `_pd/`. */
+  codeCss: "/_pd/code.css",
   /** Document-base layer (reset + font-face). */
   baseCss: "/_pd/base.css",
 } as const;

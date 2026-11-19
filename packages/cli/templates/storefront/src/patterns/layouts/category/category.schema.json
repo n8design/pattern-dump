@@ -13,11 +13,11 @@
     },
     "description": {
       "type": "string",
-      "description": "The category's description, when storefront.categories gives one"
+      "description": "The category's description, when site.categories gives one"
     },
     "page": {
       "type": "object",
-      "description": "What the storefront works out for the page",
+      "description": "What Pattern Dump works out for the page",
       "properties": {
         "term": {
           "description": "The category: its key, label, description, route and how many pages have it"

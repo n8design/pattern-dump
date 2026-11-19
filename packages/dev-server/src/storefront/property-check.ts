@@ -43,7 +43,7 @@ export function checkProperties(input: PropertyCheckInput): string[] {
     for (const u of sourceVarUses(s.text, s.path.endsWith(".scss"))) {
       if (defined.has(u.name) || allowed(u.name)) continue;
       out.push(`${s.path}:${u.line}: var(${u.name}) reads a custom property nothing defines: define ${u.name} in the skin, `
-        + `give it a fallback (var(${u.name}, ...)), or, if JavaScript sets it, list it in storefront.checks.allowProperties`);
+        + `give it a fallback (var(${u.name}, ...)), or, if JavaScript sets it, list it in site.checks.allowProperties`);
     }
   }
   return out;

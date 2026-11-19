@@ -63,7 +63,7 @@ afterAll(async () => {
   if (tmp) await rm(tmp, { recursive: true, force: true });
 });
 
-describe("storefront.head", () => {
+describe("site.head", () => {
   it("goes into every page's head with the site's values, after the skin's head and before the stylesheets", async () => {
     const s = await serve(await project(HEAD));
     for (const page of ["/", "/about/"]) {
@@ -84,9 +84,9 @@ describe("storefront.head", () => {
     expect(page.status).toBe(500);
     const text = page.body.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
     for (const p of [
-      `storefront.head (./head.hbs): <title> is written by Pattern Dump on every page; the site's head must not write it`,
-      `storefront.head (./head.hbs): <meta name="description"> is written by Pattern Dump on every page; the site's head must not write it`,
-      `storefront.head (./head.hbs): <div> does not belong in <head>: the site's head may hold only <meta>, <link>, <script>, <style> and <noscript>`,
+      `site.head (./head.hbs): <title> is written by Pattern Dump on every page; the site's head must not write it`,
+      `site.head (./head.hbs): <meta name="description"> is written by Pattern Dump on every page; the site's head must not write it`,
+      `site.head (./head.hbs): <div> does not belong in <head>: the site's head may hold only <meta>, <link>, <script>, <style> and <noscript>`,
     ]) expect(text).toContain(p);
   });
 
@@ -94,6 +94,6 @@ describe("storefront.head", () => {
     const s = await serve(await project(null));
     const page = await get(s, "/");
     expect(page.status).toBe(500);
-    expect(page.body).toContain("storefront.head (./head.hbs): there is no such file");
+    expect(page.body).toContain("site.head (./head.hbs): there is no such file");
   });
 });

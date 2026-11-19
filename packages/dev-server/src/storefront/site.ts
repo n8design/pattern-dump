@@ -50,7 +50,7 @@ export async function checkSite(
   const problems: string[] = [];
   const entry = discoveryMap.get(SITE_SCHEMA_OWNER);
   if (!entry) {
-    if (site !== undefined) problems.push(`storefront.site is set, but there is no ${SITE_SCHEMA_OWNER} to declare what it holds`);
+    if (site !== undefined) problems.push(`site.globals is set, but there is no ${SITE_SCHEMA_OWNER} to declare what it holds`);
     return none(problems);
   }
 
@@ -59,7 +59,7 @@ export async function checkSite(
   const schema = read.schema ?? {};
   const declared = schema.properties?.site;
   if (!declared) {
-    if (site !== undefined) problems.push(`storefront.site is set, but ${SITE_SCHEMA_OWNER} declares no site, so no layout can use it`);
+    if (site !== undefined) problems.push(`site.globals is set, but ${SITE_SCHEMA_OWNER} declares no site, so no layout can use it`);
     return none(problems);
   }
   const navDeclared = declared.properties?.[NAVIGATIONS_KEY];
@@ -69,7 +69,7 @@ export async function checkSite(
     pages.folders, pages.leftOut, site);
   const cats = checkSiteCategories(declared.properties?.[CATEGORIES_KEY], SITE_SCHEMA_OWNER, site);
   if (site === undefined) {
-    if (schema.required?.includes("site")) problems.push(`storefront.site is required by ${SITE_SCHEMA_OWNER}`);
+    if (schema.required?.includes("site")) problems.push(`site.globals is required by ${SITE_SCHEMA_OWNER}`);
     problems.push(...navs.problems, ...cols.problems, ...cats.problems);
     return { ...none(problems, cols.listed, cats.listed), listed: navs.listed, notes: cols.notes };
   }
@@ -82,10 +82,10 @@ export async function checkSite(
     properties: Object.fromEntries(Object.entries(declared.properties ?? {}).filter(([k]) => own(k))),
     ...(declared.required ? { required: declared.required.filter(own) } : {}),
   };
-  const checked = checkJsonKeys(restDeclared, rest, "storefront.site", SITE_SCHEMA_OWNER);
+  const checked = checkJsonKeys(restDeclared, rest, "site.globals", SITE_SCHEMA_OWNER);
   problems.push(...checked.problems, ...navs.problems, ...cols.problems, ...cats.problems);
   if (declared.required?.includes(NAVIGATIONS_KEY) && !Object.hasOwn(site, NAVIGATIONS_KEY)) {
-    problems.push(`storefront.site.${NAVIGATIONS_KEY} is required by ${SITE_SCHEMA_OWNER}`);
+    problems.push(`site.globals.${NAVIGATIONS_KEY} is required by ${SITE_SCHEMA_OWNER}`);
   }
   if (problems.length) return { ...none(problems, cols.listed, cats.listed), listed: navs.listed, notes: cols.notes };
   return { values: checked.value as Record<string, unknown>, navigations: navs.navigations, listed: navs.listed, collections: cols.listed,

@@ -2,7 +2,8 @@
 // HTTP server + targeted HMR for `pd dev`.
 // Routes:
 //   /_pd/main.js|css             — dev-ui SPA bundle
-//   /_pd/shiki.css               — one shared Shiki stylesheet
+//   /_pd/shiki.css               : the workbench code-block frame
+//   /_pd/code.css                : code token colours (--pd-code-<kind>), also on site pages with code
 //   /_pd/base.css                — base-origin CSS only (reset + font-face; no component rules)
 //   /_pd/components/<id>.css     — per-component own-origin CSS (origin-bucketed, no base/dep rules)
 //   /_pd/themes/<name>.css       — per-theme custom-property value-sets (linked in previews)

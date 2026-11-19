@@ -76,7 +76,7 @@ npx pd build             # a static site in ./dist
 | [Themes](docs/guide/themes.md) | Writing and switching themes |
 | [Pattern packages](docs/guide/pattern-packages.md) | Using and publishing design systems as npm packages |
 | [Static build](docs/guide/static-build.md) | `pd build`: options, hosting and troubleshooting |
-| [Storefront](docs/guide/storefront.md) | A website written in markdown, with live examples, beside the workbench |
+| [Site](docs/guide/storefront.md) | A website written in markdown, with live examples, beside the workbench |
 | [Command line](docs/guide/cli.md) | Every `pd` command and option |
 | [Upgrading to 0.5](docs/guide/upgrading-to-0.5.md) | What a 0.4 site changes, step by step, and what's new |
 

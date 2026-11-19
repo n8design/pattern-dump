@@ -75,12 +75,12 @@ describe("a page's categories", () => {
     expect(typo.page.status).toBe(500);
     expect(typo.page.problems).toEqual([`index.md:3: categories: "guide" is not a category: did you mean "guides"?`]);
     const far = await assemble("/", { "index.md": page("Home", "categories: [cooking]\n") });
-    expect(far.page.problems).toEqual([`index.md:3: categories: "cooking" is not a category: the categories are "design-systems", "guides" (storefront.categories)`]);
+    expect(far.page.problems).toEqual([`index.md:3: categories: "cooking" is not a category: the categories are "design-systems", "guides" (site.categories)`]);
   });
 
   it("fail the page when the config declares none", async () => {
     const { page: p } = await assemble("/", { "index.md": page("Home", "categories: [guides]\n") }, { categories: undefined });
-    expect(p.problems).toEqual([`index.md:3: categories: "guides" is not a category: the site declares none (storefront.categories in the config)`]);
+    expect(p.problems).toEqual([`index.md:3: categories: "guides" is not a category: the site declares none (site.categories in the config)`]);
   });
 
   it("fail the page on a value that is not a key, and on one listed twice, an old key included", async () => {
@@ -94,7 +94,7 @@ describe("a page's categories", () => {
     const { page: p, data } = await assemble("/", { "index.md": page("Home", "categories: [ds]\n") }, { declared: ["categories"] });
     expect(p.problems).toEqual([]);
     expect(data).toEqual({ categories: [DS] });
-    expect(p.notes).toContain(`warning: index.md:3: category "ds" is now "design-systems" (renamed in storefront.categories): write "design-systems"`);
+    expect(p.notes).toContain(`warning: index.md:3: category "ds" is now "design-systems" (renamed in site.categories): write "design-systems"`);
   });
 
   it("are on the page's listing entry, resolved the same way", async () => {
@@ -129,6 +129,6 @@ describe("site.categories", () => {
     expect((await assemble("/", { "index.md": page("Home") }, { base: shaped })).page.problems).toEqual([
       `partials/base declares "type" for site.categories: the shape of a category is Pattern Dump's, so list the name only (a description at most)`]);
     expect((await assemble("/", { "index.md": page("Home") }, { base, site: { categories: [] } })).page.problems).toEqual([
-      `storefront.site.categories is filled by Pattern Dump from storefront.categories: list it in partials/base's schema, and don't set it in storefront.site`]);
+      `site.globals.categories is filled by Pattern Dump from site.categories: list it in partials/base's schema, and don't set it in site.globals`]);
   });
 });

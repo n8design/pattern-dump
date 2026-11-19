@@ -10,7 +10,7 @@
     "description": { "type": "string", "description": "One sentence under the heading, and the page's description for search results" },
     "page": {
       "type": "object",
-      "description": "What the storefront works out for the page",
+      "description": "What Pattern Dump works out for the page",
       "properties": {
         "next": { "description": "The page after this one in the navigation" },
         "regions": { "description": "The layout's regions: the sidebar, empty when the page puts nothing there", "x-pd-regions": ["sidebar"] }

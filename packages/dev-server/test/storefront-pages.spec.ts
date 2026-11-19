@@ -266,8 +266,8 @@ describe("readPages — the path of a workbench published on the same host", () 
   it("refuses a page at the workbench's path, and one under it", async () => {
     const dir = await pages({ "index.md": home, "workbench/index.md": page("Workbench"), "workbench/notes.md": page("Notes") });
     expect((await readPages(dir, { workbenchPath: "/workbench/" })).problems).toEqual([
-      `workbench/index.md: the page /workbench/ is at /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`,
-      `workbench/notes.md: the page /workbench/notes/ is under /workbench/, where the workbench is published on this host (storefront.workbenchUrl), so the workbench would overwrite it there`,
+      `workbench/index.md: the page /workbench/ is at /workbench/, where the workbench is published on this host (site.workbenchUrl), so the workbench would overwrite it there`,
+      `workbench/notes.md: the page /workbench/notes/ is under /workbench/, where the workbench is published on this host (site.workbenchUrl), so the workbench would overwrite it there`,
     ]);
   });
 

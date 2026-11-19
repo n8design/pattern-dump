@@ -34,7 +34,7 @@ async function startupLines(...args: Parameters<typeof startDevServer>): Promise
 
 describe("pd dev's startup addresses", () => {
   it("with a storefront: the website on its host, the workbench on pd.localhost, at the bound port, before Ready", async () => {
-    const config = validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, host: "docs.localhost" } }, "test");
+    const config = validateConfig({ ...benchConfig, site: { ...benchConfig.site!, host: "docs.localhost" } }, "test");
     const { lines, port } = await startupLines(config, storefrontBench, { port: 0, wsPort: 0 });
     expect(port).toBeGreaterThan(0);
     const at = lines.findIndex(l => l.startsWith("[dev-server] Listening at "));
@@ -48,9 +48,9 @@ describe("pd dev's startup addresses", () => {
 
   it("says that search works in pd build only: with Pagefind (the repository's), not with search: false", async () => {
     const note = "[dev-server] Search: the index is built by pd build, so the site's search finds nothing in pd dev";
-    const on = await startupLines(benchConfig, storefrontBench, { port: 0, wsPort: 0 });
+    const on = await startupLines(validateConfig(benchConfig, "storefront-bench"), storefrontBench, { port: 0, wsPort: 0 });
     expect(on.lines).toContain(note);
-    const off = validateConfig({ ...benchConfig, storefront: { ...benchConfig.storefront!, search: false } }, "test");
+    const off = validateConfig({ ...benchConfig, site: { ...benchConfig.site!, search: false } }, "test");
     expect((await startupLines(off, storefrontBench, { port: 0, wsPort: 0 })).lines).not.toContain(note);
   }, 60_000);
 
@@ -60,7 +60,7 @@ describe("pd dev's startup addresses", () => {
   }, 60_000);
 
   it("prints no addresses for a server that is not live (pd build's own)", async () => {
-    const { lines } = await startupLines(benchConfig, storefrontBench, { port: 0, wsPort: 0, live: false });
+    const { lines } = await startupLines(validateConfig(benchConfig, "storefront-bench"), storefrontBench, { port: 0, wsPort: 0, live: false });
     expect(lines.filter(l => /\] (Website|Workbench):/.test(l))).toEqual([]);
   }, 60_000);
 });
