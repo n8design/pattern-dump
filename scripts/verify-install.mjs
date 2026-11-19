@@ -389,7 +389,7 @@ if (failures.length === 0 && tmp) {
   await writeFile(join(site, "pattern-dump.config.json"), JSON.stringify({
     sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
     styles: { strategy: "parallel", dir: "./src/styles" }, packages: ["pd-fixture-skin"],
-    storefront: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "https://workbench.example.test/", site: { title: "Installed", footer: "From a packed package." } },
+    site: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "https://workbench.example.test/", globals: { title: "Installed", footer: "From a packed package." } },
   }));
   await writeFile(join(site, "pages", "index.md"), "---\ntitle: Installed site\n---\n\nA page in the installed skin.\n");
   execFileSync("npm", ["install", "--no-audit", "--no-fund", join(tmp, "pd-fixture-skin-1.0.0.tgz")], { cwd: site, stdio: "pipe" });
