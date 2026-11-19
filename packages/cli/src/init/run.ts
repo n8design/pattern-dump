@@ -5,6 +5,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import type { Command } from "../args.js";
 import { PD_PACKAGE_NAME, PD_VERSION } from "../distribution.js";
 import { applyPlan, readTemplates } from "./files.js";
@@ -23,8 +24,9 @@ export interface InitIO {
   ask(question: string, fallback: string): Promise<string>;
   confirm(question: string, fallback: boolean): Promise<boolean>;
   log(message: string): void;
-  /** Run a process with inherited output; resolves to its exit code (null when it could not start). */
-  run(command: string, args: string[], cwd: string): Promise<number | null>;
+  /** Run a process with inherited output; resolves to its exit code (null when it could not start). `onStderr`: its
+   *  error output is still shown as it comes, and also handed over, chunk by chunk. */
+  run(command: string, args: string[], cwd: string, onStderr?: (chunk: string) => void): Promise<number | null>;
   /** Set when this `pd` runs from a Pattern Dump source checkout (see local-build.ts). */
   localBuild?: LocalBuild | null;
   /** `--site`, once installed: the problems of the site's pages with the style guide (core's checkSitePages). */
@@ -168,17 +170,19 @@ export async function runInit(cmd: InitCommand, io: InitIO): Promise<number> {
 
   if (install) {
     io.log("… npm install");
-    const code = await io.run("npm", ["install"], target);
+    let stderr = "";
+    const code = await io.run("npm", ["install"], target, chunk => { stderr += chunk; });
     if (code !== 0) {
       // The project files are written, so re-running `pd init` would be refused: point at npm instead.
       io.log("✗ npm install failed. The project files are in place.");
-      if (dependency === PD_VERSION) {
-        io.log(`  ${PD_PACKAGE_NAME} may not be published yet. Install a local build into the project:`);
-        io.log(`    ${where === "." ? "" : `cd ${where} && `}npm install --save-dev <path to ${PD_PACKAGE_NAME}-${PD_VERSION}.tgz>`);
-        io.log("  (build one in the Pattern Dump repo with: npm run pack:pd)");
+      const errors = npmErrorLines(stderr);
+      if (errors.length) {
+        io.log("  npm said:");
+        for (const line of errors) io.log(`    ${line}`);
       } else {
-        io.log(`  Fix the error above, then run npm install${where === "." ? "" : ` in ${where}`}.`);
+        io.log(code === null ? "  npm could not be started: is Node.js (with npm) installed?" : `  npm stopped with exit code ${code}; its output is above.`);
       }
+      io.log(`  Fix that, then install again:  ${where === "." ? "" : `cd ${where} && `}npm install`);
       return 1;
     }
     if (site) await settleSite(site, target, io);
@@ -228,4 +232,19 @@ async function settleSite(site: { name: string; spec: string }, target: string, 
   for (const p of problems) io.log(`    ${p.startsWith("  - ") ? p.trim() : `- ${p}`}`);
   io.log("  A style guide for a website brings its skin: layouts/page and partials/base, as pd init --storefront writes them.");
   io.log("  The site is in place; once the style guide has them, npm run dev shows its pages.");
+}
+
+/** npm's error lines, for repeating them after its output: each "npm error" (npm 7 and later) or "npm ERR!" line with
+ *  text, without the pointers to its log files, each once, at most eight. */
+export function npmErrorLines(stderr: string): string[] {
+  const out: string[] = [];
+  for (const raw of stderr.split(/\r?\n/)) {
+    const line = stripVTControlCharacters(raw).trimEnd();
+    const m = /^npm (?:error|ERR!)\s+(.*)$/.exec(line);
+    if (!m || !m[1]!.trim()) continue;
+    if (/complete log of this run|log files were written|^\s*\/.*\.log$/i.test(m[1]!)) continue;
+    if (!out.includes(line)) out.push(line);
+    if (out.length === 8) break;
+  }
+  return out;
 }

@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dependencySpec, runInit, type InitIO } from "./run.js";
+import { dependencySpec, npmErrorLines, runInit, type InitIO } from "./run.js";
 import { PD_VERSION } from "../distribution.js";
 import { PAGEFIND_VERSION } from "./plan.js";
 import { save } from "../../../../test-support/save.js";
@@ -16,7 +16,7 @@ const templatesDir = fileURLToPath(new URL("../../templates/", import.meta.url))
 let root = "";
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ""; });
 
-function fakeIO(over: Partial<InitIO> & { answers?: Record<string, string | boolean>; exitCodes?: Record<string, number> } = {}) {
+function fakeIO(over: Partial<InitIO> & { answers?: Record<string, string | boolean>; exitCodes?: Record<string, number | null>; stderr?: Record<string, string> } = {}) {
   const calls: string[] = [];
   const logs: string[] = [];
   const asked: string[] = [];
@@ -25,10 +25,12 @@ function fakeIO(over: Partial<InitIO> & { answers?: Record<string, string | bool
     ask: async (q, fallback) => { asked.push(q); return (over.answers?.[q] as string | undefined) ?? fallback; },
     confirm: async (q, fallback) => { asked.push(q); return (over.answers?.[q] as boolean | undefined) ?? fallback; },
     log: m => { logs.push(m); },
-    run: async (command, args) => {
+    run: async (command, args, _cwd, onStderr) => {
       const key = [command, ...args].join(" ");
       calls.push(key);
-      return over.exitCodes?.[key] ?? (key.startsWith("git rev-parse") ? 128 : 0);
+      if (over.stderr?.[key] !== undefined) onStderr?.(over.stderr[key]);
+      const code = over.exitCodes?.[key];
+      return code !== undefined ? code : (key.startsWith("git rev-parse") ? 128 : 0);
     },
     ...over,
   };
@@ -199,16 +201,58 @@ describe("runInit", () => {
     expect(calls).not.toContain("npm install");
   });
 
-  // The project is written by the time npm fails, so the advice must not be to re-run pd init
-  // (which would now be refused): it is to install a local build into the project.
-  it("a failed registry install explains how to install a local build into the written project", async () => {
-    root = await mkdtemp(join(tmpdir(), "pd-init-"));
-    const { io, logs } = fakeIO({ exitCodes: { "npm install": 1 } });
-    expect(await runInit(init(join(root, "ds"), { git: false }), io)).toBe(1);
-    const advice = logs.join("\n");
-    expect(advice).toContain("npm install --save-dev <path to pattern-dump-");
-    expect(advice).not.toContain("pd init");
-    expect(existsSync(join(root, "ds", "pattern-dump.config.ts"))).toBe(true);
+  // The project is written by the time npm fails, so the advice must not be to re-run pd init (which would now be
+  // refused): it repeats what npm said and how to install again, and guesses at no cause.
+  describe("a failed npm install", () => {
+    const NPM_404 = [
+      "npm error code E404",
+      "npm error 404 Not Found - GET https://registry.npmjs.org/pattern-dump - Not found",
+      "npm error 404",
+      "npm error A complete log of this run can be found in: /Users/x/.npm/_logs/2026-11-19T10_00_00_000Z-debug-0.log",
+      "",
+    ].join("\n");
+
+    it("repeats npm's error and says how to install again, in the project's folder", async () => {
+      root = await mkdtemp(join(tmpdir(), "pd-init-"));
+      const { io, logs } = fakeIO({ exitCodes: { "npm install": 1 }, stderr: { "npm install": NPM_404 } });
+      expect(await runInit(init(join(root, "ds"), { git: false }), io)).toBe(1);
+      expect(logs.slice(-6)).toEqual([
+        "✗ npm install failed. The project files are in place.",
+        "  npm said:",
+        "    npm error code E404",
+        "    npm error 404 Not Found - GET https://registry.npmjs.org/pattern-dump - Not found",
+        "    npm error 404",
+        "  Fix that, then install again:  cd ds && npm install",
+      ]);
+      const advice = logs.join("\n");
+      expect(advice).not.toMatch(/published|local build|pack:pd|\.tgz/);
+      expect(advice).not.toContain("pd init");
+      expect(existsSync(join(root, "ds", "pattern-dump.config.ts"))).toBe(true);
+    });
+
+    it("without error lines from npm, gives its exit code; when npm could not start, says so", async () => {
+      root = await mkdtemp(join(tmpdir(), "pd-init-"));
+      const quiet = fakeIO({ exitCodes: { "npm install": 7 } });
+      expect(await runInit(init(join(root, "a"), { git: false }), quiet.io)).toBe(1);
+      expect(quiet.logs.slice(-2)).toEqual(["  npm stopped with exit code 7; its output is above.", "  Fix that, then install again:  cd a && npm install"]);
+      const missing = fakeIO({ exitCodes: { "npm install": null } });
+      expect(await runInit(init(join(root, "b"), { git: false }), missing.io)).toBe(1);
+      expect(missing.logs.at(-2)).toBe("  npm could not be started: is Node.js (with npm) installed?");
+    });
+  });
+
+  describe("npmErrorLines", () => {
+    it("keeps npm's error lines with text, without the log-file pointers, each once", () => {
+      expect(npmErrorLines("npm warn deprecated x\nnpm error code E404\nnpm error\nnpm error code E404\n"
+        + "npm error A complete log of this run can be found in: /tmp/x.log\nnpm ERR! old npm says this\n")).toEqual([
+        "npm error code E404", "npm ERR! old npm says this",
+      ]);
+    });
+
+    it("drops colour codes and stops at eight lines", () => {
+      expect(npmErrorLines("\x1b[31mnpm error\x1b[39m code EACCES\n")).toEqual(["npm error code EACCES"]);
+      expect(npmErrorLines(Array.from({ length: 12 }, (_, i) => `npm error line ${i}`).join("\n"))).toHaveLength(8);
+    });
   });
 
   describe("running from a source checkout", () => {

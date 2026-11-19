@@ -63,6 +63,10 @@ The `package.json` also allows the install scripts of Pattern Dump's own depende
 `@parcel/watcher` (`allowScripts`, which npm 11.19 asks for), so `npm install` has nothing to warn about. `--yes` accepts every default without asking. In a folder that already has a `package.json`, `pd init`
 adds to the project and never overwrites a file; a script name that is taken gets a `pd:` prefix instead.
 
+If `npm install` fails, the project's files are already written: `pd init` repeats npm's error lines after npm's
+own output and says how to install again (`cd <folder> && npm install`). Fix what npm names, then run that; running
+`pd init` again would find the project already there.
+
 A global install (`npm install --global pattern-dump`) also works for creating projects, but each
 project still uses its own local copy; see [global or local](cli.md#global-or-local).
 

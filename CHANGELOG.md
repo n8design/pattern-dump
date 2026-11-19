@@ -34,6 +34,10 @@
 
 ### Fixed
 
+- **A failed `npm install` in `pd init` says what failed.** It said `pattern-dump may not be published yet` and
+  suggested installing a local build, whatever the cause. It now repeats npm's error lines (`npm error code E404`,
+  `npm error 404 Not Found - GET …`) and says how to install again: `cd <folder> && npm install`. When npm wrote no
+  error, it gives npm's exit code, and when npm could not be started, says so.
 - **A placed variant no longer asks for a value its data already gives.** `<pd-components-note~warning>` without a
   `heading` stopped the page with `"heading" is required by components/note~warning`, although `note~warning.json`
   sets one. A required key the variant's data sets now counts as given, and the page shows the variant's value. A key
