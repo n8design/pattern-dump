@@ -13,7 +13,7 @@
 // `pd audit --format json`, read through a real pipe, parses and reports zero defects; `pd build
 // --base /demo/` writes a snapshot that a plain file server serves, links included; the starter's
 // TypeScript (installed by init) type-checks and compiles its behaviour scripts, which pd dev and
-// pd build both serve. Then the website starter (pd init --storefront) in a project of its own: both
+// pd build both serve. Then the website starter (pd init --with-site) in a project of its own: both
 // addresses in pd dev, the page's inlined height fitter run on its own, the audit, npm run build put
 // together as the GitHub Pages workflow does, served as plain files and read with axe in Chromium. Then a
 // content-only website on that starter (pd init --site), its pages checked by init and built without a workbench. Then a
@@ -198,7 +198,7 @@ if (failures.length === 0) {
   fileServer.kill();
 }
 
-// The website starter, from the installed package: `pd init --storefront` in a project of its own (the
+// The website starter, from the installed package: `pd init --with-site` in a project of its own (the
 // demo above stays the examples starter, whose tree is checked exactly). pd dev serves the website on
 // live.localhost and the workbench on pd.localhost and prints both addresses; the page's height fitter is
 // inlined from the packed bundle, so it is run on its own here, in an empty context, the way a browser runs
@@ -209,10 +209,10 @@ if (failures.length === 0 && tmp) {
   const name = (await readFile(join(repo, "packages/cli/src/distribution.ts"), "utf8")).match(/PD_PACKAGE_NAME = "([^"]+)"/)[1];
   const source = join(repo, ".pd-pack", `${name}-${cliVersion}.tgz`);
   const starter = join(tmp, "website");
-  const inited = spawnSync("npx", ["--yes", `--package=${source}`, "pd", "init", "website", "--yes", "--no-git", "--no-examples", "--storefront", "--pd-source", source],
+  const inited = spawnSync("npx", ["--yes", `--package=${source}`, "pd", "init", "website", "--yes", "--no-git", "--no-examples", "--with-site", "--pd-source", source],
     { cwd: tmp, encoding: "utf8" });
   const initLog = `${inited.stdout}${inited.stderr}`;
-  check(inited.status === 0, "pd init --storefront + npm install", initLog.slice(-800));
+  check(inited.status === 0, "pd init --with-site + npm install", initLog.slice(-800));
   // Pattern Dump's own install scripts are allowed in the package.json init writes (allowScripts), so npm has
   // nothing to warn about.
   check(!initLog.includes("install-scripts"), "npm doesn't warn about Pattern Dump's install scripts", initLog.split("\n").filter(l => l.includes("install-scripts")).join("\n"));
