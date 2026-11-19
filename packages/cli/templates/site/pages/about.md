@@ -11,5 +11,5 @@ order: 1
   is published (`site.workbenchUrl`).
 
 A page can name another of the style guide's layouts with `layout:`, and place its components with a `pattern` fence
-or a `pd-` tag, as the [storefront guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/storefront.md)
+or a `pd-` tag, as the [site guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/storefront.md)
 describes.

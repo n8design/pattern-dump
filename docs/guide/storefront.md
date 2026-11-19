@@ -1,6 +1,6 @@
-# Storefront
+# Site
 
-A storefront is a website of real HTML pages, written as markdown files, next to the workbench. Use it for a
+A site is a set of real HTML pages, written as markdown files, next to the workbench. Use it for a
 design system's public documentation: the pages explain, and every live example in them is the component
 itself, rendered by the same code the workbench uses, with a link into the workbench beside it.
 
@@ -21,7 +21,7 @@ It brings two pages, a small skin, one component the home page shows (in a live 
 `pd-` tag), and a GitHub Pages workflow that publishes the website with the workbench under `/workbench/`
 ([cli.md](cli.md#pd-init)). Its README says how to publish it.
 
-To add a storefront to a project you have, add a `site` block to the config ([configuration.md](configuration.md#site)):
+To add a site to a project you have, add a `site` block to the config ([configuration.md](configuration.md#site)):
 
 ```ts
 export default defineConfig({
@@ -39,8 +39,8 @@ Then write the pages, and give the project a skin: the layouts the pages render 
 from a [pattern package](#skins), or write your own [layouts and partials](#writing-a-skin).
 
 ```bash
-npx pd dev     # the storefront at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/
-npx pd build   # the workbench snapshot in outDir, the storefront in site.outDir
+npx pd dev     # the site at http://live.localhost:4000/, the workbench at http://pd.localhost:4000/
+npx pd build   # the workbench snapshot in outDir, the site in site.outDir
 ```
 
 ---
@@ -129,7 +129,7 @@ A `pattern` fence shows a component:
 ```
 ````
 
-On a storefront page this is a frame with the component's own preview, not a copy of its markup, so the
+On a site page this is a frame with the component's own preview, not a copy of its markup, so the
 component is styled by its own CSS and nothing on the page can restyle it. With JavaScript on, the frame
 fits the preview's height. Beside the frame are a list of the component's variants, each a link to its
 preview, and a link that opens the component in the workbench (in `pd dev`, this server's workbench; in a
@@ -229,7 +229,7 @@ head, so the page's own styles also reach it.
 | A child `pd-` tag | An item of the property whose items name that component (`"items": { "x-pd-component": "components/slide" }`), or the property's value when it names the component itself |
 | Text inside the tag | The property the schema names with `"x-pd-content"`. Markdown when that property is `"contentMediaType": "text/markdown"`, otherwise plain text |
 
-A component placed with children, from the storefront bench:
+A component placed with children, from the bench in this repository (`storefront-bench/`):
 
 ```md
 <pd-components-slider label="The bench in pictures">
@@ -257,7 +257,7 @@ wrong type or outside its `enum`, a child the component doesn't take, content te
 index.md:22:21: <pd-components-note>.tone must be one of "tip", "warning" (got "tips")
 ```
 
-`pd-` tags work on storefront pages. In a component's own documentation they are shown as text.
+`pd-` tags work on site pages. In a component's own documentation they are shown as text.
 
 ---
 
@@ -371,7 +371,7 @@ options for its `related` query, without writing them.
   `404.md` and the tag and category pages take none.
 - `layout` in `childDefaults` is `childLayout` written the long way. Use one: both on one `index.md` is a problem.
 - **What can't be a default:** what names one page (`title`, `order`, `redirectFrom`, `date`, `updated`), what
-  belongs to a folder's own `index.md` (`sort`, `view`, `childLayout`, `childDefaults`), and what the storefront
+  belongs to a folder's own `index.md` (`sort`, `view`, `childLayout`, `childDefaults`), and what Pattern Dump
   fills (`body`, `site`, `page`). Each is a problem on the `index.md`, at its line. `nav: false` can be a default:
   it leaves the folder's pages out of the navigation, and not the `index.md` itself.
 - **Checked as if the page had written it.** Each page is checked against the layout it ends up with, its folder's
@@ -400,7 +400,7 @@ folder's `index.md` (a query's options one by one, `"related.limit"`).
 In `pd dev` a page with a problem is replaced by the list of its problems, every one with its file and
 line, and the same lines go to the terminal. Fix the file and the page comes back by itself.
 
-In `pd build` every problem on every page is listed, and **nothing is written**: neither the storefront nor
+In `pd build` every problem on every page is listed, and **nothing is written**: neither the site nor
 the workbench snapshot. A page with a problem never reaches a host.
 
 ---
@@ -478,7 +478,7 @@ A layout receives:
 | `body` | The page's markdown, rendered. Include it unescaped, `{{{body}}}`: it is the only value safe to, because the markdown renderer escapes everything an author writes. Every other value is included escaped, `{{…}}`. A layout can name another key for it ([below](#a-page-or-template-as-a-layout)) |
 | `nav` | The navigation: `{ route, title, description?, current?, children? }` per entry, `current: true` on the page's own entry. A page with `nav: false` in its frontmatter is not in it |
 | `site` | The values of `site.globals` |
-| `page` | What the storefront derives for the page, when the layout declares it (below) |
+| `page` | What the site derives for the page, when the layout declares it (below) |
 
 ```hbs
 {{#> partials-base }}
@@ -491,7 +491,7 @@ A layout receives:
 
 A layout's sample data (`<name>.json`) is what its workbench preview shows. It never reaches a page: a
 page gets only its own values and the ones above. To keep that true, a sample may only use the keys its
-layout declares plus `body`, `nav` and `site`, and the storefront reports any other as a problem.
+layout declares plus `body`, `nav` and `site`, and the site reports any other as a problem.
 
 In the workbench a layout fills the Stage, like a page or a template, so its `index.md` needs no
 `preview: full`. See [Preview layout](authoring.md#preview-layout) for overriding it.
@@ -538,11 +538,11 @@ schema is the page's frontmatter contract.
 schema that declares what the template takes. Resolving `$ref` and `allOf` in schemas, so such a wrapper's schema
 could refer to the original instead of repeating it, is not supported yet.
 
-### What the storefront derives for a page
+### What the site derives for a page
 
 A layout that declares a `page` property in its schema, with sub-properties, gets those sub-keys of what
-the storefront works out for each page, and only those. Each is present, and `null` where there is
-nothing. A page cannot set `page`, and a sub-key the storefront does not fill is a problem that names the
+the site works out for each page, and only those. Each is present, and `null` where there is
+nothing. A page cannot set `page`, and a sub-key the site does not fill is a problem that names the
 ones it does. A sample's `page` may only use the sub-keys the layout declares, and inside them only the
 keys below, at any depth.
 
@@ -1335,10 +1335,10 @@ out, since their pages are listed. URLs are absolute with `site.url`, else paths
 build` writes it to the site's root (under a path, at `<path>llms.txt`); `pd dev` has none. On unless the site has
 `index: false`; `site.llms: false` turns it off.
 
-**`robots.txt`.** Both output roots get one. The storefront's keeps crawlers out of `/preview/` (the live
+**`robots.txt`.** Both output roots get one. The site's keeps crawlers out of `/preview/` (the live
 examples: component demos, not pages) and names the sitemap. The workbench's keeps them out of its
-previews only; the workbench itself stays searchable. A workbench on the storefront's own host
-([below](#building)) has its previews kept out by the storefront's `robots.txt` too
+previews only; the workbench itself stays searchable. A workbench on the site's own host
+([below](#building)) has its previews kept out by the site's `robots.txt` too
 (`Disallow: /workbench/preview/`), since crawlers read only the one at the host's root. Two limits:
 
 - `Disallow` stops crawling, not indexing: a preview someone links to from elsewhere can still appear in
@@ -1346,7 +1346,7 @@ previews only; the workbench itself stays searchable. A workbench on the storefr
   so their text doesn't count toward the page.
 - Crawlers read `robots.txt` only at a host's root. A workbench built with `--base` for a host of its own
   writes it to its own root, so copy its rule into the `robots.txt` that host serves at `/` (the build says
-  so); its previews also carry a robots `noindex` tag then. On the storefront's host there is nothing to copy.
+  so); its previews also carry a robots `noindex` tag then. On the site's host there is nothing to copy.
 - A site published under a path has no `robots.txt` at all ([below](#publishing-under-a-path)).
 
 ### The 404 page
@@ -1381,12 +1381,12 @@ to open when it starts:
 
 | Address | Serves |
 |---|---|
-| `http://live.localhost:<port>/` | The storefront (`site.host` changes the name), under its path when `site.url` has one |
+| `http://live.localhost:<port>/` | The site (`site.host` changes the name), under its path when `site.url` has one |
 | `http://pd.localhost:<port>/` | The workbench |
-| `http://localhost:<port>/` | The workbench, as without a storefront |
+| `http://localhost:<port>/` | The workbench, as without a site |
 
 `pd dev` answers only to these names (and `127.0.0.1`) at its own port: a request for any other host name
-gets `403`, and the live-reload connection accepts only pages served from them. Without a storefront,
+gets `403`, and the live-reload connection accepts only pages served from them. Without a site,
 `live.localhost` is not one of them.
 
 Edits to pages, layouts, partials, styles, global data, assets and helper modules reload the open page.
@@ -1402,7 +1402,7 @@ been checked by hand yet.
 
 The known risk is Safari. Chromium and Firefox resolve `*.localhost` names themselves; Safari asks the
 system, and macOS answers `live.localhost` with the IPv6 address `::1` first. If Safari does not fall back
-to `127.0.0.1`, the storefront address does not load. The workaround is an entry in `/etc/hosts`:
+to `127.0.0.1`, the site address does not load. The workaround is an entry in `/etc/hosts`:
 
 ```
 127.0.0.1  live.localhost pd.localhost
@@ -1419,10 +1419,10 @@ built site is plain files on a host of its own, with no `*.localhost` name invol
 
 | Folder | Holds |
 |---|---|
-| `build.outDir` (or `--out`) | The workbench snapshot, exactly as a build without a storefront writes it ([static-build.md](static-build.md)) |
-| `site.outDir` | The storefront: one `index.html` per page, plus everything the pages use |
+| `build.outDir` (or `--out`) | The workbench snapshot, exactly as a build without a site writes it ([static-build.md](static-build.md)) |
+| `site.outDir` | The site: one `index.html` per page, plus everything the pages use |
 
-The storefront folder has its own copy of every preview its pages show and of every stylesheet, script,
+The site folder has its own copy of every preview its pages show and of every stylesheet, script,
 font and image they reference, so it is complete on its own. It is served at `site.url`: the root of its
 host, or the path under it ([Publishing under a path](#publishing-under-a-path)). A
 page built here is the same page `pd dev` serves, apart from the live-reload script and the address of the
@@ -1619,7 +1619,7 @@ npx playwright install chromium
 
 A page is fetched from the build itself, never from the network: images and fonts from other sites are not loaded.
 
-**The workbench on the storefront's host.** One host can serve both: the website at its root and the
+**The workbench on the site's host.** One host can serve both: the website at its root and the
 workbench under a path. Set `workbenchUrl` to that path and build the workbench for it:
 
 ```ts
@@ -1630,11 +1630,11 @@ export default defineConfig({
 });
 ```
 
-`pd build` still writes two folders. Publish the storefront's at the host's root and the workbench's inside
+`pd build` still writes two folders. Publish the site's at the host's root and the workbench's inside
 it at `/workbench/`; on GitHub Pages the workflow copies one into the other before it uploads them, as
 `pd init --with-site`'s does. Then:
 
-- the storefront's `robots.txt` also keeps crawlers out of the workbench's previews;
+- the site's `robots.txt` also keeps crawlers out of the workbench's previews;
 - no page or `redirectFrom` may be at or under `/workbench/`, since the workbench would overwrite it there;
 - the build refuses to make the workbench for another base path than `workbenchUrl`'s (`build.basePath`,
   or `--base`): its pages would link to a workbench that isn't there.

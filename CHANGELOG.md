@@ -5,14 +5,14 @@
 ### Upgrading from 0.7.0
 
 - **Rename your config: `storefront` is now `site`, and `storefront.site` is now `site.globals`.** Templates keep
-  reading `{{site.…}}`; only the config changes. The old names still load in 0.8.0, with one warning per key
-  (`storefront.pagesDir is now site.pagesDir`); setting both `site` and `storefront` is a config problem. Messages
-  name the new paths (`site.globals.navigations.footer[0]: …`) and say "site" where they said "storefront"
-  (`pd build: the site has problems, so nothing was written`), and terminal lines about the site start with `[site]`
-  instead of `[storefront]`.
+  reading `{{site.…}}`; only the config changes. The old names still load, with one warning per key
+  (`storefront.pagesDir is now site.pagesDir`), until 1.0, which removes them; setting both `site` and `storefront`
+  is a config problem. Messages name the new paths (`site.globals.navigations.footer[0]: …`) and say "site" where
+  they said "storefront" (`pd build: the site has problems, so nothing was written`), and terminal lines about the
+  site start with `[site]` instead of `[storefront]`. The guide and a new project's starter files say "site" too.
 - **`pd init --storefront` is now `--with-site`,** and `--no-storefront` is `--without-site`: two flags of their
   own, apart from `--site <package>`, which still makes a website on an existing style guide. The old flags still
-  work, with a warning; `--with-site` with `--without-site` is an error. A new project's config uses the new names.
+  work, with a warning, until 1.0, which removes them; `--with-site` with `--without-site` is an error. A new project's config uses the new names.
 - **Highlighted code has fixed class names.** Each token's class is its kind, `pd-code-keyword`, `pd-code-string` and
   so on, in place of a generated name such as `__shiki_17h8wv`, and a block is `<pre class="shiki">` with no inline
   style. CSS written for the generated names no longer matches: set the kinds' colours instead (below).

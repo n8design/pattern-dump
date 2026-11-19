@@ -9,7 +9,7 @@
     "description": { "type": "string", "description": "One sentence under the heading, and the page's description for search results" },
     "page": {
       "type": "object",
-      "description": "What the storefront works out for the page",
+      "description": "What Pattern Dump works out for the page",
       "properties": {
         "listing": { "description": "The folder's pages, shown through the view its index.md names (view: grid), else the list view, newest first with sort: date", "x-pd-view": "list" }
       }

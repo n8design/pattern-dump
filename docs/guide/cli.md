@@ -126,7 +126,7 @@ Results are cached per component and reused when nothing changed, or when nothin
 changed.
 
 `pd audit` fails (exit code `1`) when it finds an error, so a CI step that runs it stops there. (`pd build` does
-not fail on component findings, its own audit's included; it fails on its storefront and schema checks.) Warnings alone leave it at `0`; with `--strict`, any finding fails it. The
+not fail on component findings, its own audit's included; it fails on its site and schema checks.) Warnings alone leave it at `0`; with `--strict`, any finding fails it. The
 last line says why it failed:
 
 ```
@@ -146,10 +146,10 @@ Writes a static snapshot of the workbench: plain files for any static host.
 |---|---|
 | `--out <dir>` | Output folder, relative to the root. Default: `build.outDir`, `outDir`, then `dist`. Replaced as a whole once every check has passed; a build that stops leaves it as it was |
 | `--base <path>` | Where it will be hosted: `/` or a subpath such as `/docs/`. Default: `build.basePath`, then `/` (a project made with `pd init --with-site` sets `/workbench/`) |
-| `--browser` | Also check the storefront's pages in Chromium: contrast and the other accessibility rules that need a rendered page, and each image's variant against its box ([storefront.md](storefront.md#checks-in-a-browser-pd-build---browser)). Needs the project's own Playwright |
+| `--browser` | Also check the site's pages in Chromium: contrast and the other accessibility rules that need a rendered page, and each image's variant against its box ([storefront.md](storefront.md#checks-in-a-browser-pd-build---browser)). Needs the project's own Playwright |
 | `--no-audit` / `--audit` | Leave the corpus audit out (it is not run, and there is no Audit tab), or force it in. Default: `build.audit` |
-| `--check-workers <n>` | Threads that check the storefront's pages for accessibility. Default: the cores less one, at most 8, within a quarter of the memory; `1` checks them in one thread. The findings are the same with any number |
-| `--skip-checks=a11y,html` | Leave checks out, for a quick local build: `a11y`, the accessibility of the storefront's pages; `html`, the components' markup against HTML's content model. The build's last line says what was not checked. Default: `build.skipChecks`, else every check runs; `--skip-checks=` runs every check |
+| `--check-workers <n>` | Threads that check the site's pages for accessibility. Default: the cores less one, at most 8, within a quarter of the memory; `1` checks them in one thread. The findings are the same with any number |
+| `--skip-checks=a11y,html` | Leave checks out, for a quick local build: `a11y`, the accessibility of the site's pages; `html`, the components' markup against HTML's content model. The build's last line says what was not checked. Default: `build.skipChecks`, else every check runs; `--skip-checks=` runs every check |
 
 Full guide: [static-build.md](static-build.md).
 

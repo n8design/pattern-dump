@@ -36,7 +36,7 @@ npx --package=/path/to/pattern-dump-<version>.tgz pd init my-design-system --pd-
 | Package name | `--name <name>` | the folder name; a generic one is scoped by its parent folder (below) |
 | Title in the Nav Rail | `--brand <title>` | the name, or the parent folder's name for a scoped one |
 | Include the starter components? | `--no-examples` to skip | yes |
-| Include a website (storefront)? | `--with-site` | no |
+| Include a website? | `--with-site` | no |
 | Include site search (Pagefind)? (with a website) | `--search` / `--no-search` | yes |
 | Follow the viewer's light or dark setting? (with a website) | `--system-theme` / `--no-system-theme` | yes |
 | Run `git init`? | `--git` / `--no-git` | yes, unless already inside a repository |

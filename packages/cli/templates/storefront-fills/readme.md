@@ -43,7 +43,7 @@ and changed per page under the query's name (`related:`, with `limit: 5` indente
 
 A page that doesn't exist shows a built-in 404 page; write `pages/404.md` to change it. A page that moved
 can forward from its old address (`redirectFrom: [/old/]`), and `index: false` keeps a page out of search
-engines. All of it is in the [storefront guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/storefront.md).
+engines. All of it is in the [site guide](https://github.com/n8design/pattern-dump/blob/main/docs/guide/storefront.md).
 
 ### Build it
 

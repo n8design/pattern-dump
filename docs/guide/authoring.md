@@ -147,7 +147,7 @@ relative link starts with `.`, `#` or `/` (`./guide/`, `#usage`, `/atoms/button/
 and stays text.
 
 Besides the usual Markdown, docs can hold definition lists: a term on its own line, then each definition on a line
-starting with `:` and a space. They render as plain `<dl>`, `<dt>` and `<dd>`; the storefront guide shows the syntax
+starting with `:` and a space. They render as plain `<dl>`, `<dt>` and `<dd>`; the site guide shows the syntax
 and the HTML in full.
 
 ### Live examples and source in docs
@@ -166,11 +166,11 @@ Any other fence is syntax-highlighted when its language is one of `handlebars` (
 `json`, `javascript` (`js`), `typescript` (`ts`), `markdown` (`md`), shell code as `bash`, `sh`, `shell` or `zsh`,
 and a prompt with its output as `console` or `shell-session`. Any other language, `text` included, is a plain
 block. Every code block is written the same way wherever its markdown is (a
-component's docs, a storefront page, the content of a component placed on a page), a fence and an indented block
+component's docs, a site page, the content of a component placed on a page), a fence and an indented block
 alike: highlighted where its language is one of these, with a copy button, and focusable (`tabindex="0"`), so a block that scrolls sideways can be
 scrolled from the keyboard. Style it with `overflow-x: auto` rather than wrapping its lines. Each token's class
 names its kind (`pd-code-keyword`), coloured by a custom property a site can set from its own tokens
-(`--pd-code-keyword`, see [Code colours](storefront.md#code-colours)). On a storefront page the
+(`--pd-code-keyword`, see [Code colours](storefront.md#code-colours)). On a site page the
 copy button is added by a small script of the page's own, and only where the browser can copy: with scripting off,
 or without a clipboard, the page has no button at all, so a skin's CSS can't show one that does nothing. "Copied"
 is also said in a polite live region, for screen readers.
@@ -368,8 +368,8 @@ assets: {
   `icons.svg` (or `images/icons.svg`), hidden, at the top of the preview. It is looked up in every asset folder in
   turn, yours before packages', and the first that has it wins. Use a symbol with
   `<svg><use href="#icon-name"/></svg>`. The set is inlined once per preview, including for components
-  that include this one, and on every site page that shows the component (see the storefront guide). A symbol used
+  that include this one, and on every site page that shows the component (see the site guide). A symbol used
   from the same document inherits `currentColor` and the theme's custom properties; one referenced from an external
   file does not reliably.
 - **Symbol images** (`![Alt](#name)`, one SVG per symbol in `assets/symbols/`) are for site pages (see the
-  storefront guide). In a component's docs they show an error until a later release.
+  site guide). In a component's docs they show an error until a later release.

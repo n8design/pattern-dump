@@ -17,7 +17,7 @@
     },
     "page": {
       "type": "object",
-      "description": "What the storefront works out for the page",
+      "description": "What Pattern Dump works out for the page",
       "properties": {
         "term": {
           "description": "The tag: its key, label, description, route and how many pages have it"
