@@ -20,7 +20,9 @@
   `/_pd/shiki.css` yourself, link `/_pd/code.css` instead, or code loses its token colours.
 - **The config's types are named `Site…`:** `SiteChecks`, `SiteTermPages`, `SiteTag`, `SiteCategory` and
   `SiteNavEntry`, beside `SiteConfig`. Each `Storefront…` name still works as a deprecated alias until 1.0, which
-  removes them; `StorefrontConfig` stays the shape of the old `storefront` key.
+  removes them. `StorefrontConfig` is deprecated too, but it is not an alias of `SiteConfig`: it stays the shape of
+  the old `storefront` key, so code typed with it keeps working. Moving such code to `SiteConfig` means its globals
+  key `site` becomes `globals`.
 
 ### Added
 
