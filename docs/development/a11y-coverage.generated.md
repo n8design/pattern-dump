@@ -23,7 +23,7 @@ No browser required.
 
 These rules require a real rendering engine (computed styles, layout) to evaluate correctly.
 They return `incomplete` in jsdom, so `pd audit` leaves them out. They run in the browser: on the
-component on screen in the workbench (the Console's Diagnostics tab), and on a storefront's pages
+component on screen in the workbench (the Console's Diagnostics tab), and on a site's pages
 with `pd build --browser`.
 
 - `aria-hidden-focus`

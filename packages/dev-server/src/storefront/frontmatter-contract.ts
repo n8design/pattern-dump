@@ -257,8 +257,8 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     if (key === "nav") continue; // nav: true or false, checked with the build's keys (checkBuildKeys)
     if (filled(key)) {
       at(key, key === bodySlot && key !== "body"
-        ? `"${key}" is filled by the storefront with the page's markdown (x-pd-content of ${named}), not by a page`
-        : `"${key}" is filled by the storefront, not by a page`);
+        ? `"${key}" is filled by the site with the page's markdown (x-pd-content of ${named}), not by a page`
+        : `"${key}" is filled by the site, not by a page`);
       continue;
     }
     const prop = Object.hasOwn(declared, key) ? declared[key] : undefined;

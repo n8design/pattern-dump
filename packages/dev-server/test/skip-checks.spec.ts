@@ -58,7 +58,7 @@ const opts = (root: string) => ({ outDir: join(root, ".out"), pdVersion: "0.0.0-
 describe("skipChecks", () => {
   it("checks accessibility by default: the failing page stops the build", async () => {
     const root = await failingSite();
-    await expect(buildStaticSite(config(), root, opts(root))).rejects.toThrow("the storefront has accessibility problems");
+    await expect(buildStaticSite(config(), root, opts(root))).rejects.toThrow("the site has accessibility problems");
   }, 60_000);
 
   it("leaves the accessibility check out when asked, and the report says so", async () => {
@@ -74,7 +74,7 @@ describe("skipChecks", () => {
     const fromConfig = await buildStaticSite(config({ skipChecks: ["a11y"] }), root, opts(root));
     expect(fromConfig.skippedChecks).toEqual(["a11y"]);
     await expect(buildStaticSite(config({ skipChecks: ["a11y"] }), root, { ...opts(root), skipChecks: [] }))
-      .rejects.toThrow("the storefront has accessibility problems");
+      .rejects.toThrow("the site has accessibility problems");
   }, 60_000);
 
   it("names a check it can't skip, and refuses --browser with the accessibility check skipped", async () => {

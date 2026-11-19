@@ -141,7 +141,7 @@ export function planInit(
   const skin = storefront.filter(f => isSkin(renamed(f.path)));
   const skinTaken = skin.map(f => renamed(f.path)).find(p => existing.exists(p));
   if (skinTaken) {
-    skipped.push({ path: skinTaken, reason: `already exists: the storefront skin (${skin.length} files in src/patterns/layouts, `
+    skipped.push({ path: skinTaken, reason: `already exists: the site skin (${skin.length} files in src/patterns/layouts, `
       + `src/patterns/partials, src/patterns/views and their styles) was left out as a whole, so it isn't mixed with the skin already here` });
   }
   const files = [...templates.base, ...(answers.examples ? templates.examples : []),

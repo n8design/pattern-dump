@@ -364,7 +364,7 @@ describe("pd build — a storefront with problems writes nothing", () => {
     await brokenHome(root);
     const out = join(root, "..", "wb-fail");
     await expect(build(root, out)).rejects.toThrow(
-      "pd build: the storefront has problems, so nothing was written:\n"
+      "pd build: the site has problems, so nothing was written:\n"
       + `  - /: index.md:4: "bogus" is not declared by layout "home"\n`
       + "  - /about/: about.md: pattern components/nope: there is no such component",
     );
@@ -378,7 +378,7 @@ describe("pd build — a storefront with problems writes nothing", () => {
     const out = join(root, "..", "wb-nav");
     const error = await build(root, out, config({ globals: site })).then(() => "", (e: Error) => e.message);
     const problem = `site.globals.navigations.footer[0]: "nope.md" is not a page in the pages folder`;
-    expect(error).toBe(`pd build: the storefront has problems, so nothing was written:\n  - ${problem}`);
+    expect(error).toBe(`pd build: the site has problems, so nothing was written:\n  - ${problem}`);
     expect(await exists(out)).toBe(false);
   }, 120_000);
 
@@ -388,7 +388,7 @@ describe("pd build — a storefront with problems writes nothing", () => {
     await build(root, out);
     const before = { wb: await tree(out), sf: await tree(join(root, ".out", "storefront")) };
     await breakPage(root);
-    await expect(build(root, out)).rejects.toThrow("pd build: the storefront has problems, so nothing was written:");
+    await expect(build(root, out)).rejects.toThrow("pd build: the site has problems, so nothing was written:");
     const after = { wb: await tree(out), sf: await tree(join(root, ".out", "storefront")) };
     for (const which of ["wb", "sf"] as const) {
       expect([...after[which].keys()].sort(), which).toEqual([...before[which].keys()].sort());

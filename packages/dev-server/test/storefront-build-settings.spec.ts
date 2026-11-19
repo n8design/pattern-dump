@@ -55,7 +55,7 @@ describe("pd build — the storefront's settings", () => {
     const { workbenchUrl: _w, ...rest } = benchConfig.site!;
     const out = join(root, "..", "wb-nourl");
     await expect(buildStaticSite(validateConfig({ ...benchConfig, site: rest }, "test"), root, { outDir: out, pdVersion: "x" }))
-      .rejects.toThrow("pd build: site.workbenchUrl is required to build the storefront: its pages link into the workbench at that address");
+      .rejects.toThrow("pd build: site.workbenchUrl is required to build the site: its pages link into the workbench at that address");
     expect(await exists(out)).toBe(false);
   });
 
@@ -122,7 +122,7 @@ describe("pd build — the storefront's settings", () => {
 
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
     const root = await benchCopy();
-    await expect(build(root, join(root, ".out", "storefront"))).rejects.toThrow(/and --out .* overlap: the storefront and the workbench each need a folder of their own/);
+    await expect(build(root, join(root, ".out", "storefront"))).rejects.toThrow(/and --out .* overlap: the site and the workbench each need a folder of their own/);
     await expect(build(root, join(root, "..", "wb-x"), config({ outDir: "./src/styles/out" }))).rejects.toThrow(/site\.outDir .* overlaps .*styles, which Pattern Dump reads/);
     // An output root that contains the project is already refused by the config (it holds the pages and the
     // patterns); the build refuses it too, for a config that never went through validation.

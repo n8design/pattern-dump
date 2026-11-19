@@ -91,7 +91,7 @@ describe("pd build: the storefront can't take its place", () => {
     failing.renameTo = sfOut;
     try {
       const result = buildStaticSite(config, root, { outDir: out, pdVersion: "0.0.0-test", now: NOW, loadPagefind: async () => undefined });
-      await expect(result).rejects.toThrow(/^pd build: the workbench in .+ is this build's, but the storefront could not take its place in .+: the two are out of step\. The storefront in it is the earlier one; run pd build again\.\n {2}EIO: i\/o error/);
+      await expect(result).rejects.toThrow(/^pd build: the workbench in .+ is this build's, but the site could not take its place in .+: the two are out of step\. The site in it is the earlier one; run pd build again\.\n {2}EIO: i\/o error/);
     } finally {
       failing.renameTo = undefined;
     }

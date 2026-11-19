@@ -176,7 +176,7 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
         ok = /^https?:$/.test(url.protocol) && url.search === "" && url.hash === "" && !/[?#]/.test(value);
       } catch { ok = false; }
     }
-    if (!ok) fail(`an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the storefront's host, such as "/workbench/"`);
+    if (!ok) fail(`an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the site's host, such as "/workbench/"`);
     return;
   }
   if (rule === "site-url") {

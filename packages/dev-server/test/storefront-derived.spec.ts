@@ -188,6 +188,6 @@ describe("assemblePage — page", () => {
   it("a page's frontmatter cannot set page", async () => {
     const { page } = await assemble({ properties: { title: { type: "string" }, page: { type: "object", properties: {} } } }, "title: Home\npage: x");
     expect(page.status).toBe(500);
-    expect(page.problems).toEqual([`index.md:3: "page" is filled by the storefront, not by a page`]);
+    expect(page.problems).toEqual([`index.md:3: "page" is filled by the site, not by a page`]);
   });
 });

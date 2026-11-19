@@ -72,7 +72,7 @@ export function renderError(e: unknown): string {
   if (!(e instanceof TypeError) || !READ_ONLY.test(e.message) || e.message.includes(", so it is read-only:")) return e.message;
   // The first frame of the stack is the code that made the change (a project helper, say).
   const at = /\n\s+at (.+)/.exec(e.stack ?? "")?.[1];
-  return `${e.message}. The storefront's page data is shared by every page, so it is read-only: copy a value before `
+  return `${e.message}. The site's page data is shared by every page, so it is read-only: copy a value before `
     + `changing it${at ? ` (changed at ${at})` : ""}`;
 }
 

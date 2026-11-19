@@ -64,6 +64,6 @@ describe("pd build — build.workbench: false", () => {
     const { site: _, ...rest } = benchConfig;
     const cfg = validateConfig({ ...rest, build: { workbench: false } }, "test");
     await expect(build(root, join(root, "..", "nowb-none"), cfg))
-      .rejects.toThrow("pd build: build.workbench is false and the project has no storefront, so there is nothing to build");
+      .rejects.toThrow("pd build: build.workbench is false and the project has no site, so there is nothing to build");
   }, 60_000);
 });

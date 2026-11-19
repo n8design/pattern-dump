@@ -7,7 +7,8 @@
 - **Rename your config: `storefront` is now `site`, and `storefront.site` is now `site.globals`.** Templates keep
   reading `{{site.…}}`; only the config changes. The old names still load in 0.8.0, with one warning per key
   (`storefront.pagesDir is now site.pagesDir`); setting both `site` and `storefront` is a config problem. Messages
-  name the new paths (`site.globals.navigations.footer[0]: …`), and terminal lines about the site start with `[site]`
+  name the new paths (`site.globals.navigations.footer[0]: …`) and say "site" where they said "storefront"
+  (`pd build: the site has problems, so nothing was written`), and terminal lines about the site start with `[site]`
   instead of `[storefront]`.
 - **`pd init --storefront` is now `--with-site`,** and `--no-storefront` is `--without-site`: two flags of their
   own, apart from `--site <package>`, which still makes a website on an existing style guide. The old flags still

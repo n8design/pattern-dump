@@ -68,7 +68,7 @@ describe("the accessibility gate in pd build", () => {
     const root = await project(`<header><p>Site</p><button></button></header><div>{{{body}}}</div><footer><p>F</p></footer>\n`);
     const out = join(root, ".out");
     const build = buildStaticSite(config, root, { outDir: out, pdVersion: "0.0.0-test" });
-    await expect(build).rejects.toThrow("pd build: the storefront has accessibility problems, so nothing was written:");
+    await expect(build).rejects.toThrow("pd build: the site has accessibility problems, so nothing was written:");
     const message = await build.catch((e: Error) => e.message);
     expect(message).toContain("  - /: the page has no <main>:");
     expect(message).toContain("  - /: the page has no <h1>:");

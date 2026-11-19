@@ -163,7 +163,7 @@ describe("configProblems — storefront", () => {
       "/workbench/", "/workbench", "/docs/workbench/", "/Docs/v2.1/work_bench~x/"]) {
       expect(storefront({ ...base, workbenchUrl: ok }), ok).toEqual([]);
     }
-    const message = `"site.workbenchUrl" must be an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the storefront's host, such as "/workbench/"`;
+    const message = `"site.workbenchUrl" must be an absolute http(s) URL for a workbench on its own host, such as "https://workbench.example.com/", or a path for one on the site's host, such as "/workbench/"`;
     for (const bad of ["workbench.example.com", "ftp://example.com", "javascript:alert(1)", "", 42,
       "https://htwoo.io/workbench/?v=1", "https://htwoo.io/workbench/#top", "https://htwoo.io/workbench?",
       // Paths: "//host/" is another host to a browser; a relative path depends on the page; "/" is the storefront.

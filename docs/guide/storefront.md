@@ -1513,7 +1513,7 @@ writes.
   `mailto:` and `tel:` links are left alone.
 
 ```
-pd build: the storefront has broken links, so nothing was written:
+pd build: the site has broken links, so nothing was written:
   - /guides/: <a href="/guides/instal/">: no page or file is built at /guides/instal/
   - /about/: <a href="/guides/setup/#instal">: /guides/setup/ has no element with id "instal"
 ```
@@ -1576,7 +1576,7 @@ routes) with [axe](https://github.com/dequelabs/axe-core), the WCAG 2.x A and AA
   or minor, and every best-practice rule (headings that skip a level, content outside any landmark).
 
 ```
-pd build: the storefront has accessibility problems, so nothing was written:
+pd build: the site has accessibility problems, so nothing was written:
   - /about/: image-alt (critical): Images must have alternative text, on img (https://dequeuniversity.com/rules/axe/…/image-alt)
   - /guides/: the page has 2 <h1> headings: one names the page, the others are <h2> or lower
 ```

@@ -39,7 +39,7 @@ export async function checkSitePages(root: string): Promise<string[]> {
   console.log = capture; console.error = capture; console.warn = capture;
   try {
     const config = await loadConfig(root);
-    if (!config.storefront) return ["the project has no storefront: there are no pages to check"];
+    if (!config.storefront) return ["the project has no site: there are no pages to check"];
     const host = config.storefront.host ?? PD_HOSTS.storefront;
     const server = await startDevServer(config, root, { port: 0, wsPort: 0, live: false });
     try {
@@ -104,7 +104,7 @@ export async function runBuild(
     console.log(`[pd build] styles: ${n} stylesheet${n === 1 ? "" : "s"} linked by a borrowed class (STYLE_BORROWED on the component's Diagnostics tab)`);
   }
   if (report.storefront) {
-    console.log(`[pd build] storefront: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from ${report.storefront.basePath})`);
+    console.log(`[pd build] site: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from ${report.storefront.basePath})`);
   }
   if (report.links) {
     console.log(`[pd build] links: ${report.links.references} references on ${report.links.pages} pages, none broken`

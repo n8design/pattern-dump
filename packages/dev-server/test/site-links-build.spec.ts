@@ -53,7 +53,7 @@ describe("the link check in pd build", () => {
     });
     const out = join(root, ".out", "wb");
     await expect(buildStaticSite(config("https://wb.test/"), root, { outDir: out, pdVersion: "0.0.0-test" })).rejects.toThrow([
-      "pd build: the storefront has broken links, so nothing was written:",
+      "pd build: the site has broken links, so nothing was written:",
       `  - /: <a href="/guids/">: no page or file is built at /guids/`,
       `  - /: <a href="/about/#nowhere">: /about/ has no element with id "nowhere"`,
       `  - /: <a href="#gone">: / has no element with id "gone"`,

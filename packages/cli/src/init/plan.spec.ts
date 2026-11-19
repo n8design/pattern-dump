@@ -132,7 +132,7 @@ describe("planInit — the storefront", () => {
     const paths = p.writes.map(w => w.path);
     for (const s of SKIN) expect(paths, s).not.toContain(s);
     expect(paths).toEqual(expect.arrayContaining(REST));
-    expect(p.skipped).toEqual([{ path: "src/patterns/partials/base/base.hbs", reason: "already exists: the storefront skin (7 files in src/patterns/layouts, "
+    expect(p.skipped).toEqual([{ path: "src/patterns/partials/base/base.hbs", reason: "already exists: the site skin (7 files in src/patterns/layouts, "
       + "src/patterns/partials, src/patterns/views and their styles) was left out as a whole, so it isn't mixed with the skin already here" }]);
   });
 

@@ -64,7 +64,7 @@ test("text that fails contrast stops the build, and nothing is written", async (
   });
   const build = buildStaticSite(config, root, { outDir: join(root, ".out", "wb"), pdVersion: "0.0.0-test", browser: true, loadPlaywright });
   const message = await build.then(() => "built", (e: Error) => e.message);
-  expect(message).toContain("pd build: the storefront has problems in a browser, so nothing was written:");
+  expect(message).toContain("pd build: the site has problems in a browser, so nothing was written:");
   expect(message).toMatch(/ {2}- \/: color-contrast \(serious\): Elements must meet minimum color contrast ratio thresholds, on .*\(at 1000×720 and 390×844\)/);
   expect(existsSync(join(root, ".out"))).toBe(false);
 });
@@ -171,7 +171,7 @@ test("under a path, a script's request outside it stops the build, naming the pa
   const root = await scripted(`fetch("/data.json?v=1");`);
   const message = await buildStaticSite(underPath, root, { outDir: join(root, ".out", "wb"), pdVersion: "0.0.0-test", browser: true, loadPlaywright })
     .then(() => "built", (e: Error) => e.message);
-  expect(message).toContain("pd build: the storefront has problems in a browser, so nothing was written:");
+  expect(message).toContain("pd build: the site has problems in a browser, so nothing was written:");
   for (const page of ["/", "/about/"]) {
     expect(message).toContain(`  - ${page}: a request to /data.json?v=1 is outside /sub/, the path the site is published under (site.url): `
       + `a script that builds this URL needs the site's path, which <meta name="pd-base-path"> names (at 1000×720 and 390×844)`);
@@ -221,7 +221,7 @@ test("with search, a search field that shows no result for a word the index has 
   const message = await buildStaticSite(cfg, root, {
     outDir: join(root, ".out", "wb"), pdVersion: "0.0.0-test", browser: true, loadPlaywright, loadPagefind: () => loadProjectPagefind(bench),
   }).then(() => "built", (e: Error) => e.message);
-  expect(message).toContain("pd build: the storefront has problems in a browser, so nothing was written:");
+  expect(message).toContain("pd build: the site has problems in a browser, so nothing was written:");
   expect(message).toContain(`  - /harbour/: searching for "Home" in its search field (input[type="search"]) showed no result within 5 s, though the index has a page with it: `
     + `the search component loads /_pd/search/pagefind.js under the site's path (<meta name="pd-base-path">) and shows each result's data() (at 1000×720 and 390×844)`);
   expect(existsSync(join(root, ".out"))).toBe(false);
