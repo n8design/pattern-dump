@@ -35,7 +35,7 @@ import { createDisplayPath } from "./display-path.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 import { buildShellHtml, json, mimeType, serveFile, servesShell, workbenchTitle } from "./http-utils.js";
-import { baseComponentIds } from "./discovery-index.js";
+import { auditedComponentIds, baseComponentIds } from "./discovery-index.js";
 import { buildComponentTree } from "./component-tree.js";
 import { buildComponentDetail, previewTitle } from "./detail.js";
 import { buildFolderOverview } from "./overview.js";
@@ -466,7 +466,7 @@ async function routeRequest(
               discoveryMap, handleMap: discovery.handleMap, composition: await compositionFor(state, discovery, patternDirs), globalData,
               helperPaths: cfg.helperPaths,
             });
-            const r = await refreshDiagnosticsGraph(cwd, baseComponentIds(discovery), render, discovery.quarantineMap, inputs);
+            const r = await refreshDiagnosticsGraph(cwd, auditedComponentIds(discovery), render, discovery.quarantineMap, inputs);
             await testHook()?.("audit-seed", "built", () => {});
             // The deviation from lazy.ts's rule that a value an invalidation overtook is never stored: a
             // seed is long on a large corpus, and a save during every seed would otherwise repeat the whole

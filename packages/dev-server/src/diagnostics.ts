@@ -164,12 +164,15 @@ export interface ComponentAudit {
   occurrences: DiagnosticOccurrence[];
 }
 
-/** Audit one component -> its node + occurrences. Reuses `checkComponent`, the exact per-component
- *  unit the panel uses, so the aggregate cannot drift from the panel. */
+/** Audit one component or variant (`base~v`) -> its node + occurrences. Reuses `checkComponent`, the exact
+ *  per-component unit the panel uses, so the aggregate cannot drift from the panel. A variant is rendered as its
+ *  own detail renders it (the base with the variant), and keeps its own id. */
 export async function auditComponent(
   id: string, render: CheckRenderer, quarantineEntry: CollisionEntry | undefined,
 ): Promise<ComponentAudit> {
-  const { previewHtml, diagnostics } = await checkComponent(id, undefined, render, quarantineEntry);
+  const tilde = id.indexOf("~");
+  const [base, variant] = tilde < 0 ? [id, undefined] : [id.slice(0, tilde), id.slice(tilde + 1)];
+  const { previewHtml, diagnostics } = await checkComponent(base, variant, render, quarantineEntry);
   const occurrences: DiagnosticOccurrence[] = diagnostics.map(diag => {
     const domPath = diag.kind === "A11Y" ? diag.target : undefined;
     return {

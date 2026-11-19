@@ -106,7 +106,8 @@ describe("the starter project", () => {
       graph.components.map(c => [c.id, "ok"]),
     );
     expect(graph.components.map(c => c.id).sort()).toEqual([
-      "atoms/button", "molecules/search-field", "molecules/search-field/input", "pages/example",
+      "atoms/button", "atoms/button~icon", "atoms/button~secondary", "molecules/search-field", "molecules/search-field/input",
+      "pages/example",
     ]);
   }, 120_000);
 
@@ -188,7 +189,7 @@ describe("the starter project with a website (--with-site, no examples)", () => 
     const { graph } = await runDiagnosticsAudit(config, siteDir);
     expect(graph.occurrences).toEqual([]);
     expect(graph.components.map(c => [c.id, c.render]).sort()).toEqual(
-      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"], ["components/search", "ok"], ["components/toc", "ok"],
+      [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"], ["components/note~warning", "ok"], ["components/search", "ok"], ["components/toc", "ok"],
         ["layouts/article", "ok"], ["layouts/categories", "ok"], ["layouts/category", "ok"], ["layouts/doc", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"],
         ["layouts/tag", "ok"], ["layouts/tags", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
         ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);

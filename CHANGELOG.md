@@ -45,6 +45,10 @@
 
 ### Changed
 
+- **`pd audit` checks every variant.** Each variant is an entry of its own (`atoms/button~secondary`) in the report,
+  the Audit tab and a rule's count of components: a data overlay with its data, a variant with markup of its own
+  from its template. Until now only each component's default render was audited. **Heads-up:** an audit that passed
+  in 0.7.0 can fail in 0.8.0 on a variant's defect, in CI too; the report names the variant.
 - **Code colours reach 4.5:1 contrast,** in the workbench and on site pages: in light mode, strings, keywords and
   tags, function and attribute names, CSS properties and values, parameters and Handlebars expressions are darker;
   in dark mode, comments are lighter. Each keeps its hue.

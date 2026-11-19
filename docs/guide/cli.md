@@ -95,15 +95,16 @@ shown.
 
 ## `pd audit`
 
-Renders every component once, with its own data, and reports defects across the whole design system:
+Renders every component and every variant, each with its own data, and reports defects across the whole design
+system:
 
 - render errors;
 - data and schema checks (`UNFILLED_REQUIRED`, `SHAPE_MISMATCH`, `DATA_INVALID`, `SCHEMA_INVALID`, `HELPER_SHADOW`);
 - HTML validation;
 - structural accessibility checks (axe-core rules that don't need layout or colour).
 
-Variants are not part of the audit: each variant is checked on its own page in the workbench (the Console's
-**Diagnostics** tab), and `pd build` checks every variant it writes. A component left out of the tree by a handle
+Each variant is an entry of its own, `atoms/button~secondary`, in the report and in a rule's count of components: a
+data overlay is checked with its data, a variant with markup of its own from its template. A component left out of the tree by a handle
 collision is not in the audit either: the collision is named in the terminal, on the Console, and on that
 component's Diagnostics tab.
 
