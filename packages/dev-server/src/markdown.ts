@@ -92,6 +92,9 @@ export interface DocRegions {
  * {{pd-image}} writes it (renderer's imageTag), in the slot the page's layout declares (x-pd-prose-images), lazy with
  * `sizes="auto, <sizes>"`, the first `eager` images from the assets at once with `<sizes>` alone; an SVG as one file
  * at its size. A raster with no slot, a path the index doesn't have and an image that can't be encoded are problems.
+ * With a title and alone on its line (`![Alt](/assets/x.jpg "Caption")`) it is a <figure> with that <figcaption>, as a
+ * symbol image is; in a line of text the title stays the <img>'s title. A sibling `<name>-dark.<ext>` in the assets
+ * makes it a <picture> with a `(prefers-color-scheme: dark)` <source> in the same widths.
  * Any other image (remote, relative) is left as markdown writes it. Problems carry their line in the page's file.
  */
 export interface ProseImages {
@@ -335,9 +338,11 @@ function symbolImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, s
  *  the symbol pass's when `symbolsOwnFragments`. */
 function proseImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, prose: ProseImages, symbolsOwnFragments = false): void {
   let eager = prose.slot?.eager ?? 0;
-  for (const block of tokens) {
+  for (const [bi, block] of tokens.entries()) {
     if (block.type !== "inline" || !block.children) continue;
     let line = (block.map?.[0] ?? 0) + 1 + prose.lineOffset;
+    // An image alone in its paragraph, as for a symbol image: with a title, a <figure> in place of the paragraph.
+    const alone = block.children.length === 1 && tokens[bi - 1]?.type === "paragraph_open" && tokens[bi + 1]?.type === "paragraph_close";
     for (const child of block.children) {
       if (child.type === "softbreak" || child.type === "hardbreak") { line++; continue; }
       if (child.type !== "image") continue;
@@ -358,14 +363,23 @@ function proseImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, pr
           + (prose.slotProblem ? `has an invalid x-pd-prose-images (${prose.slotProblem})` : `declares no x-pd-prose-images`));
         continue;
       }
+      // A sibling <name>-dark.<ext> is the image in dark mode: a <picture> with a (prefers-color-scheme: dark) source.
+      const darkSrc = /-dark\.[^./]+$/.test(src) ? undefined : src.replace(/(\.[^./]+)$/, "-dark$1");
+      const dark = darkSrc !== undefined && darkSrc !== src ? prose.lookup(darkSrc) : undefined;
+      if (dark?.kind === "unavailable") { problem(`: its dark version ${darkSrc} can't be used: ${dark.reason}`); continue; }
       const title = child.attrGet("title");
+      const figure = title !== null && alone;
       const atOnce = eager > 0;
       if (atOnce) eager--;
       const slot = prose.slot;
-      child.meta = { pdImage: imageTag(source, {
+      const tag = imageTag(source, {
         widths: slot?.widths ?? [], sizes: slot ? (atOnce ? slot.sizes : `auto, ${slot.sizes}`) : "",
-        alt, eager: atOnce, settings: "site", ...(title !== null ? { title } : {}),
-      }) };
+        alt, eager: atOnce, settings: "site", ...(title !== null && !figure ? { title } : {}), ...(dark ? { dark } : {}),
+      });
+      if (!figure) { child.meta = { pdImage: tag }; continue; }
+      tokens[bi - 1]!.hidden = true;
+      tokens[bi + 1]!.hidden = true;
+      child.meta = { pdImage: `<figure class="doc-figure">\n${tag}\n<figcaption>${escapeHtml(title)}</figcaption>\n</figure>\n` };
     }
   }
 }

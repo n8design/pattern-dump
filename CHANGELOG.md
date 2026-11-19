@@ -38,6 +38,11 @@
   For a style guide in a folder without the field, `pd init --site` prints the block to add, from the folders of the
   style guide's own config.
 
+- **Images in a page's markdown, like symbol images.** `![Alt](/assets/photo.jpg "Caption")` on a line of its own
+  is a `<figure>` with the caption as its `<figcaption>`, instead of a `title` attribute (in a line of text, the
+  title stays an attribute). A file named `photo-dark.jpg` next to `photo.jpg` makes the image a `<picture>` with a
+  `(prefers-color-scheme: dark)` source, both written as WebP variants with their width and height, lazy as before.
+
 ### Changed
 
 - **Code colours reach 4.5:1 contrast,** in the workbench and on site pages: in light mode, strings, keywords and

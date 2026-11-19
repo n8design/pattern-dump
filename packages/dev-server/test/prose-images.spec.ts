@@ -7,15 +7,21 @@ import { describe, expect, it } from "vitest";
 import type { DiscoveryMap, ImageLookup, ImageSource } from "@pattern-dump/contracts";
 import { renderDoc, type ProseImages } from "../src/markdown.js";
 
-const raster = (width: number, height: number): ImageSource => ({
+const raster = (width: number, height: number, name = "photo"): ImageSource => ({
   kind: "variants", width, height,
-  variantUrl: (w, settings) => `/_pd/images/photo.k${settings ?? "-"}.${w}.webp`,
+  variantUrl: (w, settings) => `/_pd/images/${name}.k${settings ?? "-"}.${w}.webp`,
 });
 const IMAGES: Record<string, ImageSource> = {
   "/assets/images/photo.jpg": raster(1200, 800),
   "/assets/images/small.jpg": raster(400, 300),
   "/assets/images/mark.svg": { kind: "single", url: "/assets/images/mark.svg", width: 48, height: 24 },
   "/assets/images/broken.jpg": { kind: "unavailable", reason: "sharp could not be loaded (test)" },
+  "/assets/images/chart.png": raster(1000, 500, "chart"),
+  "/assets/images/chart-dark.png": raster(1000, 500, "chart-dark"),
+  "/assets/images/logo.svg": { kind: "single", url: "/assets/images/logo.svg", width: 40, height: 20 },
+  "/assets/images/logo-dark.svg": { kind: "single", url: "/assets/images/logo-dark.svg", width: 40, height: 20 },
+  "/assets/images/night.jpg": raster(800, 600, "night"),
+  "/assets/images/night-dark.jpg": { kind: "unavailable", reason: "it is not an image sharp can read (test)" },
 };
 const lookup: ImageLookup = src => IMAGES[src];
 const SLOT = { widths: [480, 960], sizes: "(min-width: 60rem) 40rem, 100vw", eager: 0 };
@@ -65,9 +71,48 @@ describe("prose images on a storefront page", () => {
     expect(r.html).toBe(`<p><img src="/assets/images/mark.svg" width="48" height="24" alt="The mark" loading="lazy" decoding="async"></p>\n`);
   });
 
-  it("keeps a title", async () => {
-    const r = await page(`![A harbour](/assets/images/photo.jpg "At dawn")\n`);
+  it("with a title, alone on its line: a <figure> with the title as its <figcaption>, and no title attribute", async () => {
+    const r = await page(`![A harbour](/assets/images/photo.jpg "At <dawn> & after")\n`);
+    expect(r.problems).toEqual([]);
+    expect(r.html).toBe(`<figure class="doc-figure">\n<img src="/_pd/images/photo.ksite.960.webp" `
+      + `srcset="/_pd/images/photo.ksite.480.webp 480w, /_pd/images/photo.ksite.960.webp 960w" `
+      + `sizes="auto, (min-width: 60rem) 40rem, 100vw" width="960" height="640" alt="A harbour" loading="lazy" decoding="async">\n`
+      + `<figcaption>At &lt;dawn&gt; &amp; after</figcaption>\n</figure>\n`);
+  });
+
+  it("with a title in a line of text: the <img> keeps it as its title", async () => {
+    const r = await page(`See ![A harbour](/assets/images/photo.jpg "At dawn") here.\n`);
+    expect(r.html).not.toContain("<figure");
     expect(r.html).toContain(`alt="A harbour" title="At dawn" loading="lazy"`);
+  });
+
+  it("a sibling <name>-dark.<ext>: a <picture> with a (prefers-color-scheme: dark) source in the same widths", async () => {
+    const r = await page(`![Sales by month](/assets/images/chart.png)\n`);
+    expect(r.problems).toEqual([]);
+    expect(r.html).toBe(`<p><picture><source media="(prefers-color-scheme: dark)" `
+      + `srcset="/_pd/images/chart-dark.ksite.480.webp 480w, /_pd/images/chart-dark.ksite.960.webp 960w" `
+      + `sizes="auto, (min-width: 60rem) 40rem, 100vw" width="960" height="480">`
+      + `<img src="/_pd/images/chart.ksite.960.webp" srcset="/_pd/images/chart.ksite.480.webp 480w, /_pd/images/chart.ksite.960.webp 960w" `
+      + `sizes="auto, (min-width: 60rem) 40rem, 100vw" width="960" height="480" alt="Sales by month" loading="lazy" decoding="async">`
+      + `</picture></p>\n`);
+  });
+
+  it("a dark version with a caption is a <figure> around the <picture>; an SVG's is one file at its size", async () => {
+    const fig = await page(`![Sales by month](/assets/images/chart.png "2026")\n`);
+    expect(fig.html).toMatch(/^<figure class="doc-figure">\n<picture><source media="\(prefers-color-scheme: dark\)" [^>]+><img [^>]+><\/picture>\n<figcaption>2026<\/figcaption>\n<\/figure>\n$/);
+    const svg = await page(`![The logo](/assets/images/logo.svg)\n`, { slot: undefined });
+    expect(svg.html).toBe(`<p><picture><source media="(prefers-color-scheme: dark)" srcset="/assets/images/logo-dark.svg" width="40" height="20">`
+      + `<img src="/assets/images/logo.svg" width="40" height="20" alt="The logo" loading="lazy" decoding="async"></picture></p>\n`);
+  });
+
+  it("no sibling, or the dark file named itself: a plain <img>; a dark version that can't be used is a problem", async () => {
+    expect((await page(`![A harbour](/assets/images/photo.jpg)\n`)).html).not.toContain("<picture");
+    const own = await page(`![Dark sales](/assets/images/chart-dark.png)\n`);
+    expect(own.html).not.toContain("<picture");
+    expect(own.html).toContain(`src="/_pd/images/chart-dark.ksite.960.webp"`);
+    const r = await page(`![At night](/assets/images/night.jpg)\n`);
+    expect(r.problems).toEqual([`1: the image /assets/images/night.jpg: its dark version /assets/images/night-dark.jpg can't be used: `
+      + `it is not an image sharp can read (test)`]);
   });
 
   it("an empty or blank alt is a problem at its line, for any image, and says how a decorative image goes in", async () => {

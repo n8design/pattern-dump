@@ -96,23 +96,40 @@ function dataFile(store: SourceStore, path: string, display: (absPath: string) =
 /**
  * An image as an <img>: with its variants (the slot's widths the image has as displayed, at least its own width when
  * every slot width is wider; `src` the largest), or a single file at its size. Shared by `{{pd-image}}` and the
- * storefront's prose images, so both write the same markup.
+ * storefront's prose images, so both write the same markup. With `dark`, a <picture> whose
+ * `(prefers-color-scheme: dark)` <source> is that image, in the same widths, at its own size; the <img> is the light one.
  */
 export function imageTag(
   source: Exclude<ImageSource, { kind: "unavailable" }>,
-  o: { widths: readonly number[]; sizes: string; alt: string; title?: string; eager: boolean; settings?: "site" },
+  o: { widths: readonly number[]; sizes: string; alt: string; title?: string; eager: boolean; settings?: "site";
+    dark?: Exclude<ImageSource, { kind: "unavailable" }> },
 ): string {
   const esc = Handlebars.escapeExpression;
   const rest = `alt="${esc(o.alt)}"${o.title !== undefined ? ` title="${esc(o.title)}"` : ""} `
     + `loading="${o.eager ? "eager" : "lazy"}" decoding="async"`;
-  if (source.kind === "single") return `<img src="${esc(source.url)}" width="${source.width}" height="${source.height}" ${rest}>`;
+  const light = candidates(source, o);
+  const img = light.srcset === undefined
+    ? `<img src="${esc(light.src)}" width="${light.width}" height="${light.height}" ${rest}>`
+    : `<img src="${esc(light.src)}" srcset="${light.srcset}" sizes="${esc(o.sizes)}" width="${light.width}" height="${light.height}" ${rest}>`;
+  if (!o.dark) return img;
+  const dark = candidates(o.dark, o);
+  const sizes = dark.srcset === undefined ? "" : ` sizes="${esc(o.sizes)}"`;
+  return `<picture><source media="(prefers-color-scheme: dark)" srcset="${dark.srcset ?? esc(dark.src)}"${sizes} `
+    + `width="${dark.width}" height="${dark.height}">${img}</picture>`;
+}
+
+/** An image's URLs and size as imageTag writes them: a srcset (escaped) for one with variants. */
+function candidates(
+  source: Exclude<ImageSource, { kind: "unavailable" }>, o: { widths: readonly number[]; settings?: "site" },
+): { src: string; srcset?: string; width: number; height: number } {
+  if (source.kind === "single") return { src: source.url, width: source.width, height: source.height };
+  const esc = Handlebars.escapeExpression;
   const widths = o.widths.filter(w => w <= source.width);
   if (widths.length === 0) widths.push(source.width);
   const urls = widths.map(w => source.variantUrl(w, o.settings));
   const top = widths[widths.length - 1]!;
-  const srcset = urls.map((u, i) => `${esc(u)} ${widths[i]}w`).join(", ");
-  return `<img src="${esc(urls[urls.length - 1]!)}" srcset="${srcset}" sizes="${esc(o.sizes)}" `
-    + `width="${top}" height="${Math.round(top * source.height / source.width)}" ${rest}>`;
+  return { src: urls[urls.length - 1]!, srcset: urls.map((u, i) => `${esc(u)} ${widths[i]}w`).join(", "),
+    width: top, height: Math.round(top * source.height / source.width) };
 }
 
 /** `{{pd-image field alt=… [loading="eager"]}}`: an image in its slot (image-slots.ts) as an <img> with its variants. */

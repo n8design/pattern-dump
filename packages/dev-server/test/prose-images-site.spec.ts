@@ -1,16 +1,17 @@
 // A storefront page's prose images end to end, through the server pd build crawls: a raster from the assets in the
 // page's markdown is written with its variants in the layout's slot (x-pd-prose-images), and every URL it writes is
 // served on the storefront's host; a page whose layout declares no slot, and an image with no alt, fail the page
-// with the file and line.
+// with the file and line. A sibling <name>-dark.<ext> makes the image a <picture> whose dark source's variants are served
+// and written by pd build too; a caption on an image alone on its line makes a <figure>.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "@pattern-dump/config";
 import { PD_HOSTS } from "@pattern-dump/contracts";
-import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import { buildStaticSite, startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import { save } from "../../../test-support/save.js";
 
 const fixtures = fileURLToPath(new URL("../../build/test/fixtures/images/", import.meta.url));
@@ -40,6 +41,8 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "pd-prose-images-"));
   await mkdir(join(root, "src", "assets", "images"), { recursive: true });
   await copyFile(join(fixtures, "photo.jpg"), join(root, "src", "assets", "images", "launch.jpg"));
+  await copyFile(join(fixtures, "flat.png"), join(root, "src", "assets", "images", "chart.png"));
+  await copyFile(join(fixtures, "alpha.png"), join(root, "src", "assets", "images", "chart-dark.png"));
   const layout = (slot: boolean) => JSON.stringify({ type: "object", required: ["title"], properties: { title: { type: "string" } },
     ...(slot ? { "x-pd-prose-images": SLOT } : {}) });
   for (const [rel, body] of Object.entries({
@@ -50,6 +53,7 @@ beforeAll(async () => {
     "pages/index.md": `---\ntitle: Home\n---\n\nThe launch:\n\n![The shuttle on its pad](/assets/images/launch.jpg)\n`,
     "pages/no-slot.md": `---\ntitle: No slot\nlayout: plain\n---\n\n![The shuttle on its pad](/assets/images/launch.jpg)\n`,
     "pages/no-alt.md": `---\ntitle: No alt\n---\n\nText first.\n\n![](/assets/images/launch.jpg)\n`,
+    "pages/chart.md": `---\ntitle: Chart\n---\n\n![Sales by month](/assets/images/chart.png "Sales, 2026")\n`,
   })) await save(join(root, rel), body);
   server = await startDevServer(config, root, { port: 0, live: false });
 });
@@ -72,6 +76,20 @@ describe("prose images on the storefront", () => {
     for (const url of urls) expect((await get(url)).status, url).toBe(200);
   });
 
+  it("a sibling -dark file: a <picture> in a <figure>, the dark source's variants served on the storefront's host", async () => {
+    const page = await get("/chart/");
+    expect(page.status).toBe(200);
+    const figure = /<figure class="doc-figure">[\s\S]*?<\/figure>/.exec(page.body)?.[0] ?? "";
+    expect(figure).toMatch(/^<figure class="doc-figure">\n<picture><source media="\(prefers-color-scheme: dark\)" srcset="[^"]+" sizes="[^"]+" width="\d+" height="\d+"><img [^>]+><\/picture>\n<figcaption>Sales, 2026<\/figcaption>\n<\/figure>$/);
+    expect(figure).not.toContain("title=");
+    const dark = /<source [^>]* srcset="([^"]+)"/.exec(figure)![1]!.split(",").map(c => c.trim().split(/\s+/)[0]!);
+    expect(dark.length).toBeGreaterThan(0);
+    for (const url of dark) {
+      expect(url).toMatch(/^\/_pd\/images\/images\/chart-dark\.[0-9a-f]{10}\.\d+\.webp$/);
+      expect((await get(url)).status, url).toBe(200);
+    }
+  });
+
   it("a page whose layout declares no slot fails, naming the file, line, layout and key", async () => {
     const page = await get("/no-slot/");
     expect(page.status).toBe(500);
@@ -84,4 +102,21 @@ describe("prose images on the storefront", () => {
     expect(page.status).toBe(500);
     expect(page.body).toContain(`no-alt.md:7: the image /assets/images/launch.jpg has no alt text`);
   });
+  // Last: it removes the two pages that fail, which a build would stop on.
+  it("pd build writes the dark source's variants beside the light ones", async () => {
+    const out = join(root, "..", `${root.split("/").pop()}-workbench`);
+    await rm(join(root, "pages", "no-slot.md"));
+    await rm(join(root, "pages", "no-alt.md"));
+    try {
+      await buildStaticSite(defineConfig({ ...config, storefront: { ...config.storefront!, workbenchUrl: "/workbench/" }, build: { basePath: "/workbench/" } }), root, { outDir: out, pdVersion: "0.0.0-test" });
+      const html = await readFile(join(root, "site", "chart", "index.html"), "utf8");
+      expect(html).toContain(`<source media="(prefers-color-scheme: dark)"`);
+      const files = await readdir(join(root, "site", "_pd", "images", "images"));
+      expect(files.some(f => /^chart-dark\..*\.webp$/.test(f)), files.join(" ")).toBe(true);
+      expect(files.some(f => /^chart\.[0-9a-f]{10}\..*\.webp$/.test(f)), files.join(" ")).toBe(true);
+    } finally {
+      await rm(out, { recursive: true, force: true });
+    }
+  }, 90_000);
+
 });
