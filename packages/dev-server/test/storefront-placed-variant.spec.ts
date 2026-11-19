@@ -5,8 +5,10 @@
 //
 // The variant's data comes with it: each key whose value in the variant's .json differs from the base's .json, and
 // that the tag leaves unset, takes the variant's value (`tone: loud`). Keys the two share are sample text and stay
-// out, as every unset key of a placement does; the tag's own values win, and a required key still has to be set by
-// the tag. On a copy of the storefront bench, as in storefront-placed.spec.ts.
+// out, as every unset key of a placement does; the tag's own values win. The variant's data comes before the check, so
+// a required key the variant sets counts as given; a required key that neither the tag nor the variant's data sets
+// (a key the variant's .json leaves out, or one it shares with the base's) still fails. On a copy of the storefront
+// bench, as in storefront-placed.spec.ts.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { request } from "node:http";
@@ -32,10 +34,15 @@ const ADDED: Record<string, string> = {
   "src/patterns/atoms/pill/pill~loud.json": json({ tone: "loud", label: "LOUD", hint: "A sample hint" }),
   // A data-overlay variant with its own schema, which allows only its own tones.
   "src/patterns/atoms/pill/pill~quiet.json": json({ tone: "quiet" }),
+  // A data-overlay variant whose label is the base's: sample text, so it does not count as given.
+  "src/patterns/atoms/pill/pill~same.json": json({ tone: "same", label: "Pill" }),
   "src/patterns/atoms/pill/pill~quiet.schema.json": json({ required: ["label"], properties: { label: { type: "string" }, tone: { type: "string", enum: ["quiet", "hushed"] } } }),
   "pages/loud.md": `${FM}<pd-atoms-pill~loud label="Loud one"></pd-atoms-pill~loud>\n`,
   "pages/quiet.md": `${FM}<pd-atoms-pill~quiet label="Quiet one" tone="plain"></pd-atoms-pill~quiet>\n`,
   "pages/typo.md": `${FM}<pd-atoms-pill~loud lable="Loud one"></pd-atoms-pill~loud>\n`,
+  "pages/loud-bare.md": `${FM}<pd-atoms-pill~loud></pd-atoms-pill~loud>\n`,
+  "pages/quiet-bare.md": `${FM}<pd-atoms-pill~quiet></pd-atoms-pill~quiet>\n`,
+  "pages/same-bare.md": `${FM}<pd-atoms-pill~same></pd-atoms-pill~same>\n`,
   "pages/own-tone.md": `${FM}<pd-atoms-pill~loud label="Soft one" tone="soft"></pd-atoms-pill~loud>\n`,
 };
 
@@ -93,12 +100,31 @@ describe("a pd- tag that places a variant", () => {
     expect(page.body).toContain(`<span class="pill pill--soft" title="">Soft one</span>`);
   });
 
+  it("a required key the variant's data sets counts as given: the tag can leave it out", async () => {
+    const page = await get("/loud-bare/");
+    expect(problemsOf(page.body)).toEqual([]);
+    expect(page.status).toBe(200);
+    expect(page.body).toContain(`<span class="pill pill--loud" title="">LOUD</span>`);
+  });
+
+  it("a required key the variant's data leaves out is still required, with the same message", async () => {
+    const page = await get("/quiet-bare/");
+    expect(page.status).toBe(500);
+    expect(problemsOf(page.body)).toEqual([`quiet-bare.md:5:1: <pd-atoms-pill~quiet>: "label" is required by atoms/pill~quiet`]);
+  });
+
+  it("a required key the variant shares with the base is sample text: still required", async () => {
+    const page = await get("/same-bare/");
+    expect(page.status).toBe(500);
+    expect(problemsOf(page.body)).toEqual([`same-bare.md:5:1: <pd-atoms-pill~same>: "label" is required by atoms/pill~same`]);
+  });
+
   it("the base's schema names a misspelled key", async () => {
+    // label is required, and pill~loud.json sets it ("LOUD"), so the misspelling is the one problem.
     const page = await get("/typo/");
     expect(page.status).toBe(500);
     expect(problemsOf(page.body)).toEqual([
       `typo.md:5:21: <pd-atoms-pill~loud>: "lable" is not declared by atoms/pill~loud: did you mean "label"?`,
-      `typo.md:5:1: <pd-atoms-pill~loud>: "label" is required by atoms/pill~loud`,
     ]);
   });
 

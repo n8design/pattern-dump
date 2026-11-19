@@ -210,8 +210,10 @@ The tag's name is `pd-` followed by the component's handle (`<category>-<name>`,
 a variant is `pd-components-note~warning`. A variant's values are checked against its own `.schema.json`, else its
 base's, and it brings the data that makes it the variant: each key the tag leaves unset whose value in
 `note~warning.json` differs from `note.json` (`tone: warning`), while sample text the two share stays out; the tag's
-own values win. The component renders into the page, with its stylesheet linked in the page's head, so the page's
-own styles also reach it.
+own values win. A required key the variant brings counts as given, so `<pd-components-note~warning>` needs no
+`heading` when `note~warning.json` sets one; a required key that the variant's data leaves out, or shares with the
+base's, is still the tag's to set. The component renders into the page, with its stylesheet linked in the page's
+head, so the page's own styles also reach it.
 
 | Written | Becomes |
 |---|---|

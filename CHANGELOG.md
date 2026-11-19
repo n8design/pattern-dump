@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0 (unreleased)
+
+### Fixed
+
+- **A placed variant no longer asks for a value its data already gives.** `<pd-components-note~warning>` without a
+  `heading` stopped the page with `"heading" is required by components/note~warning`, although `note~warning.json`
+  sets one. A required key the variant's data sets now counts as given, and the page shows the variant's value. A key
+  the variant's `.json` leaves out, or has the same value for as the base's `.json`, is still required on the tag,
+  with the same message as before.
+
 ## 0.7.0 (2026-11-18)
 
 Diagrams that follow the site's colours: symbol images, drawn once with colour tokens, shown on site pages in light
