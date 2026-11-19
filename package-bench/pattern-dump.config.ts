@@ -9,6 +9,9 @@ export default defineConfig({
   outDir: "./.out/workbench",
   styles: { strategy: "parallel", dir: "./src/styles" },
   packages: ["pd-fixture-ds", "pd-fixture-skin"],
+  // The old names on purpose: `storefront`, with `site` for the values every page shares, as configs were written
+  // before 0.8.0 (now `site` and `site.globals`). They still load, with a warning per key, until 1.0;
+  // test/old-names.spec.ts asserts the warnings and that the bench loads as it would with the new names.
   storefront: {
     pagesDir: "./pages",
     outDir: "./.out/storefront",

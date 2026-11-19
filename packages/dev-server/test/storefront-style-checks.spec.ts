@@ -67,14 +67,14 @@ describe("pd build — classes outside the design system", () => {
       `about.md:${line}: class "lede" isn't defined by any component or style`,
       `about.md:${line}: class "hero-big-title" isn't defined by any component or style`,
     ]);
-    expect(await exists(join(root, ".out", "storefront", "about", "index.html"))).toBe(true);
+    expect(await exists(join(root, ".out", "site", "about", "index.html"))).toBe(true);
   }, 60_000);
 
   it("stops the build with checks.classes: \"error\", and writes nothing", async () => {
     const root = await benchCopy();
     await placeBadge(root, "hero-big-title");
     await expect(build(root, config({ classes: "error" }))).rejects.toThrow(/classes outside the design system[\s\S]*about\.md:\d+: class "hero-big-title"/);
-    expect(await exists(join(root, ".out", "storefront"))).toBe(false);
+    expect(await exists(join(root, ".out", "site"))).toBe(false);
   }, 60_000);
 
   it("takes allowClasses, by name and by prefix, and skips the check with checks.classes: \"off\"", async () => {
@@ -101,7 +101,7 @@ describe("pd build — custom properties nothing defines", () => {
     const line = await lineIn(card, "--wf-ink-missing");
     await expect(build(root)).rejects.toThrow(
       `src/styles/components/card.scss:${line}: var(--wf-ink-missing) reads a custom property nothing defines`);
-    expect(await exists(join(root, ".out", "storefront"))).toBe(false);
+    expect(await exists(join(root, ".out", "site"))).toBe(false);
   }, 60_000);
 
   it("builds with a fallback, with allowProperties, and with the property set in a component's style attribute", async () => {

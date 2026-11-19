@@ -19,7 +19,7 @@ export default defineConfig({
   themes: { dir: "./themes", default: "light" },
   site: {
     pagesDir: "./pages",
-    outDir: "./.out/storefront",
+    outDir: "./.out/site",
     workbenchUrl: "https://workbench.example.test/",
     // The site's own address: canonical URLs, Open Graph, JSON-LD and the sitemap are built from it.
     url: "https://bench.example.test/",

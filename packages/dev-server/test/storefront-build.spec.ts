@@ -63,7 +63,7 @@ describe("pd build — the storefront root", () => {
   beforeAll(async () => {
     root = await benchCopy();
     report = await build(root, join(root, "..", "wb-good"));
-    files = await tree(join(root, ".out", "storefront"));
+    files = await tree(join(root, ".out", "site"));
   }, 120_000);
 
   it("writes one HTML file per page at its route, the previews they embed, and what those reference", () => {
@@ -140,7 +140,7 @@ describe("pd build — the storefront root", () => {
       "tags/layout/index.html",
       "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "storefront"), basePath: "/", pages: 14, files: 57, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "site"), basePath: "/", pages: 14, files: 57, bytes: expect.any(Number) });
     // llms.txt lists six pages: every page of the folder but the home page, whose title and description head it.
     expect(report.llms).toEqual({ pages: 6 });
   });
@@ -162,7 +162,7 @@ describe("pd build — the storefront root", () => {
   it("is the same, byte for byte, when built again", async () => {
     const again = await benchCopy();
     const second = await build(again, join(again, "..", "wb-again"));
-    const files2 = await tree(join(again, ".out", "storefront"));
+    const files2 = await tree(join(again, ".out", "site"));
     expect([...files2.keys()].sort()).toEqual([...files.keys()].sort());
     for (const [file, { bytes }] of files) expect(files2.get(file)!.bytes.equals(bytes), file).toBe(true);
     expect(second.notes).toEqual(report.notes);
@@ -369,7 +369,7 @@ describe("pd build — a storefront with problems writes nothing", () => {
       + "  - /about/: about.md: pattern components/nope: there is no such component",
     );
     expect(await exists(out)).toBe(false);
-    expect(await exists(join(root, ".out", "storefront"))).toBe(false);
+    expect(await exists(join(root, ".out", "site"))).toBe(false);
   }, 120_000);
 
   it("lists a problem of the whole site once, not once for every page that shows it", async () => {
@@ -386,10 +386,10 @@ describe("pd build — a storefront with problems writes nothing", () => {
     const root = await benchCopy();
     const out = join(root, "..", "wb-kept");
     await build(root, out);
-    const before = { wb: await tree(out), sf: await tree(join(root, ".out", "storefront")) };
+    const before = { wb: await tree(out), sf: await tree(join(root, ".out", "site")) };
     await breakPage(root);
     await expect(build(root, out)).rejects.toThrow("pd build: the site has problems, so nothing was written:");
-    const after = { wb: await tree(out), sf: await tree(join(root, ".out", "storefront")) };
+    const after = { wb: await tree(out), sf: await tree(join(root, ".out", "site")) };
     for (const which of ["wb", "sf"] as const) {
       expect([...after[which].keys()].sort(), which).toEqual([...before[which].keys()].sort());
       for (const [k, v] of before[which]) {

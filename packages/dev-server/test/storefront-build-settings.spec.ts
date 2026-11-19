@@ -67,7 +67,7 @@ describe("pd build — the storefront's settings", () => {
     const note = `site.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, `
       + `and there is no sitemap: set site.url to the site's address, such as "https://example.com/"`;
     expect(report.notes.filter(n => n === note)).toHaveLength(1);
-    const pages = await tree(join(root, ".out", "storefront"));
+    const pages = await tree(join(root, ".out", "site"));
     for (const [file, { bytes }] of pages) {
       if (file.endsWith(".html")) expect(bytes.toString("utf8"), file).not.toMatch(/rel="canonical"|property="og:|name="twitter:/);
     }
@@ -96,7 +96,7 @@ describe("pd build — the storefront's settings", () => {
     const setup = join(root, "pages", "guides", "setup.md");
     await save(setup, (await readFile(setup, "utf8")).replace("title: Setup\n", "title: Setup\nindex: false\n"));
     await build(root, join(root, "..", "wb-noindex"));
-    const out = join(root, ".out", "storefront");
+    const out = join(root, ".out", "site");
     const sitemap = await readFile(join(out, "sitemap.xml"), "utf8");
     expect(sitemap).not.toContain("/guides/setup/");
     expect(sitemap).toContain("<loc>https://bench.example.test/guides/</loc>");
@@ -106,7 +106,7 @@ describe("pd build — the storefront's settings", () => {
   it("a site with index: false: no sitemap, and robots.txt keeps everything out", async () => {
     const root = await benchCopy();
     await build(root, join(root, "..", "wb-staging"), config({ index: false }));
-    const out = join(root, ".out", "storefront");
+    const out = join(root, ".out", "site");
     expect(await exists(join(out, "sitemap.xml"))).toBe(false);
     expect(await readFile(join(out, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /\n");
   }, 60_000);
@@ -115,14 +115,14 @@ describe("pd build — the storefront's settings", () => {
     const root = await benchCopy();
     const { url: _u, ...rest } = benchConfig.site!;
     await buildStaticSite(validateConfig({ ...benchConfig, site: rest }, "test"), root, { outDir: join(root, "..", "wb-nourl2"), pdVersion: "x", now: NOW });
-    const out = join(root, ".out", "storefront");
+    const out = join(root, ".out", "site");
     expect(await exists(join(out, "sitemap.xml"))).toBe(false);
     expect(await readFile(join(out, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /preview/\n");
   }, 60_000);
 
   it("keeps the storefront's output apart from the workbench's and from what PD reads", async () => {
     const root = await benchCopy();
-    await expect(build(root, join(root, ".out", "storefront"))).rejects.toThrow(/and --out .* overlap: the site and the workbench each need a folder of their own/);
+    await expect(build(root, join(root, ".out", "site"))).rejects.toThrow(/and --out .* overlap: the site and the workbench each need a folder of their own/);
     await expect(build(root, join(root, "..", "wb-x"), config({ outDir: "./src/styles/out" }))).rejects.toThrow(/site\.outDir .* overlaps .*styles, which Pattern Dump reads/);
     // An output root that contains the project is already refused by the config (it holds the pages and the
     // patterns); the build refuses it too, for a config that never went through validation.

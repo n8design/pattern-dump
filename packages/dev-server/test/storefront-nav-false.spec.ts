@@ -189,7 +189,7 @@ describe("pd build: a page with nav: false", () => {
     }, "test");
     const report = await buildStaticSite(cfg, root, { outDir: join(tmp, "bench-out"), pdVersion: "0.0.0-test", now: new Date("2027-01-02T03:04:05.000Z") });
     expect(report.storefront?.pages).toBeGreaterThan(0);
-    const site = join(root, ".out", "storefront");
+    const site = join(root, ".out", "site");
     expect(await stat(join(site, "about", "index.html")).then(() => true, () => false)).toBe(true);
     expect(await readFile(join(site, "sitemap.xml"), "utf8")).toContain("/about/</loc>");
     // The home page's nav, as the bench's layout writes it, no longer lists About.
