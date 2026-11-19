@@ -167,8 +167,8 @@ export interface PatternDumpConfig {
   /**
    * `pd build` — the static snapshot. `outDir` (relative to the root) defaults to the top-level
    * `outDir`; `basePath` is where the snapshot will be hosted ("/" at a domain root, "/docs/" under a
-   * subpath) and defaults to "/". `audit: false` leaves the corpus audit out — it is not run, and the
-   * static site has no Audit tab. All three can be overridden on the command line. `skipChecks` names checks the
+   * subpath) and defaults to "/". `audit: false` leaves the corpus audit out: it is not run, and the
+   * workbench snapshot has no Audit tab. All three can be overridden on the command line. `skipChecks` names checks the
    * build leaves out (SKIPPABLE_CHECKS), for a quick local build: none by default, and the build report names each
    * one skipped. `--skip-checks` on the command line replaces it. `workbench: false` writes the site only:
    * for a site whose components come from a style guide package that publishes its own workbench, at
@@ -182,11 +182,6 @@ export interface PatternDumpConfig {
   storefront?: StorefrontConfig;
 }
 
-/**
- * The storefront. `pd dev` serves it on its own host (`live.localhost` unless `host` says otherwise),
- * the workbench on `pd.localhost`, both from `/`. `pd build` writes it to its own folder, apart from
- * the workbench snapshot. A page renders with the layout `layouts/<layout>` from the project's patterns.
- */
 /** How responsive image variants are encoded. */
 export interface ImageSettings {
   /** WebP quality, a whole number from 1 to 100. Default: 75. */
@@ -195,6 +190,10 @@ export interface ImageSettings {
   effort?: number;
 }
 
+/**
+ * @deprecated Use SiteConfig. Removed in 1.0. The shape of `storefront`, the old name of `site`: the values every page
+ * shares are its `site`, where SiteConfig has `globals`.
+ */
 export interface StorefrontConfig {
   /** Folder of the pages, relative to the root. `index.md` is `/`, `guides/setup.md` is `/guides/setup/`.
    *  `pagesDir`, `patternsDir` and `outDir` are three separate folders: none is another, and none is inside
@@ -248,31 +247,31 @@ export interface StorefrontConfig {
    * property of `partials/base`'s schema declares: they are checked against it, not inferred.
    *
    * One key is Pattern Dump's: `navigations`, named lists of links (a footer's, a sidebar's), each entry a
-   * page, an external link or a group, nested to any depth. Their shape is fixed (StorefrontNavEntry) and
+   * page, an external link or a group, nested to any depth. Their shape is fixed (SiteNavEntry) and
    * checked by Pattern Dump; the skin's schema only lists the names it uses.
    */
-  site?: Record<string, unknown> & { navigations?: Record<string, StorefrontNavEntry[]> };
+  site?: Record<string, unknown> & { navigations?: Record<string, SiteNavEntry[]> };
   /**
    * The categories a page can be in (its `categories:`), by key: the only values a page may name, so a typo fails the
    * build. Independent of the folders, so a page changes category without changing its URL. A key is lowercase
    * letters, digits and hyphens. `aliases` are the category's old keys: a page that still names one builds, as the
    * category, with a note naming the page so it can be updated.
    */
-  categories?: Record<string, StorefrontCategory>;
+  categories?: Record<string, SiteCategory>;
   /**
    * The tags a page can have (its `tags:`), by key, declared as categories are. Optional: without it every tag works,
    * labelled with its key. With it, it is the list, so a typo fails the build; an alias is an old key that still builds.
    */
-  tags?: Record<string, StorefrontTag>;
+  tags?: Record<string, SiteTag>;
   /**
    * A page per tag (`/tags/<key>/`) and an index of them (`/tags/`), each through the skin's `layouts/tag` and
    * `layouts/tags`. Left out: on when the skin has `layouts/tag`. `false`: off. `true` or an object: on, and a missing
    * layout is a problem. `path`: the URL segment (default `tags`); `title`: the index page's title (default "Tags").
    */
-  tagPages?: boolean | StorefrontTermPages;
+  tagPages?: boolean | SiteTermPages;
   /** A page per category and an index of them, as tagPages (`layouts/category`, `layouts/categories`; default path
    *  `categories`, title "Categories"). */
-  categoryPages?: boolean | StorefrontTermPages;
+  categoryPages?: boolean | SiteTermPages;
   /**
    * Search with Pagefind: pd build indexes each page's own content and writes the index to `_pd/search/` in the site.
    * Pagefind is the project's own (`npm install --save-dev pagefind`). Left out: on when the project has Pagefind.
@@ -286,11 +285,11 @@ export interface StorefrontConfig {
    */
   llms?: boolean;
   /** pd build's checks of the site against its style guide. */
-  checks?: StorefrontChecks;
+  checks?: SiteChecks;
 }
 
 /** site.checks: what pd build checks the site's classes and custom properties against. */
-export interface StorefrontChecks {
+export interface SiteChecks {
   /**
    * A class on a page that no component or style of the style guide defines: `"warning"` (the default) lists it in
    * the report, `"error"` stops the build, `"off"` skips the check.
@@ -304,7 +303,7 @@ export interface StorefrontChecks {
 }
 
 /** site.tagPages and site.categoryPages as an object. */
-export interface StorefrontTermPages {
+export interface SiteTermPages {
   /** The pages' first URL segment: lowercase letters, digits and hyphens. */
   path?: string;
   /** The index page's title. */
@@ -312,10 +311,10 @@ export interface StorefrontTermPages {
 }
 
 /** A declared tag (`site.tags.<key>`): the same shape as a category. */
-export type StorefrontTag = StorefrontCategory;
+export type SiteTag = SiteCategory;
 
 /** A declared category (`site.categories.<key>`). */
-export interface StorefrontCategory {
+export interface SiteCategory {
   label: string;
   description?: string;
   /** Old keys of this category, kept after a rename. */
@@ -328,10 +327,21 @@ export interface StorefrontCategory {
  * - an external link: `href` is `https:`, `http:` or `mailto:`, or a path from the site's root (`/feed.xml`);
  * - a group: a `label` and its `children`, entries of any of the three kinds.
  */
-export type StorefrontNavEntry =
+export type SiteNavEntry =
   | { page: string; label?: string }
   | { href: string; label: string }
-  | { label: string; children: StorefrontNavEntry[] };
+  | { label: string; children: SiteNavEntry[] };
+
+/** @deprecated Use SiteChecks. Removed in 1.0. */
+export type StorefrontChecks = SiteChecks;
+/** @deprecated Use SiteTermPages. Removed in 1.0. */
+export type StorefrontTermPages = SiteTermPages;
+/** @deprecated Use SiteTag. Removed in 1.0. */
+export type StorefrontTag = SiteTag;
+/** @deprecated Use SiteCategory. Removed in 1.0. */
+export type StorefrontCategory = SiteCategory;
+/** @deprecated Use SiteNavEntry. Removed in 1.0. */
+export type StorefrontNavEntry = SiteNavEntry;
 
 /**
  * What a project writes: the config, where `sourceDir`, `patternsDir` and `styles` may be left out (a site whose
@@ -353,7 +363,7 @@ export type PatternDumpConfigInput = Omit<PatternDumpConfig, "sourceDir" | "patt
 export type SiteConfig = Omit<StorefrontConfig, "site"> & {
   /** Values every page of the site shares, such as its title or the line in its footer; every layout gets them as
    *  `site`. Checked against the `site` property of `partials/base`'s schema. `navigations` is Pattern Dump's:
-   *  named lists of links (StorefrontNavEntry). */
+   *  named lists of links (SiteNavEntry). */
   globals?: StorefrontConfig["site"];
 };
 

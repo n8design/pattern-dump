@@ -478,7 +478,7 @@ A layout receives:
 | `body` | The page's markdown, rendered. Include it unescaped, `{{{body}}}`: it is the only value safe to, because the markdown renderer escapes everything an author writes. Every other value is included escaped, `{{…}}`. A layout can name another key for it ([below](#a-page-or-template-as-a-layout)) |
 | `nav` | The navigation: `{ route, title, description?, current?, children? }` per entry, `current: true` on the page's own entry. A page with `nav: false` in its frontmatter is not in it |
 | `site` | The values of `site.globals` |
-| `page` | What the site derives for the page, when the layout declares it (below) |
+| `page` | What Pattern Dump derives for the page, when the layout declares it (below) |
 
 ```hbs
 {{#> partials-base }}
@@ -491,7 +491,7 @@ A layout receives:
 
 A layout's sample data (`<name>.json`) is what its workbench preview shows. It never reaches a page: a
 page gets only its own values and the ones above. To keep that true, a sample may only use the keys its
-layout declares plus `body`, `nav` and `site`, and the site reports any other as a problem.
+layout declares plus `body`, `nav` and `site`, and Pattern Dump reports any other as a problem.
 
 In the workbench a layout fills the Stage, like a page or a template, so its `index.md` needs no
 `preview: full`. See [Preview layout](authoring.md#preview-layout) for overriding it.
@@ -538,11 +538,11 @@ schema is the page's frontmatter contract.
 schema that declares what the template takes. Resolving `$ref` and `allOf` in schemas, so such a wrapper's schema
 could refer to the original instead of repeating it, is not supported yet.
 
-### What the site derives for a page
+### What Pattern Dump derives for a page
 
 A layout that declares a `page` property in its schema, with sub-properties, gets those sub-keys of what
-the site works out for each page, and only those. Each is present, and `null` where there is
-nothing. A page cannot set `page`, and a sub-key the site does not fill is a problem that names the
+Pattern Dump works out for each page, and only those. Each is present, and `null` where there is
+nothing. A page cannot set `page`, and a sub-key Pattern Dump does not fill is a problem that names the
 ones it does. A sample's `page` may only use the sub-keys the layout declares, and inside them only the
 keys below, at any depth.
 
