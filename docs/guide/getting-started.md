@@ -112,7 +112,7 @@ The workbench has four regions:
 | **Nav Rail** (left) | The component tree and search; the theme picker; **Accessibility** (colour-vision simulation); viewport sizes (fit, fit content, mobile, tablet, desktop); buttons to show or hide the Inspector and Console; **Show private**; **Hide packages** when pattern packages are used |
 | **Stage** (centre) | The live preview of the selected component or variant, a gallery of all variants, or a folder gallery |
 | **Inspector** (right) | **Docs** (the component's `.md`), **Relationships** (what it uses and what uses it, including borrowed CSS classes), **Audit** (defects across all components) |
-| **Console** (bottom) | **Source** (template, data, schema), **HTML** (the rendered markup), **Diagnostics** (render, schema, HTML validation and accessibility findings), **Console** (messages from the server) |
+| **Console** (bottom) | **Source** (template, data, schema), **HTML** (the rendered markup), **Diagnostics** (render, schema, HTML validation and accessibility findings), **Console** (messages from the server; a warning starts with `Warning:` and has an orange mark at its left edge, an error is red) |
 
 Every view has its own address, so links, reloads and the browser's Back button work. PatternLab-style
 links (`/#/atoms/button`) open the same view, and an address that names nothing says so and links the

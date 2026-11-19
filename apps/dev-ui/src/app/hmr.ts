@@ -240,7 +240,7 @@ export function connectHmr(): void {
     } else if (msg.type === "orphan-variant") {
       // Left out of the tree like a quarantined component, and for the same reason said here: otherwise the
       // variant simply never appears.
-      renderConsole(`Data variant left out: ${msg.variantPath} needs ${msg.basePath} to overlay, and there is none`, "error");
+      renderConsole(`Data variant left out: ${msg.variantPath} needs ${msg.basePath} to overlay, and there is none`, "warn");
     } else if (msg.type === "page-changed") {
       // Storefront pages reload on this; the workbench shows no storefront page, so it ignores it.
     } else {

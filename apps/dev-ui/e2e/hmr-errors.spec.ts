@@ -99,10 +99,50 @@ test.describe("HMR — build errors reach the Console", () => {
     const variant = path.join(testBench, "src/patterns/atoms", `${slug}~loud.json`);
     try {
       await save(variant, `{ "tone": "loud" }\n`);
-      const line = page.locator(`${consoleLines}[data-level="error"]`, { hasText: `${slug}~loud.json` });
+      // A warning, not an error: nothing breaks, the variant just doesn't appear.
+      const line = page.locator(`${consoleLines}[data-level="warn"]`, { hasText: `${slug}~loud.json` });
       await expect(line.first()).toBeAttached({ timeout: 20_000 });
       await expect(line.first()).toContainText(`${slug}.hbs`);
       await expect(line.first()).toContainText("left out");
+      await expect(line.first()).toHaveText(/^Warning: Data variant left out: /);
+      await expect(page.locator(`${consoleLines}[data-level="error"]`, { hasText: `${slug}~loud.json` })).toHaveCount(0);
+      // The rendered line, under the OS's light and dark setting: the text is the normal ink at 4.5:1 or more on the
+      // Console's ground (the word carries the meaning, not colour), and the marker paints in --pd-warning.
+      for (const colorScheme of ["light", "dark"] as const) {
+        await page.emulateMedia({ colorScheme });
+        const painted = await line.first().evaluate((el: HTMLElement) => {
+          // Any CSS colour (rgb(), oklch(), …) as sRGB 0–255 plus alpha 0–255: painted on a 1×1 canvas and read back.
+          const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+          const rgb = (c: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data]; };
+          const lum = (c: number[]) => {
+            const [r, g, b] = c.slice(0, 3).map(v => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+            return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+          };
+          let ground = "";
+          for (let n: Element | null = el; n && !ground; n = n.parentElement) {
+            const bg = getComputedStyle(n).backgroundColor;
+            if (bg && bg !== "transparent" && rgb(bg)[3] !== 0) ground = bg;
+          }
+          const [a, b] = [lum(rgb(getComputedStyle(el).color)), lum(rgb(ground || "rgb(255, 255, 255)"))];
+          const probe = document.createElement("span");
+          probe.style.borderLeft = "1px solid var(--pd-warning)";
+          document.body.appendChild(probe);
+          const warning = getComputedStyle(probe).borderLeftColor;
+          probe.remove();
+          const s = getComputedStyle(el);
+          return {
+            contrast: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+            inkIsBodyInk: s.color === getComputedStyle(el.parentElement!).color,
+            borderStyle: s.borderInlineStartStyle, borderWidth: parseFloat(s.borderInlineStartWidth),
+            borderColor: s.borderInlineStartColor, warning,
+          };
+        });
+        expect(painted.contrast, colorScheme).toBeGreaterThanOrEqual(4.5);
+        expect(painted.inkIsBodyInk, colorScheme).toBe(true);
+        expect(painted.borderStyle, colorScheme).toBe("solid");
+        expect(painted.borderWidth, colorScheme).toBeGreaterThanOrEqual(2);
+        expect(painted.borderColor, colorScheme).toBe(painted.warning);
+      }
     } finally {
       await rm(variant, { force: true });
       await page.waitForTimeout(1500);

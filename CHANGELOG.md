@@ -46,6 +46,9 @@
 
 ### Fixed
 
+- **The Console has a warning level.** A data variant left out for want of a base template, and a preview whose
+  height depends on the frame's, are warnings now: the line starts with `Warning:` and has an orange mark at its left
+  edge, its text in the normal colour. The variant was shown in red, like a broken build. Errors stay red.
 - **A failed `npm install` in `pd init` says what failed.** It said `pattern-dump may not be published yet` and
   suggested installing a local build, whatever the cause. It now repeats npm's error lines (`npm error code E404`,
   `npm error 404 Not Found - GET …`) and says how to install again: `cd <folder> && npm install`. When npm wrote no

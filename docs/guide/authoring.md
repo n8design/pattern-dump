@@ -67,7 +67,7 @@ A variant is a sibling file named `<name>~<variant>`:
 A component can consist of variants with their own markup alone (`button~icon.hbs`), with no `button.hbs`. The
 workbench then shows the variants, each selectable, and a gallery of all of them. A data overlay needs a base
 template to overlay: a `button~secondary.json` with no `button.hbs` beside it has no markup, so it is left out, and
-`pd dev` names it in the terminal and on the Console.
+`pd dev` names it in the terminal and on the Console, as a warning.
 
 A variant can have its own `.md` and `.schema.json` (`button~secondary.md`); a variant with no `.md` of its own shows
 the base component's documentation.

@@ -70,7 +70,7 @@ export function mount(): void {
   initContentHeight(frame => {
     const id = frame.contentDocument?.body?.dataset.componentId ?? session.current?.id ?? "preview";
     renderConsole(`${id}: height depends on the preview's own height (a viewport-relative rule such as `
-      + `height: 100vh), so the frame keeps its last steady height and the content scrolls inside it.`);
+      + `height: 100vh), so the frame keeps its last steady height and the content scrolls inside it.`, "warn");
   });
 
   // Nav open-state persistence is wired by mountSidebar() — click listeners on each
