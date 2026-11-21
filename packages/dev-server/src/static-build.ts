@@ -11,6 +11,7 @@
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
 import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createImageCache } from "@pattern-dump/build";
 import { sameHostWorkbenchPath, type PatternDumpConfig, SKIPPABLE_CHECKS, type SkippableCheck } from "@pattern-dump/config";
@@ -70,6 +71,8 @@ export interface StaticBuildOptions {
 /** Not a test's watcher barrier (`.__testOnly_barrier`, which tests and the settle hook write into watched
  *  folders, asset folders among them): those never reach the build's output. */
 const notABarrier = (path: string): boolean => basename(path) !== ".__testOnly_barrier";
+/** A helpers path is a folder of modules or one module file; a missing one is named as a file. */
+const isFolder = (path: string): boolean => { try { return statSync(path).isDirectory(); } catch { return false; } };
 
 export interface StaticBuildReport {
   outDir: string;
@@ -187,22 +190,37 @@ async function buildOnce(
     return rel === "" || (!rel.startsWith("..") && !rel.startsWith(sep) && !/^[a-zA-Z]:/.test(rel));
   };
   const project = resolve(root);
-  if (buildWorkbench && inside(project, outDir)) throw new Error(`pd build: --out ${outDir} would contain the project itself: choose a folder inside or beside it, like ./dist`);
-  for (const source of buildWorkbench ? [cfg.patternsDir, cfg.stylesDir, ...cfg.themeDirs, ...cfg.assetRoots] : []) {
-    if (inside(outDir, source) || inside(source, outDir)) {
-      throw new Error(`pd build: --out ${outDir} overlaps ${source}, which Pattern Dump reads: choose another folder`);
+  const storefront = cfg.storefront;
+  // Every file the build reads, named by kind: the output folders must stay clear of each, and the input stamps
+  // (input-stamps.ts) watch the same list, so the two can't drift.
+  const reads: Array<{ kind: string; path: string }> = [
+    ...cfg.patternRoots.map(r => ({ kind: "the patterns folder", path: r.dir })),
+    ...cfg.styleRoots.map(r => ({ kind: "the styles folder", path: r.dir })),
+    ...cfg.dataDirs.map(path => ({ kind: "the data folder", path })),
+    ...cfg.helperPaths.map(path => ({ kind: isFolder(path) ? "the helpers folder" : "the helpers file", path })),
+    ...cfg.scriptsDirs.map(path => ({ kind: "the scripts folder", path })),
+    ...cfg.themeDirs.map(path => ({ kind: "the theme folder", path })),
+    ...cfg.assetRoots.map(path => ({ kind: "the asset folder", path })),
+    ...(storefront ? [{ kind: "the pages folder", path: storefront.pagesDir }] : []),
+    ...(storefront?.head ? [{ kind: "the site's head file", path: storefront.head }] : []),
+  ];
+  /** Refuses an output root that is, holds, or sits inside anything the build reads. */
+  const clearOfInputs = (name: string, out: string): void => {
+    for (const { kind, path } of reads) {
+      if (inside(out, path) || inside(path, out)) {
+        throw new Error(`pd build: ${name} ${out} overlaps ${kind} ${path}, which Pattern Dump reads: choose another folder`);
+      }
     }
+  };
+  if (buildWorkbench) {
+    if (inside(project, outDir)) throw new Error(`pd build: --out ${outDir} would contain the project itself: choose a folder inside or beside it, like ./dist`);
+    clearOfInputs("--out", outDir);
   }
   // The storefront's own output root: the same rules, and apart from the workbench's.
-  const storefront = cfg.storefront;
   if (storefront) {
     const sfOut = storefront.outDir;
     if (inside(project, sfOut)) throw new Error(`pd build: site.outDir ${sfOut} would contain the project itself: choose a folder inside or beside it`);
-    for (const source of [cfg.patternsDir, cfg.stylesDir, storefront.pagesDir, ...cfg.themeDirs, ...cfg.assetRoots]) {
-      if (inside(sfOut, source) || inside(source, sfOut)) {
-        throw new Error(`pd build: site.outDir ${sfOut} overlaps ${source}, which Pattern Dump reads: choose another folder`);
-      }
-    }
+    clearOfInputs("site.outDir", sfOut);
     if (buildWorkbench && (inside(sfOut, outDir) || inside(outDir, sfOut))) {
       throw new Error(`pd build: site.outDir ${sfOut} and --out ${outDir} overlap: the site and the workbench each need a folder of their own`);
     }
@@ -221,11 +239,7 @@ async function buildOnce(
 
   // Every file the build reads, as it is now (input-stamps.ts). Compared before each write: a file saved while the
   // build runs stops it, naming the file, instead of output that is part old, part new.
-  const inputs = [
-    ...cfg.patternRoots.map(r => r.dir), ...cfg.styleRoots.map(r => r.dir), ...cfg.dataDirs, ...cfg.helperPaths,
-    ...cfg.scriptsDirs, ...cfg.themeDirs, ...cfg.assetRoots,
-    ...(storefront ? [storefront.pagesDir, ...(storefront.head ? [storefront.head] : [])] : []),
-  ];
+  const inputs = reads.map(r => r.path);
   const outputs = [...(buildWorkbench ? [outDir] : []), ...(storefront ? [storefront.outDir] : [])];
   // Each part is written into a folder of its own beside its output, and put in place only once every check has
   // passed: a build that stops leaves both outputs as they were.
