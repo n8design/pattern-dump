@@ -106,6 +106,10 @@ switch (command.kind) {
     console.log(USAGE);
     break;
 
+  case "version":
+    console.log(PD_VERSION);
+    break;
+
   case "error":
     console.error(`[pd] Error: ${command.message}\n`);
     console.error(USAGE);
