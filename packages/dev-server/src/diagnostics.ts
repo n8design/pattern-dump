@@ -20,7 +20,7 @@
 
 import { checkCodeDigest } from "./check-code.js";
 import { createHash, randomUUID } from "node:crypto";
-import { readdir, readFile, writeFile, mkdir, rename, rm, stat } from "node:fs/promises";
+import { readdir, readFile, writeFile, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { CompositionRegistry } from "./composition.js";
 import { borrowedStyleMessage, borrowedStyles } from "./css-closure.js";
@@ -32,7 +32,7 @@ import type {
   DiagnosticComponentNode, DiagnosticOccurrence, DiagnosticsGraph, DiscoveryMap, RenderOutcome,
   RuleNode,
 } from "@pattern-dump/contracts";
-import { pdScratchDir } from "./scratch.js";
+import { ensureScratchDir, pdScratchDir } from "./scratch.js";
 
 // ---- Per-component static check unit ----
 
@@ -241,6 +241,9 @@ export function graphArtifactPath(root: string): string {
 
 export async function readDiagnosticsArtifact(root: string): Promise<PersistedDiagnostics | null> {
   try {
+    // Only from a scratch folder that is this user's alone: anyone else could have written an audit that matches the
+    // project's hashes and reports nothing. A folder that fails the check is no cache: the audit runs in full.
+    await ensureScratchDir(root);
     const parsed = JSON.parse(await readFile(graphArtifactPath(root), "utf-8")) as PersistedDiagnostics;
     return parsed.version === GRAPH_ARTIFACT_VERSION ? parsed : null; // version mismatch -> discard
   } catch { return null; }
@@ -250,7 +253,7 @@ export async function readDiagnosticsArtifact(root: string): Promise<PersistedDi
 // step, so a reader (headless `pd audit`, another pd dev on the same root) sees the old artifact or the
 // new one, never part of one: a torn read parses as "no artifact" and costs a full re-audit.
 async function writeDiagnosticsArtifact(root: string, art: PersistedDiagnostics): Promise<void> {
-  await mkdir(pdScratchDir(root), { recursive: true });
+  await ensureScratchDir(root);
   const path = graphArtifactPath(root);
   const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   try {

@@ -102,6 +102,7 @@ import { buildAllStyleData } from "./style-index.js";
 // config -> renderer -> discovery, which is orchestration, not graph shaping.
 // Component requirement aggregation over the include tree + SVG symbol-set loading.
 export { buildDiagnosticsGraph } from "./diagnostics.js";
+export { ensureScratchDir, pdScratchDir } from "./scratch.js";
 // `pd export` I/O half (the pure shaping lives in export.ts). planExport/writeExport/
 // writeThreadedIncluders are part of the package contract — packages/core imports all three.
 export {

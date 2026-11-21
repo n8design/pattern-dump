@@ -1,6 +1,6 @@
 // @pattern-dump/core
 // Orchestration: load config, start dev server, run the diagnostics audit.
-import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite } from "@pattern-dump/dev-server";
+import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite, ensureScratchDir } from "@pattern-dump/dev-server";
 import type { DevServerOptions, AuditFormat } from "@pattern-dump/dev-server";
 import { PD_HOSTS, PD_ROUTES, type DiagnosticsGraph, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { request as httpRequest } from "node:http";
@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
 import { basename, join, dirname, resolve, relative, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { ConfigError, configWarnings, validateConfig, withOwnManifest, type PatternDumpConfig } from "@pattern-dump/config";
 
@@ -210,14 +210,13 @@ export function auditSummaryLines(r: {
 }
 
 /**
- * A PD-owned default export sink OUTSIDE the project root, under the OS temp dir. Used only when
- * `--out` is omitted. Keyed by a hash of the root (mirrors dev-server's pdScratchDir), with a
- * dedicated `export/` leaf so a written corpus never collides with the diagnostics artifacts.
- * `--out <dir>` is the intended durable target; this is the ephemeral fallback.
+ * A PD-owned default export sink OUTSIDE the project root: an `export/` leaf of the root's scratch folder (the
+ * user's cache folder, created for the user only), so a written corpus never collides with the diagnostics
+ * artifacts. Used only when `--out` is omitted. `--out <dir>` is the intended durable target; this is the
+ * ephemeral fallback.
  */
-function defaultExportDir(root: string): string {
-  const key = createHash("sha1").update(resolve(root)).digest("hex").slice(0, 16);
-  return join(tmpdir(), "pattern-dump", key, "export");
+async function defaultExportDir(root: string): Promise<string> {
+  return join(await ensureScratchDir(root), "export");
 }
 
 /**
@@ -248,7 +247,7 @@ function assertOutsideRoot(outDir: string, root: string): void {
 export async function runExport(root: string, configPath?: string, outDir?: string): Promise<void> {
   const config = await loadConfig(root, configPath);
   const patternsDir = resolve(root, config.patternsDir);
-  const sink = outDir ? resolve(process.cwd(), outDir) : defaultExportDir(root);
+  const sink = outDir ? resolve(process.cwd(), outDir) : await defaultExportDir(root);
   assertOutsideRoot(sink, root);
 
   const plan = await planExport(config, root);
