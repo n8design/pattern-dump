@@ -25,7 +25,7 @@ interface AxeResult { id: string; impact?: string | null; tags: string[]; help: 
 
 /** axe's raw results for `html` with `rules` (all of PAGE_TAGS when empty), and the rules those tags hold. */
 export async function runAxeOnPage(html: string, rules: string[]): Promise<{
-  violations: AxeResult[]; incomplete: AxeResult[]; axeVersion: string; ruleIds: string[];
+  violations: AxeResult[]; incomplete: AxeResult[]; axeVersion: string; ruleIds: string[]; toolOptions: { iframes?: boolean };
 }> {
   const dom = new JSDOM(html, { url: "http://site.invalid/", runScripts: "outside-only", pretendToBeVisual: true });
   // A canvas jsdom can't draw on: axe probes for one and carries on without it.
@@ -33,13 +33,15 @@ export async function runAxeOnPage(html: string, rules: string[]): Promise<{
   try {
     dom.window.eval(source());
     const axe = (dom.window as unknown as { axe: {
-      run(context: unknown, options: unknown): Promise<{ violations: AxeResult[]; incomplete: AxeResult[] }>;
+      run(context: unknown, options: unknown): Promise<{ violations: AxeResult[]; incomplete: AxeResult[]; toolOptions: { iframes?: boolean } }>;
       getRules(tags: string[]): Array<{ ruleId: string }>; version: string;
     } }).axe;
     const ruleIds = axe.getRules(PAGE_TAGS).map(r => r.ruleId);
     const options = rules.length ? { runOnly: { type: "rule", values: rules } } : { runOnly: { type: "tag", values: PAGE_TAGS } };
-    const r = await axe.run(dom.window.document, { ...options, resultTypes: ["violations", "incomplete"] });
-    return { violations: r.violations, incomplete: r.incomplete, axeVersion: axe.version, ruleIds };
+    // No frames: jsdom's never answer axe's ping, which then waits half a second per page that has one. A frame's
+    // content is never checked here either way; frame-title reads the element in this document.
+    const r = await axe.run(dom.window.document, { ...options, resultTypes: ["violations", "incomplete"], iframes: false });
+    return { violations: r.violations, incomplete: r.incomplete, axeVersion: axe.version, ruleIds, toolOptions: r.toolOptions };
   } finally {
     dom.window.close();
   }
