@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.1 (unreleased)
+
+### Fixed
+
+- **`pd build` writes only inside its output folders.** A reference with an encoded slash, such as
+  `/_pd/components/x%2f..%2fevil.css` in a component's template, could make the workbench build write a file outside
+  its output. Such a path now stops the build, naming it, and `/_pd/components/<name>.css` answers 404 for a name
+  that is no component (a component without styles still gets an empty stylesheet).
+- **A data file can no longer change every object in the process.** A `__proto__` key in a JSON data file was
+  merged into `Object.prototype`. Keys named `__proto__`, `constructor` and `prototype` in data files are now
+  ignored. In frontmatter, such a key (and any other name every object has, like `toString`) is refused as before,
+  now with `"<key>" cannot be a frontmatter key: choose another name` instead of `duplicate key`.
+- **`--out` and `site.outDir` are refused on everything the build reads.** The data folder, the scripts folder, the
+  helpers file and the site's head file were not checked, so `pd build --out src/_data` replaced the data folder with
+  the build. They are refused now, `--out` on the pages folder too, and the message names what the folder would hit:
+  `overlaps the data folder <dir>`.
+- **The scratch folder is your own.** The audit report, the diagnostics graph, `CONFLICTS.generated.md`,
+  `FLATTENED.generated.md`, `BASE-LAYER.generated.md` and `pd export`'s default output moved from the shared temp
+  folder to your cache folder: `~/Library/Caches/pattern-dump/` on macOS, `%LOCALAPPDATA%\pattern-dump\` on Windows,
+  `~/.cache/pattern-dump/` on Linux. It is created for you alone, and a folder there that is a link or open to other
+  users stops the run, naming the folder to remove; a cached audit is never reused from one. Old folders in the temp
+  folder are left as they are; delete them when you like.
+
+### Changed
+
+- **On macOS, `XDG_CACHE_HOME` is honoured.** When it is set to an absolute path, the scratch folder is created
+  under it, as on Linux, instead of under `~/Library/Caches`.
+
 ## 0.8.0 (2026-11-19)
 
 ### Upgrading from 0.7.0
