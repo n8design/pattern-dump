@@ -180,20 +180,31 @@ function registerHelpers(
     return m ? m[1] : "0";
   });
 
-  // Core generic helpers
-  env.registerHelper("eq",  (a: unknown, b: unknown) => a === b);
-  env.registerHelper("ne",  (a: unknown, b: unknown) => a !== b);
-  env.registerHelper("lt",  (a: unknown, b: unknown) => (a as number) < (b as number));
-  env.registerHelper("gt",  (a: unknown, b: unknown) => (a as number) > (b as number));
-  env.registerHelper("lte", (a: unknown, b: unknown) => (a as number) <= (b as number));
-  env.registerHelper("gte", (a: unknown, b: unknown) => (a as number) >= (b as number));
-  env.registerHelper("and", (a: unknown, b: unknown) => Boolean(a) && Boolean(b));
-  env.registerHelper("or",  (a: unknown, b: unknown) => Boolean(a) || Boolean(b));
-  env.registerHelper("not", (a: unknown) => !a);
-  env.registerHelper("isdefined", (v: unknown) => v !== undefined && v !== null);
-  env.registerHelper("defaultValue", (v: unknown, fallback: unknown) =>
-    v !== undefined && v !== null ? v : fallback
-  );
+  // Core generic helpers. Handlebars hands a helper its options object last, so a call an argument short would read
+  // that object as the argument (`[object Object]`, a silent false): each counts what it was given. `and` and `or`
+  // take exactly two (a third was ignored); the others ignore extras, as before.
+  const counted = (name: string, n: number, exact: boolean, f: (...args: unknown[]) => unknown) =>
+    (...args: unknown[]): unknown => {
+      const given = args.length - 1;
+      const word = `argument${n === 1 ? "" : "s"}`;
+      if (given < n) throw new Error(`${name} needs ${n} ${word}, got ${given}`);
+      if (exact && given > n) throw new Error(`${name} takes exactly ${n} ${word}, got ${given}`);
+      return f(...args.slice(0, n));
+    };
+  const helper = (name: string, n: number, f: (...args: unknown[]) => unknown, exact = false): void => {
+    env.registerHelper(name, counted(name, n, exact, f));
+  };
+  helper("eq",  2, (a, b) => a === b);
+  helper("ne",  2, (a, b) => a !== b);
+  helper("lt",  2, (a, b) => (a as number) < (b as number));
+  helper("gt",  2, (a, b) => (a as number) > (b as number));
+  helper("lte", 2, (a, b) => (a as number) <= (b as number));
+  helper("gte", 2, (a, b) => (a as number) >= (b as number));
+  helper("and", 2, (a, b) => Boolean(a) && Boolean(b), true);
+  helper("or",  2, (a, b) => Boolean(a) || Boolean(b), true);
+  helper("not", 1, a => !a);
+  helper("isdefined", 1, v => v !== undefined && v !== null);
+  helper("defaultValue", 2, (v, fallback) => v !== undefined && v !== null ? v : fallback);
   env.registerHelper("ifCond", function(
     this: unknown,
     a: unknown, op: string, b: unknown,
