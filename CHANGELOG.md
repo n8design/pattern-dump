@@ -43,6 +43,15 @@
   page and address: `<page>: <a href="/sale/50%-off/">: not a URL that can be read`.
 - **Pages with live examples are checked faster.** The accessibility check waited half a second for each page that
   embeds an example, for frames that can't answer. It no longer asks them; the findings are the same.
+- **A new website project starts without a warning about its own files.** `pd init --with-site` wrote tag and
+  category layouts that were copies of each other, so the first `pd dev` printed `FLATTENED: 2 cluster(s) across 5
+  components`. They now share two partials, `partials/term-index` and `partials/term-listing`; the pages they make
+  are the same.
+- **`pd --version`.** `pd --version` and `pd -v` print the installed version; they answered "unknown command".
+- **A helper called without its arguments fails, naming it.** `{{defaultValue x}}` with no fallback showed
+  `[object Object]`, and `eq`, `lt` and the other comparisons with one argument quietly gave false. They now fail
+  with `<helper> needs 2 arguments, got 1`, and `and` and `or` refuse a third argument, which they ignored. A template
+  that showed `[object Object]` or relied on such a call now fails the render: give the helper its arguments.
 
 ### Changed
 
