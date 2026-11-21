@@ -286,206 +286,199 @@ async function buildOnce(
     onStorefrontNote: note => { storefrontNotes.add(note); },
     ...(pagefind ? { onSearchRecord: (r: SearchRecord) => { searchRecords.set(r.route, r); } } : {}),
   });
-  log("… server ready");
-  if (skipped.has("html")) log("… HTML validation skipped (skipChecks: html)");
-
-  // A component schema that isn't JSON would turn that component's checks off: no build, with or without a site.
-  const brokenSchemas = await server.schemaProblems();
-  if (brokenSchemas.length) {
-    await server.close();
-    throw new Error(`pd build: a component schema isn't valid JSON, so nothing was written:\n${brokenSchemas.map(p => `  - ${p}`).join("\n")}`);
-  }
-
-  // Symbol images: each one's standalone file (/_pd/symbols/<stem>.svg), read before anything is written. A source
-  // that can't be used, or that uses a token the base layer lacks, stops the build; each is written into every output.
-  const symbols = await server.symbols();
-  const symbolFiles = new Map<string, string>();
-  const symbolProblems = [...symbols.problems];
-  for (const stem of symbols.stems) {
-    const url = `${PD_ROUTE_PREFIX.symbols}${stem}.svg`;
-    const res = await fetch(`http://127.0.0.1:${server.port}${url}`);
-    if (res.status === 200) symbolFiles.set(url, await res.text());
-    else symbolProblems.push(await res.text());
-  }
-  if (symbolProblems.length) {
-    await server.close();
-    throw new Error(`pd build: a symbol image can't be used, so nothing was written:\n${symbolProblems.map(p => `  - ${p}`).join("\n")}`);
-  }
-
-  // The storefront, crawled before anything is written: a problem anywhere stops the build with both
-  // output roots as they were.
-  // A site published under a path is asked for under it, as a browser asks: everything is checked as it is served.
-  const sfBase = storefront?.basePath ?? "/";
-  const sfGet = storefront ? hostTransport(server.port, storefront.host, sfBase) : null;
-  // The crawler files: robots.txt at a host's root (a site under a path has none: crawlers would never read it);
-  // the sitemap when the site has an address and is indexed.
-  const sfFiles: string[] = storefront ? [...(sfBase === "/" ? [PD_ROUTES.robots] : []), PD_ROUTES.notFound,
-    ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
-  const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles, sfBase) : null;
-  if (sfCrawl && sfCrawl.problems.length) {
-    await server.close();
-    throw new Error(`pd build: the site has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
-  }
-  if (sfCrawl) log(`… site checked: ${sfCrawl.urls.length} files`);
-  // The search index, from the pages the crawl served, in memory: checked in Chromium with --browser, written with the
-  // site.
-  const searchFiles = pagefind && sfCrawl
-    ? await buildSearchIndex([...searchRecords.values()], pagefind, sfBase).catch(async (e: unknown) => { await server.close(); throw e; })
-    : undefined;
-  if (searchFiles) log(`… search index: ${searchRecords.size} pages`);
-  const origin = `http://127.0.0.1:${server.port}`;
-
-  // The link check (links.ts), also before anything is written: every reference on every site page (its pages and
-  // its 404 page; not the previews and redirect stubs it writes) resolves to what this build writes, a link into the
-  // workbench to a component and variant the workbench snapshot has. Other hosts are listed in the notes.
-  let linkSummary: StaticBuildReport["links"];
-  let classSummary: StaticBuildReport["classes"];
-  let pageModel: Awaited<ReturnType<typeof readPages>> | undefined;
-  let a11ySummary: StaticBuildReport["accessibility"];
-  let imageSummary: StaticBuildReport["images"];
-  const externalNotes: string[] = [];
-  if (storefront && sfGet && sfCrawl) {
-    const { pages: list } = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
-    const pages = [...list.map(p => p.route), PD_ROUTES.notFound];
-    const wbUrl = storefront.workbenchUrl!.endsWith("/") ? storefront.workbenchUrl! : `${storefront.workbenchUrl!}/`;
-    const tree = await (await fetch(`${origin}${PD_ROUTES.tree}`)).json() as ComponentTree;
-    const routes = new Set<string>([""]);
-    const walk = (nodes: TreeNode[]): void => nodes.forEach(n => { routes.add(n.path); walk(n.children ?? []); });
-    walk(tree.roots);
-    const variants = new Map<string, string[]>();
-    for (const route of linkedWorkbenchRoutes(sfCrawl.documents, pages, wbUrl)) {
-      if (!routes.has(route)) continue;
-      const res = await fetch(`${origin}${componentUrl(route)}`);
-      if (res.status !== 200) continue;
-      const names = (await res.json() as ComponentDetailResponse).variants.map(v => v.name);
-      variants.set(route, names);
-      if (names.length) routes.add(`${route}/variants`);
-    }
-    const links = checkLinks({
-      // The crawl records a stamped reference with its ?v=; what is written, and what a link names, is the path.
-      built: new Set(sfCrawl.urls.map(u => u.split("?")[0]!)), documents: sfCrawl.documents, pages,
-      ...(storefront.url !== undefined ? { siteUrl: storefront.url.endsWith("/") ? storefront.url : `${storefront.url}/` } : {}),
-      basePath: sfBase,
-      workbench: { url: wbUrl, routes, variants },
-    });
-    if (links.problems.length) {
-      await server.close();
-      throw new Error(`pd build: the site has broken links, so nothing was written:\n${links.problems.map(p => `  - ${p}`).join("\n")}`);
-    }
-    for (const [url, on] of links.external) externalNotes.push(`an external link, not checked: ${url} (on ${on.join(", ")})`);
-    linkSummary = { pages: pages.length, references: links.references, external: links.external.size };
-    log(`… links checked: ${links.references} references on ${pages.length} pages`);
-
-    // The style checks, also before anything is written (class-check.ts, property-check.ts): every class a site page
-    // carries is defined by the style guide (a warning unless storefront.checks.classes says otherwise), and every
-    // var() the skin's own styles read without a fallback has a definition somewhere (an error).
-    pageModel = await readPages(storefront.pagesDir, {
-      drafts: "leave-out", scheduled: "leave-out", today, categories: storefront.categories, tags: storefront.tags,
-    });
-    const guide = await server.styleGuide();
-    const stylesheets = [...guide.stylesheets, ...sfCrawl.stylesheets.values()];
-    const fail = async (what: string, lines: string[]): Promise<never> => {
-      await server.close();
-      throw new Error(`pd build: ${what}, so nothing was written:\n${lines.map(l => `  - ${l}`).join("\n")}`);
-    };
-    const properties = checkProperties({
-      sources: await styleSources(cfg.stylesDir, project), stylesheets, documents: [...sfCrawl.documents.values()],
-      allow: storefront.checks.allowProperties,
-    });
-    if (properties.length) await fail("the skin reads custom properties nothing defines", properties);
-    if (storefront.checks.classes !== "off") {
-      const model = pageModel;
-      const checkPages = await Promise.all(pages.flatMap(route => {
-        const html = sfCrawl.documents.get(route);
-        if (html === undefined) return [];
-        const f = route === PD_ROUTES.notFound ? model.notFound : model.files.get(route);
-        return [(async () => ({ route, html, ...(f ? { file: { path: f.path, text: await readFile(f.file, "utf8") } } : {}) }))()];
-      }));
-      const classes = checkClasses({ pages: checkPages, stylesheets, templates: guide.templates, allow: storefront.checks.allowClasses });
-      if (storefront.checks.classes === "error" && classes.length) {
-        await fail("the site uses classes outside the design system (site.checks.classes is \"error\")", classes);
-      }
-      classSummary = { severity: storefront.checks.classes, warnings: storefront.checks.classes === "warning" ? classes : [] };
-    }
-    log(`… styles checked against the style guide`);
-
-    // Accessibility (step 6b), also before anything is written: one main landmark and one <h1> per site page, and
-    // axe's rules that jsdom decides (@pattern-dump/a11y). A critical or serious WCAG finding, and a page without
-    // exactly one main and one <h1>, stop the build; the rest are warnings in the report, grouped by rule.
-    // `skipChecks: ["a11y"]` leaves all of it out (the report says so); --browser, which checks in Chromium, refused it.
-    const errors: string[] = [];
-    const warned = new Map<string, { finding: PageA11yFinding; pages: string[]; elements: number }>();
-    // axe runs on worker threads (runPagesA11y); its findings come back in the pages' order, so the report is the
-    // same however the work was spread.
-    const checked = skipped.has("a11y") ? [] : pages.filter(page => sfCrawl.documents.has(page));
-    const htmlOf = (page: string): string => sfCrawl.documents.get(page)!;
-    const axeFindings = await runPagesA11y(checked.map(htmlOf), opts.checkWorkers !== undefined ? { workers: opts.checkWorkers } : {})
-      .catch(async (e: unknown) => {
-        await server.close();
-        throw e instanceof PageCheckError ? new Error(`pd build: the accessibility check of ${checked[e.index]} failed: ${e.message}`) : e;
-      });
-    for (const [k, page] of checked.entries()) {
-      const html = htmlOf(page);
-      for (const p of checkPageBasics(html)) errors.push(`${page}: ${p}`);
-      for (const f of axeFindings[k]!) {
-        const where = f.nodes.map(n => n.target).join(", ");
-        if (f.severity === "error") {
-          errors.push(`${page}: ${f.ruleId} (${f.impact}): ${f.help}, on ${where} (${f.helpUrl})`);
-          continue;
-        }
-        const w = warned.get(f.ruleId) ?? { finding: f, pages: [], elements: 0 };
-        w.pages.push(page);
-        w.elements += f.nodes.length;
-        warned.set(f.ruleId, w);
-      }
-    }
-    if (errors.length) {
-      await server.close();
-      throw new Error(`pd build: the site has accessibility problems, so nothing was written:\n${errors.map(e => `  - ${e}`).join("\n")}`);
-    }
-    // --browser: the rules that need a rendered page, and the images against their boxes (browser-checks.ts).
-    let imageWarnings: string[] | undefined;
-    const browserWarnings: string[] = [];
-    if (playwright) {
-      const checked = await runBrowserChecks({ pages, get: sfGet, playwright, basePath: sfBase, ...(searchFiles ? { search: { files: searchFiles, word: searchWord([...searchRecords.values()]) } } : {}) }).catch(async (e: unknown) => { await server.close(); throw e; });
-      if (checked.errors.length) {
-        await server.close();
-        throw new Error(`pd build: the site has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
-      }
-      browserWarnings.push(...checked.a11yWarnings);
-      imageWarnings = checked.images;
-      log(`… checked in Chromium at ${VIEWPORTS.map(v => `${v.name} @${v.dpr}x`).join(" and ")}`);
-    }
-    imageSummary = imageWarnings ? { warnings: imageWarnings } : undefined;
-    if (skipped.has("a11y")) {
-      log(`… accessibility check skipped (skipChecks: a11y)`);
-    } else {
-      a11ySummary = {
-        pages: pages.length, ...(playwright ? { browser: true } : {}),
-        warnings: [...[...warned.values()].map(w => `${w.finding.ruleId} (${w.finding.impact}): ${w.finding.help}, ${w.elements} `
-          + `element${w.elements === 1 ? "" : "s"} on ${w.pages.join(", ")} (${w.finding.helpUrl})`), ...browserWarnings],
-      };
-      log(`… accessibility checked on ${pages.length} pages`);
-    }
-  }
-
-  await assertUnchanged("nothing was written").catch(async (e: unknown) => { await server.close(); throw e; });
-  if (buildWorkbench) {
-    await rm(wbStage, { recursive: true, force: true });
-    await mkdir(wbStage, { recursive: true });
-  }
-  const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], borrowedStyles: 0, ms: 0,
-    ...(buildWorkbench ? {} : { workbench: false as const }) };
-  report.warnings.push(...symbols.warnings);
-  report.notes.push(...symbols.infos);
-  if (opts.browser && !storefront) report.notes.push("--browser checks a site's pages in Chromium, and this project has no site: nothing was checked");
-  const { capture, store } = createSnapshotWriter({ outDir: wbStage, basePath, origin, report });
-
-  /** Every /_pd/ stylesheet and script a document references. */
-  const referenced = (html: string): string[] =>
-    [...html.matchAll(/(?:href|src)="(\/_pd\/(?:components|themes|scripts)\/[^"]+)"/g)].map(m => m[1].replace(/&amp;/g, "&"));
-
+  // From here on a failure anywhere closes the server and removes the stage folders (finally, below).
   try {
+    log("… server ready");
+    if (skipped.has("html")) log("… HTML validation skipped (skipChecks: html)");
+
+    // A component schema that isn't JSON would turn that component's checks off: no build, with or without a site.
+    const brokenSchemas = await server.schemaProblems();
+    if (brokenSchemas.length) {
+      throw new Error(`pd build: a component schema isn't valid JSON, so nothing was written:\n${brokenSchemas.map(p => `  - ${p}`).join("\n")}`);
+    }
+
+    // Symbol images: each one's standalone file (/_pd/symbols/<stem>.svg), read before anything is written. A source
+    // that can't be used, or that uses a token the base layer lacks, stops the build; each is written into every output.
+    const symbols = await server.symbols();
+    const symbolFiles = new Map<string, string>();
+    const symbolProblems = [...symbols.problems];
+    for (const stem of symbols.stems) {
+      const url = `${PD_ROUTE_PREFIX.symbols}${stem}.svg`;
+      const res = await fetch(`http://127.0.0.1:${server.port}${url}`);
+      if (res.status === 200) symbolFiles.set(url, await res.text());
+      else symbolProblems.push(await res.text());
+    }
+    if (symbolProblems.length) {
+      throw new Error(`pd build: a symbol image can't be used, so nothing was written:\n${symbolProblems.map(p => `  - ${p}`).join("\n")}`);
+    }
+
+    // The storefront, crawled before anything is written: a problem anywhere stops the build with both
+    // output roots as they were.
+    // A site published under a path is asked for under it, as a browser asks: everything is checked as it is served.
+    const sfBase = storefront?.basePath ?? "/";
+    const sfGet = storefront ? hostTransport(server.port, storefront.host, sfBase) : null;
+    // The crawler files: robots.txt at a host's root (a site under a path has none: crawlers would never read it);
+    // the sitemap when the site has an address and is indexed.
+    const sfFiles: string[] = storefront ? [...(sfBase === "/" ? [PD_ROUTES.robots] : []), PD_ROUTES.notFound,
+      ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
+    const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles, sfBase) : null;
+    if (sfCrawl && sfCrawl.problems.length) {
+      throw new Error(`pd build: the site has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
+    }
+    if (sfCrawl) log(`… site checked: ${sfCrawl.urls.length} files`);
+    // The search index, from the pages the crawl served, in memory: checked in Chromium with --browser, written with the
+    // site.
+    const searchFiles = pagefind && sfCrawl
+      ? await buildSearchIndex([...searchRecords.values()], pagefind, sfBase)
+      : undefined;
+    if (searchFiles) log(`… search index: ${searchRecords.size} pages`);
+    const origin = `http://127.0.0.1:${server.port}`;
+
+    // The link check (links.ts), also before anything is written: every reference on every site page (its pages and
+    // its 404 page; not the previews and redirect stubs it writes) resolves to what this build writes, a link into the
+    // workbench to a component and variant the workbench snapshot has. Other hosts are listed in the notes.
+    let linkSummary: StaticBuildReport["links"];
+    let classSummary: StaticBuildReport["classes"];
+    let pageModel: Awaited<ReturnType<typeof readPages>> | undefined;
+    let a11ySummary: StaticBuildReport["accessibility"];
+    let imageSummary: StaticBuildReport["images"];
+    const externalNotes: string[] = [];
+    if (storefront && sfGet && sfCrawl) {
+      const { pages: list } = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
+      const pages = [...list.map(p => p.route), PD_ROUTES.notFound];
+      const wbUrl = storefront.workbenchUrl!.endsWith("/") ? storefront.workbenchUrl! : `${storefront.workbenchUrl!}/`;
+      const tree = await (await fetch(`${origin}${PD_ROUTES.tree}`)).json() as ComponentTree;
+      const routes = new Set<string>([""]);
+      const walk = (nodes: TreeNode[]): void => nodes.forEach(n => { routes.add(n.path); walk(n.children ?? []); });
+      walk(tree.roots);
+      const variants = new Map<string, string[]>();
+      for (const route of linkedWorkbenchRoutes(sfCrawl.documents, pages, wbUrl)) {
+        if (!routes.has(route)) continue;
+        const res = await fetch(`${origin}${componentUrl(route)}`);
+        if (res.status !== 200) continue;
+        const names = (await res.json() as ComponentDetailResponse).variants.map(v => v.name);
+        variants.set(route, names);
+        if (names.length) routes.add(`${route}/variants`);
+      }
+      const links = checkLinks({
+        // The crawl records a stamped reference with its ?v=; what is written, and what a link names, is the path.
+        built: new Set(sfCrawl.urls.map(u => u.split("?")[0]!)), documents: sfCrawl.documents, pages,
+        ...(storefront.url !== undefined ? { siteUrl: storefront.url.endsWith("/") ? storefront.url : `${storefront.url}/` } : {}),
+        basePath: sfBase,
+        workbench: { url: wbUrl, routes, variants },
+      });
+      if (links.problems.length) {
+        throw new Error(`pd build: the site has broken links, so nothing was written:\n${links.problems.map(p => `  - ${p}`).join("\n")}`);
+      }
+      for (const [url, on] of links.external) externalNotes.push(`an external link, not checked: ${url} (on ${on.join(", ")})`);
+      linkSummary = { pages: pages.length, references: links.references, external: links.external.size };
+      log(`… links checked: ${links.references} references on ${pages.length} pages`);
+
+      // The style checks, also before anything is written (class-check.ts, property-check.ts): every class a site page
+      // carries is defined by the style guide (a warning unless storefront.checks.classes says otherwise), and every
+      // var() the skin's own styles read without a fallback has a definition somewhere (an error).
+      pageModel = await readPages(storefront.pagesDir, {
+        drafts: "leave-out", scheduled: "leave-out", today, categories: storefront.categories, tags: storefront.tags,
+      });
+      const guide = await server.styleGuide();
+      const stylesheets = [...guide.stylesheets, ...sfCrawl.stylesheets.values()];
+      const fail = async (what: string, lines: string[]): Promise<never> => {
+        throw new Error(`pd build: ${what}, so nothing was written:\n${lines.map(l => `  - ${l}`).join("\n")}`);
+      };
+      const properties = checkProperties({
+        sources: await styleSources(cfg.stylesDir, project), stylesheets, documents: [...sfCrawl.documents.values()],
+        allow: storefront.checks.allowProperties,
+      });
+      if (properties.length) await fail("the skin reads custom properties nothing defines", properties);
+      if (storefront.checks.classes !== "off") {
+        const model = pageModel;
+        const checkPages = await Promise.all(pages.flatMap(route => {
+          const html = sfCrawl.documents.get(route);
+          if (html === undefined) return [];
+          const f = route === PD_ROUTES.notFound ? model.notFound : model.files.get(route);
+          return [(async () => ({ route, html, ...(f ? { file: { path: f.path, text: await readFile(f.file, "utf8") } } : {}) }))()];
+        }));
+        const classes = checkClasses({ pages: checkPages, stylesheets, templates: guide.templates, allow: storefront.checks.allowClasses });
+        if (storefront.checks.classes === "error" && classes.length) {
+          await fail("the site uses classes outside the design system (site.checks.classes is \"error\")", classes);
+        }
+        classSummary = { severity: storefront.checks.classes, warnings: storefront.checks.classes === "warning" ? classes : [] };
+      }
+      log(`… styles checked against the style guide`);
+
+      // Accessibility (step 6b), also before anything is written: one main landmark and one <h1> per site page, and
+      // axe's rules that jsdom decides (@pattern-dump/a11y). A critical or serious WCAG finding, and a page without
+      // exactly one main and one <h1>, stop the build; the rest are warnings in the report, grouped by rule.
+      // `skipChecks: ["a11y"]` leaves all of it out (the report says so); --browser, which checks in Chromium, refused it.
+      const errors: string[] = [];
+      const warned = new Map<string, { finding: PageA11yFinding; pages: string[]; elements: number }>();
+      // axe runs on worker threads (runPagesA11y); its findings come back in the pages' order, so the report is the
+      // same however the work was spread.
+      const checked = skipped.has("a11y") ? [] : pages.filter(page => sfCrawl.documents.has(page));
+      const htmlOf = (page: string): string => sfCrawl.documents.get(page)!;
+      const axeFindings = await runPagesA11y(checked.map(htmlOf), opts.checkWorkers !== undefined ? { workers: opts.checkWorkers } : {})
+        .catch((e: unknown) => {
+          throw e instanceof PageCheckError ? new Error(`pd build: the accessibility check of ${checked[e.index]} failed: ${e.message}`) : e;
+        });
+      for (const [k, page] of checked.entries()) {
+        const html = htmlOf(page);
+        for (const p of checkPageBasics(html)) errors.push(`${page}: ${p}`);
+        for (const f of axeFindings[k]!) {
+          const where = f.nodes.map(n => n.target).join(", ");
+          if (f.severity === "error") {
+            errors.push(`${page}: ${f.ruleId} (${f.impact}): ${f.help}, on ${where} (${f.helpUrl})`);
+            continue;
+          }
+          const w = warned.get(f.ruleId) ?? { finding: f, pages: [], elements: 0 };
+          w.pages.push(page);
+          w.elements += f.nodes.length;
+          warned.set(f.ruleId, w);
+        }
+      }
+      if (errors.length) {
+        throw new Error(`pd build: the site has accessibility problems, so nothing was written:\n${errors.map(e => `  - ${e}`).join("\n")}`);
+      }
+      // --browser: the rules that need a rendered page, and the images against their boxes (browser-checks.ts).
+      let imageWarnings: string[] | undefined;
+      const browserWarnings: string[] = [];
+      if (playwright) {
+        const checked = await runBrowserChecks({ pages, get: sfGet, playwright, basePath: sfBase, ...(searchFiles ? { search: { files: searchFiles, word: searchWord([...searchRecords.values()]) } } : {}) });
+        if (checked.errors.length) {
+          throw new Error(`pd build: the site has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
+        }
+        browserWarnings.push(...checked.a11yWarnings);
+        imageWarnings = checked.images;
+        log(`… checked in Chromium at ${VIEWPORTS.map(v => `${v.name} @${v.dpr}x`).join(" and ")}`);
+      }
+      imageSummary = imageWarnings ? { warnings: imageWarnings } : undefined;
+      if (skipped.has("a11y")) {
+        log(`… accessibility check skipped (skipChecks: a11y)`);
+      } else {
+        a11ySummary = {
+          pages: pages.length, ...(playwright ? { browser: true } : {}),
+          warnings: [...[...warned.values()].map(w => `${w.finding.ruleId} (${w.finding.impact}): ${w.finding.help}, ${w.elements} `
+            + `element${w.elements === 1 ? "" : "s"} on ${w.pages.join(", ")} (${w.finding.helpUrl})`), ...browserWarnings],
+        };
+        log(`… accessibility checked on ${pages.length} pages`);
+      }
+    }
+
+    await assertUnchanged("nothing was written");
+    if (buildWorkbench) {
+      await rm(wbStage, { recursive: true, force: true });
+      await mkdir(wbStage, { recursive: true });
+    }
+    const report: StaticBuildReport = { outDir, basePath, files: 0, bytes: 0, components: 0, warnings: [], notes: [], borrowedStyles: 0, ms: 0,
+      ...(buildWorkbench ? {} : { workbench: false as const }) };
+    report.warnings.push(...symbols.warnings);
+    report.notes.push(...symbols.infos);
+    if (opts.browser && !storefront) report.notes.push("--browser checks a site's pages in Chromium, and this project has no site: nothing was checked");
+    const { capture, store } = createSnapshotWriter({ outDir: wbStage, basePath, origin, report });
+
+    /** Every /_pd/ stylesheet and script a document references. */
+    const referenced = (html: string): string[] =>
+      [...html.matchAll(/(?:href|src)="(\/_pd\/(?:components|themes|scripts)\/[^"]+)"/g)].map(m => m[1].replace(/&amp;/g, "&"));
+
     // ---- 1 to 6: the workbench, unless another build writes it (build.workbench: false) ----
     if (buildWorkbench) {
       // ---- 1. Fixed resources ----
@@ -708,16 +701,16 @@ async function buildOnce(
 
     // Deliberately no 404.html shell: every route has its own index.html, and a host that served the
     // shell for a missing preview would boot a second workbench inside the preview iframe.
+
+    if (skipped.size) report.skippedChecks = SKIPPABLE_CHECKS.filter(c => skipped.has(c));
+    report.ms = Math.round(performance.now() - started);
+    return report;
   } finally {
     await server.close();
     // A build that stopped leaves nothing of its own beside the outputs.
     await rm(wbStage, { recursive: true, force: true });
     if (sfStage) await rm(sfStage, { recursive: true, force: true });
   }
-
-  if (skipped.size) report.skippedChecks = SKIPPABLE_CHECKS.filter(c => skipped.has(c));
-  report.ms = Math.round(performance.now() - started);
-  return report;
 }
 
 /** The folder a build writes an output into before it takes the output's place: beside it, so on the same
