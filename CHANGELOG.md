@@ -30,6 +30,10 @@
 
 ### Changed
 
+- **Dependencies updated within their ranges,** for the security fixes in them: handlebars 4.7.10, markdown-it 14.3.3
+  (a crafted page could make the build slow), postcss 8.5.33, postcss-selector-parser 7.2.1, html-validate 11.21.1,
+  sass 1.108.2, shiki 4.6.0 and their own dependencies. A fresh install already got these; the release is now
+  tested with them.
 - **On macOS, `XDG_CACHE_HOME` is honoured.** When it is set to an absolute path, the scratch folder is created
   under it, as on Linux, instead of under `~/Library/Caches`.
 
