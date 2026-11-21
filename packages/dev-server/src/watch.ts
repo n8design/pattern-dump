@@ -973,7 +973,7 @@ async function reloadHelpers(filePath: string): Promise<void> {
 
 /** Data, helper and asset files; true when the file was one of them. */
 async function handleReloadable(filePath: string, event: "change" | "add" | "unlink"): Promise<boolean> {
-  const helper = helperOf(filePath);
+  const helper = helperOf(filePath, pagesDir);
   if (helper === "entry") { await reloadHelpers(filePath); return true; }
   if (helper === "other") {
     const message = `${shown(filePath)} changed: restart pd dev to load it (a helper's own imports are not reloaded)`;

@@ -79,11 +79,16 @@ export function rootMatchers(watched: WatchedRoots) {
     scriptDirOf: (p: string): string | undefined => watched.scripts.find(d => within(d, p)),
     dataDirOf: (p: string): string | undefined => watched.data.find(d => within(d, p)),
     assetRootOf: (p: string): string | undefined => watched.assets.find(d => within(d, p)),
-    /** A helper file: an entry pd dev reloads in place, or another file in a helper's folder. */
-    helperOf: (p: string): "entry" | "other" | undefined => {
+    /** A helper file: an entry pd dev reloads in place, or another file in a helper's folder. A file there that a
+     *  source root holds is that root's, not a helper's import (a single helper file shares its folder with them):
+     *  `pages` is the site's pages folder, which the watcher handles apart from these roots. */
+    helperOf: (p: string, pages: string | null = null): "entry" | "other" | undefined => {
       const h = watched.helpers.filter(x => within(x.scope, p));
       if (!h.length) return undefined;
-      return h.some(x => x.isEntry(p)) ? "entry" : "other";
+      if (h.some(x => x.isEntry(p))) return "entry";
+      const sourceRoots = [...watched.patterns, ...watched.styles.map(r => r.dir), ...watched.themes, ...watched.scripts,
+        ...watched.data, ...watched.assets, ...(pages ? [pages] : [])];
+      return sourceRoots.some(d => within(d, p)) ? undefined : "other";
     },
     /** A stylesheet's rules are base-layer CSS: its root's documentBase lists it. */
     inBase: (p: string): boolean => styleRootOf(p)?.inBase(p) ?? false,
