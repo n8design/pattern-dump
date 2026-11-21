@@ -84,17 +84,25 @@ function referencesOf(html: string): Array<[string, string, string]> {
 }
 
 /** The workbench routes the site pages link (without the leading slash), so the caller can look up their variants. */
+/** A reference `new URL` can't parse, or with a % that is no escape: the author's address, not a fault of the check. */
+const unreadable = (e: unknown): boolean =>
+  e instanceof URIError || (e instanceof TypeError && (e as { code?: string }).code === "ERR_INVALID_URL");
+
 export function linkedWorkbenchRoutes(documents: ReadonlyMap<string, string>, pages: readonly string[], workbenchUrl: string): Set<string> {
   const routes = new Set<string>();
   for (const page of pages) {
     for (const [, , ref] of referencesOf(documents.get(page) ?? "")) {
-      let rest: string | undefined;
-      if (OTHER_HOST.test(workbenchUrl)) { if (ref.startsWith(workbenchUrl)) rest = ref.slice(workbenchUrl.length); }
-      else if (!OTHER_HOST.test(ref)) {
-        const path = new URL(ref, `http://site.invalid${page}`).pathname;
-        if (path.startsWith(workbenchUrl)) rest = path.slice(workbenchUrl.length);
+      try {
+        let rest: string | undefined;
+        if (OTHER_HOST.test(workbenchUrl)) { if (ref.startsWith(workbenchUrl)) rest = ref.slice(workbenchUrl.length); }
+        else if (!OTHER_HOST.test(ref)) {
+          const path = new URL(ref, `http://site.invalid${page}`).pathname;
+          if (path.startsWith(workbenchUrl)) rest = path.slice(workbenchUrl.length);
+        }
+        if (rest !== undefined) routes.add(decodeURIComponent(rest.split(/[?#]/)[0]!.replace(/\/$/, "")));
+      } catch (e) {
+        if (!unreadable(e)) throw e; // checkLinks reports it, on its page
       }
-      if (rest !== undefined) routes.add(decodeURIComponent(rest.split(/[?#]/)[0]!.replace(/\/$/, "")));
     }
   }
   return routes;
@@ -139,48 +147,53 @@ export function checkLinks(site: LinkSite): LinkCheck {
       references++;
       if (ref === "" || SKIPPED.test(ref)) continue;
       const say = (why: string) => problems.push(`${page}: <${tag} ${attr}="${ref}">: ${why}`);
-      // The workbench and the site's own address, absolute.
-      if (wb && OTHER_HOST.test(wb.url) && ref.startsWith(wb.url)) {
-        const [rest = "", hash = ""] = ref.slice(wb.url.length).split("#");
-        const why = workbenchProblem(rest.split("?")[0]!, hash);
-        if (why) say(why);
-        continue;
+      try {
+        // The workbench and the site's own address, absolute.
+        if (wb && OTHER_HOST.test(wb.url) && ref.startsWith(wb.url)) {
+          const [rest = "", hash = ""] = ref.slice(wb.url.length).split("#");
+          const why = workbenchProblem(rest.split("?")[0]!, hash);
+          if (why) say(why);
+          continue;
+        }
+        let href = ref;
+        if (site.siteUrl && ref.startsWith(site.siteUrl)) href = `${base}${ref.slice(site.siteUrl.length)}`;
+        else if (OTHER_HOST.test(ref)) {
+          if (site.pagesOnly) continue;
+          const list = external.get(ref) ?? [];
+          if (!list.includes(page)) list.push(page);
+          external.set(ref, list);
+          continue;
+        }
+        // Resolved where the page is served: under the site's path.
+        const url = new URL(href, `http://site.invalid${base}${page.slice(1)}`);
+        const served = decodeURIComponent(url.pathname);
+        const hash = url.hash.slice(1);
+        // A workbench on the site's own host, by its path.
+        if (wb && wb.url.startsWith("/") && served.startsWith(wb.url)) {
+          const why = workbenchProblem(served.slice(wb.url.length), hash);
+          if (why) say(why);
+          continue;
+        }
+        if (!served.startsWith(base)) { say(`${served} is outside ${base}, the path the site is published under (site.url)`); continue; }
+        const path = `/${served.slice(base.length)}`;
+        if (site.pagesOnly && /^\/(?:_pd|assets|preview)\//.test(path)) continue;
+        const target = builtAs(path);
+        if (target === undefined) {
+          // Written with the site's path already: the pass put it in front a second time.
+          const doubled = hint !== "/" && path.startsWith(hint) && builtAs(`/${path.slice(hint.length)}`) !== undefined;
+          say(doubled
+            ? `no page or file is built at ${path}: the link is written with the site's path ${hint} already; write it from the site's root, `
+              + `such as /${path.slice(hint.length)}, and the path is put in front of it`
+            : `no page or file is built at ${path}`);
+          continue;
+        }
+        if (!hash) continue;
+        const targetIds = ids(target);
+        if (targetIds && !targetIds.has(decodeURIComponent(hash))) say(`${target} has no element with id "${decodeURIComponent(hash)}"`);
+      } catch (e) {
+        if (!unreadable(e)) throw e;
+        say("not a URL that can be read");
       }
-      let href = ref;
-      if (site.siteUrl && ref.startsWith(site.siteUrl)) href = `${base}${ref.slice(site.siteUrl.length)}`;
-      else if (OTHER_HOST.test(ref)) {
-        if (site.pagesOnly) continue;
-        const list = external.get(ref) ?? [];
-        if (!list.includes(page)) list.push(page);
-        external.set(ref, list);
-        continue;
-      }
-      // Resolved where the page is served: under the site's path.
-      const url = new URL(href, `http://site.invalid${base}${page.slice(1)}`);
-      const served = decodeURIComponent(url.pathname);
-      const hash = url.hash.slice(1);
-      // A workbench on the site's own host, by its path.
-      if (wb && wb.url.startsWith("/") && served.startsWith(wb.url)) {
-        const why = workbenchProblem(served.slice(wb.url.length), hash);
-        if (why) say(why);
-        continue;
-      }
-      if (!served.startsWith(base)) { say(`${served} is outside ${base}, the path the site is published under (site.url)`); continue; }
-      const path = `/${served.slice(base.length)}`;
-      if (site.pagesOnly && /^\/(?:_pd|assets|preview)\//.test(path)) continue;
-      const target = builtAs(path);
-      if (target === undefined) {
-        // Written with the site's path already: the pass put it in front a second time.
-        const doubled = hint !== "/" && path.startsWith(hint) && builtAs(`/${path.slice(hint.length)}`) !== undefined;
-        say(doubled
-          ? `no page or file is built at ${path}: the link is written with the site's path ${hint} already; write it from the site's root, `
-            + `such as /${path.slice(hint.length)}, and the path is put in front of it`
-          : `no page or file is built at ${path}`);
-        continue;
-      }
-      if (!hash) continue;
-      const targetIds = ids(target);
-      if (targetIds && !targetIds.has(decodeURIComponent(hash))) say(`${target} has no element with id "${decodeURIComponent(hash)}"`);
     }
   }
   return { problems, external, references };

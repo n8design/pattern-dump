@@ -2,7 +2,7 @@
 // and srcset of every element on a site page resolves to a built file or page, a #fragment to an id in the target, a
 // link into the workbench to a component and its variant; other hosts are listed, not fetched; text is never a link.
 import { describe, expect, it } from "vitest";
-import { checkLinks, type LinkSite } from "../src/storefront/links.js";
+import { checkLinks, linkedWorkbenchRoutes, type LinkSite } from "../src/storefront/links.js";
 
 const page = (body: string) => `<!DOCTYPE html><html><head><title>T</title></head><body>${body}</body></html>`;
 const SITE: Omit<LinkSite, "documents" | "pages"> & { documents: Record<string, string> } = {
@@ -23,6 +23,24 @@ function check(pages: Record<string, string>, over: Partial<LinkSite> = {}) {
 }
 
 describe("checkLinks", () => {
+  // A % that is no escape can't be decoded: one problem on its page, naming the address, and the check goes on (CR-002).
+  it("reports a reference that can't be read as a link problem on its page, and checks the rest", () => {
+    const r = check({ "/about/": page(`
+      <a href="/sale/50%-off/">path</a> <a href="/guides/setup/#50%">fragment</a>
+      <a href="https://wb.test/components/50%">workbench</a> <a href="https://wb.test/components/callout#5%">variant</a>
+      <a href="/missing/">still checked</a>`) });
+    const unreadable = (href: string) => `/about/: <a href="${href}">: not a URL that can be read`;
+    expect(r.problems).toEqual([
+      unreadable("/sale/50%-off/"), unreadable("/guides/setup/#50%"), unreadable("https://wb.test/components/50%"),
+      unreadable("https://wb.test/components/callout#5%"), `/about/: <a href="/missing/">: no page or file is built at /missing/`,
+    ]);
+  });
+
+  it("leaves a reference that can't be read out of the workbench routes a site links", () => {
+    const documents = new Map([["/about/", page(`<a href="/wb/50%">bad</a> <a href="/wb/components/callout">good</a>`)]]);
+    expect([...linkedWorkbenchRoutes(documents, ["/about/"], "/wb/")]).toEqual(["components/callout"]);
+  });
+
   it("passes what resolves: pages, folders, relative links, files, srcset, fragments, stubs, previews, the site's own URLs, the workbench", () => {
     const r = check({ "/about/": page(`
       <a href="/guides/">guides</a> <a href="/guides">no slash</a> <a href="../guides/setup/#pages">relative</a>

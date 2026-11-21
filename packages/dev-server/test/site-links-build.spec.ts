@@ -64,6 +64,20 @@ describe("the link check in pd build", () => {
     expect(existsSync(join(root, "site"))).toBe(false);
   }, 60_000);
 
+  // A % that is no escape (CR-002), in a link a template writes (markdown writes a lone % as %25, and raw HTML in a
+  // page as text): a broken link on its page, not a bare "URI malformed" that ends the build.
+  it("refuses a link that can't be read as a broken link, naming the page and the address", async () => {
+    const root = await project({ "index.md": `---\ntitle: Home\nlayout: sale\n---\n\nToday only.\n` });
+    await save(join(root, "src/patterns/layouts/sale/sale.hbs"), `<main><h1>{{title}}</h1><a href="/sale/50%-off/">Sale</a>{{{body}}}</main>\n`);
+    await save(join(root, "src/patterns/layouts/sale/sale.schema.json"), schema);
+    const out = join(root, ".out", "wb");
+    await expect(buildStaticSite(config("https://wb.test/"), root, { outDir: out, pdVersion: "0.0.0-test" })).rejects.toThrow([
+      "pd build: the site has broken links, so nothing was written:",
+      `  - /: <a href="/sale/50%-off/">: not a URL that can be read`,
+    ].join("\n"));
+    expect(existsSync(out)).toBe(false);
+  }, 60_000);
+
   it("builds a sound site: the report counts the links, and other hosts are notes", async () => {
     const root = await project({
       "index.md": md("Home", "[About](/about/#team) [Old](/old/) [Callout](https://wb.test/components/callout#warning) [Elsewhere](https://example.com/x)"),
