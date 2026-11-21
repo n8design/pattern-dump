@@ -736,6 +736,40 @@ async function handleComponentScss(filePath: string): Promise<void> {
   }
 }
 
+// Per-file compile failures. Until now these were only console.warn'ed inside the tracker, so a
+// broken .scss produced NOTHING in the workbench — the one place a design-system author looks.
+// Non-fatal by design, so report and carry on rather than returning early.
+function pushCompileErrors(compileErrors: Array<{ file: string; message: string }>): void {
+  for (const { file, message } of compileErrors) {
+    hmr.push({
+      type: "error",
+      scope: "build",
+      message: `SCSS ${basename(file)}: ${message.split("\n")[0]}`,
+    });
+  }
+}
+
+/** A stylesheet removed: the tracker drops it (a stylesheet that loaded it recompiles and shows its error), then
+ *  the style data is rebuilt from disk, so its CSS leaves the preview as a change would update it. */
+async function handleRemovedScss(filePath: string): Promise<void> {
+  const release = state.style.fence();
+  let stale = true;
+  try {
+    let compileErrors: Array<{ file: string; message: string }>;
+    try {
+      ({ errors: compileErrors } = await tracker.update(filePath));
+    } catch (e) {
+      hmr.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
+      console.error("[dev-server] SCSS error:", e);
+      return;
+    }
+    pushCompileErrors(compileErrors);
+    stale = !(await restyleAll(await currentDiscovery(state, patternRoots), Date.now(), [resolve(filePath)], compileErrors.length > 0));
+  } finally {
+    release({ stale });
+  }
+}
+
 /** The save's patch, or a full restyle; true when it stored a complete full build. */
 async function patchStyles(filePath: string): Promise<boolean> {
   let recompiledFiles: string[];
@@ -751,16 +785,7 @@ async function patchStyles(filePath: string): Promise<boolean> {
     return false;
   }
 
-  // Per-file compile failures. Until now these were only console.warn'ed inside the tracker, so a
-  // broken .scss produced NOTHING in the workbench — the one place a design-system author looks.
-  // Non-fatal by design, so report and carry on rather than returning early.
-  for (const { file, message } of compileErrors) {
-    hmr.push({
-      type: "error",
-      scope: "build",
-      message: `SCSS ${basename(file)}: ${message.split("\n")[0]}`,
-    });
-  }
+  pushCompileErrors(compileErrors);
   const discovery = await currentDiscovery(state, patternRoots);
   const allIds = baseComponentIds(discovery);
   const timestamp = Date.now();
@@ -1267,7 +1292,24 @@ on("unlink", async (filePath) => {
   if (await handlePages(filePath, "unlink")) return;
   if (await handleReloadable(filePath, "unlink")) return;
   const patternRoot = patternRootOf(filePath);
-  if (extname(filePath) === ".hbs" && patternRoot) {
+  const themesDir = themeDirOf(filePath);
+  if (extname(filePath) === ".scss" && themesDir) {
+    // A theme removed: no longer served, and the preview reloads without it.
+    const themeName = basename(filePath, ".theme.scss");
+    state.themeCss.delete(themeName);
+    state.themeTokens.delete(themeName);
+    hmr.push({ type: "content-swap", componentId: state.lastComponentId });
+    console.log(`[dev-server] Theme removed: ${themeName}`);
+  } else if (extname(filePath) === ".scss") {
+    await handleRemovedScss(filePath);
+  } else if (extname(filePath) === ".ts" && scriptDirOf(filePath)) {
+    // As for a change: the next request compiles again, and finds the script gone (404).
+    const scriptId = basename(filePath, ".ts");
+    scriptFor(state, scriptId).invalidate();
+    if (state.lastComponentId) hmr.push({ type: "content-swap", componentId: state.lastComponentId });
+    await everyPageChanged();
+    console.log(`[dev-server] Script removed: ${scriptId} → srcdoc reload dispatched`);
+  } else if (extname(filePath) === ".hbs" && patternRoot) {
     await rebuildAndSignalTree(`Pattern removed: ${relative(patternRoot, filePath)}`);
   } else if (extname(filePath) === ".md" && patternRoot) {
     await handleMarkdown(filePath, "unlink");
