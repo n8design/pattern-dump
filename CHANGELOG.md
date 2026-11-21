@@ -22,6 +22,11 @@
   `~/.cache/pattern-dump/` on Linux. It is created for you alone, and a folder there that is a link or open to other
   users stops the run, naming the folder to remove; a cached audit is never reused from one. Old folders in the temp
   folder are left as they are; delete them when you like.
+- **The accessibility check runs with the axe-core it was proven on.** Which rules are decided without a browser was
+  measured with axe-core 4.11.4, but any axe-core 4 could be installed, and a fresh install got a newer one. The
+  package now depends on axe-core 4.11.4 and jsdom 27.4.0 exactly, and `pd dev`, `pd build` and `pd audit` stop
+  with another axe-core installed: `axe-core <installed> is installed, but the accessibility rule tiers were proven
+  on 4.11.4: install axe-core 4.11.4`.
 
 ### Changed
 
