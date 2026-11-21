@@ -9,8 +9,9 @@
 //   - axe-core is resolved like any dependency, from wherever this module is installed;
 //   - the rule tiers come from @pattern-dump/a11y as data, not as a path into its sources.
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Locate the dev-ui bundle directory for the module at `moduleUrl`. `exists` is injectable so both
@@ -27,4 +28,9 @@ export function resolveDevUiDist(
 /** Absolute path of axe-core's browser build, resolved from the module at `moduleUrl`. */
 export function resolveAxeCore(moduleUrl: string): string {
   return createRequire(moduleUrl).resolve("axe-core/axe.min.js");
+}
+
+/** The version of the axe-core resolveAxeCore serves, from its own package.json. */
+export function servedAxeVersion(moduleUrl: string): string {
+  return (JSON.parse(readFileSync(join(dirname(resolveAxeCore(moduleUrl)), "package.json"), "utf8")) as { version: string }).version;
 }

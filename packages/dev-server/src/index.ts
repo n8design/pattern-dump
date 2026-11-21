@@ -81,7 +81,8 @@ import { createImageService } from "./image-service.js";
 // HTTP route handling — takes an explicit RouteContext instead of closing over this scope.
 import { handleRequest, type RouteContext, type BootStamp } from "./routes.js";
 import { createSiteValues } from "./storefront/site-values.js";
-import { resolveDevUiDist } from "./assets.js";
+import { resolveDevUiDist, servedAxeVersion } from "./assets.js";
+import { assertAxeVersion } from "@pattern-dump/a11y";
 import { assertPortFree, describeBindError } from "./ports.js";
 export { PortInUseError } from "./ports.js";
 import { loadPatternPackages } from "./packages.js";
@@ -191,6 +192,9 @@ export async function startDevServer(
   opts: DevServerOptions = {}
 ): Promise<DevServer> {
   const startTime = performance.now();
+  // The workbench's preview runs the axe-core served at /_pd/axe-core.js against the rule tiers: another release than
+  // the one they were proven on stops pd dev and pd build here, naming both.
+  assertAxeVersion(servedAxeVersion(import.meta.url));
   const cfg = resolveServerConfig(config, cwd, opts, loadPatternPackages(config.packages, cwd));
   // Destructured so the body below reads unchanged. `cfg` is what gets handed to the extracted
   // route and watcher modules; these locals are the same values under their original names.

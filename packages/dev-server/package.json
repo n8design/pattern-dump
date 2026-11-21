@@ -20,7 +20,7 @@
     "@pattern-dump/discovery": "*",
     "@pattern-dump/hotreloader": "*",
     "@pattern-dump/renderer": "*",
-    "axe-core": "^4.9.0",
+    "axe-core": "4.11.4",
     "chokidar": "^3.6.0",
     "markdown-it": "^14",
     "markdown-it-deflist": "4.0.0",

@@ -8,12 +8,14 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { JSDOM } from "jsdom";
 import pageTiers from "./page-rule-tiers.generated.json" with { type: "json" };
+import { assertInstalledAxe } from "./axe-version.js";
 
 const require = createRequire(import.meta.url);
 let axeSource: string | undefined;
 const source = (): string => (axeSource ??= readFileSync(require.resolve("axe-core/axe.min.js"), "utf8"));
-/** axe-core's browser build, as text: injected into a page a browser renders (`pd build --browser`). */
-export const axeScript = (): string => source();
+/** axe-core's browser build, as text: injected into a page a browser renders (`pd build --browser`). Stops when the
+ *  installed release is not the one the tiers were proven on. */
+export const axeScript = (): string => { assertInstalledAxe(); return source(); };
 
 /** The axe tags a site page is checked against. */
 export const PAGE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
@@ -61,6 +63,7 @@ export function severityOf(impact: string | null | undefined, tags: readonly str
 
 /** The rules of a site page decided in jsdom, run on `html`: every rule it fails. */
 export async function runPageA11y(html: string): Promise<PageA11yFinding[]> {
+  assertInstalledAxe();
   const { violations } = await runAxeOnPage(html, pageTiers.jsdom);
   return violations.map(v => ({
     ruleId: v.id, severity: severityOf(v.impact, v.tags), impact: v.impact ?? "minor", help: v.help, helpUrl: v.helpUrl,

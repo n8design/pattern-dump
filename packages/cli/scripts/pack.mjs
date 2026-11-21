@@ -31,8 +31,10 @@ const VERSION = cliPkg.version;
 const RUNTIME_RESOLVED = ["axe-core"];
 // Pinned to the exact version locked here, not a caret range: sharp's version is part of every image variant's
 // key, so another release could encode other bytes under the same URL. markdown-it-deflist is the syntax of every
-// page's markdown: another release could render the same markdown differently.
-const EXACT = new Set(["markdown-it-deflist", "sharp"]);
+// page's markdown: another release could render the same markdown differently. axe-core is the release the
+// accessibility rule tiers were proven on (the check stops on any other), and jsdom's cascade is part of every
+// result the check gives.
+const EXACT = new Set(["axe-core", "jsdom", "markdown-it-deflist", "sharp"]);
 
 await rm(outRoot, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });

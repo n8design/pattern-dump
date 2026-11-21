@@ -15,7 +15,7 @@ const command = parseCommand(process.argv.slice(2), process.cwd());
  *  config, so it gets its message alone; anything else keeps its stack trace. Matched by name, not
  *  class, so the CLI needs no import beyond core. */
 function describeError(e: unknown): unknown {
-  return e instanceof Error && e.name === "ConfigError" ? e.message : e;
+  return e instanceof Error && (e.name === "ConfigError" || e.name === "AxeVersionError") ? e.message : e;
 }
 
 switch (command.kind) {

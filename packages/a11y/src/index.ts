@@ -1,4 +1,5 @@
 export { runA11yProducer } from "./producer.js";
+export { assertAxeVersion, assertInstalledAxe, AxeVersionError, installedAxeVersion } from "./axe-version.js";
 export { axeScript, runPageA11y, severityOf, pageRuleTiers, PAGE_TAGS, type PageA11yFinding } from "./page.js";
 
 /** The axe rule-tier classification (alwaysOn / needsRendering / …), as data. The dev server serves
