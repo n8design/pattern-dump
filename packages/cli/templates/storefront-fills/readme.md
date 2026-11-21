@@ -28,6 +28,7 @@ returns by itself. How `pd-` tags work:
 | `src/patterns/layouts/home/`, `layouts/article/` | the home page's layout, with the latest articles, and an article's, with its related articles |
 | `src/patterns/partials/base/` | the frame around every page: header, navigation, footer |
 | `src/patterns/partials/head/` | what the skin adds to every page's `<head>` (the icon) |
+| `src/patterns/partials/term-index/`, `partials/term-listing/` | what the tag and category pages show, shared by their layouts (`tags`, `categories`; `tag`, `category` and `listing`) |
 | `src/patterns/components/note/` | the component the home page shows |
 | `src/patterns/views/` | the ways a listing can be shown: `list`, `grid`, `featured`, `compact` |
 | `src/patterns/components/*-card/` | the card each view shows a page as; its schema says which fields a page needs |

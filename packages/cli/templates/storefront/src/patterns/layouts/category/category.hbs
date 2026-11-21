@@ -1,7 +1,3 @@
 {{#> partials-base }}
-<article class="page">
-  <h1 class="page-title">{{title}}</h1>
-  {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
-  <div class="page-body">{{{page.pages.listing}}}</div>
-</article>
+{{> partials-term-listing content=page.pages.listing }}
 {{/partials-base}}
