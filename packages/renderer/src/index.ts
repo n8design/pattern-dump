@@ -18,7 +18,7 @@ import { tagShapeProblems } from "./tag-shape";
 import { checkSchemaExtensions } from "./schema-extensions";
 import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
-import { createSourceStore, deepFreeze, mergeData, templateKey, templateSpec, type SourceStore } from "./source-store";
+import { createSourceStore, deepFreeze, mergeData, PROTOTYPE_KEYS, templateKey, templateSpec, type SourceStore } from "./source-store";
 import type {
   CreateRenderer, RendererOptions, Diagnostic, RenderMeta,
   ImageLookup, ImageSource,
@@ -48,6 +48,8 @@ export function renderPlainTemplate(source: string, data: Record<string, unknown
   return Handlebars.create().compile(source, COMPILE)(data);
 }
 
+/** `sources` merged into `target`, later over earlier, descending where both hold an object. PROTOTYPE_KEYS are
+ *  left out: merging a parsed `__proto__` would otherwise change Object.prototype. */
 export function deepMerge(
   target: Record<string, unknown>,
   ...sources: Array<Record<string, unknown> | undefined>
@@ -55,6 +57,7 @@ export function deepMerge(
   for (const source of sources) {
     if (!source) continue;
     for (const [key, value] of Object.entries(source)) {
+      if (PROTOTYPE_KEYS.has(key)) continue;
       const targetVal = target[key];
       if (
         value !== null && typeof value === "object" && !Array.isArray(value) &&
