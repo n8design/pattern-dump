@@ -27,6 +27,22 @@
   package now depends on axe-core 4.11.4 and jsdom 27.4.0 exactly, and `pd dev`, `pd build` and `pd audit` stop
   with another axe-core installed: `axe-core <installed> is installed, but the accessibility rule tiers were proven
   on 4.11.4: install axe-core 4.11.4`.
+- **Live reload works beside a single helper file.** With `helpers` set to one file, every other file in its folder
+  counted as a helper's import: saving a template or stylesheet there asked you to restart `pd dev` and reloaded
+  nothing. Only the helper file itself is a helper now; files in your patterns, styles and other source folders reload
+  as usual, and any other file beside the helper still asks for a restart.
+- **Removing a file takes effect in `pd dev`.** A removed component stylesheet's CSS stayed in the preview, a stylesheet
+  that used a removed partial showed no error, and a removed theme or script was still served, until a restart. They
+  now leave as a change updates them; a stylesheet that used a removed partial shows its error.
+- **`pd dev` keeps handling changes after a failed send.** If sending a reload to the open pages threw, every later
+  change waited silently until a restart. The failure is reported now, and the next change is handled.
+- **A failed `pd build` closes its server.** Some failures between the start and the writing of the files left the
+  build's server running, so a script calling the build in its own process never exited.
+- **A link that can't be read is a broken link.** A `%` that is no escape in a link a template writes
+  (`/sale/50%-off/`) ended `pd build` with a bare `URI malformed`. It is now listed with the broken links, with its
+  page and address: `<page>: <a href="/sale/50%-off/">: not a URL that can be read`.
+- **Pages with live examples are checked faster.** The accessibility check waited half a second for each page that
+  embeds an example, for frames that can't answer. It no longer asks them; the findings are the same.
 
 ### Changed
 
