@@ -47,6 +47,11 @@ export interface FrontmatterReading {
 /** The key whose block is read as a page's frontmatter, one level deeper than every other key. */
 export const CHILD_DEFAULTS = "childDefaults";
 
+/** A key every object already has (`__proto__`, `constructor`, `toString`…): written into the reading it would
+ *  replace its prototype or read as a duplicate of itself, so it is refused, as the error a page shows. */
+const inherited = (key: string): boolean => key in Object.prototype;
+const reservedKey = (key: string): string => `"${key}" cannot be a frontmatter key: choose another name`;
+
 const BOM = "﻿";
 
 const unquote = (s: string): string => {
@@ -139,6 +144,7 @@ function scan(md: string, nested = true): FrontmatterReading {
         continue;
       }
       const [, , name, raw] = sub;
+      if (inherited(name)) { lineErr(reservedKey(`${openKey}.${name}`)); subListKey = null; continue; }
       if (name in map) lineErr(`duplicate key "${openKey}.${name}"`);
       keyLines[`${openKey}.${name}`] = n;
       const value = raw.trim();
@@ -185,6 +191,7 @@ function scan(md: string, nested = true): FrontmatterReading {
       i = last;
       continue;
     }
+    if (inherited(key)) { lineErr(reservedKey(key)); openKey = null; subListKey = null; continue; }
     if (key in out || key in maps) lineErr(`duplicate key "${key}"`);
     delete maps[key];
     keyLines[key] = n;
