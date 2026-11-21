@@ -34,7 +34,11 @@ async function files(dir: string): Promise<string[]> {
 
 beforeAll(async () => {
   server = createServer((req, res) => {
-    const r = RESPONSES[req.url ?? ""] ?? { status: 404, type: "text/plain", body: "nope" };
+    // Any component stylesheet answers 200, as the route did for an id it doesn't know: the writer alone must
+    // keep such a path inside its root.
+    const anyCss = req.url?.startsWith("/_pd/components/") && req.url.endsWith(".css")
+      ? { status: 200, type: "text/css", body: "" } : undefined;
+    const r = RESPONSES[req.url ?? ""] ?? anyCss ?? { status: 404, type: "text/plain", body: "nope" };
     res.writeHead(r.status, r.type ? { "Content-Type": r.type } : {});
     res.end(r.body);
   });
@@ -130,5 +134,25 @@ describe("createSnapshotWriter", () => {
     expect(await readFile(join(rootA, "preview", "atoms", "a", "index.html"), "utf8")).toBe(`<link href="/pd/_pd/components/atoms/a.css">`);
     expect(await readFile(join(rootB, "preview", "atoms", "a", "index.html"), "utf8")).toBe(`<link href="/_pd/components/atoms/a.css">`);
     expect(counts.files).toBe(2);
+  });
+
+  it("refuses a path that leaves its root once decoded, and writes nothing anywhere", async () => {
+    const outDir = join(root, "out");
+    // One writer captures, another stores: a writer writes each path once, so one writer would only store it once.
+    const w = createSnapshotWriter({ outDir, basePath: "/", origin, report: counts });
+    const s = createSnapshotWriter({ outDir, basePath: "/", origin, report: counts });
+    const escapes = [
+      "/_pd/components/x%2f..%2f..%2f..%2fevil.css",
+      "/_pd/components/x%2F..%2F..%2F..%2Fevil.css",
+      "/_pd/components/x%5c..%5c..%5c..%5cevil.css",
+      "/_pd/components/x%00.css",
+      "/_pd/components/50%-off.css",
+    ];
+    for (const url of escapes) {
+      await expect(w.capture(url), url).rejects.toThrow(`pd build: ${url} does not name a file inside the output folder`);
+      await expect(s.store(url, "x"), url).rejects.toThrow(`pd build: ${url} does not name a file inside the output folder`);
+    }
+    expect(await files(root)).toEqual([]);
+    expect(counts.files).toBe(0);
   });
 });

@@ -359,7 +359,18 @@ async function routeRequest(
       // Query string (cache-buster) already stripped by `url.pathname`. The id is RAW, as in every
       // component-id route: producers never encode it, so decoding here would break an id with a `%`.
       const componentId = pathname.slice(PD_ROUTE_PREFIX.componentCss.length, -".css".length);
-      const css = state.perComponentCss.get(componentId) ?? "";
+      // A component without styles gets an empty stylesheet (its preview links one either way); a name that
+      // is no component is a 404, so `pd build` never follows a made-up address to write it.
+      let css = state.perComponentCss.get(componentId);
+      if (css === undefined) {
+        const discovery = await currentDiscovery(state, patternRoots);
+        if (!discovery.discoveryMap.has(componentId) && !discovery.quarantineMap.has(componentId)) {
+          res.writeHead(404, { "Content-Type": "text/plain" });
+          res.end("Stylesheet not found");
+          return;
+        }
+        css = "";
+      }
       res.writeHead(200, { "Content-Type": "text/css" });
       res.end(normalizeAssetRefs(css, assetRootNames));
       return;

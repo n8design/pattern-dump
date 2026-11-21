@@ -10,8 +10,9 @@
 // records its failure in `failures` instead, for the caller to turn into a build error.
 
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { PD_ROUTES, staticPathFor } from "@pattern-dump/contracts";
+import { decodePath, isInside } from "./contained-file.js";
 
 /** Root-relative PD URL prefixes that must move under the base path. */
 const PD_PREFIXES = /(^|["'(\s,=])\/(_pd|api|preview|source|assets)\//g;
@@ -25,9 +26,20 @@ export function withBasePath(text: string, basePath: string): string {
 const isText = (contentType: string): boolean =>
   /\b(text\/html|text\/css|application\/json)\b/.test(contentType);
 
-/** The on-disk path for a snapshot URL path: segments decoded, as a static host will look them up. */
-function diskPath(outDir: string, urlPath: string): string {
-  return join(outDir, ...urlPath.split("/").map(seg => decodeURIComponent(seg)));
+/**
+ * The on-disk path for a snapshot URL path: segments decoded, as a static host will look them up. A URL can
+ * carry an encoded separator (`%2f`) that no URL parser treats as one, so a path is refused, before anything
+ * is written, when a segment doesn't decode, decodes to a separator, a NUL or "..", or the file
+ * would not be inside `outDir`. `liveUrl` names the request in the error.
+ */
+function diskPath(outDir: string, urlPath: string, liveUrl: string): string {
+  const segments = urlPath.split("/").map(seg => decodePath(seg));
+  const target = segments.every((s): s is string => s !== null && s !== ".." && !/[/\\\0]/.test(s))
+    ? join(outDir, ...segments) : null;
+  if (target === null || !isInside(resolve(target), resolve(outDir))) {
+    throw new Error(`pd build: ${liveUrl} does not name a file inside the output folder: nothing was written for it`);
+  }
+  return target;
 }
 
 /** The counters and warnings a writer adds to. Shared by every writer of one build. */
@@ -88,7 +100,7 @@ export function createSnapshotWriter({ outDir, basePath, origin, report, fetch: 
       return null;
     }
     const type = res.headers.get("content-type") ?? "";
-    const target = diskPath(outDir, file);
+    const target = diskPath(outDir, file, liveUrl);
     await mkdir(dirname(target), { recursive: true });
     if (isText(type)) {
       const body = await res.text();
@@ -109,8 +121,8 @@ export function createSnapshotWriter({ outDir, basePath, origin, report, fetch: 
     const file = staticPathFor(liveUrl);
     const holder = done.get(file);
     if (holder !== undefined) return holder;
+    const target = diskPath(outDir, file, liveUrl);
     done.set(file, liveUrl);
-    const target = diskPath(outDir, file);
     await mkdir(dirname(target), { recursive: true });
     const out = withBasePath(body, basePath);
     await writeFile(target, out);
