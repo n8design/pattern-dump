@@ -83,3 +83,38 @@ describe("a watcher handler that fails", () => {
     }, 60_000);
   }
 });
+
+// The queue after a handler: its messages are sent and the test hook is told before the next event starts. A throw
+// there (a socket that fails to send, CR-025) left the queue's current event set for good, so every later change
+// waited without a word. Forced with the hook the harness itself listens on, made to throw once after it has
+// recorded the event: the same place in the queue as the send.
+describe("a throw after a handler, while its messages go out", () => {
+  type Handled = (event: string, path: string, stillRunning: number, stamp: string | null) => void;
+  const tap = globalThis as { __testOnly_onEventHandled?: Handled };
+
+  it("is reported, and pd dev handles the next change", async () => {
+    const b = await project();
+    lost.length = 0;
+    const harness = tap.__testOnly_onEventHandled!;
+    let thrown = false;
+    tap.__testOnly_onEventHandled = (event, path, stillRunning, stamp) => {
+      harness(event, path, stillRunning, stamp);
+      if (!thrown && event === "change" && path.endsWith(FILE)) { thrown = true; throw new Error("send failed for a test"); }
+    };
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => { errors.push(a.map(String).join(" ")); });
+    try {
+      await b.step(() => save(b.at(FILE), `<button class="btn">Two</button>\n`), [["change", FILE]]);
+      expect(thrown).toBe(true);
+      expect(errors).toContain(`[dev-server] ${FILE} (change): the test hook failed: send failed for a test`);
+      const next = await b.step(() => save(b.at(FILE), `<button class="btn">Three</button>\n`), [["change", FILE]]);
+      expect(next.messages).toEqual([`{"type":"content-swap","componentId":"atoms/btn"}`]);
+      expect(await (await fetch(`${b.origin}/preview/atoms/btn`)).text()).toContain("Three");
+    } finally {
+      spy.mockRestore();
+      tap.__testOnly_onEventHandled = harness;
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(lost).toEqual([]);
+  }, 60_000);
+});

@@ -415,7 +415,9 @@ function pump(): void {
   const next = queue.shift();
   if (!next) { const waiters = drainWaiters; drainWaiters = []; waiters.forEach(w => w()); return; }
   current = next;
-  void next.start().finally(() => { current = null; pump(); });
+  // An event's turn that throws before its handler runs (forgetInside, startCycle) is reported, never left to
+  // reject unhandled.
+  void next.start().catch((e: unknown) => { reportHandlerFailure(next.event, next.path, e); }).finally(() => { current = null; pump(); });
 }
 function enqueue(job: Job): void {
   // Closing: nothing new starts (an event chokidar flushes while it closes is dropped).
@@ -432,8 +434,9 @@ function enqueue(job: Job): void {
 function reportHandlerFailure(event: string, path: string, e: unknown, step?: string): void {
   const reason = e instanceof Error ? e.message : String(e);
   const message = step ? `${shown(path)} (${event}): ${step} failed: ${reason}` : `${shown(path)} (${event}) was not handled: ${reason}`;
-  hmr.push({ type: "error", scope: "build", message });
+  // The terminal first: the pages' socket may be what failed.
   console.error(`[dev-server] ${message}`);
+  try { hmr.push({ type: "error", scope: "build", message }); } catch { /* said in the terminal */ }
 }
 
 function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler: (path: string) => unknown): void {
@@ -477,9 +480,12 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
     const done = () => {
       const sending = outbox;
       outbox = null;
-      if (sending && sending.length > 0) hotreloader.pushChange(sending);
+      // A throw here (a socket that fails to send, the test hook) is reported and stops nothing: finish() always
+      // runs, so the next event is handled.
+      const guarded = (step: string, f: () => void): void => { try { f(); } catch (e) { reportHandlerFailure(event, path, e, step); } };
+      guarded("sending its reload messages", () => { if (sending && sending.length > 0) hotreloader.pushChange(sending); });
       // Still to finish after this one: the ones waiting.
-      (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, queue.length, readStamp);
+      guarded("the test hook", () => (globalThis as { __testOnly_onEventHandled?: TestOnlyEventHandled }).__testOnly_onEventHandled?.(event, path, queue.length, readStamp));
       finish();
       if (event !== "change" || closed || seen === null) return;
       rechecks.set(path, setTimeout(() => {
