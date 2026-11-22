@@ -52,7 +52,7 @@ import { checkLinks } from "./links.js";
 import { checkPageBasics } from "./page-basics.js";
 import { dateOf, entriesOf, resolveCollections, type Entry } from "./collections.js";
 import { cardOf, checkEntries, readCard } from "./cards.js";
-import { checkViewSampleData, DEFAULT_VIEW_KEY, resolveView } from "./views.js";
+import { DEFAULT_VIEW_KEY, resolveView } from "./views.js";
 import { termOf, type Category, type Term } from "./categories.js";
 import type { GeneratedPage } from "./terms.js";
 
@@ -641,7 +641,6 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
         notes.push(...listed.notes);
       }
       problems.push(...checkEntries(entries, resolved.view.card, page.path, model));
-      problems.push(...await checkViewSampleData(resolved.view, a.discoveryMap));
       view = { id: resolved.view.id, entries };
     }
   }

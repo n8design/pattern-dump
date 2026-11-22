@@ -29,7 +29,7 @@ import type { PageFile, PageModel } from "./pages.js";
 import { placeOf } from "./folder-defaults.js";
 import { entryOf, type Entry } from "./collections.js";
 import { checkEntries, readCard, cardOf, type Card } from "./cards.js";
-import { checkViewSampleData, viewOf, type ResolvedView } from "./views.js";
+import { viewOf, type ResolvedView } from "./views.js";
 import { readTerms } from "./listing-keys.js";
 import { TERM_WORDS } from "./categories.js";
 
@@ -352,7 +352,6 @@ export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise
   // ---- each page against the view's card, and the query's own ----
   if (view) {
     problems.push(...checkEntries(listed, view.card, ctx.path, model));
-    problems.push(...await checkViewSampleData(view, ctx.discoveryMap));
   }
   if (card) problems.push(...checkEntries(listed, card, ctx.path, model));
   return { name: q.name, entries: listed, ...(view ? { view } : {}), problems: [...new Set(problems)], notes: [...new Set(notes)] };
