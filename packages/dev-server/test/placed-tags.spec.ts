@@ -90,6 +90,28 @@ describe("the pd- tag rule", () => {
   });
 });
 
+describe("code inside a tag's content", () => {
+  // Content as a page writes it to show placed tags as code: a fence holding an opening tag, one never closed and a
+  // closing one, a tilde fence, and inline code. All of it is text of the slide's caption, as at the top level.
+  const FENCED = "<pd-atoms-slide image=\"a.jpg\">\n  Write it like this:\n\n  ```md\n  <pd-atoms-note>\n  <pd-molecules-slider label=\"x\">\n  </pd-atoms-slide>\n  ```\n\n"
+    + "  ~~~~\n  </pd-molecules-slider>\n  ~~~\n  ~~~~\n\n  Or inline: `<pd-atoms-note>` and ``</pd-atoms-slide>``.\n</pd-atoms-slide>\n";
+
+  it("a fence or a code span is text, never a tag", async () => {
+    const r = await placed(FENCED);
+    expect(r.problems).toEqual([]);
+    expect(entry(r.values, "caption")).toMatchObject({ kind: "text", value: "Write it like this:\n\n```md\n<pd-atoms-note>\n<pd-molecules-slider label=\"x\">\n</pd-atoms-slide>\n```\n\n"
+      + "~~~~\n</pd-molecules-slider>\n~~~\n~~~~\n\nOr inline: `<pd-atoms-note>` and ``</pd-atoms-slide>``." });
+  });
+
+  it("a fence left open runs on: the tag around it is never closed; a lone backtick is a backtick", async () => {
+    expect(outline("<pd-atoms-slide image=\"a.jpg\">\n  ```\n  </pd-atoms-slide>\n\nText after.\n")[0].problems)
+      .toEqual(["5:1 <pd-atoms-slide> is never closed"]);
+    const r = await placed("<pd-atoms-slide image=\"a.jpg\">a ` tick</pd-atoms-slide>\n");
+    expect(r.problems).toEqual([]);
+    expect(entry(r.values, "caption")).toMatchObject({ value: "a ` tick" });
+  });
+});
+
 describe("a tag tree as located values", () => {
   it("maps attributes to camelCase keys, bare attributes to a marker, children to their property, content to x-pd-content", async () => {
     const r = await placed(`<pd-molecules-slider label="x">\n  <pd-atoms-slide image="a.jpg">ESPC **2025**</pd-atoms-slide>\n</pd-molecules-slider>\n`);

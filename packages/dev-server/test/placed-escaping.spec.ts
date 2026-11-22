@@ -68,6 +68,17 @@ describe("a payload in a placed component", () => {
     expect(html).not.toMatch(/href="javascript:/i);
   });
 
+  it("pd- tags written as code in the content: shown as code, escaped", async () => {
+    const r = await place(
+      `<pd-molecules-slider>\n  <pd-atoms-slide image="a.jpg" alt="a">\n    \`\`\`md\n    <pd-atoms-slide image="b.jpg">\n    <pd-molecules-slider>\n    </pd-atoms-slide>\n    \`\`\`\n\n`
+      + `    Inline: \`</pd-molecules-slider>\`\n  </pd-atoms-slide>\n</pd-molecules-slider>\n`,
+    );
+    expect(r.problems).toEqual([]);
+    // A code block, highlighted as any in a page: the tags are its text.
+    expect(r.html).toContain(`<pre class="shiki shiki-plain" tabindex="0"><code>&lt;pd-atoms-slide image="b.jpg"&gt;\n&lt;pd-molecules-slider&gt;\n&lt;/pd-atoms-slide&gt;\n</code></pre>`);
+    expect(r.html).toContain(`<p>Inline: <code>&lt;/pd-molecules-slider&gt;</code></p>`);
+  });
+
   it("through a template that outputs a plain value with triple-stash: a named error, nothing rendered", async () => {
     const r = await place(`<pd-atoms-loud image="a.jpg" alt="a" credit="${SCRIPT}"></pd-atoms-loud>\n`);
     expect(r.html).toBeUndefined();
