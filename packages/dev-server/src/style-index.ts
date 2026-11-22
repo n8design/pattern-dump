@@ -139,10 +139,14 @@ function strippedIds(componentIds: Set<string>): Map<string, string | null> {
   return map;
 }
 
+/** The extensions of a styles-tree file: Sass, or plain CSS, which Sass reads (`@use "plain"` loads `plain.css`) and
+ *  which is an entry of its own as a non-partial `.scss` is. */
+const STYLESHEET_EXT = /\.(scss|css)$/;
+
 export function resolveScssToComponent(absPath: string, stylesDir: string, componentIds: Set<string>): string | null {
   const rel = relative(stylesDir, absPath);
   let normalized = rel
-    .replace(/\.scss$/, "")
+    .replace(STYLESHEET_EXT, "")
     .split("/")
     .map(seg => seg.replace(/^_/, ""))
     .join("/");
@@ -169,7 +173,7 @@ export function resolveScssToComponent(absPath: string, stylesDir: string, compo
 export function resolveSharedModulePath(absPath: string, stylesDir: string, keepBarrel = false): string | null {
   const rel = relative(stylesDir, absPath);
   if (rel.startsWith("..")) return null;
-  const parts = rel.replace(/\.scss$/, "").split("/");
+  const parts = rel.replace(STYLESHEET_EXT, "").split("/");
   const normalized = parts.map((seg, i) =>
     i === parts.length - 1 ? seg.replace(/^_/, "") : seg
   );
@@ -446,7 +450,7 @@ export async function buildAllStyleData(
       for (const dep of deps) {
         const depComp = resolveScssToComponent(dep, stylesDir, componentIds);
         if (depComp !== null && depComp !== compOwner) {
-          const rawRel = relative(stylesDir, dep).replace(/\.scss$/, "");
+          const rawRel = relative(stylesDir, dep).replace(STYLESHEET_EXT, "");
           const modPath = rawRel.endsWith("/_index") ? rawRel.slice(0, -7) : rawRel;
           if (modPath) {
             const mArr = styleUsesModules.get(compOwner) ?? [];
