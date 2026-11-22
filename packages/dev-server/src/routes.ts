@@ -34,6 +34,7 @@ import { compositionFor, currentDiscovery, type ServerState } from "./server-sta
 import { createDisplayPath } from "./display-path.js";
 import { buildGraph, graphJson, type ProjectGraph } from "./graph/build.js";
 import { gatherGraphInputs } from "./graph/inputs.js";
+import { layoutPagesOf } from "./graph/queries.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 import { buildShellHtml, json, mimeType, serveFile, servesShell, workbenchTitle } from "./http-utils.js";
@@ -60,7 +61,7 @@ import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
-import { layoutPages, readPages, todayOf } from "./storefront/pages.js";
+import { readPages, todayOf } from "./storefront/pages.js";
 import { createPagesCache, type PagesCache } from "./storefront/pages-cache.js";
 import { assetFile } from "./asset-file.js";
 import { decodePath } from "./contained-file.js";
@@ -574,8 +575,9 @@ async function routeRequest(
         const layouts = await layoutIndex(discovery.discoveryMap);
         const layoutName = layouts.nameOf(componentId);
         if (cfg.storefront && layoutName !== undefined) {
-          // With the discovery map, so the tag and category pages its layouts generate are in the model too.
-          detail.relationships.pages = layoutPages(await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap), layoutName);
+          // The graph's page model is read with the discovery map, so the tag and category pages its layouts generate
+          // are in it too.
+          detail.relationships.pages = layoutPagesOf(graph, componentId);
         }
         const quarantineEntry = discovery.quarantineMap.get(componentId);
         const checked = await checkComponent(componentId, variant, render, quarantineEntry);
