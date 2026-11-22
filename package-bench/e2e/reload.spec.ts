@@ -99,8 +99,9 @@ test("edits to linked packages reach the open workbench and storefront page, wit
 
   await test.step("an asset referenced from CSS", async () => {
     // Both pages load it again, with its new bytes (it is a background in the chip's stylesheet). The storefront
-    // asks for it at its stamped URL (?v=<content hash>), so the path is what is compared.
-    const fresh = (page: Page) => page.waitForResponse(async r => new URL(r.url()).pathname === "/assets/pd-fixture-ds/dot.svg" && (await r.text()).includes("data-v2"));
+    // asks for it at its stamped URL (?v=<content hash>), so the path is what is compared. A response whose body
+    // is gone by the time it is read (its frame was replaced) is not the one: the wait goes on for the fresh one.
+    const fresh = (page: Page) => page.waitForResponse(r => new URL(r.url()).pathname === "/assets/pd-fixture-ds/dot.svg" && r.text().then(t => t.includes("data-v2"), () => false));
     const loaded = [fresh(workbench), fresh(storefront)];
     await edit("vendor/fixture-ds/assets/pd-fixture-ds/dot.svg", "<svg ", `<svg data-v2="" `);
     await Promise.all(loaded);
