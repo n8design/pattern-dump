@@ -37,7 +37,6 @@ import { renderError } from "./pages-cache.js";
 import { designFiles } from "./design-files.js";
 import { checkSite, SITE_SCHEMA_OWNER } from "./site.js";
 import { resolveNavigations } from "./navigations.js";
-import { checkSampleData, includeTree } from "./sample-data.js";
 import { checkPageDeclaration, FILLED, pageValue, positionOf, RETIRED, type DerivedPage, type PageHeading } from "./derived.js";
 import { checkDeclaredQueries, declaredQueries, resolveQuery, type ResolvedQuery } from "./query.js";
 import { collidingHeadings, idsBesides } from "./anchors.js";
@@ -46,6 +45,7 @@ import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 import type { PageImage, PageImageCheck } from "./page-image.js";
 import { jsonLdScript } from "./json-ld.js";
+import { includeTree } from "../composition.js";
 import { checkHeadMarkup, HEAD_PARTIAL } from "./head-partial.js";
 import { checkImages, type ImageFinding } from "./image-checks.js";
 import { checkLinks } from "./links.js";
@@ -692,18 +692,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       + `{ "collections": ["${site.collections[0]}"], "sort": "date", "limit": 3 })`);
   }
   notes.push(...site.notes ?? []);
-  if (a.discoveryMap.has(checked.layoutId)) {
-    problems.push(...await checkSampleData(checked.layoutId, a.discoveryMap, a.composition, layoutDeclared, siteDeclared, pageDeclaration.declared, site.listed, site.collections,
-      [...(layoutCard !== undefined && declares("children") ? [layoutCard] : []), ...declaredQs.flatMap(q => q.card !== undefined ? [q.card] : [])],
-      declaredQs.map(q => q.name)));
-  }
   // The skin's head partial: the same for every page, so its problems are the whole site's.
   const hasHead = a.discoveryMap.has(HEAD_PARTIAL);
-  if (hasHead) {
-    const headSample = await checkSampleData(HEAD_PARTIAL, a.discoveryMap, a.composition, [], siteDeclared, undefined, site.listed, site.collections);
-    siteWide = [...siteWide, ...headSample];
-    problems.push(...headSample);
-  }
   // Tags are objects since 0.5.0: a template that still writes one as text fails, naming what to write.
   // A card's string tags are its check's problem already (cards.ts, naming the listing): not said twice.
   const STRING_TAGS = " declares tags as a list of strings";
@@ -713,7 +703,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (problems.length) return fail(problems);
   if (view) {
     try {
-      listing.listing = (await a.render({ component: view.id, data: { entries: view.entries } })).html;
+      listing.listing = (await a.render({ component: view.id, data: { entries: view.entries }, sampleData: false })).html;
     } catch (e) {
       return fail([`${view.id}: ${renderError(e)}`]);
     }
@@ -724,7 +714,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     let html: string | null = null;
     if (q.view && q.entries.length) {
       try {
-        html = (await a.render({ component: q.view.id, data: { entries: q.entries } })).html;
+        html = (await a.render({ component: q.view.id, data: { entries: q.entries }, sampleData: false })).html;
       } catch (e) {
         return fail([`${q.view.id}: ${renderError(e)}`]);
       }
@@ -761,7 +751,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   // like any other, listed and escaped, never an unhandled 500.
   const renderLayout = async (body: string, headings: PageHeading[]): Promise<Awaited<ReturnType<Render>> | AssembledPage> => {
     try {
-      return await a.render({ component: checked.layoutId, data: dataFor(body, headings) });
+      return await a.render({ component: checked.layoutId, data: dataFor(body, headings), sampleData: false });
     } catch (e) {
       return fail([`${page.path}: ${renderError(e)}`]);
     }
@@ -844,7 +834,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   let headExtra = "";
   if (hasHead) {
     try {
-      headExtra = (await a.render({ component: HEAD_PARTIAL, data: { site: siteData, body: null, nav: null } })).html.trim();
+      headExtra = (await a.render({ component: HEAD_PARTIAL, data: { site: siteData, body: null, nav: null }, sampleData: false })).html.trim();
     } catch (e) {
       const p = `${HEAD_PARTIAL}: ${renderError(e)}`;
       siteWide = [...siteWide, p];

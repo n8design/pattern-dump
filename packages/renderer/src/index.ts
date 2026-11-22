@@ -373,8 +373,13 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
       return data;
     };
 
-    const defaultData: Record<string, unknown> = (entry.jsonPath ? await readData(entry.jsonPath) : undefined) ?? {};
-    const variantData = variantJsonPath ? await readData(variantJsonPath) : undefined;
+    // A site page renders without sample data (RenderInput.sampleData): only what it is given reaches it. The files
+    // are still read, so one that doesn't parse is reported as before.
+    const samples = input.sampleData !== false;
+    const ownData = entry.jsonPath ? await readData(entry.jsonPath) : undefined;
+    const ownVariantData = variantJsonPath ? await readData(variantJsonPath) : undefined;
+    const defaultData: Record<string, unknown> = (samples ? ownData : undefined) ?? {};
+    const variantData = samples ? ownVariantData : undefined;
 
     // Cascade (lowest → highest): project global data → component defaults → variant → live.
     // A new object: every source is shared and frozen (source-store.ts), so none is changed.
@@ -514,7 +519,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
             currentBase = thisBase;
 
             const merged = mergeData(
-              capturedDefaults,
+              samples ? capturedDefaults : {},
               context != null && typeof context === "object" && !Array.isArray(context)
                 ? (context as Record<string, unknown>)
                 : {}

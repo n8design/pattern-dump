@@ -1,7 +1,7 @@
-// `page`, what the storefront derives for a page: a layout's sample data must never reach a real page
-// through it. The renderer merges sample data beneath a page's values key by key, so sample keys under
-// `page` (`page.foo`, `page.prev.extra`) would show on every page using the layout. The layout and a page
-// using it are written into the bench at test time and removed after.
+// `page`, what the storefront derives for a page: a layout's sample data never reaches a real page through it.
+// A site page renders without sample data, so sample keys under `page` (`page.foo`, `page.prev.extra`) are no
+// problem and show nowhere on the page. The layout and a page using it are written into the bench at test time and
+// removed after.
 import { expect, test } from "./fixtures.js";
 import { mkdir, rm } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -22,7 +22,7 @@ test.afterEach(async () => {
   for (const rel of ADDED) await rm(bench(rel), { recursive: true, force: true });
 });
 
-test("a layout's sample page data is a listed problem on the page, never shown on it", async ({ page }) => {
+test("a layout's sample page data is never shown on a page, and is no problem", async ({ page }) => {
   await put("src/patterns/layouts/zz-leak/zz-leak.hbs",
     `{{#> partials-base }}\n<article class="zz-leak"><h1>{{title}}</h1>{{{body}}}`
     + `<p class="zz-leak-out">{{page.foo}} {{page.prev.extra}}</p></article>\n{{/partials-base}}\n`);
@@ -34,17 +34,14 @@ test("a layout's sample page data is a listed problem on the page, never shown o
     JSON.stringify({ title: "Sample", page: { foo: "LEAKED-SAMPLE", prev: { title: "Before", extra: "LEAKED-NESTED" } } }));
   await put("pages/zz-leak.md", "---\nlayout: zz-leak\ntitle: Leak\norder: 9\n---\n\nA page on the leaking layout.\n");
 
-  const sample = (key: string) => `the sample data of layouts/zz-leak (zz-leak.json) sets "${key}", `
-    + `which is not part of the page data Pattern Dump fills, so it would show on every page using layouts/zz-leak`;
-  const problems = page.locator("ul.pd-problems li");
-  // Until the watcher has read every new file, the page is missing or renders without the sample check.
+  // Until the watcher has read every new file, the page is missing.
   await expect(async () => {
     await page.goto("/zz-leak/");
-    await expect(problems).toContainText([sample("page.foo"), sample("page.prev.extra")], { timeout: 1_000 });
+    await expect(page.locator("article.zz-leak h1")).toHaveText("Leak", { timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
-  await expect(page.locator("h1")).toHaveText("The page /zz-leak/ cannot be built");
+  await expect(page.locator("ul.pd-problems li")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("LEAKED");
-  await expect(page.locator(".zz-leak-out")).toHaveCount(0);
+  await expect(page.locator(".zz-leak-out")).toHaveCount(1);
 
   for (const rel of ADDED) await rm(bench(rel), { recursive: true, force: true });
   await expect.poll(async () => [

@@ -1,6 +1,7 @@
-// pd dev never assembles a site page from a stale file: the storefront's checks keep the design system's templates,
-// schemas and sample data in memory between requests (design-files.ts), and an edit to any of them, in the project
-// or in a linked package (through its real folder or the link), shows on the next request for the page. Each case
+// pd dev never assembles a site page from a stale file: the storefront's checks keep the design system's templates
+// and schemas in memory between requests (design-files.ts), and an edit to any of them, in the project or in a
+// linked package (through its real folder or the link), shows on the next request for the page. Sample data no
+// longer reaches a page, so it has no case here. Each case
 // asks for the page first, so whatever is kept is filled, then makes one edit and waits until the watcher has
 // handled it (watch-harness.ts), then asks again.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -86,15 +87,11 @@ const projectCases: Case[] = [
   ["the layout's template", "src/patterns/layouts/page/page.hbs",
     `<main><h1>{{title}}</h1><p>layout-template-2</p>{{{body}}}{{> atoms-badge}}{{> atoms-chip}}</main>\n`, "layout-template-2"],
   ["the layout's schema", "src/patterns/layouts/page/page.schema.json", LAYOUT_SCHEMA(`"required": ["subtitle"], `), "subtitle"],
-  ["the layout's sample data", "src/patterns/layouts/page/page.json", `{ "title": "layout-sample", "motto": "x" }\n`,
-    `sets "motto", which layouts/page does not declare`],
   ["a partial's template, read by a check", "src/patterns/atoms/badge/badge.hbs", `<b class="badge">${TAGS_AS_TEXT}</b>\n`,
     "atoms/badge (badge.hbs:1)"],
 ];
 const packageCases: Case[] = [
   ["a partial's template", "patterns/atoms/chip/chip.hbs", `<span class="chip">${TAGS_AS_TEXT}</span>\n`, "atoms/chip (chip.hbs:1)"],
-  ["a partial's sample data", "patterns/atoms/chip/chip.json", `{ "title": "chip-sample", "motto": "x" }\n`,
-    `sets "motto", which layouts/page does not declare`],
   ["a partial's schema", "patterns/atoms/chip/chip.schema.json", TAGS_AS_STRINGS, "atoms/chip (chip.schema.json) declares tags as a list of strings"],
 ];
 
