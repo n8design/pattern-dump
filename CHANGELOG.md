@@ -353,7 +353,7 @@ finds an error.
 
 Measured on a generated documentation site, main and 0.5.3 back to back (median of 5):
 
-| | 0.5.2 | 0.5.3 |
+| Build | 0.5.2 | 0.5.3 |
 |---|---:|---:|
 | 500 pages, every check | 15.6 s | 13.2 s |
 | 500 pages, `--skip-checks=a11y,html` | 5.5 s | 3.6 s |
@@ -402,10 +402,10 @@ Two checks can now be left out for a quick local build.
 
 Measured on a generated 500-page documentation site, with every check on (median of 3 runs):
 
-| | 0.5.0 | 0.5.2 |
+| Build | 0.5.0 | 0.5.2 |
 |---|---:|---:|
 | 500 pages, every check | 114.9 s | 14.8 s |
-| 500 pages, `--skip-checks=a11y` | | 6.9 s |
+| 500 pages, `--skip-checks=a11y` | not available | 6.9 s |
 
 - **The storefront's pages are read once per build**, and each page is assembled once: the build writes the pages as
   its crawl read them instead of asking for each one again. A build no longer slows down faster than the site
