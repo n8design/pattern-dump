@@ -52,6 +52,13 @@
   `[object Object]`, and `eq`, `lt` and the other comparisons with one argument quietly gave false. They now fail
   with `<helper> needs 2 arguments, got 1`, and `and` and `or` refuse a third argument, which they ignored. A template
   that showed `[object Object]` or relied on such a call now fails the render: give the helper its arguments.
+- **Sample data stays in the workbench.** A component's sample `.json` no longer reaches a site page: the layout,
+  its partials at any depth, its views and cards, placed components and the head partial render on a page with what
+  the page gives them and their template's defaults (`defaultValue`), and the project's data. So sample data may set
+  any key: the build no longer refuses one a layout, a partial, a placed component, a view or a card doesn't
+  declare (`the sample data of <id> (<file>) sets "<key>", … so it would show on every page …`), and a header or
+  footer in the frame can have sample data of its own again. The workbench, its previews and the examples a page
+  embeds show each component with its sample data as before. Every site that built before builds the same pages.
 
 ### Changed
 
