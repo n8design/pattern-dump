@@ -641,6 +641,8 @@ export const PD_ROUTES = {
   tree: "/api/tree",
   /** GET → AuditResponse (500 → ApiError) */
   audit: "/api/audit",
+  /** GET → ProjectGraphJson: the project graph (graph.ts). */
+  graph: "/api/graph",
   /** GET → ThemeSummary[] */
   themes: "/api/themes",
   /** GET → VersionInfo */

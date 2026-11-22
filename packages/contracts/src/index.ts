@@ -384,3 +384,4 @@ export * from "./dev-protocol";
 // ---- Preview iframe height fitting (browser) ----
 // The one fitter: the workbench Stage imports it; storefront pages inline it. See iframe-fit.ts.
 export * from "./iframe-fit";
+export * from "./graph";
