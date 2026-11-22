@@ -181,7 +181,24 @@ export function resolveSharedModulePath(absPath: string, stylesDir: string, keep
   return normalized.join("/");
 }
 
+/** The classes one stylesheet's rules name: the ones it defines (a context-free compound) and the ones it only
+ *  mentions (in context, or in a pseudo-class's argument), each with the first compiled selector that names it. A
+ *  stylesheet is the file that authored the rules (a partial included), found through the source map. */
+export interface StylesheetClasses {
+  /** The styles folder it is in. */
+  root: string;
+  /** The component it belongs to, or null for a shared module. */
+  component: string | null;
+  defines: Map<string, string>;
+  /** Without the classes the same stylesheet defines: styling its own class in context is no coupling. */
+  mentions: Map<string, string>;
+}
+
 export interface AllStyleData {
+  /** Every stylesheet a compiled entry's rules came from, by absolute path. Unlike the class index, which keeps only
+   *  the winning claim for each class, this keeps every claim: a stylesheet that reaches into another component's
+   *  class (`.card-body > .button`) is here, though `button` belongs to Button. */
+  stylesheets: Map<string, StylesheetClasses>;
   scssModuleGraph: ScssModuleGraph;
   classOwnerIndex: ClassOwnerIndex;
   baseProvenance: BaseProvenanceIndex;
@@ -257,7 +274,9 @@ export function extractClassesFromCompiled(
   root: postcss.Root,
   entryFile: string,
   stylesDir: string,
-  componentIds: Set<string>
+  componentIds: Set<string>,
+  /** Collects each origin stylesheet's defined and mentioned classes, when given (the full build). */
+  sheets?: Map<string, StylesheetClasses>,
 ): { classMap: Map<string, string>; baseModules: BaseProvenanceIndex; ranks: Map<string, number> } {
   const classMap = new Map<string, string>();
   const baseModules: BaseProvenanceIndex = new Map();
@@ -274,6 +293,12 @@ export function extractClassesFromCompiled(
       : resolve(dirname(entryFile), original.source);
     const resolved = resolveScssToComponent(originPath, stylesDir, componentIds);
     const owner = resolved ?? "__base__";
+    if (sheets) {
+      let sheet = sheets.get(originPath);
+      if (!sheet) { sheet = { root: stylesDir, component: resolved, defines: new Map(), mentions: new Map() }; sheets.set(originPath, sheet); }
+      for (const name of defines) if (!sheet.defines.has(name)) sheet.defines.set(name, rule.selector);
+      for (const name of mentions) if (!sheet.mentions.has(name)) sheet.mentions.set(name, rule.selector);
+    }
     // Base-class provenance: keep the authoring partial (barrel-retaining) when the origin
     // resolves to no component. Discarded here before; retained now for styleModules.
     const modulePath = resolved === null ? resolveSharedModulePath(originPath, stylesDir, true) : null;
@@ -409,6 +434,7 @@ export async function buildAllStyleData(
   // Distinct rule texts per unlisted, unowned file (a shared partial compiles into several entries).
   const outsideRules = new Map<string, Set<string>>();
   const baseRulesByEntry = new Map<string, string>();
+  const stylesheets = new Map<string, StylesheetClasses>();
 
   for (const id of componentIds) styleUsesModules.set(id, []);
 
@@ -517,7 +543,7 @@ export async function buildAllStyleData(
     // Class owner index: delegate to the shared attribution core so the per-save patch
     // (patchClassOwnerIndex via attributeClassesFromFile) and this full build cannot drift.
     const { classMap: perFileClasses, baseModules: perFileBaseModules, ranks: perFileRanks } =
-      extractClassesFromCompiled(consumer, root, entryFile, stylesDir, componentIds);
+      extractClassesFromCompiled(consumer, root, entryFile, stylesDir, componentIds, stylesheets);
     for (const [name, owner] of perFileClasses) {
       const rank = perFileRanks.get(name) ?? 0;
       const prev = classRanks.get(name);
@@ -544,8 +570,19 @@ export async function buildAllStyleData(
     componentCssMap.set(id, joinCssChunks(bucket));
   }
 
+  // Sorted by path, each map by class, so the data is the same however the entries were ordered; a stylesheet's
+  // own classes are no mention of its own.
+  const sortedSheets = new Map<string, StylesheetClasses>();
+  for (const path of [...stylesheets.keys()].sort()) {
+    const sheet = stylesheets.get(path)!;
+    const byName = (m: Map<string, string>) => new Map([...m].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    const mentions = new Map([...sheet.mentions].filter(([name]) => !sheet.defines.has(name)));
+    sortedSheets.set(path, { ...sheet, defines: byName(sheet.defines), mentions: byName(mentions) });
+  }
+
   if (verboseTiming) console.timeEnd("[dev-server:timing] full classOwnerIndex build");
   return {
+    stylesheets: sortedSheets,
     scssModuleGraph: { styleUsesModules },
     classOwnerIndex: classIndex,
     baseProvenance,
