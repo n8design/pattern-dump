@@ -43,6 +43,13 @@ const CLEAN = { "atoms/ok/ok.hbs": `<p>fine</p>\n` };
 const WARNING = { "atoms/odd/odd.hbs": `<span><div>odd</div></span>\n` };
 /** A helper nobody registered: the render fails, an error. */
 const ERROR = { "atoms/broken/broken.hbs": `<p>{{nope "x"}}</p>\n` };
+/** A partial whose sample file doesn't parse, included by another component. Pages no longer read sample data
+ *  (0.8.1), so the site build doesn't report it; pd audit still must, as an error. */
+const BROKEN_SAMPLE = {
+  "atoms/price/price.hbs": `<span>{{amount}}</span>\n`,
+  "atoms/price/price.json": `{ "amount": 61.40,\n}\n`,
+  "molecules/card/card.hbs": `<div>{{> atoms-price }}</div>\n`,
+};
 
 describe("pd audit's exit code", () => {
   it("is 0 when it finds nothing", async () => {
@@ -62,6 +69,16 @@ describe("pd audit's exit code", () => {
     const r = await audit(await project({ ...CLEAN, ...WARNING, ...ERROR }));
     expect(r.code).toBe(1);
     expect(lastLine(r.out)).toBe("[pd audit] failed: 1 error found (warnings alone don't fail it; --strict makes them fail it too).");
+  }, 120_000);
+
+  it("is 1 for a partial's sample file that isn't valid JSON, reported as DATA_INVALID", async () => {
+    const root = await project({ ...CLEAN, ...BROKEN_SAMPLE });
+    const r = await audit(root);
+    expect(r.code).toBe(1);
+    // Reported on the partial and on the component that includes it: two errors.
+    expect(r.out).toMatch(/### atoms\/price[^\n]*\n- `render:DATA_INVALID`[^\n]*price\.json is not valid JSON/);
+    expect(r.out).toMatch(/### molecules\/card[^\n]*\n- `render:DATA_INVALID`[^\n]*price\.json is not valid JSON/);
+    expect(lastLine(r.out)).toBe("[pd audit] failed: 2 errors found (warnings alone don't fail it; --strict makes them fail it too).");
   }, 120_000);
 
   it("is 1 for an error with --format json too, whose standard output stays the JSON report", async () => {
