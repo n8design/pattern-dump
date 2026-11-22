@@ -26,9 +26,9 @@ import { readFile, mkdir, rm, cp, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import WebSocket from "ws";
 
-import { startDevServer } from "@pattern-dump/dev-server";
 import { defineConfig } from "@pattern-dump/config";
 import { save } from "../../../test-support/save.js";
+import { startOnFreeWsPort } from "./free-ports.js";
 
 const here      = dirname(fileURLToPath(import.meta.url));
 const testBench = join(here, "../../../test-bench");
@@ -43,9 +43,9 @@ const config = defineConfig({
   scriptsDir:  "./src/scripts",
 });
 
-/** HMR messages are only observable over the socket — DevServer does not expose wsPort, so the
- *  test fixes one rather than using an ephemeral port. */
-const WS_PORT = 47_311;
+/** HMR messages are only observable over the socket, on the live-reload port the server got: a free one, never a
+ *  fixed one another test file may hold. */
+let wsPort = 0;
 
 interface HmrMessage {
   type: string;
@@ -62,7 +62,7 @@ class HmrTap {
   private ws!: WebSocket;
 
   async connect(): Promise<void> {
-    this.ws = new WebSocket(`ws://127.0.0.1:${WS_PORT}`);
+    this.ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
     this.ws.on("message", (raw) => {
       try { this.received.push(JSON.parse(String(raw)) as HmrMessage); } catch { /* not ours */ }
     });
@@ -112,7 +112,7 @@ describe("file watcher / HMR — characterisation", () => {
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), "pd-watcher-"));
     await cp(testBench, dir, { recursive: true });
-    server = await startDevServer(config, dir, { port: 0, wsPort: WS_PORT });
+    ({ server, wsPort } = await startOnFreeWsPort(config, dir));
     tap = new HmrTap();
     await tap.connect();
   }, 60_000);
