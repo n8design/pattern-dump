@@ -114,11 +114,17 @@ export async function currentGraph(ctx: RouteContext, taken?: DiscoveryResult): 
   const style = await state.style.get(() => buildAllStyleData(cfg.styleRoots, baseComponentIds(discovery)));
   const composition = await compositionFor(state, discovery, cfg.patternDirs);
   const pages = cfg.storefront ? await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap) : null;
-  return state.graph.get([generation, discovery, style, composition, pages], async () => buildGraph(await gatherGraphInputs({
-    discovery, composition, style, pages,
-    assetsCss: cfg.assetsCss, assetRoots: cfg.assetRoots, assetRootNames: cfg.assetRootNames,
-    display: createDisplayPath(cfg.cwd, cfg.packages),
-  })));
+  return state.graph.get([generation, discovery, style, composition, pages], async () => {
+    const inputs = await gatherGraphInputs({
+      discovery, composition, style, pages,
+      assetsCss: cfg.assetsCss, assetRoots: cfg.assetRoots, assetRootNames: cfg.assetRootNames,
+      display: createDisplayPath(cfg.cwd, cfg.packages),
+    });
+    if (verboseTiming) console.time("[dev-server:timing] graph build");
+    const graph = buildGraph(inputs);
+    if (verboseTiming) console.timeEnd("[dev-server:timing] graph build");
+    return graph;
+  });
 }
 
 export interface RouteContext {
