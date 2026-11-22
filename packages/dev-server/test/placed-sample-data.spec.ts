@@ -1,7 +1,7 @@
-// Sample data never reaches a page through a placed component. Declared keys are null where the page sets
-// none (so a declared sample value cannot fill them), and a sample key a component does not declare is a
-// problem: in its own sample, in an included partial's, and one level inside a declared object. Through
-// the real renderer, so the cascade is the real one.
+// Sample data never reaches a page through a placed component: it renders without sample data (its own, an included
+// partial's, at any depth), and declared keys the page does not set are null. A sample key a component does not
+// declare is no problem (it was, before 0.8.1, as the guard against the leak). Through the real renderer, so the
+// cascade is the real one.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -71,13 +71,12 @@ describe("sample data and a placed component", () => {
     expect(r.html).toContain(`<img src="a.jpg">`);
   });
 
-  it("is refused where a sample key is not declared: an included partial's, a nested component's, inside a declared object", async () => {
-    expect((await place(leaky, SLIDER)).problems).toEqual([
-      `the sample data of atoms/badge (badge.json) sets "tone", which molecules/slider does not declare, so it would show wherever molecules/slider is placed`,
-      `the sample data of atoms/slide (slide.json) sets "secret", which atoms/slide does not declare, so it would show wherever atoms/slide is placed`,
-    ]);
-    expect((await place(leaky, `<pd-molecules-box></pd-molecules-box>\n`)).problems).toEqual([
-      `the sample data of molecules/box (box.json) sets "meta.secret", which molecules/box does not declare, so it would show wherever molecules/box is placed`,
-    ]);
+  it("renders with sample keys a component doesn't declare, and none reaches the page: a partial's, a nested one's, inside an object", async () => {
+    const slider = await place(leaky, SLIDER);
+    expect(slider.problems).toEqual([]);
+    expect(slider.html).not.toMatch(/SAMPLE|sample\.jpg|data-n="9"/);
+    const box = await place(leaky, `<pd-molecules-box></pd-molecules-box>\n`);
+    expect(box.problems).toEqual([]);
+    expect(box.html).not.toMatch(/SAMPLE/);
   });
 });

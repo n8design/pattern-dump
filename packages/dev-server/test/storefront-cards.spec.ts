@@ -93,14 +93,13 @@ describe("x-pd-card: each page of a listing, checked against its card", () => {
     ]);
   });
 
-  it("checks a card's sample data against a listing's page, not against the layout's keys", async () => {
+  it("leaves a card's sample data out of the page: an entry's field or not, it is no problem and shows on no card", async () => {
     const schema = card({ properties: { route: { type: "string" }, title: { type: "string" } } });
-    // Keys of an entry: fine, though the layout declares none of them.
-    expect((await assemble("/articles/", { ...LISTING, ...schema, "components/card/card.json": JSON.stringify({ route: "/x/", title: "Sample", tags: ["a"] }) })).problems).toEqual([]);
-    // A key outside the entry would show on every card of every listing.
-    expect((await assemble("/articles/", { ...LISTING, ...schema, "components/card/card.json": JSON.stringify({ title: "Sample", author: "Someone" }) })).problems).toEqual([
-      `the sample data of components/card (card.json) sets "author", which is not a field of a page in a listing, so it would show on every card of layouts/listing`,
-    ]);
+    for (const sample of [{ route: "/x/", title: "SAMPLE-TITLE", tags: ["a"] }, { title: "SAMPLE-TITLE", author: "SAMPLE-AUTHOR" }]) {
+      const p = await assemble("/articles/", { ...LISTING, ...schema, "components/card/card.json": JSON.stringify(sample) });
+      expect(p.problems).toEqual([]);
+      expect(p.html).not.toMatch(/SAMPLE-/);
+    }
   });
 
   it("fails the listing when the card named is not a component with a schema", async () => {

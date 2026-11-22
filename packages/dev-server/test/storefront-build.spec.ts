@@ -382,6 +382,20 @@ describe("pd build — a storefront with problems writes nothing", () => {
     expect(await exists(out)).toBe(false);
   }, 120_000);
 
+  it("fails on a link whose encoded slashes lead out of the output folder, and writes nothing there", async () => {
+    // From the staging folder, five levels up is the project itself.
+    const link = "/_pd/components/x%2f..%2f..%2f..%2f..%2f..%2fevil.css";
+    const root = await benchCopy();
+    await append(join(root, "pages", "about.md"), `\n[styles](${link})\n`);
+    const out = join(root, "..", "wb-escape");
+    // The crawl asks for every reference before anything is written: the address is no stylesheet, so it stops there.
+    await expect(build(root, out)).rejects.toThrow(`pd build: the site has problems, so nothing was written:\n  - ${link}: 404 Stylesheet not found`);
+    const anywhere = async (dir: string): Promise<string[]> => (await readdir(dir, { recursive: true })).filter(f => f.endsWith("evil.css"));
+    expect(await anywhere(tmp)).toEqual([]);
+    expect(await exists(out)).toBe(false);
+    expect(await exists(join(root, ".out", "site"))).toBe(false);
+  }, 120_000);
+
   it("leaves both roots of an earlier build untouched", async () => {
     const root = await benchCopy();
     const out = join(root, "..", "wb-kept");

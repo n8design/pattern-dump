@@ -21,19 +21,24 @@ export function deepFreeze<T>(value: T): T {
   return Object.freeze(value);
 }
 
+/** Keys that reach a prototype when a merge writes or descends into them. JSON.parse makes "__proto__" an own key,
+ *  so a data file can hold any of them; every merge of parsed data skips them. */
+export const PROTOTYPE_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
 const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 
 /**
  * `sources` merged, later over earlier, into a new object; no source is changed. Where two sources both give an
  * object (not an array) under a key, the result holds a new object merging the two; any other value is taken as
  * it is, so a frozen source's values stay shared and frozen. The same result as deepMerge(structuredClone(first),
- * ...rest), without the copy.
+ * ...rest), without the copy. PROTOTYPE_KEYS are left out.
  */
 export function mergeData(...sources: Array<Record<string, unknown> | undefined>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const source of sources) {
     if (!source) continue;
     for (const [key, value] of Object.entries(source)) {
+      if (PROTOTYPE_KEYS.has(key)) continue;
       const current = out[key];
       out[key] = isPlainObject(value) && isPlainObject(current) ? mergeData(current, value) : value;
     }

@@ -7,7 +7,7 @@ import autoprefixer from "autoprefixer";
 import { build as esbuildBuild } from "esbuild";
 import { existsSync, realpathSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { dirname, join, extname, resolve } from "node:path";
+import { basename, dirname, join, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Dirent } from "node:fs";
 
@@ -134,7 +134,11 @@ export async function createSassDependencyTracker(
   // because Sass names a partial by the path it reached it through: through a package's link in
   // node_modules for a `@use` into another package, while the watcher reports the real file.
   const reverseDeps = new Map<string, Set<string>>();
-  const real = (p: string): string => { try { return realpathSync(p); } catch { return resolve(p); } };
+  // A removed file has no real path of its own: its folder's, then its name.
+  const real = (p: string): string => {
+    try { return realpathSync(p); } catch { /* removed */ }
+    try { return join(realpathSync(dirname(p)), basename(p)); } catch { return resolve(p); }
+  };
 
   function addDeps(sourceFile: string, deps: string[]) {
     for (const dep of deps) {
@@ -173,6 +177,14 @@ export async function createSassDependencyTracker(
     async update(changedFile: string) {
       const abs = resolve(changedFile);
       const filesToRecompile = new Set<string>();
+
+      // A removed file: a tracked non-partial leaves the sources, with its CSS and the edges it had. Those
+      // that loaded it still recompile below, and fail with their own error.
+      if (!existsSync(abs) && perFileCss.has(abs)) {
+        perFileCss.delete(abs);
+        sourceFiles.splice(sourceFiles.indexOf(abs), 1);
+        removeDeps(abs);
+      }
 
       // If the changed file is a tracked non-partial, recompile it directly.
       if (perFileCss.has(abs)) filesToRecompile.add(abs);

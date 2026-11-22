@@ -1,0 +1,8 @@
+<article class="page{{#if listing}} listing{{/if}}">
+  <h1 class="page-title">{{title}}</h1>
+  {{#if description}}<p class="page-description">{{description}}</p>{{/if}}
+  <div class="page-body">{{{content}}}</div>
+  {{#if listing}}
+  {{{pages}}}
+  {{/if}}
+</article>

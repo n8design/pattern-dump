@@ -14,13 +14,13 @@
 // `surfaceDocumentBase` is lighter still: a startup check of the configured documentBase paths on the
 // console, plus BASE-LAYER.generated.md listing every unlisted, unowned base-layer file.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import type { CollisionEntry, CollisionMessage, DiscoveryMap, OrphanVariantEntry, OrphanVariantMessage } from "@pattern-dump/contracts";
 import type { HotReloader } from "@pattern-dump/hotreloader";
 import { detectFlattening, renderFlatteningReport, type FlatteningInput } from "./flattening.js";
 import type { CompositionRegistry } from "./composition.js";
-import { pdScratchDir } from "./scratch.js";
+import { ensureScratchDir, pdScratchDir } from "./scratch.js";
 import { shadowedAssetRoots, type StyleRoot } from "./server-config.js";
 import { missingDocumentBase } from "./style-index.js";
 
@@ -70,8 +70,7 @@ export async function surfaceCollisions(
   // scratch dir outside the root; the collisions are also pushed to the Console above, so a
   // failed write degrades to "diagnostic on the Console only", never a crash.
   try {
-    const dir = pdScratchDir(cwd);
-    await mkdir(dir, { recursive: true });
+    const dir = await ensureScratchDir(cwd);
     await writeFile(join(dir, "CONFLICTS.generated.md"), md, "utf-8");
   } catch (e) {
     console.warn("[dev-server] Could not write CONFLICTS.generated.md to scratch dir:", e);
@@ -118,8 +117,7 @@ export async function surfaceFlattening(
   // Never write into the (possibly read-only) project root — emit to the PD-owned scratch dir. A
   // failed write degrades to "no artifact", never a crash (mirrors surfaceCollisions).
   try {
-    const dir = pdScratchDir(cwd);
-    await mkdir(dir, { recursive: true });
+    const dir = await ensureScratchDir(cwd);
     await writeFile(join(dir, "FLATTENED.generated.md"), md, "utf-8");
   } catch (e) {
     console.warn("[dev-server] Could not write FLATTENED.generated.md to scratch dir:", e);
@@ -158,7 +156,7 @@ export async function surfaceDocumentBase(roots: readonly StyleRoot[], outsideLi
   }
   const report = join(pdScratchDir(cwd), "BASE-LAYER.generated.md");
   try {
-    await mkdir(pdScratchDir(cwd), { recursive: true });
+    await ensureScratchDir(cwd);
     await writeFile(report, renderBaseLayerReport(outsideList, cwd), "utf-8");
   } catch (e) {
     console.warn("[dev-server] Could not write BASE-LAYER.generated.md to scratch dir:", e);

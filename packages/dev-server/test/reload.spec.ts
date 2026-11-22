@@ -178,6 +178,48 @@ describe("pd dev reloads data, helpers and assets", () => {
   }, 60_000);
 });
 
+// helpers as one file: its folder is watched, but only the file is a helper. A file there that a source root
+// holds is handled as that root's (CR-023); any other keeps the restart notice, as a helper's import may be.
+describe("a single helper file beside the project's sources", () => {
+  const single = validateConfig(defineConfig({
+    sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
+    styles: { strategy: "parallel", dir: "./src/styles" }, helpers: "./src/helpers.js",
+  }), "site");
+
+  async function singleProject(): Promise<Bench & { preview(): Promise<string> }> {
+    const root = join(tmp, `single-${n++}`);
+    await write(join(root, "src/patterns/atoms/loud/loud.hbs"), `<p class="loud">{{shout "quiet"}}</p>\n`);
+    await write(join(root, "src/styles/atoms/loud.scss"), ".loud {\n  color: red;\n}\n");
+    await write(join(root, "src/helpers.js"), `export function shout(s) { return String(s).toUpperCase(); }\n`);
+    const b = new Bench(root, "atoms/loud");
+    await b.start(single);
+    return Object.assign(b, {
+      preview: async () => /<p class="loud">([^<]*)<\/p>/.exec(await (await fetch(`${b.origin}/preview/atoms/loud`)).text())?.[1] ?? "(no preview)",
+    });
+  }
+
+  it("a template in the patterns folder: reloads its component, with no restart notice", async () => {
+    const b = await singleProject();
+    expect(await b.preview()).toBe("QUIET");
+    const r = await b.step(() => b.create("src/patterns/atoms/loud/loud.hbs", `<p class="loud">{{shout "saved"}}</p>\n`));
+    expect(r.messages.filter(m => m.includes("restart pd dev"))).toEqual([]);
+    expect(await b.preview()).toBe("SAVED");
+  }, 60_000);
+
+  it("another module beside the helper file, in no source root: asks for a restart", async () => {
+    const b = await singleProject();
+    const r = await b.step(() => b.create("src/mark.js", `export const mark = "!";\n`));
+    expect(r.messages).toEqual([`{"type":"error","scope":"build","message":"src/mark.js changed: restart pd dev to load it (a helper's own imports are not reloaded)"}`]);
+  }, 60_000);
+
+  it("the helper file itself: reloads in place", async () => {
+    const b = await singleProject();
+    const r = await b.step(() => b.create("src/helpers.js", `export function shout(s) { return "<" + s + ">"; }\n`), [["change", "src/helpers.js"]]);
+    expect(r.messages).toEqual(OPEN);
+    expect(await b.preview()).toBe("&lt;quiet&gt;");
+  }, 60_000);
+});
+
 describe("a reload that fails keeps the last good state, and the next good save recovers", () => {
   const CASES: Array<[name: string, file: string, what: string, broken: string, problem: string, fixed: string, after: string]> = [
     ["global data that is not valid JSON", "src/_data/site.json", "global data", `{ "site": { "v": "data-2", } }\n`,

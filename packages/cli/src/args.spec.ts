@@ -2,7 +2,7 @@
 // replaced, so the move to util.parseArgs cannot quietly change what an existing invocation does.
 
 import { describe, expect, it } from "vitest";
-import { parseCommand } from "./args.js";
+import { parseCommand, USAGE } from "./args.js";
 
 const cwd = "/work/project";
 
@@ -143,6 +143,11 @@ describe("help and errors", () => {
     for (const argv of [[], ["help"], ["--help"], ["-h"]]) expect(parseCommand(argv, cwd).kind).toBe("help");
     expect(parseCommand(["help", "audit"], cwd)).toEqual({ kind: "help", topic: "audit" });
     expect(parseCommand(["dev", "--help"], cwd)).toEqual({ kind: "help", topic: "dev" });
+  });
+
+  it("--version and -v ask for the version; help lists it", () => {
+    for (const argv of [["--version"], ["-v"]]) expect(parseCommand(argv, cwd)).toEqual({ kind: "version" });
+    expect(USAGE).toMatch(/^ {2}--version, -v +Print the installed version$/m);
   });
 
   it("an unknown command or flag is an error, not silently ignored", () => {

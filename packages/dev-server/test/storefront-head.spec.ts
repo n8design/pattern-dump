@@ -104,14 +104,15 @@ describe("assemblePage — the head partial", () => {
     expect(p.html).toContain(`<li data-pd-site>partials/head: &lt;title&gt; is written by Pattern Dump`);
   });
 
-  it("fails every page on sample data that would reach a page", async () => {
+  it("renders without its sample data: a sample key it doesn't declare is no problem, and doesn't reach the page", async () => {
     const p = await page({
       "patterns/partials/head/head.hbs": `<meta name="x" content="{{color}}">`,
-      "patterns/partials/head/head.json": `{ "color": "red" }`,
+      "patterns/partials/head/head.json": `{ "color": "SAMPLE-RED" }`,
     });
-    expect(p.status).toBe(500);
-    expect(p.problems).toEqual([`the sample data of partials/head (head.json) sets "color", which partials/head does not declare, so it would show on every page using that layout`]);
-    expect(p.html).toContain("<li data-pd-site>the sample data of partials/head");
+    expect(p.problems).toEqual([]);
+    expect(p.status).toBe(200);
+    expect(p.html).toContain(`<meta name="x" content="">`);
+    expect(p.html).not.toContain("SAMPLE-RED");
   });
 
   it("fails every page on a head partial that does not render", async () => {

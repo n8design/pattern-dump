@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@pattern-dump/contracts": "*",
-    "axe-core": "*",
-    "jsdom": "^27.0.0"
+    "axe-core": "4.11.4",
+    "jsdom": "27.4.0"
   },
   "devDependencies": {
     "@types/jsdom": "*"

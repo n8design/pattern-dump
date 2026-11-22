@@ -71,4 +71,19 @@ describe("unmatched paths", () => {
     expect((await get("/api/component/atoms/badge")).status).toBe(200);
     expect((await get("/api/component/atoms/baseless/baseless-2")).status).toBe(200);
   });
+
+  it("the component stylesheet route is a 404 for an id nothing defines, and empty for one without styles", async () => {
+    // A 200 for any name let `pd build` follow a link like this one and write the file it names.
+    for (const path of ["/_pd/components/atoms/buton.css", "/_pd/components/x%2f..%2f..%2fevil.css"]) {
+      expect((await get(path)).status, path).toBe(404);
+    }
+    const styled = await get("/_pd/components/atoms/button.css");
+    expect(styled.status).toBe(200);
+    expect(await styled.text()).not.toBe("");
+    // atoms/chip has no stylesheet: the preview still links one, and gets it empty.
+    const unstyled = await get("/_pd/components/atoms/chip.css");
+    expect(unstyled.status).toBe(200);
+    expect(unstyled.headers.get("content-type")).toBe("text/css");
+    expect(await unstyled.text()).toBe("");
+  });
 });

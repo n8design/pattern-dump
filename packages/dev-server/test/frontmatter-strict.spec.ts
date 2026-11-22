@@ -94,6 +94,16 @@ describe("readFrontmatterStrict — every problem, with its line", () => {
       [{ line: 2, message: "list item \"b has an opening quote with no closing one" }]],
     ["an inline list never closed", "---\ntags: [a, b\n---\n",
       [{ line: 2, message: "\"tags\": the list opened with [ is never closed with ]" }]],
+    // A key Object.prototype holds: once "duplicate key" (`in` sees the inherited one), and `__proto__` replaced
+    // the reading's own prototype. `prototype` is no such key and reads as any other (below).
+    ["the key __proto__", "---\ntitle: A\n__proto__: x\n---\n",
+      [{ line: 3, message: "\"__proto__\" cannot be a frontmatter key: choose another name" }]],
+    ["the key constructor", "---\nconstructor: x\n---\n",
+      [{ line: 2, message: "\"constructor\" cannot be a frontmatter key: choose another name" }]],
+    ["the key toString", "---\ntoString: x\n---\n",
+      [{ line: 2, message: "\"toString\" cannot be a frontmatter key: choose another name" }]],
+    ["the key constructor in a map", "---\nrelated:\n  constructor: x\n---\n",
+      [{ line: 3, message: "\"related.constructor\" cannot be a frontmatter key: choose another name" }]],
     ["several problems, in line order", "---\ntitle: A\n  child: x\nwhat is this\ntitle: B\n---\n", [
       { line: 3, message: "nested value with no key above it: nested keys follow a line `key:`, indented under it" },
       { line: 4, message: "cannot read this line: what is this" },
@@ -206,5 +216,16 @@ describe("readFrontmatterStrict: childDefaults, a folder's defaults for its page
   it("is absent from a file that sets none, and from the lenient reading's values", () => {
     expect(readFrontmatterStrict("---\ntitle: A\n---\n").childDefaults).toBeUndefined();
     expect(readFrontmatter(md)).toEqual({ title: "Services", order: "3" });
+  });
+});
+
+describe("readFrontmatterStrict — keys Object.prototype holds", () => {
+  it("keeps the reading a plain object when __proto__ opens a block, and reads prototype as any key", () => {
+    const r = readFrontmatterStrict("---\n__proto__:\n  d: yes\nprototype: x\n---\n");
+    expect(r.errors[0]).toEqual({ line: 2, message: "\"__proto__\" cannot be a frontmatter key: choose another name" });
+    expect(Object.getPrototypeOf(r.values)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(r.maps)).toBe(Object.prototype);
+    expect(r.values).toEqual({ prototype: "x" });
+    expect(Object.keys(Object.prototype)).toEqual([]);
   });
 });

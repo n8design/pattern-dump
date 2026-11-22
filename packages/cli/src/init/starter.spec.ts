@@ -6,7 +6,7 @@
 // the config is bundled by esbuild from its own location, and here it imports the in-repo
 // @pattern-dump/config instead of the not-yet-installed distributable.
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFile } from "node:child_process";
 import { request } from "node:http";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -192,8 +192,22 @@ describe("the starter project with a website (--with-site, no examples)", () => 
       [["components/compact-card", "ok"], ["components/feature-card", "ok"], ["components/grid-card", "ok"], ["components/listing-card", "ok"], ["components/note", "ok"], ["components/note~warning", "ok"], ["components/search", "ok"], ["components/toc", "ok"],
         ["layouts/article", "ok"], ["layouts/categories", "ok"], ["layouts/category", "ok"], ["layouts/doc", "ok"], ["layouts/home", "ok"], ["layouts/listing", "ok"], ["layouts/page", "ok"],
         ["layouts/tag", "ok"], ["layouts/tags", "ok"], ["partials/base", "ok"], ["partials/head", "ok"],
-        ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
+        ["partials/term-index", "ok"], ["partials/term-listing", "ok"], ["views/compact", "ok"], ["views/featured", "ok"], ["views/grid", "ok"], ["views/list", "ok"]]);
   }, 120_000);
+
+  // The tag and category layouts share their markup through two partials, so the flattening pass, which pd dev runs
+  // at start, finds no copies in the starter's own files (DIA-034, CLI-116).
+  it("starts without a FLATTENED warning about its own layouts", async () => {
+    const config = await loadConfig(siteDir);
+    const warn = vi.spyOn(console, "warn");
+    const server = await startDevServer(config, siteDir, { port: 0, wsPort: 0 });
+    try {
+      expect(warn.mock.calls.map(c => c.map(String).join(" ")).filter(l => l.includes("FLATTENED"))).toEqual([]);
+    } finally {
+      warn.mockRestore();
+      await server.close();
+    }
+  }, 60_000);
 
   it("serves the website: the home page with its placed note, the about page, the 404 page and robots.txt", async () => {
     const config = await loadConfig(siteDir);

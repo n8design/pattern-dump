@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.8.1 (2026-11-22)
+
+### Fixed
+
+- **`pd build` writes only inside its output folders.** A reference with an encoded slash, such as
+  `/_pd/components/x%2f..%2fevil.css` in a component's template, could make the workbench build write a file outside
+  its output. Such a path now stops the build, naming it, and `/_pd/components/<name>.css` answers 404 for a name
+  that is no component (a component without styles still gets an empty stylesheet).
+- **A data file can no longer change every object in the process.** A `__proto__` key in a JSON data file was
+  merged into `Object.prototype`. Keys named `__proto__`, `constructor` and `prototype` in data files are now
+  ignored. In frontmatter, such a key (and any other name every object has, like `toString`) is refused as before,
+  now with `"<key>" cannot be a frontmatter key: choose another name` instead of `duplicate key`.
+- **`--out` and `site.outDir` are refused on everything the build reads.** The data folder, the scripts folder, the
+  helpers file and the site's head file were not checked, so `pd build --out src/_data` replaced the data folder with
+  the build. They are refused now, `--out` on the pages folder too, and the message names what the folder would hit:
+  `overlaps the data folder <dir>`.
+- **The scratch folder is your own.** The audit report, the diagnostics graph, `CONFLICTS.generated.md`,
+  `FLATTENED.generated.md`, `BASE-LAYER.generated.md` and `pd export`'s default output moved from the shared temp
+  folder to your cache folder: `~/Library/Caches/pattern-dump/` on macOS, `%LOCALAPPDATA%\pattern-dump\` on Windows,
+  `~/.cache/pattern-dump/` on Linux. It is created for you alone, and a folder there that is a link or open to other
+  users stops the run, naming the folder to remove; a cached audit is never reused from one. Old folders in the temp
+  folder are left as they are; delete them when you like.
+- **The accessibility check runs with the axe-core it was proven on.** Which rules are decided without a browser was
+  measured with axe-core 4.11.4, but any axe-core 4 could be installed, and a fresh install got a newer one. The
+  package now depends on axe-core 4.11.4 and jsdom 27.4.0 exactly, and `pd dev`, `pd build` and `pd audit` stop
+  with another axe-core installed: `axe-core <installed> is installed, but the accessibility rule tiers were proven
+  on 4.11.4: install axe-core 4.11.4`.
+- **Live reload works beside a single helper file.** With `helpers` set to one file, every other file in its folder
+  counted as a helper's import: saving a template or stylesheet there asked you to restart `pd dev` and reloaded
+  nothing. Only the helper file itself is a helper now; files in your patterns, styles and other source folders reload
+  as usual, and any other file beside the helper still asks for a restart.
+- **Removing a file takes effect in `pd dev`.** A removed component stylesheet's CSS stayed in the preview, a stylesheet
+  that used a removed partial showed no error, and a removed theme or script was still served, until a restart. They
+  now leave as a change updates them; a stylesheet that used a removed partial shows its error.
+- **`pd dev` keeps handling changes after a failed send.** If sending a reload to the open pages threw, every later
+  change waited silently until a restart. The failure is reported now, and the next change is handled.
+- **A failed `pd build` closes its server.** Some failures between the start and the writing of the files left the
+  build's server running, so a script calling the build in its own process never exited.
+- **A link that can't be read is a broken link.** A `%` that is no escape in a link a template writes
+  (`/sale/50%-off/`) ended `pd build` with a bare `URI malformed`. It is now listed with the broken links, with its
+  page and address: `<page>: <a href="/sale/50%-off/">: not a URL that can be read`.
+- **Pages with live examples are checked faster.** The accessibility check waited half a second for each page that
+  embeds an example, for frames that can't answer. It no longer asks them; the findings are the same.
+- **A new website project starts without a warning about its own files.** `pd init --with-site` wrote tag and
+  category layouts that were copies of each other, so the first `pd dev` printed `FLATTENED: 2 cluster(s) across 5
+  components`. They now share two partials, `partials/term-index` and `partials/term-listing`; the pages they make
+  are the same.
+- **`pd --version`.** `pd --version` and `pd -v` print the installed version; they answered "unknown command".
+- **A helper called without its arguments fails, naming it.** `{{defaultValue x}}` with no fallback showed
+  `[object Object]`, and `eq`, `lt` and the other comparisons with one argument quietly gave false. They now fail
+  with `<helper> needs 2 arguments, got 1`, and `and` and `or` refuse a third argument, which they ignored. A template
+  that showed `[object Object]` or relied on such a call now fails the render: give the helper its arguments.
+- **Sample data stays in the workbench.** A component's sample `.json` no longer reaches a site page: the layout,
+  its partials at any depth, its views and cards, placed components and the head partial render on a page with what
+  the page gives them and their template's defaults (`defaultValue`), and the project's data. So sample data may set
+  any key: the build no longer refuses one a layout, a partial, a placed component, a view or a card doesn't
+  declare (`the sample data of <id> (<file>) sets "<key>", … so it would show on every page …`), and a header or
+  footer in the frame can have sample data of its own again. The workbench, its previews and the examples a page
+  embeds show each component with its sample data as before. Every site that built before builds the same pages.
+
+### Changed
+
+- **Dependencies updated within their ranges,** for the security fixes in them: handlebars 4.7.10, markdown-it 14.3.3
+  (a crafted page could make the build slow), postcss 8.5.33, postcss-selector-parser 7.2.1, html-validate 11.21.1,
+  sass 1.108.2, shiki 4.6.0 and their own dependencies. A fresh install already got these; the release is now
+  tested with them.
+- **On macOS, `XDG_CACHE_HOME` is honoured.** When it is set to an absolute path, the scratch folder is created
+  under it, as on Linux, instead of under `~/Library/Caches`.
+
 ## 0.8.0 (2026-11-19)
 
 ### Upgrading from 0.7.0

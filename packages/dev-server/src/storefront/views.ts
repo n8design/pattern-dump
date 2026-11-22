@@ -8,14 +8,12 @@
 //     `required` are the fields the view needs (cards.ts): separate cards per view, not variants of one, so each
 //     view's fields are checked on their own.
 //   - Checked: a view that isn't one, a listing page that names none, a view on a page whose layout shows no listing,
-//     a view that names no card. Its sample data, and its card's, may hold only the fields of a page in a listing.
+//     a view that names no card. Its sample data, and its card's, are the workbench's: a site page renders without.
 
-import { basename } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { suggest } from "@pattern-dump/config";
 import { readSchema } from "./declared-values.js";
 import { cardOf, readCard, type Card } from "./cards.js";
-import { ENTRY, outsideShape } from "./derived.js";
 import { designFiles } from "./design-files.js";
 
 const VIEW_ID = /^views\/[^/~]+$/;
@@ -82,36 +80,3 @@ export async function resolveView(o: {
   return viewOf(o.view, at, o.discoveryMap);
 }
 
-const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-
-/**
- * A view's sample data, and its card's: the view may set only `entries`, each a page of a listing, and the card only
- * the fields of one. The renderer merges a component's sample data beneath what it is given, so anything else would
- * show on every listing shown in the view.
- */
-export async function checkViewSampleData(view: ResolvedView, discoveryMap: DiscoveryMap): Promise<string[]> {
-  const problems: string[] = [];
-  const read = async (id: string): Promise<{ data?: unknown; where: string } | undefined> => {
-    const jsonPath = discoveryMap.get(id)?.jsonPath;
-    if (!jsonPath) return undefined;
-    const where = `the sample data of ${id} (${basename(jsonPath)})`;
-    try { return { data: await designFiles(discoveryMap).data(jsonPath), where }; }
-    catch (e) { problems.push(`${where} cannot be read: ${e instanceof Error ? e.message : String(e)}`); return undefined; }
-  };
-  const own = await read(view.id);
-  if (own && isPlainObject(own.data)) {
-    for (const key of Object.keys(own.data).filter(k => k !== VIEW_KEY)) {
-      problems.push(`${own.where} sets "${key}", which a view doesn't get: a view gets only ${VIEW_KEY}, the pages of its listing`);
-    }
-    for (const at of outsideShape(own.data[VIEW_KEY], { items: ENTRY }, VIEW_KEY)) {
-      problems.push(`${own.where} sets "${at}", which is not a field of a page in a listing, so it would show on every page using ${view.id}`);
-    }
-  }
-  const card = await read(view.card.id);
-  if (card) {
-    for (const at of outsideShape(card.data, ENTRY, "")) {
-      problems.push(`${card.where} sets "${at.slice(1)}", which is not a field of a page in a listing, so it would show on every card of ${view.id}`);
-    }
-  }
-  return problems;
-}

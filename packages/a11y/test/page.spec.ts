@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { classifyPages } from "../src/page-classifier.js";
 import { page } from "../src/page-fixtures.js";
-import { pageRuleTiers, runPageA11y, severityOf } from "../src/page.js";
+import { pageRuleTiers, runAxeOnPage, runPageA11y, severityOf } from "../src/page.js";
 
 describe("the page rule tiers", () => {
   it("are what the classifier says for the installed axe-core: re-run classify-pages after an axe bump", async () => {
@@ -45,5 +45,23 @@ describe("runPageA11y", () => {
   it("never reports what needs a browser", async () => {
     const found = await runPageA11y(page(`<p style="color:#bbb;background:#fff">Low contrast</p>`));
     expect(found).toEqual([]);
+  });
+});
+
+// A live example embeds a preview in an iframe (figure.doc-example). axe pinged each frame and waited half a second
+// for an answer jsdom's frame never gives (CR-016). It runs with iframes: false now, as the browser tier does; the
+// findings are the same (pinned below from the run before the change), frame-title included: it reads the element.
+describe("a page that embeds live examples", () => {
+  const html = `<!DOCTYPE html><html lang="en"><head><title>Examples</title></head><body><main><h1>Examples</h1>
+    <figure class="doc-example"><iframe src="/preview/a" title="Button, live"></iframe></figure>
+    <figure class="doc-example"><iframe src="/preview/b"></iframe></figure></main></body></html>`;
+
+  it("is checked without asking its frames", async () => {
+    expect((await runAxeOnPage(html, pageRuleTiers.jsdom)).toolOptions.iframes).toBe(false);
+  });
+
+  it("has the same findings: frame-title on the iframe without a title, nothing else", async () => {
+    const findings = await runPageA11y(html);
+    expect(findings.map(f => [f.ruleId, f.nodes.map(n => n.target)])).toEqual([["frame-title", [`iframe[src$="preview/b"]`]]]);
   });
 });

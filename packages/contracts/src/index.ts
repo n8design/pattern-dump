@@ -28,6 +28,10 @@ export interface RenderInput {
   variant?: string;
   /** Live-control overrides; highest precedence in the cascade. */
   data?: Record<string, unknown>;
+  /** `false`: no sample data, as a site page renders. The component's own `.json`, its variant's (and its base's)
+   *  and every included partial's are left out; `data`, the template's defaults and the project's data remain.
+   *  Left out, the cascade has them all: the workbench, its previews, and the examples a page embeds. */
+  sampleData?: false;
   /** Which image settings the variant URLs this render writes are keyed with: "site" for a storefront page and the
    *  previews its host serves (`storefront.images` over `images`), else the project's (`images`). */
   images?: "site";

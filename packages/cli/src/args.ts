@@ -21,6 +21,7 @@ export type Command =
       /** Flags given by their names before 0.8.0, each as "<old> is now <new>". */
       warnings?: string[] }
   | { kind: "help"; topic?: string }
+  | { kind: "version" }
   | { kind: "error"; message: string };
 
 const COMMANDS = ["init", "dev", "audit", "build", "export"] as const;
@@ -45,6 +46,7 @@ export function parseCommand(argv: string[], cwd: string): Command {
   if (cmd === undefined || cmd === "help" || cmd === "--help" || cmd === "-h") {
     return { kind: "help", ...(rest[0] ? { topic: rest[0] } : {}) };
   }
+  if (cmd === "--version" || cmd === "-v") return { kind: "version" };
   if (!(COMMANDS as readonly string[]).includes(cmd)) {
     return { kind: "error", message: `unknown command "${cmd}"` };
   }
@@ -269,4 +271,5 @@ export const USAGE = `Usage: pd <command> [options]
     --out <dir>        Durable output sink (must be outside --root)
     --config <path>    Use a config file outside the root
 
-  help     Show this help`;
+  help     Show this help
+  --version, -v        Print the installed version`;

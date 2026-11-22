@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { JSDOM } from "jsdom";
 import type { A11yDiagnostic } from "@pattern-dump/contracts";
 import ruleTiers from "./rule-tiers.generated.json" with { type: "json" };
+import { assertInstalledAxe } from "./axe-version.js";
 
 // axe-core ships as CJS; createRequire gives reliable ESM interop.
 const require = createRequire(import.meta.url);
@@ -22,6 +23,7 @@ const SEVERITY_MAP: Record<string, A11yDiagnostic["severity"]> = {
  * Returns one A11yDiagnostic per failing DOM node (independent dismissal; per-node target).
  */
 export async function runA11yProducer(html: string): Promise<A11yDiagnostic[]> {
+  assertInstalledAxe();
   const dom = new JSDOM(
     `<!DOCTYPE html><html lang="en"><body><main>${html}</main></body></html>`,
     { url: "http://localhost" }

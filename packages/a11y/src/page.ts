@@ -8,12 +8,14 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { JSDOM } from "jsdom";
 import pageTiers from "./page-rule-tiers.generated.json" with { type: "json" };
+import { assertInstalledAxe } from "./axe-version.js";
 
 const require = createRequire(import.meta.url);
 let axeSource: string | undefined;
 const source = (): string => (axeSource ??= readFileSync(require.resolve("axe-core/axe.min.js"), "utf8"));
-/** axe-core's browser build, as text: injected into a page a browser renders (`pd build --browser`). */
-export const axeScript = (): string => source();
+/** axe-core's browser build, as text: injected into a page a browser renders (`pd build --browser`). Stops when the
+ *  installed release is not the one the tiers were proven on. */
+export const axeScript = (): string => { assertInstalledAxe(); return source(); };
 
 /** The axe tags a site page is checked against. */
 export const PAGE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
@@ -23,7 +25,7 @@ interface AxeResult { id: string; impact?: string | null; tags: string[]; help: 
 
 /** axe's raw results for `html` with `rules` (all of PAGE_TAGS when empty), and the rules those tags hold. */
 export async function runAxeOnPage(html: string, rules: string[]): Promise<{
-  violations: AxeResult[]; incomplete: AxeResult[]; axeVersion: string; ruleIds: string[];
+  violations: AxeResult[]; incomplete: AxeResult[]; axeVersion: string; ruleIds: string[]; toolOptions: { iframes?: boolean };
 }> {
   const dom = new JSDOM(html, { url: "http://site.invalid/", runScripts: "outside-only", pretendToBeVisual: true });
   // A canvas jsdom can't draw on: axe probes for one and carries on without it.
@@ -31,13 +33,15 @@ export async function runAxeOnPage(html: string, rules: string[]): Promise<{
   try {
     dom.window.eval(source());
     const axe = (dom.window as unknown as { axe: {
-      run(context: unknown, options: unknown): Promise<{ violations: AxeResult[]; incomplete: AxeResult[] }>;
+      run(context: unknown, options: unknown): Promise<{ violations: AxeResult[]; incomplete: AxeResult[]; toolOptions: { iframes?: boolean } }>;
       getRules(tags: string[]): Array<{ ruleId: string }>; version: string;
     } }).axe;
     const ruleIds = axe.getRules(PAGE_TAGS).map(r => r.ruleId);
     const options = rules.length ? { runOnly: { type: "rule", values: rules } } : { runOnly: { type: "tag", values: PAGE_TAGS } };
-    const r = await axe.run(dom.window.document, { ...options, resultTypes: ["violations", "incomplete"] });
-    return { violations: r.violations, incomplete: r.incomplete, axeVersion: axe.version, ruleIds };
+    // No frames: jsdom's never answer axe's ping, which then waits half a second per page that has one. A frame's
+    // content is never checked here either way; frame-title reads the element in this document.
+    const r = await axe.run(dom.window.document, { ...options, resultTypes: ["violations", "incomplete"], iframes: false });
+    return { violations: r.violations, incomplete: r.incomplete, axeVersion: axe.version, ruleIds, toolOptions: r.toolOptions };
   } finally {
     dom.window.close();
   }
@@ -61,6 +65,7 @@ export function severityOf(impact: string | null | undefined, tags: readonly str
 
 /** The rules of a site page decided in jsdom, run on `html`: every rule it fails. */
 export async function runPageA11y(html: string): Promise<PageA11yFinding[]> {
+  assertInstalledAxe();
   const { violations } = await runAxeOnPage(html, pageTiers.jsdom);
   return violations.map(v => ({
     ruleId: v.id, severity: severityOf(v.impact, v.tags), impact: v.impact ?? "minor", help: v.help, helpUrl: v.helpUrl,

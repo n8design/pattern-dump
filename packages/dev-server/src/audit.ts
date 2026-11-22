@@ -16,6 +16,7 @@ import type { PatternDumpConfig } from "@pattern-dump/config";
 import type { DiagnosticsGraph } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
+import { assertInstalledAxe } from "@pattern-dump/a11y";
 import { auditedComponentIds } from "./discovery-index.js";
 import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 import { buildCompositionRegistry } from "./composition.js";
@@ -34,6 +35,9 @@ import { createDisplayPath } from "./display-path.js";
 export async function runDiagnosticsAudit(
   config: PatternDumpConfig, cwd: string,
 ): Promise<{ graph: DiagnosticsGraph; reaudited: string[]; reused: number; artifactPath: string; imageWarning?: string }> {
+  // Once for the whole audit, before any component: the producer would otherwise report the same mismatch as a
+  // defect of every component.
+  assertInstalledAxe();
   const cfg = resolveServerConfig(config, cwd, {}, loadPatternPackages(config.packages, cwd));
   const { patternsDir, patternRoots, patternDirs, themesDir, defaultTheme } = cfg;
   const helperRegistrars: Awaited<ReturnType<typeof loadHelperRegistrars>> = [];

@@ -18,7 +18,7 @@ import { tagShapeProblems } from "./tag-shape";
 import { checkSchemaExtensions } from "./schema-extensions";
 import { SLOT_KEY, withImageSlots, type ImageSlot } from "./image-slots";
 import { checkSchemaHelperNames } from "./schema-helper-names";
-import { createSourceStore, deepFreeze, mergeData, templateKey, templateSpec, type SourceStore } from "./source-store";
+import { createSourceStore, deepFreeze, mergeData, PROTOTYPE_KEYS, templateKey, templateSpec, type SourceStore } from "./source-store";
 import type {
   CreateRenderer, RendererOptions, Diagnostic, RenderMeta,
   ImageLookup, ImageSource,
@@ -48,6 +48,8 @@ export function renderPlainTemplate(source: string, data: Record<string, unknown
   return Handlebars.create().compile(source, COMPILE)(data);
 }
 
+/** `sources` merged into `target`, later over earlier, descending where both hold an object. PROTOTYPE_KEYS are
+ *  left out: merging a parsed `__proto__` would otherwise change Object.prototype. */
 export function deepMerge(
   target: Record<string, unknown>,
   ...sources: Array<Record<string, unknown> | undefined>
@@ -55,6 +57,7 @@ export function deepMerge(
   for (const source of sources) {
     if (!source) continue;
     for (const [key, value] of Object.entries(source)) {
+      if (PROTOTYPE_KEYS.has(key)) continue;
       const targetVal = target[key];
       if (
         value !== null && typeof value === "object" && !Array.isArray(value) &&
@@ -177,20 +180,31 @@ function registerHelpers(
     return m ? m[1] : "0";
   });
 
-  // Core generic helpers
-  env.registerHelper("eq",  (a: unknown, b: unknown) => a === b);
-  env.registerHelper("ne",  (a: unknown, b: unknown) => a !== b);
-  env.registerHelper("lt",  (a: unknown, b: unknown) => (a as number) < (b as number));
-  env.registerHelper("gt",  (a: unknown, b: unknown) => (a as number) > (b as number));
-  env.registerHelper("lte", (a: unknown, b: unknown) => (a as number) <= (b as number));
-  env.registerHelper("gte", (a: unknown, b: unknown) => (a as number) >= (b as number));
-  env.registerHelper("and", (a: unknown, b: unknown) => Boolean(a) && Boolean(b));
-  env.registerHelper("or",  (a: unknown, b: unknown) => Boolean(a) || Boolean(b));
-  env.registerHelper("not", (a: unknown) => !a);
-  env.registerHelper("isdefined", (v: unknown) => v !== undefined && v !== null);
-  env.registerHelper("defaultValue", (v: unknown, fallback: unknown) =>
-    v !== undefined && v !== null ? v : fallback
-  );
+  // Core generic helpers. Handlebars hands a helper its options object last, so a call an argument short would read
+  // that object as the argument (`[object Object]`, a silent false): each counts what it was given. `and` and `or`
+  // take exactly two (a third was ignored); the others ignore extras, as before.
+  const counted = (name: string, n: number, exact: boolean, f: (...args: unknown[]) => unknown) =>
+    (...args: unknown[]): unknown => {
+      const given = args.length - 1;
+      const word = `argument${n === 1 ? "" : "s"}`;
+      if (given < n) throw new Error(`${name} needs ${n} ${word}, got ${given}`);
+      if (exact && given > n) throw new Error(`${name} takes exactly ${n} ${word}, got ${given}`);
+      return f(...args.slice(0, n));
+    };
+  const helper = (name: string, n: number, f: (...args: unknown[]) => unknown, exact = false): void => {
+    env.registerHelper(name, counted(name, n, exact, f));
+  };
+  helper("eq",  2, (a, b) => a === b);
+  helper("ne",  2, (a, b) => a !== b);
+  helper("lt",  2, (a, b) => (a as number) < (b as number));
+  helper("gt",  2, (a, b) => (a as number) > (b as number));
+  helper("lte", 2, (a, b) => (a as number) <= (b as number));
+  helper("gte", 2, (a, b) => (a as number) >= (b as number));
+  helper("and", 2, (a, b) => Boolean(a) && Boolean(b), true);
+  helper("or",  2, (a, b) => Boolean(a) || Boolean(b), true);
+  helper("not", 1, a => !a);
+  helper("isdefined", 1, v => v !== undefined && v !== null);
+  helper("defaultValue", 2, (v, fallback) => v !== undefined && v !== null ? v : fallback);
   env.registerHelper("ifCond", function(
     this: unknown,
     a: unknown, op: string, b: unknown,
@@ -359,8 +373,13 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
       return data;
     };
 
-    const defaultData: Record<string, unknown> = (entry.jsonPath ? await readData(entry.jsonPath) : undefined) ?? {};
-    const variantData = variantJsonPath ? await readData(variantJsonPath) : undefined;
+    // A site page renders without sample data (RenderInput.sampleData): only what it is given reaches it. The files
+    // are still read, so one that doesn't parse is reported as before.
+    const samples = input.sampleData !== false;
+    const ownData = entry.jsonPath ? await readData(entry.jsonPath) : undefined;
+    const ownVariantData = variantJsonPath ? await readData(variantJsonPath) : undefined;
+    const defaultData: Record<string, unknown> = (samples ? ownData : undefined) ?? {};
+    const variantData = samples ? ownVariantData : undefined;
 
     // Cascade (lowest → highest): project global data → component defaults → variant → live.
     // A new object: every source is shared and frozen (source-store.ts), so none is changed.
@@ -500,7 +519,7 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
             currentBase = thisBase;
 
             const merged = mergeData(
-              capturedDefaults,
+              samples ? capturedDefaults : {},
               context != null && typeof context === "object" && !Array.isArray(context)
                 ? (context as Record<string, unknown>)
                 : {}

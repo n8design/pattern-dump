@@ -11,7 +11,6 @@
 // `text/markdown`; anything else is a named error, and nothing is rendered. Strict on purpose: a partial
 // included with the current context sees the placement's values too.
 
-import { basename } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { createMarkdown } from "../code-blocks.js";
 import type { DiscoveryMap, Render } from "@pattern-dump/contracts";
@@ -23,7 +22,7 @@ import type { PageHeading } from "./derived.js";
 import { defaultRegion } from "./regions.js";
 import { TOC_ID, TOC_TAG, tocItems, type TocAnchor, type TocItem } from "./toc.js";
 import { checkPlaced, type ObjectSchema, type PlacedProblem, type PropertySchema } from "./declared-values.js";
-import { includeTree } from "./sample-data.js";
+import { includeTree } from "../composition.js";
 import { designFiles } from "./design-files.js";
 
 /** Content markdown: block markdown, HTML escaped (html: false), markdown-it's link check. */
@@ -89,45 +88,6 @@ async function unsafeOutputs(id: string, at: PlacedProblem["at"], deps: Placemen
       if (!o.helper && allowed.has(o.name)) continue;
       const what = o.helper ? `a helper's result unescaped ({{{${o.name}}}})` : `"${o.name}" unescaped ({{{${o.name}}}})`;
       problems.push({ at, message: `${componentId} outputs ${what} at ${deps.shown(file)}:${o.line}:${o.column}, which only a text/markdown property may be` });
-    }
-  }
-  return problems;
-}
-
-// Sample data. The renderer's data cascade puts a component's sample data beneath what it is given, and an
-// included partial's beneath the context it is included with; objects merge key by key (lists replace).
-// The null-fill (checkPlaced) covers every declared key, so what could still reach the page is a sample key
-// the schema does not declare, at any depth of a declared object. So for each component of the placement,
-// its own sample and that of every other template in its include tree may set only keys it declares. A
-// partial reachable from two components is held to both.
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-
-function undeclaredSampleKeys(sample: Record<string, unknown>, props: Record<string, PropertySchema> | undefined, prefix: string): string[] {
-  const out: string[] = [];
-  for (const [key, value] of Object.entries(sample)) {
-    const prop = props && Object.hasOwn(props, key) ? props[key] : undefined;
-    if (!prop) { out.push(`${prefix}${key}`); continue; }
-    if (isObject(value) && prop.properties) out.push(...undeclaredSampleKeys(value, prop.properties, `${prefix}${key}.`));
-  }
-  return out;
-}
-
-async function sampleDataProblems(id: string, at: PlacedProblem["at"], deps: PlacementDeps): Promise<PlacedProblem[]> {
-  const components = await placementComponents(id, deps);
-  const problems: PlacedProblem[] = [];
-  for (const owner of components) {
-    const declared = (await deps.schemaOf(owner))?.properties;
-    for (const template of includeTree(owner, deps.composition)) {
-      // Another component of the placement has its own context, checked as its own owner.
-      if (template !== owner && components.includes(template)) continue;
-      const jsonPath = deps.discoveryMap.get(template)?.jsonPath;
-      if (!jsonPath) continue;
-      let sample: unknown;
-      try { sample = await designFiles(deps.discoveryMap).data(jsonPath); } catch { continue; } // reported as DATA_INVALID
-      if (!isObject(sample)) continue;
-      for (const key of undeclaredSampleKeys(sample, declared, "")) {
-        problems.push({ at, message: `the sample data of ${template} (${basename(jsonPath)}) sets "${key}", which ${owner} does not declare, so it would show wherever ${owner} is placed` });
-      }
     }
   }
   return problems;
@@ -214,7 +174,7 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps, page: 
     // Placed content is a storefront page's: its code blocks get their copy buttons from the page's script (code-blocks.ts).
     markdown: text => contentMd.render(text, { pdCodeBlocks: { storefront: true } }),
   }, { given: new Set(Object.keys(variant)) });
-  problems.push(...checked.problems, ...await unsafeOutputs(id, block.root.at, deps), ...await sampleDataProblems(id, block.root.at, deps));
+  problems.push(...checked.problems, ...await unsafeOutputs(id, block.root.at, deps));
   const where = region !== undefined ? { region, regionFrom } : {};
   if (problems.length) return { problems, ...where };
   // A placement that fails to render (an image that can't be served as variants, a helper that isn't registered)
@@ -222,7 +182,8 @@ export async function placeBlock(block: PlacedBlock, deps: PlacementDeps, page: 
   try {
     const data = { ...checked.value };
     for (const [key, v] of Object.entries(variant)) if (Object.hasOwn(data, key) && data[key] === null) data[key] = v;
-    return { html: (await deps.render({ component: id, data })).html, problems, ...where };
+    // Without sample data, as every part of a site page: what the tag sets, and the variant's own keys above.
+    return { html: (await deps.render({ component: id, data, sampleData: false })).html, problems, ...where };
   } catch (e) {
     return { problems: [{ at: block.root.at, message: `<${block.root.name}>: ${e instanceof Error ? e.message : String(e)}` }] };
   }
@@ -253,12 +214,12 @@ export async function placeTocItems(items: TocItem[], at: PlacedProblem["at"], w
   if (!schema?.properties?.["items"]) problems.push({ at, message: `${TOC_ID}: its schema declares no "items", the list of { text, href, level } it shows` });
   const own = defaultRegion(schema, TOC_ID);
   if (own.problem) problems.push({ at, message: own.problem });
-  problems.push(...await unsafeOutputs(TOC_ID, at, deps), ...await sampleDataProblems(TOC_ID, at, deps));
+  problems.push(...await unsafeOutputs(TOC_ID, at, deps));
   const region = tagRegion ?? own.region;
   const where = region !== undefined ? { region, regionFrom: tagRegion !== undefined ? fromTag! : `${what} (${TOC_ID}'s default region, x-pd-region)` } : {};
   if (problems.length) return { problems, toc: true, ...where };
   try {
-    return { html: (await deps.render({ component: TOC_ID, data: { items } })).html, problems, toc: true, ...where };
+    return { html: (await deps.render({ component: TOC_ID, data: { items }, sampleData: false })).html, problems, toc: true, ...where };
   } catch (e) {
     return { problems: [{ at, message: `${TOC_ID}: ${e instanceof Error ? e.message : String(e)}` }], toc: true };
   }

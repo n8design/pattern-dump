@@ -122,16 +122,13 @@ describe("listing views", () => {
     expect(p.problems).toEqual([`views/list: its schema declares no "entries" list with "x-pd-card": a view names the card it shows each page as, so each page can be checked against it`]);
   });
 
-  it("keeps a view's and its card's sample data to the fields of a listing's page", async () => {
+  it("leaves a view's and its card's sample data out of the page: whatever they set, no problem, no sample shown", async () => {
     const p = await assemble("/articles/", pagesWith("view: list\n"), {
       ...SKIN,
-      "views/list/list.json": json({ entries: [{ route: "/a/", title: "A", author: "x" }], heading: "Latest" }),
-      "components/list-card/list-card.json": json({ title: "Sample", rating: 5 }),
+      "views/list/list.json": json({ entries: [{ route: "/a/", title: "SAMPLE-A", author: "SAMPLE-X" }], heading: "SAMPLE-LATEST" }),
+      "components/list-card/list-card.json": json({ title: "SAMPLE-TITLE", rating: 5 }),
     });
-    expect(p.problems).toEqual([
-      `the sample data of views/list (list.json) sets "heading", which a view doesn't get: a view gets only entries, the pages of its listing`,
-      `the sample data of views/list (list.json) sets "entries[0].author", which is not a field of a page in a listing, so it would show on every page using views/list`,
-      `the sample data of components/list-card (list-card.json) sets "rating", which is not a field of a page in a listing, so it would show on every card of views/list`,
-    ]);
+    expect(p.problems).toEqual([]);
+    expect(p.html).not.toMatch(/SAMPLE-/);
   });
 });

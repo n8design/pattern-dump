@@ -60,3 +60,16 @@ export async function buildCompositionRegistry(
   for (const [k, v] of usedBy) usedBy.set(k, [...new Set(v)].sort());
   return { uses, usedBy };
 }
+
+/** A template and every component it includes, however deep, in a stable order: the template first, then the rest
+ *  sorted. */
+export function includeTree(id: string, composition: CompositionRegistry): string[] {
+  const seen = new Set<string>([id]);
+  const queue = [id];
+  while (queue.length) {
+    for (const child of composition.uses.get(queue.shift()!) ?? []) {
+      if (!seen.has(child)) { seen.add(child); queue.push(child); }
+    }
+  }
+  return [id, ...[...seen].filter(c => c !== id).sort()];
+}

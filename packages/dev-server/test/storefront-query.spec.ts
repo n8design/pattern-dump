@@ -267,12 +267,10 @@ describe("a query's values, checked", () => {
     expect(clash.problems).toEqual([`layouts/article: page.related: a page sets the query under "related", which is already a key of the page: give the query another name`]);
   });
 
-  it("keeps a layout's sample data for a query to entries and listing", async () => {
+  it("leaves a layout's sample data for a query out of the page, whatever it sets", async () => {
     const p = await assemble("/articles/a/", site(), { skin: { ...SKIN,
-      "layouts/article/article.json": json({ title: "T", page: { related: { entries: [{ route: "/x/", title: "X", rating: 4 }], listing: "<ul></ul>", heading: "More" } } }) } });
-    expect(p.problems).toEqual([
-      `the sample data of layouts/article (article.json) sets "page.related.entries[0].rating", which is not part of the page data Pattern Dump fills, so it would show on every page using layouts/article`,
-      `the sample data of layouts/article (article.json) sets "page.related.heading", which is not part of the page data Pattern Dump fills, so it would show on every page using layouts/article`,
-    ]);
+      "layouts/article/article.json": json({ title: "T", page: { related: { entries: [{ route: "/x/", title: "SAMPLE-X", rating: 4 }], listing: "<ul></ul>", heading: "SAMPLE-MORE" } } }) } });
+    expect(p.problems).toEqual([]);
+    expect(p.html).not.toMatch(/SAMPLE-/);
   });
 });
