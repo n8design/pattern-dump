@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.2 (2026-11-22)
+
+### Fixed
+
+- **A `pd-` tag shown as code inside a placed component stays code.** A fence or inline code in a tag's content
+  was read for tags, so a `<pd-…>` written there as an example failed the build (`is never closed`). Code is text
+  there now, as it is everywhere else on a page.
+- **A `pd-` tag can be written over several lines.** Attributes on lines of their own failed with `has something it
+  cannot read before its closing >`. Line breaks between attributes work as in HTML, and that error now points at
+  what it cannot read.
+- **A style guide's `pd build` writes the images its previews use.** An image placed with `{{pd-image}}` showed in
+  `pd dev` but was missing from the built workbench, in a preview and in an example in a component's docs. The
+  build now writes every image size they reference, as the site build does.
+
 ## 0.8.1 (2026-11-22)
 
 ### Fixed
