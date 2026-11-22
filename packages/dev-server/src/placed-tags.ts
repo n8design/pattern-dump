@@ -120,7 +120,10 @@ function parseTags(src: Src, problems: PlacedProblem[]): { root?: PlacedTag; com
         j += m[0].length;
       }
       const end = /^\s*(\/?)>/.exec(t.slice(j));
-      if (!end) { problems.push({ at: src.pos[j] ?? tag.at, message: `<${tag.name}> has something it cannot read before its closing >` }); return { complete: true }; }
+      // Only white space after the attributes so far: the tag goes on over the next line, as HTML allows.
+      if (!end && !t.slice(j).trim()) return { root, complete: false };
+      // At what it cannot read, on whichever line that is.
+      if (!end) { problems.push({ at: src.pos[j + t.slice(j).search(/\S/)] ?? tag.at, message: `<${tag.name}> has something it cannot read before its closing >` }); return { complete: true }; }
       j += end[0].length;
       if (stack.length) stack.at(-1)!.children.push(tag); else root = tag;
       if (!end[1]) stack.push(tag);
