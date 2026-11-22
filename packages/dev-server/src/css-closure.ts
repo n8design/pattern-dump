@@ -188,7 +188,7 @@ export function extractUsedClasses(hbsSource: string): string[] {
  *  whole include tree, and parsing the templates as HTML each time was a share of every page. Kept for up to 10,000
  *  texts, then started again; an edited template is a new text. */
 const keptClasses = new Map<string, readonly string[]>();
-function templateClasses(hbsSource: string): readonly string[] {
+export function templateClasses(hbsSource: string): readonly string[] {
   let classes = keptClasses.get(hbsSource);
   if (!classes) {
     if (keptClasses.size >= 10_000) keptClasses.clear();

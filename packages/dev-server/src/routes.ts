@@ -21,7 +21,7 @@ import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile } from "node:fs/promises";
-import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap, type StorefrontPage } from "@pattern-dump/contracts";
+import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap, type ProjectGraphJson, type StorefrontPage } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
@@ -32,6 +32,8 @@ import { sameHostWorkbenchPath } from "@pattern-dump/config";
 import type { ResolvedConfig } from "./server-config.js";
 import { compositionFor, currentDiscovery, type ServerState } from "./server-state.js";
 import { createDisplayPath } from "./display-path.js";
+import { buildGraph, graphJson, type ProjectGraph } from "./graph/build.js";
+import { gatherGraphInputs } from "./graph/inputs.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 import { buildShellHtml, json, mimeType, serveFile, servesShell, workbenchTitle } from "./http-utils.js";
@@ -96,6 +98,25 @@ async function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteConte
     today, categories: sf.categories, tags: sf.tags, tagPages: sf.tagPages, categoryPages: sf.categoryPages,
     ...(layouts ? { layouts: new Set(layouts) } : {}),
   }));
+}
+
+/**
+ * The project graph as it is now: built from the current discovery, include graph, style data and page model, and
+ * kept until one of them, or the watch generation, moves (graph/current.ts). The generation is read first, so a save
+ * that lands while the inputs are gathered leaves a key the next request no longer matches.
+ */
+export async function currentGraph(ctx: RouteContext): Promise<ProjectGraph> {
+  const { cfg, state } = ctx;
+  const generation = state.watchGeneration;
+  const discovery = await currentDiscovery(state, cfg.patternRoots);
+  const style = await state.style.get(() => buildAllStyleData(cfg.styleRoots, baseComponentIds(discovery)));
+  const composition = await compositionFor(state, discovery, cfg.patternDirs);
+  const pages = cfg.storefront ? await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap) : null;
+  return state.graph.get([generation, discovery, style, composition, pages], async () => buildGraph(await gatherGraphInputs({
+    discovery, composition, style, pages,
+    assetsCss: cfg.assetsCss, assetRoots: cfg.assetRoots, assetRootNames: cfg.assetRootNames,
+    display: createDisplayPath(cfg.cwd, cfg.packages),
+  })));
 }
 
 export interface RouteContext {
@@ -456,6 +477,12 @@ async function routeRequest(
       const discovery = await currentDiscovery(state, patternRoots);
       const tree = await buildComponentTree(patternDirs, overviewsEnabled, discovery.discoveryMap);
       json(res, 200, tree satisfies ComponentTree);
+      return;
+    }
+
+    // The project graph (graph/), as its JSON: what `pd graph --json` prints and the static build writes.
+    if (pathname === PD_ROUTES.graph) {
+      json(res, 200, graphJson(await currentGraph(ctx)) satisfies ProjectGraphJson);
       return;
     }
 

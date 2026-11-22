@@ -46,6 +46,7 @@
 import type { DiscoveryResult } from "@pattern-dump/contracts";
 import { buildDiscoveryMap, type PatternRoot } from "@pattern-dump/discovery";
 import { createLazy, testHook, type Lazy } from "./lazy.js";
+import { createGraphCache, type GraphCache } from "./graph/current.js";
 import { buildCompositionRegistry, type CompositionRegistry } from "./composition.js";
 import type { AuditedSlice } from "./diagnostics.js";
 import type {
@@ -95,6 +96,13 @@ export interface ServerState {
    *  surgical means +1 per .hbs edit, +0 per .scss edit. */
   liveReauditCount: number;
 
+  /** Moved at the start and at the end of every event the watcher handles (watch.ts): part of the key a value
+   *  derived from the project's files is kept under (the graph), so one built before or during a save is not
+   *  served after it. Only ever increased. */
+  watchGeneration: number;
+  /** The project graph, kept under the inputs it was built from (graph/current.ts; routes.ts `currentGraph`). */
+  readonly graph: GraphCache;
+
   /** themeName → compiled CSS. Mutated, never replaced. */
   readonly themeCss: Map<string, string>;
   /** themeName → { "--slot": value | null }. Populated at startup and on HMR recompile. */
@@ -120,6 +128,8 @@ export function createServerState(): ServerState {
     audit: createLazy<Map<string, AuditedSlice>>("audit"),
     auditSeeding: null,
     liveReauditCount: 0,
+    watchGeneration: 0,
+    graph: createGraphCache(),
     themeCss: new Map<string, string>(),
     themeTokens: new Map<string, Record<string, string | null>>(),
     scripts: new Map<string, Lazy<string>>(),
