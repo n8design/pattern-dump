@@ -478,6 +478,10 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       forgetInside(path);
     }
     const done = () => {
+      // Every handled event moves the generation at its start and at its end (before its reload messages go
+      // out), so a value derived from files (the graph, graph/current.ts) built during a handler is never taken
+      // for one built after it.
+      if (basename(path) !== BARRIER) state.watchGeneration++;
       const sending = outbox;
       outbox = null;
       // A throw here (a socket that fails to send, the test hook) is reported and stops nothing: finish() always
@@ -503,6 +507,7 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
     // on the open pages, like any other, and pd dev keeps running: nothing is left to reject unhandled.
     const failed = (e: unknown): void => { reportHandlerFailure(event, path, e); };
     const run = (): void => {
+      state.watchGeneration++;
       let result: unknown;
       try {
         const fail = (globalThis as { __testOnly_failHandler?: TestOnlyFailHandler }).__testOnly_failHandler?.(event, path);
