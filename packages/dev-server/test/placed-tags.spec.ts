@@ -86,7 +86,53 @@ describe("the pd- tag rule", () => {
     expect(outline(`<pd-molecules-slider label="x">\n  <pd-atoms-slide image="a.jpg"></pd-molecules-slider>\n</pd-atoms-slide>\n`)[0].problems)
       .toEqual([`6:33 </pd-molecules-slider> closes <pd-atoms-slide> (opened at 6:3)`, `7:1 </pd-atoms-slide> closes <pd-molecules-slider> (opened at 5:1)`]);
     expect(outline(`<pd-atoms-slide image="a.jpg" =oops>x</pd-atoms-slide>\n`)[0].problems)
-      .toEqual([`5:30 <pd-atoms-slide> has something it cannot read before its closing >`]);
+      .toEqual([`5:31 <pd-atoms-slide> has something it cannot read before its closing >`]);
+  });
+});
+
+describe("a tag over several lines", () => {
+  /** What a tree places, without positions: compared between the one-line and the several-line form. */
+  const values = (v: Placed | undefined): unknown => v?.kind === "keys"
+    ? Object.fromEntries(v.entries.map(e => [e.key, values(e.value)]))
+    : v?.kind === "list" ? v.items.map(values) : v?.kind === "text" ? v.value : v?.kind;
+
+  it("places the same component with the same values as on one line", async () => {
+    const one = await placed(`<pd-molecules-slider label="Talks" per-view="1" loop>\n  <pd-atoms-slide image="a.jpg">First</pd-atoms-slide>\n</pd-molecules-slider>\n`);
+    const several = await placed(`<pd-molecules-slider\n  label="Talks"\n  per-view="1"\n  loop\n>\n  <pd-atoms-slide\n    image="a.jpg">First</pd-atoms-slide>\n</pd-molecules-slider>\n`);
+    expect(several.problems).toEqual([]);
+    expect(several.id).toBe(one.id);
+    expect(values(several.values)).toEqual(values(one.values));
+    expect(values(several.values)).toEqual({ label: "Talks", perView: "1", loop: "bare", slides: [{ image: "a.jpg", caption: "First" }] });
+  });
+
+  it("each attribute at its own line and column; a problem on a later line points there", () => {
+    expect(outline(`<pd-molecules-slider\n  label="Talks"\n    loop>\n</pd-molecules-slider>\n`)[0]).toEqual({
+      problems: [], root: { tag: "pd-molecules-slider@5:1", attrs: ["label=Talks@6:3", "loop=(bare)@7:5"], children: [] },
+    });
+    expect(outline(`<pd-atoms-slide\n  image="a.jpg"\n  =oops>x</pd-atoms-slide>\n`)[0].problems)
+      .toEqual([`7:3 <pd-atoms-slide> has something it cannot read before its closing >`]);
+  });
+});
+
+describe("code inside a tag's content", () => {
+  // Content as a page writes it to show placed tags as code: a fence holding an opening tag, one never closed and a
+  // closing one, a tilde fence, and inline code. All of it is text of the slide's caption, as at the top level.
+  const FENCED = "<pd-atoms-slide image=\"a.jpg\">\n  Write it like this:\n\n  ```md\n  <pd-atoms-note>\n  <pd-molecules-slider label=\"x\">\n  </pd-atoms-slide>\n  ```\n\n"
+    + "  ~~~~\n  </pd-molecules-slider>\n  ~~~\n  ~~~~\n\n  Or inline: `<pd-atoms-note>` and ``</pd-atoms-slide>``.\n</pd-atoms-slide>\n";
+
+  it("a fence or a code span is text, never a tag", async () => {
+    const r = await placed(FENCED);
+    expect(r.problems).toEqual([]);
+    expect(entry(r.values, "caption")).toMatchObject({ kind: "text", value: "Write it like this:\n\n```md\n<pd-atoms-note>\n<pd-molecules-slider label=\"x\">\n</pd-atoms-slide>\n```\n\n"
+      + "~~~~\n</pd-molecules-slider>\n~~~\n~~~~\n\nOr inline: `<pd-atoms-note>` and ``</pd-atoms-slide>``." });
+  });
+
+  it("a fence left open runs on: the tag around it is never closed; a lone backtick is a backtick", async () => {
+    expect(outline("<pd-atoms-slide image=\"a.jpg\">\n  ```\n  </pd-atoms-slide>\n\nText after.\n")[0].problems)
+      .toEqual(["5:1 <pd-atoms-slide> is never closed"]);
+    const r = await placed("<pd-atoms-slide image=\"a.jpg\">a ` tick</pd-atoms-slide>\n");
+    expect(r.problems).toEqual([]);
+    expect(entry(r.values, "caption")).toMatchObject({ value: "a ` tick" });
   });
 });
 

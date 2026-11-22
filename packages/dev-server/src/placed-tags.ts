@@ -9,7 +9,7 @@
 // included. Markdown keeps `html: false`: every other tag in the page is still escaped, a tag in the middle
 // of a paragraph is not claimed (it stays text), and one indented four spaces is a code block, as
 // CommonMark says. Inside a claimed block only `pd-` tags are syntax; anything else is the content text of
-// the tag around it.
+// the tag around it, and a tag in a fence or a code span there is text too, as at the top level (textEnd).
 //
 // The rule only records each block's source with its positions in the file. `toPlaced` then reads the tag
 // tree into the located values the checker takes (declared-values.ts, checkPlaced): an attribute is a key
@@ -41,6 +41,57 @@ const OPEN = /^<(pd-[a-z0-9-]+(?:~[a-z0-9-]+)?)/;
 const CLOSE = /^<\/(pd-[a-z0-9-~]+)\s*>/;
 const ATTR = /^\s+([a-zA-Z_:][-a-zA-Z0-9_:.]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/;
 
+const FENCE = /[ \t]*(?:(`{3,})[^`\n]*|(~{3,})[^\n]*)(?=\n|$)/y;
+const TICKS = /`+/y;
+const TAG_START = /<\/?pd-/y;
+
+/**
+ * Where content text from `i` ends: at the next `pd-` tag that is not in code, else the end. Code is read as
+ * CommonMark reads it, so a tag written as code is text inside a tag as it is at the top level: a fence (a line
+ * starting, after white space, with three or more backticks or tildes) runs to its closing fence (the same character,
+ * at least as many, nothing else on the line), or to the end while none is read yet; a code span runs to the next
+ * backtick run of its length within its paragraph, and a run with no partner is plain backticks.
+ */
+function textEnd(t: string, i: number): number {
+  let k = i;
+  while (k < t.length) {
+    if (k === 0 || t[k - 1] === "\n") {
+      FENCE.lastIndex = k;
+      const fence = FENCE.exec(t);
+      if (fence) {
+        const marks = fence[1] ?? fence[2]!;
+        const closing = new RegExp(`^[ \\t]*${marks[0] === "`" ? "`" : "~"}{${marks.length},}[ \\t]*$`, "m");
+        const from = FENCE.lastIndex + 1;
+        const m = closing.exec(t.slice(from));
+        if (!m) return t.length;
+        k = from + m.index + m[0].length;
+        continue;
+      }
+    }
+    TAG_START.lastIndex = k;
+    if (k > i && TAG_START.test(t)) return k;
+    if (t[k] === "`") {
+      TICKS.lastIndex = k;
+      const run = TICKS.exec(t)![0].length;
+      const paragraph = t.slice(k + run).search(/\n[ \t]*\n/);
+      const limit = paragraph < 0 ? t.length : k + run + paragraph;
+      let close = -1;
+      for (let s = k + run; s < limit;) {
+        const n = t.indexOf("`", s);
+        if (n < 0 || n >= limit) break;
+        TICKS.lastIndex = n;
+        const len = TICKS.exec(t)![0].length;
+        if (len === run) { close = n; break; }
+        s = n + len;
+      }
+      k = close < 0 ? k + run : close + run;
+      continue;
+    }
+    k++;
+  }
+  return t.length;
+}
+
 /** One block's tag tree; `complete` is false while its root tag is not closed. */
 function parseTags(src: Src, problems: PlacedProblem[]): { root?: PlacedTag; complete: boolean } {
   const stack: PlacedTag[] = [];
@@ -69,7 +120,10 @@ function parseTags(src: Src, problems: PlacedProblem[]): { root?: PlacedTag; com
         j += m[0].length;
       }
       const end = /^\s*(\/?)>/.exec(t.slice(j));
-      if (!end) { problems.push({ at: src.pos[j] ?? tag.at, message: `<${tag.name}> has something it cannot read before its closing >` }); return { complete: true }; }
+      // Only white space after the attributes so far: the tag goes on over the next line, as HTML allows.
+      if (!end && !t.slice(j).trim()) return { root, complete: false };
+      // At what it cannot read, on whichever line that is.
+      if (!end) { problems.push({ at: src.pos[j + t.slice(j).search(/\S/)] ?? tag.at, message: `<${tag.name}> has something it cannot read before its closing >` }); return { complete: true }; }
       j += end[0].length;
       if (stack.length) stack.at(-1)!.children.push(tag); else root = tag;
       if (!end[1]) stack.push(tag);
@@ -78,8 +132,7 @@ function parseTags(src: Src, problems: PlacedProblem[]): { root?: PlacedTag; com
       continue;
     }
     // Content text of the innermost open tag.
-    const next = t.slice(i + 1).search(/<\/?pd-/);
-    const len = next < 0 ? t.length - i : next + 1;
+    const len = textEnd(t, i) - i;
     if (stack.length) stack.at(-1)!.text.push({ s: t.slice(i, i + len), at: src.pos[i], pos: src.pos.slice(i, i + len) });
     i += len;
   }

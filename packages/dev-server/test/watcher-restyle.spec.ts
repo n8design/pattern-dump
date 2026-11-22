@@ -11,11 +11,12 @@ import { mkdir, rm, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import WebSocket from "ws";
 
-import { startDevServer } from "@pattern-dump/dev-server";
 import { defineConfig } from "@pattern-dump/config";
 import { save } from "../../../test-support/save.js";
+import { startOnFreeWsPort } from "./free-ports.js";
 
-const WS_PORT = 47_312;
+/** The live-reload port the server got: a free one, never a fixed one another test file may hold. */
+let wsPort = 0;
 
 const config = defineConfig({
   sourceDir:    "./src",
@@ -59,8 +60,8 @@ describe("file watcher — full restyle for an entry bundle and the base layer",
     await write("src/styles/atoms/_tag.scss", `.tag { color: gray; }\n`);
     await write("src/styles/styles.scss", `@use 'base/reset';\n@use 'atoms/btn';\n@use 'atoms/tag';\n`);
 
-    server = await startDevServer(config, dir, { port: 0, wsPort: WS_PORT });
-    ws = new WebSocket(`ws://127.0.0.1:${WS_PORT}`);
+    ({ server, wsPort } = await startOnFreeWsPort(config, dir));
+    ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
     ws.on("message", raw => { try { received.push(JSON.parse(String(raw)) as HmrMessage); } catch { /* not ours */ } });
     await new Promise<void>((res, rej) => { ws.once("open", () => res()); ws.once("error", rej); });
     // Put atoms/btn on screen: the watcher refreshes the component the last detail request named.
@@ -117,7 +118,6 @@ describe("file watcher — full restyle for an entry bundle and the base layer",
 // A documentBase entry can list a file that belongs to a component. Its rules are base-layer CSS, so a
 // save must refresh the base layer, and the per-component recompute must not pull them back.
 describe("file watcher — a component file listed in documentBase", () => {
-  const WS = 47_313;
   let dir = "";
   let server: { port: number; close: () => Promise<void> };
   let ws: WebSocket;
@@ -130,11 +130,11 @@ describe("file watcher — a component file listed in documentBase", () => {
     for (const d of ["src/patterns/atoms", "src/styles/atoms", "assets"]) await mkdir(join(dir, d), { recursive: true });
     await write("src/patterns/atoms/btn.hbs", `<button class="btn">Hi</button>\n`);
     await write("src/styles/atoms/btn.scss", `.btn { color: red; }\n`);
-    server = await startDevServer(defineConfig({
+    ({ server, wsPort } = await startOnFreeWsPort(defineConfig({
       sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
       styles: { dir: "./src/styles" }, assets: { dir: "./assets" }, documentBase: ["atoms/btn"],
-    }), dir, { port: 0, wsPort: WS });
-    ws = new WebSocket(`ws://127.0.0.1:${WS}`);
+    }), dir));
+    ws = new WebSocket(`ws://127.0.0.1:${wsPort}`);
     ws.on("message", raw => { try { received.push(JSON.parse(String(raw)) as HmrMessage); } catch { /* not ours */ } });
     await new Promise<void>((res, rej) => { ws.once("open", () => res()); ws.once("error", rej); });
     await get("/api/component/atoms/btn");

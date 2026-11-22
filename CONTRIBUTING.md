@@ -89,7 +89,8 @@ request form. For a bug, a minimal project or component that shows the problem h
 ## Commits and branches
 
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
-  (`feat(cli): …`, `fix(dev-server): …`, `docs: …`), checked by commitlint in the `commit-msg` hook.
+  (`feat(cli): …`, `fix(dev-server): …`, `docs: …`), checked by commitlint in the `commit-msg` hook. The subject is at most 72 characters, and a
+  commit carries no tool attribution: no `Co-authored-by:` or `Claude-Session:` trailer, no "Generated with" line.
 - Branch from the current `main`.
 - Keep commits small, one concern each, with the checks passing at every commit.
 

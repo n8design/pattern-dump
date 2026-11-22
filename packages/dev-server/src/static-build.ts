@@ -475,9 +475,13 @@ async function buildOnce(
     if (opts.browser && !storefront) report.notes.push("--browser checks a site's pages in Chromium, and this project has no site: nothing was checked");
     const { capture, store } = createSnapshotWriter({ outDir: wbStage, basePath, origin, report });
 
-    /** Every /_pd/ stylesheet and script a document references. */
-    const referenced = (html: string): string[] =>
-      [...html.matchAll(/(?:href|src)="(\/_pd\/(?:components|themes|scripts)\/[^"]+)"/g)].map(m => m[1].replace(/&amp;/g, "&"));
+    /** Every /_pd/ stylesheet, script and image variant a document references: a variant in a src or as any
+     *  candidate of a srcset ({{pd-image}}), as the site's crawl reads them. */
+    const referenced = (html: string): string[] => [
+      ...[...html.matchAll(/(?:href|src)="(\/_pd\/(?:components|themes|scripts|images)\/[^"]+)"/g)].map(m => m[1]),
+      ...[...html.matchAll(/srcset="([^"]+)"/g)].flatMap(m => m[1].split(",").map(c => c.trim().split(/\s+/)[0] ?? ""))
+        .filter(u => u.startsWith(PD_ROUTE_PREFIX.images)),
+    ].map(u => u.replace(/&amp;/g, "&"));
 
     // ---- 1 to 6: the workbench, unless another build writes it (build.workbench: false) ----
     if (buildWorkbench) {
@@ -515,10 +519,11 @@ async function buildOnce(
           if (detailText) {
             // The detail response carries the complete preview document — byte-identical to what
             // /preview/:id serves for the default theme — so write it rather than render it twice.
-            const { document } = JSON.parse(detailText) as ComponentDetailResponse;
+            const { document, doc } = JSON.parse(detailText) as ComponentDetailResponse;
             // Under a base path the robots.txt rule for /preview/ is never read, so each preview says noindex itself.
             await store(previewUrl(id, variant), basePath === "/" ? document : withNoindex(document));
-            for (const ref of referenced(document)) await capture(ref);
+            // And what the docs tab's embedded examples reference: they render inline in the detail response.
+            for (const ref of new Set([...referenced(document), ...referenced(doc ?? "")])) await capture(ref);
           }
           await capture(renderedSourceUrl(id, variant), { optional: true });
           await capture(dataSourceUrl(id, variant), { optional: true });
