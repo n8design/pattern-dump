@@ -58,7 +58,7 @@ const SHAPE: Shape = {
   },
   packages: "packages",
   exclude: "strings",
-  build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks", workbench: "boolean" } },
+  build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks", workbench: "boolean", graph: "boolean" } },
   images: IMAGES,
   // The website. Written `storefront` before 0.8.0, with `globals` as `site` (legacyKeys reads the old names).
   site: {

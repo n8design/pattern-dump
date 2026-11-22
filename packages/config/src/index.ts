@@ -172,9 +172,11 @@ export interface PatternDumpConfig {
    * build leaves out (SKIPPABLE_CHECKS), for a quick local build: none by default, and the build report names each
    * one skipped. `--skip-checks` on the command line replaces it. `workbench: false` writes the site only:
    * for a site whose components come from a style guide package that publishes its own workbench, at
-   * `site.workbenchUrl` (default: true). `outDir` and `basePath` are then not used.
+   * `site.workbenchUrl` (default: true). `outDir` and `basePath` are then not used. `graph: false` leaves the
+   * project graph out of the workbench snapshot (`api/graph.json`, the same JSON as `pd graph --json`), for a project
+   * whose structure shouldn't be published; `pd graph` works either way (default: true).
    */
-  build?: { outDir?: string; basePath?: string; audit?: boolean; skipChecks?: SkippableCheck[]; workbench?: boolean };
+  build?: { outDir?: string; basePath?: string; audit?: boolean; skipChecks?: SkippableCheck[]; workbench?: boolean; graph?: boolean };
   /** How responsive image variants are encoded (WebP). Defaults: quality 75, effort 4. A site can override
    *  either in `site.images`. */
   images?: ImageSettings;

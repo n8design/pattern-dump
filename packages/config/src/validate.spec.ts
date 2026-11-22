@@ -36,6 +36,11 @@ describe("configProblems", () => {
     expect(build("a11y")).toEqual([said]);
   });
 
+  it("build.graph: a boolean", () => {
+    expect(configProblems({ ...valid, build: { graph: false } })).toEqual([]);
+    expect(configProblems({ ...valid, build: { graph: "no" } })).toEqual([`"build.graph" must be true or false`]);
+  });
+
   it("build.workbench: a boolean", () => {
     expect(configProblems({ ...valid, build: { workbench: false } })).toEqual([]);
     expect(configProblems({ ...valid, build: { workbench: "no" } })).toEqual([`"build.workbench" must be true or false`]);
