@@ -198,6 +198,11 @@ export function templateClasses(hbsSource: string): readonly string[] {
   return classes;
 }
 
+/** Whether a template has a `style` attribute or a `<style>` element. */
+export function hasInlineStyles(hbsSource: string): boolean {
+  return /style\s*=|<style[\s>]/i.test(hbsSource);
+}
+
 /** Parse a raw .hbs source and derive the class-borrowing relationships fields:
  *  styleUses (other components whose classes appear here), inlineStyles flag,
  *  utilityClasses flag, and unattributedClasses (owned by nothing recognised). */
@@ -236,7 +241,7 @@ export function deriveClassBorrowingFields(
   // No utility framework registered in test-bench → always false.
   const utilityClasses = false;
 
-  const inlineStyles = /style\s*=|<style[\s>]/i.test(hbsSource);
+  const inlineStyles = hasInlineStyles(hbsSource);
 
   return { styleUses, styleModules, inlineStyles, utilityClasses, unattributedClasses };
 }

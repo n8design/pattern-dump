@@ -67,6 +67,8 @@ export interface ClassNode {
   /** The component that owns it (the style index's claim), "base" for a shared module's, or null for a class no
    *  compiled stylesheet names. */
   owner: string | null;
+  /** For a class owned by "base": the shared module that authored it (`00-base/tokens`), when one did. */
+  module?: string;
 }
 
 export interface PageNode {
@@ -76,6 +78,8 @@ export interface PageNode {
   /** Its file, relative to the pages folder; absent for a page Pattern Dump generated. */
   file?: string;
   generated?: "tag" | "tags" | "category" | "categories";
+  /** A generated tag's or category's page: the term's key. */
+  term?: string;
 }
 
 export interface AssetNode {

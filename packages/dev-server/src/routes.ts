@@ -21,7 +21,7 @@ import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile } from "node:fs/promises";
-import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap, type ProjectGraphJson, type StorefrontPage } from "@pattern-dump/contracts";
+import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap, type DiscoveryResult, type ProjectGraphJson, type StorefrontPage } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
@@ -101,14 +101,15 @@ async function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteConte
 }
 
 /**
- * The project graph as it is now: built from the current discovery, include graph, style data and page model, and
- * kept until one of them, or the watch generation, moves (graph/current.ts). The generation is read first, so a save
- * that lands while the inputs are gathered leaves a key the next request no longer matches.
+ * The project graph as it is now: built from the discovery, include graph, style data and page model, and kept until
+ * one of them, or the watch generation, moves (graph/current.ts). The generation is read first, so a save that lands
+ * while the inputs are gathered leaves a key the next request no longer matches. A request that has taken its
+ * discovery passes it (server-state.ts, hazard 4: a request takes it once), so the graph is the one of that discovery.
  */
-export async function currentGraph(ctx: RouteContext): Promise<ProjectGraph> {
+export async function currentGraph(ctx: RouteContext, taken?: DiscoveryResult): Promise<ProjectGraph> {
   const { cfg, state } = ctx;
   const generation = state.watchGeneration;
-  const discovery = await currentDiscovery(state, cfg.patternRoots);
+  const discovery = taken ?? await currentDiscovery(state, cfg.patternRoots);
   const style = await state.style.get(() => buildAllStyleData(cfg.styleRoots, baseComponentIds(discovery)));
   const composition = await compositionFor(state, discovery, cfg.patternDirs);
   const pages = cfg.storefront ? await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap) : null;
@@ -560,10 +561,10 @@ async function routeRequest(
         // later save overtook (server-state.ts, hazard 5).
         await state.style.get(() => buildAllStyleData(styleRoots, baseComponentIds(discovery)));
         const compReg = await compositionFor(state, discovery, patternDirs);
+        // Its Relationships fields are the project graph's (graph/queries.ts).
+        const graph = await currentGraph(ctx, discovery);
         const detail = await buildComponentDetail(
-          componentId, patternDirs, render, tracker, defaultTheme, handleMap, compReg,
-          state.scssModuleGraph ?? undefined, state.classOwnerIndex ?? undefined,
-          discovery.discoveryMap, state.baseProvenance ?? undefined
+          componentId, patternDirs, render, tracker, defaultTheme, handleMap, graph, discovery.discoveryMap,
         );
 
         // Phase 2: render + static checks — the single per-component check unit (also driven by

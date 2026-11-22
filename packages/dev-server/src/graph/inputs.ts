@@ -70,6 +70,7 @@ async function graphPages(model: PageModel, discoveryMap: DiscoveryMap, handleMa
     if (generated) {
       out.push({
         route: p.route, generated: generated.role === "index" ? (generated.kind === "tag" ? "tags" : "categories") : generated.kind,
+        ...(generated.term ? { term: generated.term.key } : {}),
         ...(layoutId ? { layout: { id: layoutId, source: "generated" as const } } : {}), places: [],
       });
       continue;

@@ -21,6 +21,7 @@ export interface GraphPageInput {
   /** Relative to the pages folder; absent for a generated page. */
   file?: string;
   generated?: "tag" | "tags" | "category" | "categories";
+  term?: string;
   /** The layout component it renders with, and how it got it. */
   layout?: { id: string; source: "own" | "folder" | "default" | "generated"; via?: string };
   /** What it places, each with how (a `pd-` tag, a `pattern` fence, its listing's view or the view's card). */
@@ -77,7 +78,8 @@ export function buildGraph(inputs: GraphInputs): ProjectGraph {
     const id = `class:${name}`;
     if (!nodes.has(id)) {
       const owner = style.classOwnerIndex.get(name);
-      node({ id: id as `class:${string}`, kind: "class", owner: owner === undefined ? null : owner === "__base__" ? "base" : owner });
+      const module = owner === "__base__" ? style.baseProvenance.get(name) : undefined;
+      node({ id: id as `class:${string}`, kind: "class", owner: owner === undefined ? null : owner === "__base__" ? "base" : owner, ...(module ? { module } : {}) });
     }
     return id;
   };
@@ -177,7 +179,7 @@ export function buildGraph(inputs: GraphInputs): ProjectGraph {
   // Pages.
   for (const page of inputs.pages) {
     const id = `page:${page.route}` as const;
-    node({ id, kind: "page", route: page.route, ...(page.file !== undefined ? { file: page.file } : {}), ...(page.generated ? { generated: page.generated } : {}) });
+    node({ id, kind: "page", route: page.route, ...(page.file !== undefined ? { file: page.file } : {}), ...(page.generated ? { generated: page.generated } : {}), ...(page.term !== undefined ? { term: page.term } : {}) });
     if (page.layout && known(page.layout.id)) {
       edge({ kind: "renders", from: id, to: componentNodeId(page.layout.id), source: page.layout.source, ...(page.layout.via !== undefined ? { via: page.layout.via } : {}) });
     }

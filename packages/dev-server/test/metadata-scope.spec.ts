@@ -95,7 +95,7 @@ describe("metadata outside the frontmatter block is not read", () => {
   it("detail: title, description, status and deprecated-use", async () => {
     const dir = await patterns({ "atoms/chip/chip.hbs": "<span>c</span>", "atoms/chip/chip.md": BODY_ONLY });
     const { discoveryMap } = await buildDiscoveryMap(dir);
-    const detail = await buildComponentDetail("atoms/chip", dir, noRender, { css: "" }, undefined, new Map(), undefined, undefined, undefined, discoveryMap);
+    const detail = await buildComponentDetail("atoms/chip", dir, noRender, { css: "" }, undefined, new Map(), undefined, discoveryMap);
     expect(detail.title).toBe("chip");
     expect(detail.description).toBe("");
     expect(detail.status).toBe("draft");
@@ -140,7 +140,7 @@ describe("metadata in the frontmatter block is read as frontmatter", () => {
     expect(node.title).toBe("Chip, quoted");
     expect(node.status).toBe("stable");
     expect(node.visibility).toBe("private");
-    const detail = await buildComponentDetail("atoms/chip", dir, noRender, { css: "" }, undefined, new Map(), undefined, undefined, undefined, discoveryMap);
+    const detail = await buildComponentDetail("atoms/chip", dir, noRender, { css: "" }, undefined, new Map(), undefined, discoveryMap);
     expect(detail.description).toBe("Says: hi");
     expect(await resolveLayoutMode("atoms/chip", dir, discoveryMap)).toBe("full");
   });
