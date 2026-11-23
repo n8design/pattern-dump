@@ -8,7 +8,7 @@ import type { DiscoveryMap, DiscoveryResult, HandleMap } from "@pattern-dump/con
 import type { CompositionRegistry } from "../composition.js";
 import { createMarkdown } from "../code-blocks.js";
 import { designFiles } from "../storefront/design-files.js";
-import { frontmatterBody } from "../frontmatter.js";
+import { frontmatterBody, type FrontmatterReading } from "../frontmatter.js";
 import { readAssetStylesheets } from "../plain-stylesheets.js";
 import { usePlacedTags, type PlacedTag, type PlacedBlock } from "../placed-tags.js";
 import { normalizeScriptId, requiresList } from "../requires.js";
@@ -17,7 +17,8 @@ import { checkPageDeclaration } from "../storefront/derived.js";
 import { layoutIndex } from "../storefront/layout-index.js";
 import type { PageModel } from "../storefront/pages.js";
 import { readSchema } from "../storefront/declared-values.js";
-import { DEFAULT_VIEW_KEY, resolveView, type ResolvedView } from "../storefront/views.js";
+import { declaredQueries, type DeclaredQuery } from "../storefront/query.js";
+import { DEFAULT_VIEW_KEY, resolveView, viewOf, type ResolvedView } from "../storefront/views.js";
 import type { AllStyleData } from "../style-index.js";
 import type { GraphInputs, GraphPageInput } from "./build.js";
 import { verboseTiming } from "../timing.js";
@@ -97,10 +98,11 @@ function bodiesOf(model: PageModel): Promise<Map<string, string | null>> {
 async function graphPages(model: PageModel, discoveryMap: DiscoveryMap, handleMap: HandleMap): Promise<GraphPageInput[]> {
   const layouts = await layoutIndex(discoveryMap);
   const files = designFiles(discoveryMap);
-  // What a page's listing takes from its layout, read once per layout: whether it shows a listing, its default view,
-  // and its own card (x-pd-card on page.children: a layout that lists the folder's pages itself). And each view a
-  // layout and a page's `view:` resolve to, once per pair.
-  type LayoutFacts = { shows: boolean; fallback: string | undefined; layoutCard: string | undefined };
+  // What a page's lists take from its layout, read once per layout: whether it shows a listing, its default view, its
+  // own card (x-pd-card on page.children: a layout that lists the folder's pages itself), and its queries (query.ts:
+  // related pages, a home page's latest), each with its card and default view. And each view a layout and a page's
+  // `view:` resolve to, once per pair.
+  type LayoutFacts = { shows: boolean; fallback: string | undefined; layoutCard: string | undefined; queries: DeclaredQuery[] };
   const byLayout = new Map<string, Promise<LayoutFacts>>();
   const facts = (layoutId: string): Promise<LayoutFacts> => {
     let found = byLayout.get(layoutId);
@@ -113,6 +115,7 @@ async function graphPages(model: PageModel, discoveryMap: DiscoveryMap, handleMa
           shows: checkPageDeclaration(schema, layoutId).declared?.includes("listing") ?? false,
           fallback: typeof fallback === "string" ? fallback : undefined,
           layoutCard: cardOf(page?.children),
+          queries: declaredQueries(schema),
         };
       });
       byLayout.set(layoutId, found);
@@ -120,6 +123,25 @@ async function graphPages(model: PageModel, discoveryMap: DiscoveryMap, handleMa
     return found;
   };
   const views = new Map<string, ResolvedView | undefined>();
+  const viewNamed = async (name: string): Promise<ResolvedView | undefined> => {
+    const key = `\u0001${name}`;
+    if (!views.has(key)) views.set(key, (await viewOf(name, name, discoveryMap)).view);
+    return views.get(key);
+  };
+  /** What a layout's queries place on a page: the queries the page (its frontmatter, none for a generated page) doesn't
+   *  turn off, each with its card, and its view (the page's, else the layout's default) with the view's card. */
+  const queryPlaces = async (queries: DeclaredQuery[], fm?: FrontmatterReading): Promise<GraphPageInput["places"]> => {
+    const out: GraphPageInput["places"] = [];
+    for (const q of queries) {
+      if (fm?.values[q.name] === "false") continue;
+      if (q.card) out.push({ id: q.card, how: "card" });
+      const own = fm?.maps[q.name]?.["view"];
+      const name = typeof own === "string" ? own : typeof q.defaults["view"] === "string" ? q.defaults["view"] : undefined;
+      const view = name ? await viewNamed(name) : undefined;
+      if (view) out.push({ id: view.id, how: "view" }, { id: view.card.id, how: "card" });
+    }
+    return out;
+  };
   const bodies = await bodiesOf(model);
   const out: GraphPageInput[] = [];
   for (const p of model.pages) {
@@ -129,7 +151,9 @@ async function graphPages(model: PageModel, discoveryMap: DiscoveryMap, handleMa
       out.push({
         route: p.route, generated: generated.role === "index" ? (generated.kind === "tag" ? "tags" : "categories") : generated.kind,
         ...(generated.term ? { term: generated.term.key } : {}),
-        ...(layoutId ? { layout: { id: layoutId, source: "generated" as const } } : {}), places: [],
+        ...(layoutId ? { layout: { id: layoutId, source: "generated" as const } } : {}),
+        // A generated page lists its term's pages through its layout's queries, with their defaults.
+        places: layoutId ? await queryPlaces((await facts(layoutId)).queries) : [],
       });
       continue;
     }
@@ -141,9 +165,11 @@ async function graphPages(model: PageModel, discoveryMap: DiscoveryMap, handleMa
     const body = bodies.get(p.route);
     if (body) places = bodyPlacements(body, handleMap);
     // Its listing's view and the view's card: the one it names, else its layout's default, when the layout shows one.
-    // A collection query's cards (query.ts) are not read here yet.
+    // Then each of its layout's queries the page doesn't turn off: the query's card, and its view (the page's, else
+    // the layout's default) with the view's card. A query that matches no page still places them: the graph says what
+    // the page is built from, not what one build listed.
     if (layoutId) {
-      const { shows, fallback, layoutCard } = await facts(layoutId);
+      const { shows, fallback, layoutCard, queries } = await facts(layoutId);
       const named = f.frontmatter.values["view"];
       const viewName = typeof named === "string" ? named : undefined;
       const viewKey = `${layoutId}\u0000${viewName ?? ""}`;
@@ -154,6 +180,7 @@ async function graphPages(model: PageModel, discoveryMap: DiscoveryMap, handleMa
       }
       if (view) places = [...places, { id: view.id, how: "view" }, { id: view.card.id, how: "card" }];
       if (layoutCard) places = [...places, { id: layoutCard, how: "card" }];
+      places = [...places, ...await queryPlaces(queries, f.frontmatter)];
     }
     out.push({
       route: p.route, file: f.path,

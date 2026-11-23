@@ -122,4 +122,12 @@ describe("the project graph of a site (storefront-bench)", () => {
     has(siteBench, { kind: "places", from: "page:/", to: "component:components/callout", how: "pattern" });
     has(siteBench, { kind: "places", from: "page:/articles/", to: "component:components/card", how: "card" });
   });
+
+  it("has what a page's queries place: the query's view and the view's card, on a generated page too", () => {
+    // layouts/article declares page.related with view "compact"; views/compact's entries name components/compact-card.
+    has(siteBench, { kind: "places", from: "page:/articles/harbour/", to: "component:views/compact", how: "view" });
+    has(siteBench, { kind: "places", from: "page:/articles/harbour/", to: "component:components/compact-card", how: "card" });
+    // layouts/tag's page.pages query, with the layout's defaults: a generated page has no frontmatter.
+    has(siteBench, { kind: "places", from: "page:/tags/design/", to: "component:components/compact-card", how: "card" });
+  });
 });
