@@ -30,7 +30,7 @@ export async function fetchAuditRollup(): Promise<AuditRollup> {
   const res = await fetch(PD_ROUTES.audit);
   if (!res.ok) throw new Error(`audit fetch failed: ${res.status}`);
   const graph = (await res.json()) as AuditResponse;
-  return buildAuditRollup(graph, graph.subjectSha ? { subjectSha: graph.subjectSha } : {});
+  return buildAuditRollup(graph, { ...(graph.subjectSha ? { subjectSha: graph.subjectSha } : {}), ...(graph.style ? { style: graph.style } : {}) });
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(
@@ -143,6 +143,35 @@ export function renderAuditView(rollup: AuditRollup): HTMLElement {
       ul.appendChild(li);
     }
     section.appendChild(ul);
+  }
+
+  // Style couplings: information beside the findings, never counted, as pd audit lists them (from the project graph).
+  // Shown when the audit carries them; each row in the rules' row style, components as links.
+  if (rollup.style) {
+    section.appendChild(el("h3", "audit-h", "Style couplings (information, not defects)"));
+    const rows = el("ul", "audit-rules audit-style");
+    // One sentence per row, with real spaces between its parts (a flex gap would only look like one).
+    const row = (...parts: Array<Node | string>): void => {
+      const li = el("li", "audit-rule");
+      const sentence = el("span", "audit-finding-msg");
+      parts.forEach((p, i) => { if (i > 0 && !(typeof p === "string" && p.startsWith(","))) sentence.append(" "); sentence.append(p); });
+      li.appendChild(sentence);
+      rows.appendChild(li);
+    };
+    const classList = (names: string[]): HTMLElement => el("code", "audit-rule-id", names.map(n => `.${n}`).join(", "));
+    for (const b of rollup.style.borrowed) {
+      row(componentLink(b.component), "uses", classList(b.classes), "of", componentLink(b.owner), "without including it");
+    }
+    for (const c of rollup.style.couplings) {
+      const classes = el("span");
+      c.classes.forEach((x, i) => {
+        if (i > 0) classes.append(", ");
+        classes.append(el("code", "audit-rule-id", `.${x.name}`), " (", el("code", "audit-rule-id", x.selector), ")");
+      });
+      row(componentLink(c.from), "styles", classes, "of", componentLink(c.component), `, in ${c.stylesheet}`);
+    }
+    if (rows.childElementCount === 0) section.appendChild(el("p", "audit-empty", "None."));
+    else section.appendChild(rows);
   }
 
   // Scope — NOT optional. The number is only meaningful next to what it excludes. Collapsible, open
