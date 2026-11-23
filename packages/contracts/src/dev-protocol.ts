@@ -791,7 +791,7 @@ export type ThemeSwitch = "attribute" | "stylesheet";
 /** GET /api/config — the server-declared settings the shell reads once at startup. */
 export interface ShellClientConfig {
   /** The project's `shell` config block, or null when it has none. */
-  shell: { brand?: import("./index").ShellBrandConfig } | null;
+  shell: { brand?: import("./index").ShellBrandConfig; start?: string } | null;
   themeSwitch: ThemeSwitch;
   /** The configured default theme — what an un-themed preview actually shows. "" when none. */
   defaultTheme: string;

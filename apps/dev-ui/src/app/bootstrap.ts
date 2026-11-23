@@ -92,6 +92,7 @@ export async function init(): Promise<void> {
   session.serverDefaultTheme = shellConfig.defaultTheme;
   renderBrand(shellConfig.shell?.brand);
   session.brandTitle = brandTitle(shellConfig.shell?.brand?.title);
+  session.startItem = shellConfig.shell?.start ?? null;
 
   if (tiersRes) {
     const tiers = await tiersRes.json() as RuleTiers;

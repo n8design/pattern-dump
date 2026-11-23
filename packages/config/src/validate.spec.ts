@@ -36,6 +36,11 @@ describe("configProblems", () => {
     expect(build("a11y")).toEqual([said]);
   });
 
+  it("shell.start: a string (whether it names a component is checked at start)", () => {
+    expect(configProblems({ ...valid, shell: { start: "layouts/home" } })).toEqual([]);
+    expect(configProblems({ ...valid, shell: { start: 3 } })).toEqual([`"shell.start" must be a string`]);
+  });
+
   it("mcp.host: a host name of its own", () => {
     expect(configProblems({ ...valid, mcp: { host: "tools.localhost" } })).toEqual([]);
     expect(configProblems({ ...valid, mcp: { host: "http://tools.localhost:4000" } })).toEqual([`"mcp.host" must be a host name with no scheme, port or path, such as "live.localhost"`]);

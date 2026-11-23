@@ -19,7 +19,7 @@
 //   /source/:id/data             — Shiki-highlighted JSON data fragment
 //   *                            — SPA shell
 import { createSymbolService, type SymbolReport } from "./symbol-service.js";
-import type { PatternDumpConfig } from "@pattern-dump/config";
+import { ConfigError, suggest, type PatternDumpConfig } from "@pattern-dump/config";
 import { PD_HOSTS, type Diagnostic, type DiscoveryResult, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 // Re-exported so the export/CLI orchestration (core) can key its report on the SAME handle derivation
@@ -345,6 +345,13 @@ export async function startDevServer(
   // Initial index build: one compile pass per SCSS file produces all style data.
   {
     const dr = await buildDiscoveryMap(patternRoots);
+    // The workbench's start item names a component that exists, or pd dev (and pd build, which runs it) stops here.
+    const start = config.shell?.start;
+    if (start !== undefined && !dr.discoveryMap.has(start)) {
+      await hotreloader.close().catch(() => {});
+      const near = suggest(start, [...dr.discoveryMap.keys()]);
+      throw new ConfigError(`"shell.start": there is no component "${start}"${near ? `: did you mean "${near}"?` : ""}`);
+    }
     setDiscovery(state, dr);
     await surfaceCollisions(dr.collisions, cwd, hotreloader, dr.orphanVariants);
     for (const o of dr.overrides) {

@@ -65,6 +65,8 @@ export interface Session {
   needsRenderingRules: string[];
   /** The workbench's name for the browser tab: shell.brand.title, else "Pattern Dump" (core/title.ts). */
   brandTitle: string;
+  /** The component the root opens on (config shell.start), or null: the root then shows nothing selected. */
+  startItem: string | null;
 
   // ---- Selection ----
   current: ComponentDetail | null;
@@ -100,6 +102,7 @@ export const session: Session = {
   serverDefaultTheme: "",
   needsRenderingRules: [],
   brandTitle: "Pattern Dump",
+  startItem: null,
   current: null,
   currentVariant: null,
   stageMode: "single",

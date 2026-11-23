@@ -72,6 +72,9 @@ export interface ThemesConfig {
 export interface ShellConfig {
   /** Brand slot rendered at the top of the left rail. */
   brand?: ShellBrandConfig;
+  /** The component the workbench opens on at its root, by id (`layouts/home`, `atoms/button`), in pd dev and in the
+   *  static build. One that doesn't exist stops pd dev and pd build at start. Without it, the root opens on nothing. */
+  start?: string;
 }
 
 /**

@@ -54,7 +54,7 @@ const SHAPE: Shape = {
   documentBase: "strings",
   overviews: "boolean",
   shell: {
-    keys: { brand: { keys: { title: "string", logo: "logo", logoAlt: "string", href: "string" } } },
+    keys: { brand: { keys: { title: "string", logo: "logo", logoAlt: "string", href: "string" } }, start: "string" },
   },
   packages: "packages",
   exclude: "strings",
