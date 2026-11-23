@@ -157,3 +157,38 @@
   border: thin solid var(--pd-border-rest);
   border-radius: var(--pd-region-radius);
 }
+
+// ---- Style couplings (Styles classes of / Its classes are styled by) ----
+// A component link (as in the tree), the stylesheet that does it, then each class with its selector: code, muted,
+// one per line. Its own class, not .rel-item, so the plain-group mono rule above doesn't take the link row.
+.rel-coupling {
+  padding-block: 0.1rem;
+  line-height: 1.4;
+}
+
+.rel-coupling-sheet {
+  font-size: 0.8125rem; // 13px, beside the 14px link
+  color: var(--pd-ink-muted);
+}
+
+.rel-coupling-classes {
+  margin: 0.1rem 0 0;
+  padding-inline-start: 0.6rem; // the tree's gutter
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--pd-ink-muted);
+}
+
+// ---- Notes and the unattributed heading, inside the chip row ----
+// The row wraps chips; a note (a chip and its sentence) and the heading each take a line of their own.
+.rel-note,
+.rel-chips > .rel-group-heading {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--pd-ink-muted);
+}
+
+.rel-chips > .rel-group-heading {
+  font-weight: 500; // the Style sub-heads' tier
+}

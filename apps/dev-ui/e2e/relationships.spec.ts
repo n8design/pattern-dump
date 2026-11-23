@@ -125,7 +125,7 @@ test.describe("relationships facet", () => {
 
   // ---- Style umbrella ----
 
-  test("Style umbrella groups Style uses and Style modules", async ({ page }) => {
+  test("Style umbrella groups its stylesheet, borrowed classes, couplings and modules", async ({ page }) => {
     await page.goto("/atoms/button");
     await page.waitForSelector("#preview-frame[srcdoc]");
 
@@ -137,27 +137,29 @@ test.describe("relationships facet", () => {
     await expect(umbrella).toBeVisible();
     await expect(umbrella.locator(".rel-umbrella-heading")).toHaveText("Style");
 
-    // Sub-headings "Style uses" and "Style modules" are inside the umbrella.
+    // Its sub-headings are inside the umbrella.
     const subHeadings = umbrella.locator(".rel-group-heading");
-    await expect(subHeadings.filter({ hasText: /^Style uses$/ })).toBeVisible();
+    for (const h of [/^Stylesheet$/, /^Borrows classes from$/, /^Styles classes of$/, /^Its classes are styled by$/]) {
+      await expect(subHeadings.filter({ hasText: h })).toBeVisible();
+    }
     await expect(subHeadings.filter({ hasText: /^Style modules$/ })).toBeVisible();
 
-    // Top-level headings "Style uses" and "Style modules" do NOT exist outside the umbrella.
+    // None of them exists outside the umbrella.
     const outsideUmbrella = page.locator(".rel-panel > .rel-group-heading");
-    await expect(outsideUmbrella.filter({ hasText: /^Style uses$/ })).toHaveCount(0);
+    await expect(outsideUmbrella.filter({ hasText: /^Borrows classes from$/ })).toHaveCount(0);
     await expect(outsideUmbrella.filter({ hasText: /^Style modules$/ })).toHaveCount(0);
   });
 
-  test("toolbar: atoms/button listed under Style uses (class-borrowing)", async ({ page }) => {
+  test("toolbar: atoms/button listed under Borrows classes from (class-borrowing)", async ({ page }) => {
     await page.goto("/organisms/toolbar");
     await page.waitForSelector("#preview-frame[srcdoc]");
 
     await page.click("button[data-tab='relationships']");
     await page.waitForSelector(".rel-panel");
 
-    // "Style uses" sub-heading is inside the Style umbrella.
+    // "Borrows classes from" sub-heading is inside the Style umbrella.
     const umbrella = page.locator(".rel-style-umbrella");
-    await expect(umbrella.locator(".rel-group-heading").filter({ hasText: /^Style uses$/ })).toBeVisible();
+    await expect(umbrella.locator(".rel-group-heading").filter({ hasText: /^Borrows classes from$/ })).toBeVisible();
 
     // atoms/button listed as a navigable anchor — df-button classes borrowed in toolbar.hbs.
     const styleUsesLink = page.locator("a.rel-link[href='/atoms/button']");
@@ -230,7 +232,7 @@ test.describe("relationships facet", () => {
     await expect(sharedItem.locator("a")).toHaveCount(0);
   });
 
-  test("style-mix atom: Style uses (navigable) and Style modules (plain) are separated in the panel", async ({ page }) => {
+  test("style-mix atom: Borrows classes from (navigable) and Style modules (plain) are separated in the panel", async ({ page }) => {
     await page.goto("/atoms/style-mix");
     await page.waitForSelector("#preview-frame[srcdoc]");
 
@@ -238,7 +240,7 @@ test.describe("relationships facet", () => {
     await page.waitForSelector(".rel-panel");
 
     const umbrella = page.locator(".rel-style-umbrella");
-    // Style uses: atoms/button as a navigable link (component borrow).
+    // Borrows classes from: atoms/button as a navigable link (component borrow).
     await expect(umbrella.locator("a.rel-link[href='/atoms/button']")).toBeVisible();
     // Style modules: the shared partial as plain text (module borrow) — different relationship.
     const sharedItem = page.locator(".rel-list li").filter({ hasText: "00-base/shared-family" });
@@ -255,10 +257,16 @@ test.describe("relationships facet", () => {
 
     const umbrella = page.locator(".rel-style-umbrella");
     await expect(umbrella.locator(".rel-group-heading").filter({ hasText: /^Style modules$/ })).toBeVisible();
-    // No component borrow, no @use module, no base-authored class → no style-list items at all;
-    // both Style uses and Style modules fall through to their "none" empty-state.
+    // No stylesheet, no component borrow, no coupling, no @use module, no base-authored class → no style-list items
+    // at all; every sub-group falls through to its empty state, each saying what it means.
     await expect(umbrella.locator(".rel-list li")).toHaveCount(0);
-    await expect(umbrella.locator(".rel-empty")).toHaveCount(2);
+    await expect(umbrella.locator(".rel-empty")).toHaveText([
+      "None: no stylesheet is named after it",
+      "None: its template uses only its own classes and the base layer",
+      "None: its stylesheets style only its own classes",
+      "None: no other component's stylesheet styles its classes",
+      "none",
+    ]);
   });
 
   // ---- Leftover chips ----
@@ -275,7 +283,7 @@ test.describe("relationships facet", () => {
     await expect(chips).toBeVisible();
 
     // Inline-styles chip.
-    await expect(chips.locator(".rel-chip--inline-styles")).toHaveText("Inline styles");
+    await expect(chips.locator(".rel-chip--inline-styles .rel-chip")).toHaveText("Inline styles");
 
     // df-crad chip (typo class not owned by any stylesheet).
     await expect(chips.locator(".rel-chip--unattributed").filter({ hasText: "df-crad" })).toBeVisible();
@@ -313,5 +321,62 @@ test.describe("relationships facet", () => {
       v => v.impact === "serious" || v.impact === "critical"
     );
     expect(critical, critical.map(v => `${v.id}: ${v.description}`).join("\n")).toHaveLength(0);
+  });
+
+  // ---- Stylesheets and style couplings (the project graph) ----
+
+  test("coupled: its stylesheets, and Button's class it styles, with the selector", async ({ page }) => {
+    await page.goto("/molecules/coupled");
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await page.click("button[data-tab='relationships']");
+    await page.waitForSelector(".rel-panel");
+
+    const umbrella = page.locator(".rel-style-umbrella");
+    const sheets = umbrella.locator(".rel-group-heading").filter({ hasText: /^Stylesheet$/ }).locator("+ .rel-list > li");
+    await expect(sheets).toHaveText(["its template's <style>", "src/styles/02-molecules/coupled.scss"]);
+
+    const couplings = umbrella.locator(".rel-group-heading").filter({ hasText: /^Styles classes of$/ }).locator("+ .rel-couplings > .rel-coupling");
+    await expect(couplings).toHaveCount(2);
+    const fromScss = couplings.filter({ hasText: "coupled.scss" });
+    await expect(fromScss.locator("a.rel-link")).toHaveAttribute("href", "/atoms/button");
+    await expect(fromScss.locator("a.rel-link")).toHaveText("Button");
+    await expect(fromScss.locator(".rel-coupling-classes li")).toHaveText(".df-button in .tb-coupled > .df-button");
+    // Read off the rendered panel: the class list sits under its link, in the muted ink, not as a link.
+    await expect(fromScss.locator(".rel-coupling-classes")).toHaveCSS("list-style-type", "none");
+    // The one from its template's <style> is named as the Stylesheet group names it.
+    await expect(couplings.filter({ hasText: "<style>" }).locator(".rel-coupling-sheet")).toHaveText(" in its template's <style>");
+  });
+
+  test("button: the other component's stylesheet that styles its class", async ({ page }) => {
+    await page.goto("/atoms/button");
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await page.click("button[data-tab='relationships']");
+    await page.waitForSelector(".rel-panel");
+
+    const styledBy = page.locator(".rel-style-umbrella .rel-group-heading").filter({ hasText: /^Its classes are styled by$/ })
+      .locator("+ .rel-couplings > .rel-coupling");
+    const coupled = styledBy.filter({ hasText: "coupled.scss" });
+    await expect(coupled.locator("a.rel-link")).toHaveAttribute("href", "/molecules/coupled");
+    await expect(coupled.locator(".rel-coupling-classes li")).toHaveText(".df-button in .tb-coupled > .df-button");
+  });
+
+  test("an included variant is named by its base's title and its name", async ({ page }) => {
+    await page.goto("/atoms/widgets/spinner");
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await page.click("button[data-tab='relationships']");
+    await page.waitForSelector(".rel-panel");
+
+    await expect(page.locator("a.rel-link[href='/atoms/badge~info']")).toHaveText("Badge · info");
+  });
+
+  test("card: the unattributed chips have a heading, and inline styles a sentence", async ({ page }) => {
+    await page.goto("/organisms/card");
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await page.click("button[data-tab='relationships']");
+    await page.waitForSelector(".rel-panel");
+
+    const chips = page.locator(".rel-chips");
+    await expect(chips.locator(".rel-group-heading")).toHaveText("Classes no stylesheet defines");
+    await expect(chips.locator(".rel-note.rel-chip--inline-styles")).toHaveText("Inline styles Its template has a style attribute or a <style> element.");
   });
 });
