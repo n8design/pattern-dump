@@ -167,6 +167,23 @@ figure.preview {
   max-height: 100cqb;
 }
 
+// The inset (config shell.inset): a component sits inside a margin of the frame's own ground, not against its edge.
+// It is the frame's padding, the shell's furniture; nothing reaches the document. content-box, so the size the
+// document reports (and a device preset) stays its viewport, and the margin goes around it. A full layout and a
+// partial (part of a whole page) get none (layout-toggle.ts marks a partial). The frame's limits leave room for it.
+.single-preview:where(.stage-view:not([data-layout="full"], [data-partial]) *) iframe {
+  box-sizing: content-box;
+  padding: var(--pd-preview-inset, 1rem);
+}
+
+.single-preview:where(.stage-view:not([data-layout="full"], [data-partial]) *) iframe:is(.vp-fit, .vp-content) {
+  max-width: calc(100% - 2 * var(--pd-preview-inset, 1rem));
+}
+
+.single-preview:where(.stage-view:not([data-layout="full"], [data-partial]) *) iframe.vp-content {
+  max-height: calc(100cqb - 2 * var(--pd-preview-inset, 1rem));
+}
+
 // Focus outline: replaces the old always-on .vp-sized border.
 // .frame-focused is toggled by JS (syncFrameFocusListeners) — CSS :focus/:focus-within
 // don't cross the srcdoc boundary. Applies in all viewport modes, not just presets.

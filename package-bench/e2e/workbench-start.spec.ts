@@ -20,6 +20,8 @@ async function opensOnStart(page: Page, base: string): Promise<void> {
   await expect(frame.locator(".ds-card")).toBeVisible();
   const box = await page.locator("#preview-frame").boundingBox();
   expect(box?.height ?? 0).toBeGreaterThan(0);
+  // shell.inset: 0, so the card sits flush in its frame.
+  await expect(page.locator("#preview-frame")).toHaveCSS("padding-top", "0px");
 }
 
 test("pd dev: the root opens the start item", async ({ page }) => {

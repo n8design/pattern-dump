@@ -41,6 +41,13 @@ describe("configProblems", () => {
     expect(configProblems({ ...valid, shell: { start: 3 } })).toEqual([`"shell.start" must be a string`]);
   });
 
+  it("shell.inset: rem from 0 to 8", () => {
+    for (const ok of [0, 1, 0.5, 8]) expect(configProblems({ ...valid, shell: { inset: ok } }), String(ok)).toEqual([]);
+    for (const no of [-1, 9, "1rem", Number.NaN]) {
+      expect(configProblems({ ...valid, shell: { inset: no } }), String(no)).toEqual([`"shell.inset" must be a number of rem from 0 to 8, such as 1 (0 for none)`]);
+    }
+  });
+
   it("mcp.host: a host name of its own", () => {
     expect(configProblems({ ...valid, mcp: { host: "tools.localhost" } })).toEqual([]);
     expect(configProblems({ ...valid, mcp: { host: "http://tools.localhost:4000" } })).toEqual([`"mcp.host" must be a host name with no scheme, port or path, such as "live.localhost"`]);

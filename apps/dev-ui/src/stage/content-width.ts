@@ -48,13 +48,19 @@ function fitsContent(frame: HTMLIFrameElement): boolean {
   return frame.closest(".gallery-item") !== null;
 }
 
+/** The frame's content box: the document's viewport, inside the frame's padding (the inset, _stage.scss). */
+function viewportWidth(el: HTMLElement): number {
+  const cs = getComputedStyle(el);
+  return el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+}
+
 /** Start a measurement: full width, no transition, and wait for a pd-width taken at that width. */
 export function measureContentWidth(frame: HTMLIFrameElement): void {
   if (!fitsContent(frame)) { stopMeasuring(frame); return; }
   frame.classList.add("vp-measuring");
   frame.style.removeProperty("--vp-w");
   fitted.delete(frame);
-  measuring.set(frame, frame.clientWidth); // reading it lays the frame out at full width
+  measuring.set(frame, viewportWidth(frame)); // reading it lays the frame out at full width
 }
 
 /** Leave the frame's width to whoever sets it now (a preset, disco, full layout). */
@@ -160,7 +166,8 @@ export function acceptContentWidth(frame: HTMLIFrameElement, width: number, at: 
     // Settled. A fitted frame whose content overflows was measured too narrow for it.
     const state = fitted.get(frame);
     if (state === undefined || scroll <= at + 1) return false;
-    const parentWidth = frame.parentElement?.clientWidth ?? Infinity;
+    // The room the frame's viewport has: its parent's, less the frame's own padding.
+    const parentWidth = (frame.parentElement?.clientWidth ?? Infinity) - (frame.clientWidth - viewportWidth(frame));
     if (state === "measured" && scroll < parentWidth) {
       fitted.set(frame, "widened");
       setWidthNow(frame, scroll);

@@ -10,7 +10,7 @@ type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "plain-object" | "hbs-file"
+  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "inset" | "plain-object" | "hbs-file"
   | "quality" | "effort" | "categories" | "tags" | "term-pages" | "skip-checks";
 type Shape = Readonly<Record<string, Rule>>;
 
@@ -54,7 +54,7 @@ const SHAPE: Shape = {
   documentBase: "strings",
   overviews: "boolean",
   shell: {
-    keys: { brand: { keys: { title: "string", logo: "logo", logoAlt: "string", href: "string" } }, start: "string" },
+    keys: { brand: { keys: { title: "string", logo: "logo", logoAlt: "string", href: "string" } }, start: "string", inset: "inset" },
   },
   packages: "packages",
   exclude: "strings",
@@ -220,6 +220,10 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     if (typeof value !== "string" || !/^\/assets\/[^?#]+[^/?#]$/.test(value)) {
       fail(`a path to a file in the assets, such as "/assets/images/share.png"`);
     }
+    return;
+  }
+  if (rule === "inset") {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 8) fail("a number of rem from 0 to 8, such as 1 (0 for none)");
     return;
   }
   if (rule === "quality") {

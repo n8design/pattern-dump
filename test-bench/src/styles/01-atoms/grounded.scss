@@ -1,0 +1,9 @@
+// A page ground, for the Stage's frame to take (stage/frame-ground.ts): only this component's preview has it, so no
+// other preview changes. A theme sets a ground on body the same way.
+body:has(.tb-grounded) {
+  background-color: rgb(245 240 228);
+}
+
+.tb-grounded {
+  margin: 0;
+}

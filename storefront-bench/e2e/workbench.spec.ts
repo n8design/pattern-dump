@@ -111,6 +111,13 @@ test.describe("the Site folder in the Nav Rail", () => {
     await expect(site(page).locator(":scope > ul")).toBeVisible();
   });
 
+  test("a partial in it gets no inset: it is part of a whole page", async ({ page }) => {
+    await page.goto(`${WORKBENCH}/partials/header`);
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await expect(page.locator(".stage-view")).toHaveAttribute("data-partial", "");
+    await expect(page.locator("#preview-frame")).toHaveCSS("padding-top", "0px");
+  });
+
   test("is open when the item on screen is inside it", async ({ page }) => {
     await page.goto(`${WORKBENCH}/layouts/article`);
     await page.waitForSelector("#preview-frame[srcdoc]");

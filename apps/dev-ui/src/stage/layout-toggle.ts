@@ -68,6 +68,8 @@ export function applyLayout(): boolean {
   }
   const changed = dom.stageView.dataset.layout !== layout;
   dom.stageView.dataset.layout = layout;
+  // A partial is part of a whole page (the site's frame, its header): no inset around it, as for a full layout.
+  dom.stageView.toggleAttribute("data-partial", session.current?.id.startsWith("partials/") ?? false);
   const on = layout === "full";
   dom.layoutToggleBtn.hidden = false;
   dom.layoutToggleBtn.setAttribute("aria-pressed", String(on));
