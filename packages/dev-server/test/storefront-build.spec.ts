@@ -324,7 +324,7 @@ describe("pd build — the storefront root", () => {
     expect([...a.keys()].sort()).toEqual([...b.keys()].sort());
     const differing = [...a].filter(([k, v]) => !v.bytes.equals(b.get(k)!.bytes)).map(([k]) => k);
     // A layout's detail lists the pages that render with it (relationships.pages), which only a site has: that, the
-    // graph's pages (below), and nothing else, differ.
+    // graph's pages and the shell config's site flag (below), and nothing else, differ.
     const layouts = ["article", "doc", "home", "listing", "page"].map(l => `api/component/layouts/${l}/index.json`);
     // The generated pages' layouts list the tag and category pages and their indexes, each with what generated it.
     const generated: Record<string, unknown[]> = {
@@ -336,7 +336,12 @@ describe("pd build — the storefront root", () => {
     const generatedKeys = Object.keys(generated).map(l => `api/component/layouts/${l}/index.json`);
     // And the project graph, which has the site's pages too: without the page nodes and the edges from them, it is
     // the graph of the build without a site.
-    expect(differing.sort()).toEqual([...layouts, ...generatedKeys, "api/graph.json"].sort());
+    expect(differing.sort()).toEqual([...layouts, ...generatedKeys, "api/config.json", "api/graph.json"].sort());
+    // The shell's config says whether there is a site (the Nav Rail's Site folder), and nothing else differs in it.
+    const shellWith = JSON.parse(a.get("api/config.json")!.bytes.toString("utf8")) as { site: boolean };
+    const shellWithout = JSON.parse(b.get("api/config.json")!.bytes.toString("utf8")) as { site: boolean };
+    expect([shellWith.site, shellWithout.site]).toEqual([true, false]);
+    expect({ ...shellWith, site: false }).toEqual(shellWithout);
     type Graph = { nodes: Array<{ id: string; kind: string }>; edges: Array<{ from: string }> };
     const siteGraph = JSON.parse(a.get("api/graph.json")!.bytes.toString("utf8")) as Graph;
     expect(siteGraph.nodes.filter(n => n.kind === "page").length).toBeGreaterThan(0);

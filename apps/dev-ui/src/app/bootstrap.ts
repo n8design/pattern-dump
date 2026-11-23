@@ -93,6 +93,7 @@ export async function init(): Promise<void> {
   renderBrand(shellConfig.shell?.brand);
   session.brandTitle = brandTitle(shellConfig.shell?.brand?.title);
   session.startItem = shellConfig.shell?.start ?? null;
+  session.hasSite = shellConfig.site;
 
   if (tiersRes) {
     const tiers = await tiersRes.json() as RuleTiers;

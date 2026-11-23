@@ -31,6 +31,40 @@ export function buildSidebarHtml(nodes: TreeNode[], depth: number): string {
   return nodes.map(n => buildNodeHtml(n, depth)).join("");
 }
 
+/** The folders that are the site's machinery, not the project's own taxonomy: what a site's pages are built from. */
+export const SITE_FOLDERS: readonly string[] = ["layouts", "partials", "views"];
+
+/** The Site folder's key in the rail's remembered open folders: no component or folder has a path with a colon. */
+export const SITE_PATH = "pd:site";
+
+/** The site's line under its heading. */
+export const SITE_DESCRIPTION = "Layouts, partials and views: what the site's pages are built from.";
+
+/** The top-level nodes split into the project's own folders and the site's (SITE_FOLDERS), each in tree order. */
+export function splitSiteRoots(nodes: TreeNode[]): { own: TreeNode[]; site: TreeNode[] } {
+  return {
+    own: nodes.filter(n => !SITE_FOLDERS.includes(n.path)),
+    site: nodes.filter(n => SITE_FOLDERS.includes(n.path)),
+  };
+}
+
+/**
+ * The Nav Rail's tree: the project's own folders first, in whatever taxonomy, then, for a project with a site, its
+ * machinery under one more folder, "Site", with a line that says what it holds. The Site folder is built as any
+ * folder is (a <details> row and a list), so it opens, closes, opens on a selection inside it and filters as they do;
+ * it starts closed. Without a site, or with none of its folders, the tree is as it was.
+ */
+export function buildRailHtml(nodes: TreeNode[], hasSite: boolean): string {
+  const { own, site } = splitSiteRoots(nodes);
+  if (!hasSite || site.length === 0) return buildSidebarHtml(nodes, 0);
+  return `${buildSidebarHtml(own, 0)}<li class="tree-node tree-site" data-path="${SITE_PATH}">
+<div class="tree-folder-row" data-depth="0"><details class="tree-details" data-depth="0"><summary class="tree-folder"><span class="disclosure-caret" aria-hidden="true">${svgIcon("chevron")}</span><span class="tree-folder-label">Site</span></summary></details></div>
+<p class="tree-site-description">${SITE_DESCRIPTION}</p>
+<ul role="list">${buildSidebarHtml(site, 1)}</ul>
+</li>`;
+}
+
+
 // A node should be hidden with "Show private" off if:
 // - it is explicitly private, OR
 // - it is a GROUP whose every descendant is effectively private (empty parent hiding).

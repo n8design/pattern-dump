@@ -795,6 +795,8 @@ export interface ShellClientConfig {
   themeSwitch: ThemeSwitch;
   /** The configured default theme — what an un-themed preview actually shows. "" when none. */
   defaultTheme: string;
+  /** Whether the project has a site (a `site` block): the Nav Rail then groups the site's folders under "Site". */
+  site: boolean;
 }
 
 /** One storefront page: a markdown file in `storefront.pagesDir`, at the route its path defines. */

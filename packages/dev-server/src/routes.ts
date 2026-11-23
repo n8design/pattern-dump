@@ -704,7 +704,7 @@ async function routeRequest(
       // ?theme= the preview falls back to it (see the /preview/ branch below), so without this the
       // shell had no way to know what it was showing and displayed "— no theme —" over a themed
       // document. Read-only: the client never sends it back.
-      json(res, 200, { shell: config.shell ?? null, themeSwitch, defaultTheme: defaultTheme ?? "" } satisfies ShellClientConfig);
+      json(res, 200, { shell: config.shell ?? null, themeSwitch, defaultTheme: defaultTheme ?? "", site: cfg.storefront !== null } satisfies ShellClientConfig);
       return;
     }
 

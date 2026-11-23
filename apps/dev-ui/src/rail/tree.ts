@@ -13,7 +13,7 @@ import { session } from "../core/session.js";
 import { store } from "../core/store.js";
 import { routeHref } from "../core/runtime.js";
 import type { ComponentTree } from "@pattern-dump/contracts";
-import { buildSidebarHtml, hasPackageComponents } from "./tree-util.js";
+import { buildRailHtml, hasPackageComponents } from "./tree-util.js";
 
 
 /** Restore <details open> state for all stored paths that exist in the current tree. */
@@ -28,7 +28,7 @@ export function restoreNavOpenState(paths: ReadonlySet<string>): void {
 // ---- Tree: mount once, aria-current only ----
 
 export function mountSidebar(): void {
-  dom.sidebarTree.innerHTML = buildSidebarHtml(session.tree.roots, 0);
+  dom.sidebarTree.innerHTML = buildRailHtml(session.tree.roots, session.hasSite);
   // Wire persistence to user clicks on <summary>, not toggle events.
   // The toggle event on <details> is a queued task (not synchronous), so a suppression
   // flag around programmatic opens (det.open = true) would reset before the event fires.
