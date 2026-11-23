@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @pattern-dump/cli — the `pd` binary. Parsing is pure (./args.ts); this file only runs the result.
-import { checkSitePages, runDev, runAudit, runBuild, runExport, runGraph, runDescribe, runAffected } from "@pattern-dump/core";
+import { checkSitePages, runDev, runAudit, runBuild, runExport, runGraph, runDescribe, runAffected, runMcp } from "@pattern-dump/core";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -54,6 +54,7 @@ switch (command.kind) {
 
   case "dev":
     runDev(command.root, {
+      version: PD_VERSION,
       ...(command.port !== undefined ? { port: command.port } : {}),
       ...(command.wsPort !== undefined ? { wsPort: command.wsPort } : {}),
     }, command.configPath).catch((e: unknown) => {
@@ -114,6 +115,13 @@ switch (command.kind) {
       .catch((e) => { console.error("[pd] Error:", describeError(e)); process.exit(1); });
     break;
   }
+
+  case "mcp":
+    // Runs until the client closes stdin; then the server is closed and the process exits.
+    runMcp(command.root, command.configPath, PD_VERSION)
+      .then(() => process.exit(0))
+      .catch((e) => { console.error("[pd] Error:", describeError(e)); process.exit(1); });
+    break;
 
   case "help":
     console.log(USAGE);

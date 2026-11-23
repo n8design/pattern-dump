@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
 import { basename, join, dirname, resolve, relative, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
+import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { ConfigError, configWarnings, validateConfig, withOwnManifest, type PatternDumpConfig } from "@pattern-dump/config";
@@ -24,6 +25,36 @@ export async function runDev(
   const file = configFileOf(root, configPath);
   await startDevServer(config, root, { ...opts, configPath: file, reloadConfig: () => loadConfig(root, configPath) });
   // dev-server runs indefinitely; do not close unless signalled.
+}
+
+/**
+ * `pd mcp`: the MCP server over stdio, for a client that starts a process (Claude Code's .mcp.json, the Claude desktop
+ * app). One JSON-RPC message per line in, one answer per line out. It runs the project's own pd dev in this process
+ * (on free loopback ports, with its watcher), so its answers are pd dev's and follow every save. stdout carries the
+ * protocol only: whatever else would be printed goes to stderr. Ends when stdin closes.
+ */
+export async function runMcp(root: string, configPath: string | undefined, version: string): Promise<void> {
+  const out = process.stdout.write.bind(process.stdout);
+  process.stdout.write = process.stderr.write.bind(process.stderr) as typeof process.stdout.write;
+  console.log = console.error;
+  console.info = console.error;
+  const config = await loadConfig(root, configPath);
+  const file = configFileOf(root, configPath);
+  const server = await startDevServer(config, root, {
+    port: 0, wsPort: 0, version, configPath: file, reloadConfig: () => loadConfig(root, configPath),
+  });
+  const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  for await (const line of lines) {
+    if (!line.trim()) continue;
+    let message: unknown;
+    try { message = JSON.parse(line); } catch {
+      out(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "the line is not JSON" } })}\n`);
+      continue;
+    }
+    const answer = await server.mcp(message);
+    if (answer) out(`${JSON.stringify(answer)}\n`);
+  }
+  await server.close();
 }
 
 /**

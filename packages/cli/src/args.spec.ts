@@ -176,7 +176,13 @@ describe("pd graph, pd describe, pd affected", () => {
     expect(parseCommand(["affected"], cwd)).toEqual({ kind: "error", message: "pd affected takes one or more component ids or changed files" });
   });
 
+  it("pd mcp: --root and --config, nothing else", () => {
+    expect(parseCommand(["mcp"], cwd)).toEqual({ kind: "mcp", root: cwd });
+    expect(parseCommand(["mcp", "--root", "site"], cwd)).toEqual({ kind: "mcp", root: "/work/project/site" });
+    expect(parseCommand(["mcp", "site"], cwd)).toMatchObject({ kind: "error" });
+  });
+
   it("each is in the help", () => {
-    for (const cmd of ["graph", "describe <id>", "affected <id|file>..."]) expect(USAGE).toContain(`  ${cmd}`);
+    for (const cmd of ["graph", "describe <id>", "affected <id|file>...", "mcp"]) expect(USAGE).toContain(`  ${cmd}`);
   });
 });

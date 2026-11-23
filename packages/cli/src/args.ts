@@ -15,6 +15,7 @@ export type Command =
   | { kind: "audit"; root: string; configPath?: string; format: AuditFormat; strict?: boolean }
   | { kind: "export"; root: string; configPath?: string; out?: string }
   | { kind: "graph"; root: string; configPath?: string; json: boolean }
+  | { kind: "mcp"; root: string; configPath?: string }
   | { kind: "describe"; root: string; configPath?: string; id: string; json: boolean }
   | { kind: "affected"; root: string; configPath?: string; targets: string[]; json: boolean }
   | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean; browser?: boolean; checkWorkers?: number; skipChecks?: string[] }
@@ -27,7 +28,7 @@ export type Command =
   | { kind: "version" }
   | { kind: "error"; message: string };
 
-const COMMANDS = ["init", "dev", "audit", "build", "export", "graph", "describe", "affected"] as const;
+const COMMANDS = ["init", "dev", "audit", "build", "export", "graph", "describe", "affected", "mcp"] as const;
 
 /** `--root` and `--config` resolve against the invoking cwd, independently of each other: a config
  *  may live outside the root it opens (a read-only project you don't own). The config's own paths
@@ -86,6 +87,12 @@ export function parseCommand(argv: string[], cwd: string): Command {
         return { kind: "error", message: `--format must be one of md|text|json (got "${format}")` };
       }
       return { kind: "audit", ...base(values, cwd), format, ...(values.strict ? { strict: true } : {}) };
+    }
+
+    if (cmd === "mcp") {
+      const { values } = parseArgs({ args: rest, strict: true, allowPositionals: false, options: { ...rootAndConfig } });
+      if (values.help) return { kind: "help", topic: cmd };
+      return { kind: "mcp", ...base(values, cwd) };
     }
 
     if (cmd === "graph" || cmd === "describe" || cmd === "affected") {
@@ -302,6 +309,11 @@ export const USAGE = `Usage: pd <command> [options]
   affected <id|file>...  Everything a change reaches: the components and pages to check before handing
                  over. Takes component ids and changed files (paths from the current folder)
     --root <path>, --config <path>, --json   As for graph
+
+  mcp      The MCP server over stdio, for a client that starts a process (an .mcp.json, the Claude
+           desktop app). Answers about the project, current after every save
+    --root <path>      A specific project root (default: the current folder)
+    --config <path>    Use a config file outside the root
 
   help     Show this help
   --version, -v        Print the installed version`;
