@@ -32,7 +32,7 @@ function findTreeNode(path: string): TreeNode | null {
   return findNode(session.tree.roots);
 }
 
-function resolvePathKind(path: string): "component" | "group" | null {
+export function resolvePathKind(path: string): "component" | "group" | null {
   return findTreeNode(path)?.kind ?? null;
 }
 

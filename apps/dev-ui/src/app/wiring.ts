@@ -33,6 +33,7 @@ import { withLayoutParam } from "../stage/layout-toggle.js";
 import { listenForPreviewMessages } from "../stage/preview-messages.js";
 import { navigateVariants, swapVariant } from "./navigation.js";
 import { routeFromCurrentLocation } from "./router.js";
+import { followDocsLink, wireFrameLinks } from "./frame-links.js";
 import { renderShellHtml } from "./shell.js";
 import { initContentHeight } from "../stage/content-height.js";
 import { initContentWidth } from "../stage/content-width.js";
@@ -241,6 +242,13 @@ export function mount(): void {
     history.pushState({}, "", url);
     void routeFromCurrentLocation();
   });
+
+  // Any other plain link in the panel (a component's docs) to a workbench pattern: the workbench's own navigation.
+  // After the handlers above, which have already taken their own links.
+  dom.panelContent.addEventListener("click", (e) => { followDocsLink(e); });
+
+  // The Stage frame's links, and a frame that navigated away (app/frame-links.ts).
+  wireFrameLinks();
 
   // Panel toggle — right panel open/closed (persisted to store.local.dockVisibility).
   dom.panelToggleBtn.addEventListener("click", () => {
