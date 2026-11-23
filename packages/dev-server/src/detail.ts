@@ -158,7 +158,7 @@ export async function buildComponentDetail(
   // From the graph, in the fields' order; without one (a unit test of the rest), none.
   const fromGraph = graph
     ? relationshipsOf(graph, componentId)
-    : { uses: [], usedBy: [], styleUses: [], styleUsesModules: [], styleModules: [], unattributedClasses: [] };
+    : { uses: [], usedBy: [], styleUses: [], styleUsesModules: [], styleModules: [], unattributedClasses: [], stylesheets: [], stylesClassesOf: [], classesStyledBy: [] };
 
   const relationships: RelationshipsAvailable = {
     available: true,
@@ -171,6 +171,9 @@ export async function buildComponentDetail(
     // No utility framework is registered: always false.
     utilityClasses:     false,
     unattributedClasses: fromGraph.unattributedClasses,
+    stylesheets:        fromGraph.stylesheets,
+    stylesClassesOf:    fromGraph.stylesClassesOf,
+    classesStyledBy:    fromGraph.classesStyledBy,
   };
 
   return {

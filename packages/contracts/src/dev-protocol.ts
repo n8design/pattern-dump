@@ -480,11 +480,28 @@ export interface RelationshipsAvailable {
   inlineStyles: boolean;
   /** True if any used class is owned by a registered utility source (e.g. Tailwind). */
   utilityClasses: boolean;
-  /** CSS classes used in markup whose ownership is unrecognised (typos, dead, unregistered). */
+  /** CSS classes used in markup that no stylesheet defines (typos, dead, unregistered): not a compiled stylesheet,
+   *  an assets.css file nor a template's <style>. */
   unattributedClasses: string[];
+  /** Its own stylesheets: the one named after it, its template's `<style>`, and a sheet its template links (never
+   *  read). Empty when it has none. From the project graph. */
+  stylesheets: Array<{ file: string; source: import("./graph").StylesheetSource }>;
+  /** Other components whose classes its stylesheets style in context (`.card-body > .button`): renaming one of
+   *  those classes breaks a rule of its own. By component, each with the classes and the first selector. */
+  stylesClassesOf: StyleCoupling[];
+  /** The reverse: other components' stylesheets that style its classes in context. */
+  classesStyledBy: StyleCoupling[];
   /** A layout of a project with a website: every page that renders with it, by path, and how each got it.
    *  Absent for any other component, and in a project without a website. */
   pages?: LayoutPageUse[];
+}
+
+/** One component's stylesheet styling another's classes in context: the other component, the stylesheet that does it
+ *  (root-relative, a package's as `<name>/<path>`), and each class with the first selector that names it. */
+export interface StyleCoupling {
+  component: ComponentId;
+  stylesheet: string;
+  classes: Array<{ name: string; selector: string }>;
 }
 
 /** A storefront page that renders with a layout, and where its layout came from: a page file, or a page Pattern Dump
