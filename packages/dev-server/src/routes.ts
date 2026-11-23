@@ -62,6 +62,7 @@ import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
 import { readPages, todayOf } from "./storefront/pages.js";
+import { sitePagesRead } from "./storefront/site-pages.js";
 import { createPagesCache, type PagesCache } from "./storefront/pages-cache.js";
 import { assetFile } from "./asset-file.js";
 import { decodePath } from "./contained-file.js";
@@ -88,17 +89,11 @@ const pagesCaches = new WeakMap<RouteContext, PagesCache>();
 /** The website's pages as this server serves them: pd dev shows drafts and scheduled pages; pd build leaves them out,
  *  as if their files weren't there. */
 async function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>, discoveryMap?: DiscoveryMap): ReturnType<typeof readPages> {
-  const today = ctx.today ?? todayOf(ctx.now());
-  // The skin's layouts, by name (layout-index.ts): tag and category pages are generated through them (terms.ts).
-  const layouts = discoveryMap ? [...(await layoutIndex(discoveryMap)).names] : undefined;
+  const { key, read } = await sitePagesRead(sf, { live: ctx.live, today: ctx.today ?? todayOf(ctx.now()), ...(discoveryMap ? { discoveryMap } : {}) });
   // Not read again for every request (pages-cache.ts): once in pd build, and in pd dev until the folder changes.
   let cache = pagesCaches.get(ctx);
   if (!cache) { cache = createPagesCache(sf.pagesDir, ctx.pagesOnce === true); pagesCaches.set(ctx, cache); }
-  return cache.get(JSON.stringify([today, layouts ?? null]), () => readPages(sf.pagesDir, {
-    workbenchPath: sameHostWorkbenchPath(sf), drafts: ctx.live ? "show" : "leave-out", scheduled: ctx.live ? "show" : "leave-out",
-    today, categories: sf.categories, tags: sf.tags, tagPages: sf.tagPages, categoryPages: sf.categoryPages,
-    ...(layouts ? { layouts: new Set(layouts) } : {}),
-  }));
+  return cache.get(key, read);
 }
 
 /**
