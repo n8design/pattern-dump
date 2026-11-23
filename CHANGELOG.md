@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.9.0 (2026-11-23)
+
+### Added
+
+- **One graph of your components, stylesheets and pages.** `pd dev`, `pd build`, `pd audit` and the new commands build
+  it from what they already read. In `pd dev` it follows every save.
+- **An MCP server in `pd dev`, so an agent can ask about your project.** It answers at `http://mcp.localhost:<port>/`,
+  or at `/mcp` on `localhost`. It is read-only and speaks MCP 2025-11-25.
+- **Seven MCP tools answer from the graph.** Each gives the same JSON as the command line. They are listed below.
+- **`pd mcp` serves the same tools for a client that starts a process.** Claude Code's `.mcp.json` and the Claude
+  desktop app run it this way. It runs your project's `pd dev` inside, so it follows every save.
+- **`pd graph`, `pd describe` and `pd affected` print the graph's answers.** With `--json`, each prints what the MCP
+  tool of that name answers.
+- **`pd build` writes the graph into the workbench as `api/graph.json`.** `build.graph: false` leaves it out, for a
+  project whose structure shouldn't be published.
+- **The Relationships panel shows a component's stylesheets.** It also shows whose classes its stylesheets style, and
+  which other stylesheets style its classes.
+- **`pd audit` and the Audit tab list where components share classes.** These style couplings are information beside
+  the findings. They are never counted as defects.
+- **The workbench opens on a start item.** `shell.start` names the component its root opens, in `pd dev` and in the
+  static build.
+- **A component sits inside an inset in the Stage.** `shell.inset` sets the space in rem: 1 by default, 0 for none.
+  The frame takes the page's background, so the inset shows the theme's ground.
+- **Templates get `site.workbenchUrl`.** A site links into its workbench without repeating the address.
+- **In a project with a site, the site's folders sit under Site in the Nav Rail.** Layouts, partials and views come
+  after your own folders, in a folder that starts closed.
+- **`mcp.host` sets the MCP server's host name.** The default is `mcp.localhost`.
+- **A link to a pattern inside the workbench selects it.** In a preview or in a component's docs, it no longer loads a
+  second workbench inside the Stage. A link out of the workbench opens in the top window.
+
+### The MCP tools
+
+- `components`: every component, its role, where it comes from, its variants, and whether it is private.
+- `contract`: what a component accepts: its schema, its variants and its documentation.
+- `usage`: the components that include a component, and the pages that show it.
+- `blast_radius`: what breaks if a component changes, each with the path that connects it.
+- `ownership`: which stylesheets style a component, and whose classes it shares.
+- `affected`: everything a set of changed components or files reaches, as one list to check.
+- `checks`: the latest audit results. It never runs an audit itself.
+
+### Changed
+
+- **The full-height button sits in the viewport row.** The rail's minimum width is now 19.75rem, to hold its eight
+  icons.
+- **The Relationships panel's "Style uses" is now "Borrows classes from".** Every empty group says what its
+  emptiness means.
+- **A class that `assets.css` or a template's `<style>` defines is no longer listed as undefined.** Pattern Dump now
+  reads both for their classes.
+- **A site global named `workbenchUrl` is a config problem.** Templates get `site.workbenchUrl` from Pattern Dump, so
+  remove the global and use that.
+
+### Fixed
+
+- **A plain `.css` file in the styles folder belongs to its component.** Loaded with `@use`, its rules painted in no
+  preview, and one that nothing loaded was never compiled. Saves to either now update the preview.
+
 ## 0.8.2 (2026-11-22)
 
 ### Fixed
