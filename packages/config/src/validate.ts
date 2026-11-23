@@ -330,6 +330,10 @@ function checkRelations(raw: Record<string, unknown>, problems: string[]): void 
     else if (mcpHost === siteHost) problems.push(`"mcp.host": "${mcpHost}" is the site's host as well: give the MCP server a name of its own, such as "mcp.localhost"`);
   }
   if (!isObject(sf)) return;
+  // site.workbenchUrl reaches templates as site.workbenchUrl: a global of that name would be silently replaced.
+  if (isObject(sf.globals) && Object.hasOwn(sf.globals, "workbenchUrl")) {
+    problems.push(`"site.globals.workbenchUrl": templates get site.workbenchUrl from Pattern Dump (site.workbenchUrl, or pd dev's own workbench): remove this global and use site.workbenchUrl`);
+  }
   // Tag pages and category pages each under a path of their own (when both are on).
   const pathOf = (v: unknown, fallback: string): string | undefined =>
     v === false ? undefined : isObject(v) && typeof v.path === "string" ? v.path : fallback;

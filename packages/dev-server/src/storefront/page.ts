@@ -79,6 +79,9 @@ export interface PageAssembly {
   site: Record<string, unknown> | undefined;
   /** Where links into the workbench start, ending with "/". */
   workbenchUrl: string;
+  /** What templates get as `site.workbenchUrl`: pd dev's own workbench, or the configured site.workbenchUrl in pd
+   *  build (which a site needs). Absent for a headless check of the pages (checkSitePages). */
+  siteWorkbenchUrl?: string;
   /** Set in `pd dev`: the live-reload socket's port, the generation the page's request took, and the site's base
    *  path ("/" or "/docs/"), which the live client puts in front of a changed page's route. */
   live?: { wsPort: number; generation: string; basePath: string };
@@ -733,6 +736,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     ...(site.listed.length ? { navigations: resolveNavigations(site.navigations, site.listed, model, route) } : {}),
     ...(collections ? { collections: collections.collections } : {}),
     ...(site.categories ? { categories: model.categories.list } : {}),
+    ...(a.siteWorkbenchUrl !== undefined ? { workbenchUrl: a.siteWorkbenchUrl } : {}),
   };
   /** The layout's regions as it gets them: each one's HTML, null when empty. */
   const regionsOf = (filled: ReadonlyMap<string, string[]>): Record<string, string | null> =>

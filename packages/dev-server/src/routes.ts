@@ -846,10 +846,14 @@ async function routeRequest(
       // In pd dev a page links to the workbench of this same process, whatever the config's build-time
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
+      const ownWorkbench = `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`;
+      // site.workbenchUrl for templates: the configured one in pd build, this process's workbench in pd dev.
+      const siteWorkbenchUrl = ctx.storefrontWorkbenchUrl ?? (ctx.live ? ownWorkbench : undefined);
       const page = await assemblePage(target, model, {
         discoveryMap, handleMap: discovery.handleMap, shown: createDisplayPath(cwd, cfg.packages),
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
-        workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
+        workbenchUrl: ctx.storefrontWorkbenchUrl ?? ownWorkbench,
+        ...(siteWorkbenchUrl !== undefined ? { siteWorkbenchUrl } : {}),
         head: (layoutId, html, placed) => pageStylesheets(cfg, state, discovery, layoutId, html, placed),
         symbolSets: roots => pageSymbolSets(cfg, discovery, roots),
         borrowed: roots => pageBorrowedStyles(state, discovery, patternDirs, roots),
