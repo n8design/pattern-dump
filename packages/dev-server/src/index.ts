@@ -64,6 +64,10 @@ import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 import { surfaceAssetRoots, surfaceCollisions, surfaceDefaultTheme, surfaceDocumentBase, surfaceFlattening } from "./surfacing.js";
 // Headless `pd audit`. Re-exported: packages/core imports it.
 export { runDiagnosticsAudit } from "./audit.js";
+// The project graph and its answers, for pd graph, pd describe and pd affected (packages/core).
+export { readProjectGraph, type ProjectGraphRead } from "./graph/project.js";
+export { graphJson, type ProjectGraph } from "./graph/build.js";
+export { affectedOf, blastRadiusOf, contractOf, describeOf, ownershipOf, usageOf, UnknownIdError } from "./graph/answers.js";
 export { buildStaticSite } from "./static-build.js";
 export { withBasePath } from "./snapshot-writer.js";
 export { loadProjectPagefind, PAGEFIND_INSTALL } from "./storefront/search.js";

@@ -143,3 +143,81 @@ export interface ProjectGraphJson {
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
+
+// ---- Answers ----
+// What `pd describe`, `pd affected` and the MCP tools of the same names answer (graph/answers.ts). Each carries the
+// graph's version and the id it answers for. Ids are discovery ids (`atoms/button`, `atoms/button~icon`), pages by
+// route, files root-relative as the graph names them.
+
+/** One step of a path through the graph, from the id asked about outwards. */
+export interface GraphStep { from: string; kind: GraphEdgeKind; to: string }
+
+/** `contract`: what a component accepts. */
+export interface ContractAnswer {
+  version: typeof GRAPH_VERSION;
+  id: string;
+  role: ComponentRole | "variant";
+  origin: GraphOrigin;
+  file: string | null;
+  /** Its JSON Schema, as written, or null without one (or one that doesn't parse: `schemaError`). */
+  schema: unknown;
+  schemaError?: string;
+  variants: Array<{ id: string; form: "markup" | "data" }>;
+  /** Its docs, the `.md` text without its frontmatter, or null. */
+  docs: string | null;
+}
+
+/** `usage`: where a component appears. Components that include it directly; every page that places it or renders
+ *  with it, directly or `through` a component that includes it (at any depth). */
+export interface UsageAnswer {
+  version: typeof GRAPH_VERSION;
+  id: string;
+  components: string[];
+  pages: Array<{ route: string; how: PlacesEdge["how"] | "renders"; through?: string }>;
+}
+
+/** `ownership`: which stylesheets style a component, and whose classes it shares. */
+export interface OwnershipAnswer {
+  version: typeof GRAPH_VERSION;
+  id: string;
+  stylesheets: Array<{ file: string; source: StylesheetSource }>;
+  /** The classes its own stylesheets define, and the ones the style index gives it. */
+  defines: string[];
+  importsModules: string[];
+  /** Other components whose classes its stylesheets style in context, and the reverse. */
+  stylesClassesOf: Array<{ component: string; stylesheet: string; classes: Array<{ name: string; selector: string }> }>;
+  classesStyledBy: Array<{ component: string; stylesheet: string; classes: Array<{ name: string; selector: string }> }>;
+  /** Classes its template writes that another component owns, by owner (included or not). */
+  borrows: Array<{ owner: string; classes: string[] }>;
+  /** Classes its template writes that no stylesheet defines. */
+  unowned: string[];
+}
+
+/** `blast_radius`: what breaks if a component changes, each with the path from it. */
+export interface BlastRadiusAnswer {
+  version: typeof GRAPH_VERSION;
+  id: string;
+  components: Array<{ id: string; path: GraphStep[] }>;
+  stylesheets: Array<{ file: string; path: GraphStep[] }>;
+  pages: Array<{ route: string; path: GraphStep[] }>;
+}
+
+/** `affected`: everything a change reaches, flat: the list to check before handing over. */
+export interface AffectedAnswer {
+  version: typeof GRAPH_VERSION;
+  /** What was asked about, as the graph names it; `unknown` for what it doesn't know. */
+  changed: string[];
+  unknown: string[];
+  components: string[];
+  pages: string[];
+}
+
+/** `pd describe <id> --json`: the four answers for one component, each the tool's answer of that name. */
+export interface DescribeAnswer {
+  version: typeof GRAPH_VERSION;
+  id: string;
+  contract: ContractAnswer;
+  usage: UsageAnswer;
+  ownership: OwnershipAnswer;
+  blastRadius: BlastRadiusAnswer;
+}
