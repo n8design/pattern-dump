@@ -166,8 +166,8 @@ export async function runAudit(
   root: string, configPath?: string, format: AuditFormat = "md", opts: { strict?: boolean } = {},
 ): Promise<{ failed: boolean }> {
   const config = await loadConfig(root, configPath);
-  const { graph, reaudited, reused, artifactPath, imageWarning } = await runDiagnosticsAudit(config, root);
-  const report = formatAudit(graph, format);
+  const { graph, style, reaudited, reused, artifactPath, imageWarning } = await runDiagnosticsAudit(config, root);
+  const report = formatAudit(graph, format, { style });
   const ext = format === "json" ? "json" : format === "text" ? "txt" : "md";
   const reportPath = join(dirname(artifactPath), `diagnostics-report.${ext}`);
   await writeFile(reportPath, report, "utf-8");

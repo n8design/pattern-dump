@@ -2,7 +2,7 @@
 // command line and the MCP tools that call one give the same answer.
 
 import type {
-  ClassNode, GraphEdge, GraphEdgeKind, LayoutPageUse, PageNode, RelationshipsAvailable, StyleCoupling, StylesheetNode,
+  AuditStyle, ClassNode, GraphEdge, GraphEdgeKind, LayoutPageUse, PageNode, RelationshipsAvailable, StyleCoupling, StylesheetNode,
 } from "@pattern-dump/contracts";
 import { componentNodeId, discoveryIdOf, type ProjectGraph } from "./build.js";
 
@@ -98,4 +98,50 @@ export function layoutPagesOf(graph: ProjectGraph, id: string): LayoutPageUse[] 
     }) satisfies LayoutPageUse)
     .sort((a, b) => cmp(a.route, b.route));
   return [...files, ...generated];
+}
+
+/** Component (or variant) `id` and everything it includes, however deep; a variant brings its base too, as a render
+ *  of it does (diagnostics.ts, includeClosure). */
+export function includeClosureOf(graph: ProjectGraph, id: string): Set<string> {
+  const seen = new Set<string>();
+  const queue = [id];
+  while (queue.length) {
+    const next = queue.shift()!;
+    if (seen.has(next)) continue;
+    seen.add(next);
+    if (next.includes("~")) queue.push(next.slice(0, next.indexOf("~")));
+    for (const e of edgesOf(graph, componentNodeId(next), "includes", "out")) queue.push(discoveryIdOf(e.to));
+  }
+  return seen;
+}
+
+/**
+ * The owners whose stylesheets component (or variant) `id`'s template links only by borrowing: it writes a class they
+ * own, and it doesn't include them (css-closure.ts, borrowedStyles, the same rule over the graph). `componentId`: the
+ * component it is shown on (a variant's base). Sorted by owner, each owner's classes sorted.
+ */
+export function borrowedOf(graph: ProjectGraph, id: string, componentId = id.split("~")[0]!): Array<{ owner: string; classes: string[] }> {
+  const included = includeClosureOf(graph, id);
+  const byOwner = new Map<string, Set<string>>();
+  for (const e of edgesOf(graph, componentNodeId(id), "borrows", "out")) {
+    const cls = graph.nodes.get(e.to) as ClassNode;
+    const owner = cls.owner;
+    if (owner === null || owner === "base" || owner === componentId || included.has(owner)) continue;
+    let set = byOwner.get(owner);
+    if (!set) byOwner.set(owner, set = new Set());
+    set.add(discoveryIdOf(cls.id));
+  }
+  return [...byOwner].sort(([a], [b]) => a.localeCompare(b)).map(([owner, classes]) => ({ owner, classes: [...classes].sort() }));
+}
+
+/** The style couplings of components `ids` (AuditStyle), for the audit: what each borrows, and whose classes its
+ *  stylesheets style. Sorted by component. */
+export function auditStyleOf(graph: ProjectGraph, ids: Iterable<string>): AuditStyle {
+  const style: AuditStyle = { borrowed: [], couplings: [] };
+  for (const id of [...ids].sort(cmp)) {
+    if (!graph.nodes.has(componentNodeId(id))) continue;
+    for (const b of borrowedOf(graph, id)) style.borrowed.push({ component: id, ...b });
+    for (const c of couplings(graph, id, "out")) style.couplings.push({ from: id, ...c });
+  }
+  return style;
 }

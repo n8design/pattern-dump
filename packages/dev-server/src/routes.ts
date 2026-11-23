@@ -34,7 +34,7 @@ import { compositionFor, currentDiscovery, type ServerState } from "./server-sta
 import { createDisplayPath } from "./display-path.js";
 import { buildGraph, graphJson, type ProjectGraph } from "./graph/build.js";
 import { gatherGraphInputs } from "./graph/inputs.js";
-import { layoutPagesOf } from "./graph/queries.js";
+import { auditStyleOf, layoutPagesOf } from "./graph/queries.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 import { buildShellHtml, json, mimeType, serveFile, servesShell, workbenchTitle } from "./http-utils.js";
@@ -537,7 +537,10 @@ async function routeRequest(
         await persistSlices(cwd, slices);
         // _liveReaudits: total surgical HMR re-audits since startup — the incremental-proof instrument
         // (rises by exactly 1 per .hbs edit, 0 per .scss edit). Debug envelope field, not the graph.
-        json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount } satisfies AuditResponse);
+        // The style couplings beside the findings, from the graph as it is now (never cached with the findings: a
+        // stylesheet save re-audits nothing, so they can't live in the slices).
+        const style = auditStyleOf(await currentGraph(ctx, discovery), auditedComponentIds(discovery));
+        json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount, style } satisfies AuditResponse);
       } catch (e) {
         json(res, 500, { error: e instanceof Error ? e.message : String(e) } satisfies ApiError);
       }
@@ -584,8 +587,8 @@ async function routeRequest(
         const checked = await checkComponent(componentId, variant, render, quarantineEntry);
         const { previewHtml } = checked;
         // The stylesheets it links by borrowing a class (info, the detail only: diagnostics.ts).
-        const diagnostics = quarantineEntry || !state.classOwnerIndex ? checked.diagnostics : [...checked.diagnostics,
-          ...await styleBorrowedDiagnostics(componentId, variant, discovery.discoveryMap, compReg, state.classOwnerIndex)];
+        const diagnostics = quarantineEntry ? checked.diagnostics : [...checked.diagnostics,
+          ...styleBorrowedDiagnostics(componentId, variant, graph)];
         // Its layout problems (layout-index.ts): a misplaced x-pd-layout, or a layout name it shares with another.
         if (!quarantineEntry) {
           for (const message of layouts.problemsOf(componentId, createDisplayPath(cwd, cfg.packages))) {

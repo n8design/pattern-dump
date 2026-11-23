@@ -280,6 +280,15 @@ export interface AuditComponentRollup {
  *  `buildAuditRollup`; `md`/`text`/`json` (and the workbench facet) are renderers over this object,
  *  never independent string builders. A CI consumer reading the `json` gets `scope` (what the audit covers)
  *  and `headline` alongside the count, never a bare number. */
+/** The style couplings of the audited components, from the project graph: information beside the findings, never a
+ *  defect, never in a count. `borrowed`: a template writes a class another component's stylesheet owns, without
+ *  including that component (so its stylesheet is linked too: STYLE_BORROWED). `couplings`: a component's stylesheet
+ *  styles another component's class in context (a rename of that class breaks it). Sorted by component. */
+export interface AuditStyle {
+  borrowed: Array<{ component: ComponentId; owner: ComponentId; classes: string[] }>;
+  couplings: Array<{ from: ComponentId } & StyleCoupling>;
+}
+
 export interface AuditRollup {
   subjectSha?: string;
   /** The headline sentence, plain (no markdown emphasis); renderers wrap/position it. */
@@ -290,12 +299,14 @@ export interface AuditRollup {
   perComponent: AuditComponentRollup[];
   /** What the audit covers and leaves out (AUDIT_SCOPE). Carried in every format. */
   scope: AuditScope;
+  /** The style couplings, when the caller had the project graph (pd audit, the workbench's /api/audit). */
+  style?: AuditStyle;
 }
 
 /** Build the structured rollup from the graph — the numbers exist as data here, not only as strings.
  *  PURE: same graph → same rollup, no I/O or clock. The one builder both the CLI report renderers and
  *  the workbench audit facet call. */
-export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: string } = {}): AuditRollup {
+export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: string; style?: AuditStyle } = {}): AuditRollup {
   const total = graph.components.length;
   const affected = new Set(graph.occurrences.map(o => o.component));
   const cleanPct = total > 0 ? Math.round((100 * (total - affected.size)) / total) : 100;
@@ -335,6 +346,7 @@ export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: s
     rulesByBlast,
     perComponent,
     scope: AUDIT_SCOPE,
+    ...(opts.style ? { style: opts.style } : {}),
   };
 }
 
@@ -830,6 +842,8 @@ export interface AuditResponse extends DiagnosticsGraph {
   /** Surgical HMR re-audits since startup — a debug instrument (rises by exactly 1 per .hbs edit,
    *  0 per .scss edit). Not part of the graph; the leading underscore marks it as diagnostic. */
   _liveReaudits: number;
+  /** The style couplings of the audited components (AuditStyle), from the project graph as it is now. */
+  style?: AuditStyle;
 }
 
 /** GET /_pd/rule-tiers.json — the generated axe rule classification (packages/a11y classifier). */

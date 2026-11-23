@@ -7,7 +7,7 @@
 // contract (packages/core imports both), so index.ts re-exports them.
 
 import { buildAuditRollup } from "@pattern-dump/contracts";
-import type { AuditRollup, AuditScope, DiagnosticsGraph } from "@pattern-dump/contracts";
+import type { AuditRollup, AuditScope, AuditStyle, DiagnosticsGraph } from "@pattern-dump/contracts";
 
 /** The `pd audit` output formats. The renderers below serialize the shared `AuditRollup`
  *  (now defined in `@pattern-dump/contracts`, so the workbench facet renders from the same builder). */
@@ -39,6 +39,20 @@ function scopeText(scope: AuditScope): string[] {
   ];
 }
 
+/** The style couplings, one line each, in the order the rollup has them: what each component borrows, then whose
+ *  classes its stylesheets style. Information, not defects: they are never counted. */
+function styleLines(style: AuditStyle, bullet: string, code: (s: string) => string): string[] {
+  const lines: string[] = [];
+  for (const b of style.borrowed) {
+    lines.push(`${bullet}${b.component} uses ${b.classes.map(c => code(`.${c}`)).join(", ")} of ${b.owner} without including it`);
+  }
+  for (const c of style.couplings) {
+    const classes = c.classes.map(x => `${code(`.${x.name}`)} (${code(x.selector)})`).join(", ");
+    lines.push(`${bullet}${c.from} styles ${classes} of ${c.component}, in ${c.stylesheet}`);
+  }
+  return lines;
+}
+
 /** Markdown renderer. The part above the scope is guarded by a same-graph→same-md regression test. */
 function renderAuditMarkdown(r: AuditRollup): string {
   const lines: string[] = [];
@@ -64,6 +78,13 @@ function renderAuditMarkdown(r: AuditRollup): string {
     for (const o of c.occurrences) {
       lines.push(`- \`${o.engine}:${o.ruleId}\` **[${o.tag}]** ${o.message}${o.domPath ? ` · \`${o.domPath}\`` : ""}`);
     }
+    lines.push("");
+  }
+  if (r.style) {
+    lines.push("## Style couplings (information, not defects)");
+    lines.push("");
+    const style = styleLines(r.style, "- ", s => `\`${s}\``);
+    lines.push(...(style.length ? style : ["- (none)"]));
     lines.push("");
   }
   lines.push(...scopeMarkdown(r.scope));
@@ -96,6 +117,12 @@ function renderAuditText(r: AuditRollup): string {
     }
   }
   lines.push("");
+  if (r.style) {
+    lines.push("Style couplings (information, not defects):");
+    const style = styleLines(r.style, "  ", s => s);
+    lines.push(...(style.length ? style : ["  (none)"]));
+    lines.push("");
+  }
   lines.push(...scopeText(r.scope));
   lines.push("");
   return lines.join("\n");
@@ -108,7 +135,7 @@ function renderAuditJson(r: AuditRollup): string {
 }
 
 /** Serialize the audit report in the requested format. `md`/`text`/`json` all render one rollup. */
-export function formatAudit(graph: DiagnosticsGraph, format: AuditFormat = "md", opts: { subjectSha?: string } = {}): string {
+export function formatAudit(graph: DiagnosticsGraph, format: AuditFormat = "md", opts: { subjectSha?: string; style?: AuditStyle } = {}): string {
   const rollup = buildAuditRollup(graph, opts);
   return format === "json" ? renderAuditJson(rollup)
     : format === "text" ? renderAuditText(rollup)
