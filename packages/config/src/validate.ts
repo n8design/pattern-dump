@@ -60,6 +60,8 @@ const SHAPE: Shape = {
   exclude: "strings",
   build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks", workbench: "boolean", graph: "boolean" } },
   images: IMAGES,
+  // The MCP server of pd dev (and pd mcp): the host name it answers on.
+  mcp: { keys: { host: "host" } },
   // The website. Written `storefront` before 0.8.0, with `globals` as `site` (legacyKeys reads the old names).
   site: {
     keys: {
@@ -315,8 +317,18 @@ export class ConfigError extends Error {
 }
 
 /** Checks across keys, run once every key has the right type. */
+/** The host names pd dev answers to of its own: the MCP host must be none of them, nor the site's. */
+const RESERVED_HOSTS = ["localhost", "127.0.0.1", "pd.localhost"];
+
 function checkRelations(raw: Record<string, unknown>, problems: string[]): void {
   const sf = raw.site;
+  // The MCP host: a name of its own, so its requests are told apart from the workbench's and the site's.
+  const mcpHost = isObject(raw.mcp) && typeof raw.mcp.host === "string" ? raw.mcp.host.toLowerCase() : undefined;
+  if (mcpHost !== undefined) {
+    const siteHost = isObject(sf) && typeof sf.host === "string" ? sf.host.toLowerCase() : isObject(sf) ? "live.localhost" : undefined;
+    if (RESERVED_HOSTS.includes(mcpHost)) problems.push(`"mcp.host": "${mcpHost}" is the workbench's: give the MCP server a name of its own, such as "mcp.localhost"`);
+    else if (mcpHost === siteHost) problems.push(`"mcp.host": "${mcpHost}" is the site's host as well: give the MCP server a name of its own, such as "mcp.localhost"`);
+  }
   if (!isObject(sf)) return;
   // Tag pages and category pages each under a path of their own (when both are on).
   const pathOf = (v: unknown, fallback: string): string | undefined =>

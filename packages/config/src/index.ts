@@ -180,6 +180,13 @@ export interface PatternDumpConfig {
   /** How responsive image variants are encoded (WebP). Defaults: quality 75, effort 4. A site can override
    *  either in `site.images`. */
   images?: ImageSettings;
+  /**
+   * The MCP server (`pd dev`, and `pd mcp` over stdio): `host` is the name it answers on, at pd dev's port. Default:
+   * `mcp.localhost`, so its address is `http://mcp.localhost:<port>/`. A name of its own: not the workbench's
+   * (`localhost`, `127.0.0.1`, `pd.localhost`) nor the site's. `http://localhost:<port>/mcp` answers too, for a
+   * client that doesn't resolve `*.localhost`.
+   */
+  mcp?: { host?: string };
   /** The storefront: a website of real HTML pages, written from markdown, beside the workbench. */
   storefront?: StorefrontConfig;
 }

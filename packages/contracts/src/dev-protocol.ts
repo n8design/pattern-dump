@@ -710,6 +710,8 @@ export const PD_ROUTES = {
 export const PD_HOSTS = {
   storefront: "live.localhost",
   workbench: "pd.localhost",
+  /** The MCP server's default host (config `mcp.host`). */
+  mcp: "mcp.localhost",
 } as const;
 
 /** Prefixes of the parameterised routes. routes.ts matches with these; the builders emit them. */
