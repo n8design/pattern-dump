@@ -188,7 +188,7 @@ export function extractUsedClasses(hbsSource: string): string[] {
  *  whole include tree, and parsing the templates as HTML each time was a share of every page. Kept for up to 10,000
  *  texts, then started again; an edited template is a new text. */
 const keptClasses = new Map<string, readonly string[]>();
-function templateClasses(hbsSource: string): readonly string[] {
+export function templateClasses(hbsSource: string): readonly string[] {
   let classes = keptClasses.get(hbsSource);
   if (!classes) {
     if (keptClasses.size >= 10_000) keptClasses.clear();
@@ -196,6 +196,11 @@ function templateClasses(hbsSource: string): readonly string[] {
     keptClasses.set(hbsSource, classes);
   }
   return classes;
+}
+
+/** Whether a template has a `style` attribute or a `<style>` element. */
+export function hasInlineStyles(hbsSource: string): boolean {
+  return /style\s*=|<style[\s>]/i.test(hbsSource);
 }
 
 /** Parse a raw .hbs source and derive the class-borrowing relationships fields:
@@ -236,7 +241,7 @@ export function deriveClassBorrowingFields(
   // No utility framework registered in test-bench → always false.
   const utilityClasses = false;
 
-  const inlineStyles = /style\s*=|<style[\s>]/i.test(hbsSource);
+  const inlineStyles = hasInlineStyles(hbsSource);
 
   return { styleUses, styleModules, inlineStyles, utilityClasses, unattributedClasses };
 }

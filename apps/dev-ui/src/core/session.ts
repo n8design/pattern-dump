@@ -65,6 +65,10 @@ export interface Session {
   needsRenderingRules: string[];
   /** The workbench's name for the browser tab: shell.brand.title, else "Pattern Dump" (core/title.ts). */
   brandTitle: string;
+  /** The component the root opens on (config shell.start), or null: the root then shows nothing selected. */
+  startItem: string | null;
+  /** Whether the project has a site: then the Nav Rail puts the site's folders under "Site". */
+  hasSite: boolean;
 
   // ---- Selection ----
   current: ComponentDetail | null;
@@ -100,6 +104,8 @@ export const session: Session = {
   serverDefaultTheme: "",
   needsRenderingRules: [],
   brandTitle: "Pattern Dump",
+  startItem: null,
+  hasSite: false,
   current: null,
   currentVariant: null,
   stageMode: "single",

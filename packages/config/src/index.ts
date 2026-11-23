@@ -72,6 +72,12 @@ export interface ThemesConfig {
 export interface ShellConfig {
   /** Brand slot rendered at the top of the left rail. */
   brand?: ShellBrandConfig;
+  /** The component the workbench opens on at its root, by id (`layouts/home`, `atoms/button`), in pd dev and in the
+   *  static build. One that doesn't exist stops pd dev and pd build at start. Without it, the root opens on nothing. */
+  start?: string;
+  /** The space around a component in the Stage, in rem: the preview frame's own margin, so a component doesn't touch
+   *  its edge. `0` for none. Layouts and partials, whole pages, get none. Default: 1. */
+  inset?: number;
 }
 
 /**
@@ -172,12 +178,21 @@ export interface PatternDumpConfig {
    * build leaves out (SKIPPABLE_CHECKS), for a quick local build: none by default, and the build report names each
    * one skipped. `--skip-checks` on the command line replaces it. `workbench: false` writes the site only:
    * for a site whose components come from a style guide package that publishes its own workbench, at
-   * `site.workbenchUrl` (default: true). `outDir` and `basePath` are then not used.
+   * `site.workbenchUrl` (default: true). `outDir` and `basePath` are then not used. `graph: false` leaves the
+   * project graph out of the workbench snapshot (`api/graph.json`, the same JSON as `pd graph --json`), for a project
+   * whose structure shouldn't be published; `pd graph` works either way (default: true).
    */
-  build?: { outDir?: string; basePath?: string; audit?: boolean; skipChecks?: SkippableCheck[]; workbench?: boolean };
+  build?: { outDir?: string; basePath?: string; audit?: boolean; skipChecks?: SkippableCheck[]; workbench?: boolean; graph?: boolean };
   /** How responsive image variants are encoded (WebP). Defaults: quality 75, effort 4. A site can override
    *  either in `site.images`. */
   images?: ImageSettings;
+  /**
+   * The MCP server (`pd dev`, and `pd mcp` over stdio): `host` is the name it answers on, at pd dev's port. Default:
+   * `mcp.localhost`, so its address is `http://mcp.localhost:<port>/`. A name of its own: not the workbench's
+   * (`localhost`, `127.0.0.1`, `pd.localhost`) nor the site's. `http://localhost:<port>/mcp` answers too, for a
+   * client that doesn't resolve `*.localhost`.
+   */
+  mcp?: { host?: string };
   /** The storefront: a website of real HTML pages, written from markdown, beside the workbench. */
   storefront?: StorefrontConfig;
 }

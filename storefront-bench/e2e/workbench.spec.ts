@@ -83,3 +83,46 @@ test.describe("the skin in the workbench", () => {
     await expect(page.locator(".rel-panel .rel-group-heading", { hasText: /^Pages$/ })).toHaveCount(0);
   });
 });
+
+test.describe("the Site folder in the Nav Rail", () => {
+  const site = (page: import("@playwright/test").Page) => page.locator(".sidebar-tree > .tree-site");
+
+  test("comes after the project's own folders, closed, and holds the site's layouts, partials and views", async ({ page }) => {
+    await page.goto(`${WORKBENCH}/components/callout`);
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    const top = await page.locator(".sidebar-tree > .tree-node").evaluateAll(lis => lis.map(li => (li as HTMLElement).dataset.path));
+    expect(top).toEqual(["components", "pd:site"]);
+    await expect(site(page).locator(":scope > .tree-folder-row .tree-folder-label")).toHaveText("Site");
+    await expect(site(page).locator(":scope > .tree-folder-row > details")).not.toHaveAttribute("open");
+    // Closed: neither its line nor its folders show.
+    await expect(site(page).locator(".tree-site-description")).toBeHidden();
+    await expect(site(page).locator(":scope > ul")).toBeHidden();
+    const inside = await site(page).locator(":scope > ul > .tree-node").evaluateAll(lis => lis.map(li => (li as HTMLElement).dataset.path));
+    expect(inside).toEqual(["layouts", "partials", "views"]);
+  });
+
+  test("opens with the keyboard, and shows its line", async ({ page }) => {
+    await page.goto(`${WORKBENCH}/components/callout`);
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await site(page).locator(":scope > .tree-folder-row summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(site(page).locator(".tree-site-description")).toHaveText("Layouts, partials and views: what the site's pages are built from.");
+    await expect(site(page).locator(".tree-site-description")).toBeVisible();
+    await expect(site(page).locator(":scope > ul")).toBeVisible();
+  });
+
+  test("a partial in it gets no inset: it is part of a whole page", async ({ page }) => {
+    await page.goto(`${WORKBENCH}/partials/header`);
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await expect(page.locator(".stage-view")).toHaveAttribute("data-partial", "");
+    await expect(page.locator("#preview-frame")).toHaveCSS("padding-top", "0px");
+  });
+
+  test("is open when the item on screen is inside it", async ({ page }) => {
+    await page.goto(`${WORKBENCH}/layouts/article`);
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await expect(site(page).locator(":scope > .tree-folder-row > details")).toHaveAttribute("open", "");
+    await expect(site(page).locator(`a.tree-link[href="/layouts/article"]`)).toBeVisible();
+  });
+});
+

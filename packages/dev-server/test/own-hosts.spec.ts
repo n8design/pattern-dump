@@ -1,4 +1,5 @@
-// The host names pd dev answers to (own-hosts.ts), from its config: the workbench's, and storefront.host. A
+// The host names pd dev answers to (own-hosts.ts), from its config: the workbench's, the MCP server's (mcp.host), and
+// storefront.host. A
 // browser page from any other origin can't open the live-reload socket; a handshake without an Origin (a
 // process, not a page) still can.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,9 +18,10 @@ import { save } from "../../../test-support/save.js";
 describe("ownHosts, isOwnHost, isOwnOrigin", () => {
   const withStorefront = ownHosts("docs.localhost");
 
-  it("are the workbench's names, and site.host when there is a storefront", () => {
-    expect([...ownHosts(undefined)].sort()).toEqual(["127.0.0.1", "localhost", "pd.localhost"]);
-    expect([...withStorefront].sort()).toEqual(["127.0.0.1", "docs.localhost", "localhost", "pd.localhost"]);
+  it("are the workbench's names, the MCP server's, and site.host when there is a storefront", () => {
+    expect([...ownHosts(undefined)].sort()).toEqual(["127.0.0.1", "localhost", "mcp.localhost", "pd.localhost"]);
+    expect([...withStorefront].sort()).toEqual(["127.0.0.1", "docs.localhost", "localhost", "mcp.localhost", "pd.localhost"]);
+    expect([...ownHosts(undefined, "tools.localhost")].sort()).toEqual(["127.0.0.1", "localhost", "pd.localhost", "tools.localhost"]);
   });
 
   it("isOwnHost: one of the names at pd dev's port, in any case; nothing else", () => {

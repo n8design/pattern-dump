@@ -142,6 +142,10 @@ export function applyTheme(theme: string): void {
   });
 }
 
+/** Sent on a preview frame (the shell's element, not its document) once a theme is in effect in it: at once for an
+ *  attribute switch, when the theme's stylesheet has loaded for a stylesheet switch. The Stage follows it. */
+export const THEME_APPLIED = "pd-theme-applied";
+
 export function applyThemeToIframe(f: HTMLIFrameElement, theme: string): void {
   const doc = f.contentDocument;
   const body = doc?.body;
@@ -151,6 +155,7 @@ export function applyThemeToIframe(f: HTMLIFrameElement, theme: string): void {
     // collide. The paint changes because the linked stylesheet changes, not an attribute.
     const link = doc.querySelector<HTMLLinkElement>("link[data-pd-theme]");
     if (link && theme) {
+      link.addEventListener("load", () => f.dispatchEvent(new Event(THEME_APPLIED)), { once: true });
       link.setAttribute("href", resourceUrl(themeCssUrl(theme)));
       link.setAttribute("data-pd-theme", theme);
     }
@@ -158,4 +163,5 @@ export function applyThemeToIframe(f: HTMLIFrameElement, theme: string): void {
   }
   if (theme) body.setAttribute("data-theme", theme);
   else body.removeAttribute("data-theme");
+  f.dispatchEvent(new Event(THEME_APPLIED));
 }

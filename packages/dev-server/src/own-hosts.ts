@@ -1,13 +1,14 @@
-// The host names pd dev answers to: the workbench's (localhost, 127.0.0.1, pd.localhost) and, with a
-// storefront, storefront.host. A browser page on any other site must not reach pd dev: not its HTTP routes
-// (a name that only resolves to 127.0.0.1, as in DNS rebinding, still carries its own name in Host), and
-// not its live-reload socket (a browser always sends the page's Origin with the handshake).
+// The host names pd dev answers to: the workbench's (localhost, 127.0.0.1, pd.localhost), the MCP server's (mcp.host)
+// and, with a storefront, storefront.host. A browser page on any other site must not reach pd dev: not its HTTP
+// routes (a name that only resolves to 127.0.0.1, as in DNS rebinding, still carries its own name in Host), and not
+// its live-reload socket (a browser always sends the page's Origin with the handshake).
 
 import { PD_HOSTS } from "@pattern-dump/contracts";
 
-/** The names pd dev answers to, from its config: the workbench's, and storefront.host when there is a storefront. */
-export function ownHosts(storefrontHost: string | undefined): ReadonlySet<string> {
-  return new Set(["localhost", "127.0.0.1", PD_HOSTS.workbench, ...(storefrontHost ? [storefrontHost] : [])]);
+/** The names pd dev answers to, from its config: the workbench's, the MCP server's (mcp.host), and storefront.host when
+ *  there is a storefront. */
+export function ownHosts(storefrontHost: string | undefined, mcpHost: string = PD_HOSTS.mcp): ReadonlySet<string> {
+  return new Set(["localhost", "127.0.0.1", PD_HOSTS.workbench, mcpHost, ...(storefrontHost ? [storefrontHost] : [])]);
 }
 
 /** Whether a Host header names pd dev itself: one of `hosts`, at `port` (no port only for port 80). */

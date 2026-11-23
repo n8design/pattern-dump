@@ -125,14 +125,19 @@ test.describe("viewport simulator — sizing and centering (reduced-motion)", ()
   });
 
   // ---- Fit ----
-  test("fit mode: innerWidth equals stage inner width", async ({ page }) => {
+  test("fit mode: innerWidth equals stage inner width, less the inset on each side", async ({ page }) => {
     await gotoComponent(page, "atoms/responsive-demo");
     await clickVp(page, "desktop");
     await clickVp(page, "fit");
-    const stageW = await page.evaluate(() =>
-      (document.querySelector(".stage-view") as HTMLElement).clientWidth);
+    // The inset (shell.inset) is the frame's padding around the document's viewport: fit fills the stage with the
+    // frame, so the viewport is the stage less it on both sides.
+    const { stageW, inset } = await page.evaluate(() => ({
+      stageW: (document.querySelector(".stage-view") as HTMLElement).clientWidth,
+      inset: parseFloat(getComputedStyle(document.getElementById("preview-frame")!).paddingLeft),
+    }));
+    expect(inset).toBe(16);
     const inner = await iframeInnerWidth(page);
-    expect(Math.abs(inner - stageW)).toBeLessThanOrEqual(1);
+    expect(Math.abs(inner - (stageW - 2 * inset))).toBeLessThanOrEqual(1);
   });
 
   // ---- Task 2: centering ----

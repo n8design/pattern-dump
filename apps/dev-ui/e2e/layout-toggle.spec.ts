@@ -109,3 +109,33 @@ test.describe("full-height preview", () => {
     await expect(toggle(page)).toBeHidden();
   });
 });
+
+// The "Full height" toggle sits in the viewport row, as its eighth icon, between Disco and Full page; the rail's
+// minimum width (--pd-rail-min, 19.75rem) holds all eight. Read off the rendered buttons.
+test.describe("the Full height toggle in the viewport row", () => {
+  const icons = (page: import("@playwright/test").Page) => page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>(".rail-vp-cluster .rail-vp-btn")].filter(b => !b.hidden).map(b => {
+      const r = b.getBoundingClientRect();
+      return { label: b.getAttribute("aria-label"), top: Math.round(r.top), right: Math.round(r.right) };
+    }));
+
+  test("shares the icons' row, between Disco and Full page", async ({ page }) => {
+    await page.goto("/atoms/responsive-demo");
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    const row = await icons(page);
+    expect(row.map(b => b.label)).toEqual(["Fit", "Fit content", "Mobile", "Tablet", "Desktop", "Disco mode", "Full height", "Full-page preview"]);
+    expect(new Set(row.map(b => b.top)).size).toBe(1);
+  });
+
+  test("all eight fit at the rail's minimum width", async ({ page }) => {
+    await page.goto("/atoms/responsive-demo");
+    await page.waitForSelector("#preview-frame[srcdoc]");
+    await page.evaluate(() => (document.querySelector(".main") as HTMLElement).style.setProperty("--pd-sidebar-w", "1rem"));
+    // The rail eases to its new width: wait for the floor, 19.75rem.
+    await expect.poll(() => page.locator(".sidebar").evaluate(e => e.getBoundingClientRect().width)).toBe(316);
+    const clusterRight = await page.locator(".rail-vp-cluster").evaluate(e => e.getBoundingClientRect().right);
+    const row = await icons(page);
+    expect(new Set(row.map(b => b.top)).size).toBe(1);
+    expect(Math.max(...row.map(b => b.right))).toBeLessThanOrEqual(clusterRight);
+  });
+});

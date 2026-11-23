@@ -92,6 +92,10 @@ export async function init(): Promise<void> {
   session.serverDefaultTheme = shellConfig.defaultTheme;
   renderBrand(shellConfig.shell?.brand);
   session.brandTitle = brandTitle(shellConfig.shell?.brand?.title);
+  session.startItem = shellConfig.shell?.start ?? null;
+  session.hasSite = shellConfig.site;
+  // The space around a component in the Stage (shell.inset, rem): the frame's own padding (_stage.scss).
+  dom.stageView.style.setProperty("--pd-preview-inset", `${shellConfig.shell?.inset ?? 1}rem`);
 
   if (tiersRes) {
     const tiers = await tiersRes.json() as RuleTiers;

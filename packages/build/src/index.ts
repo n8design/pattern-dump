@@ -38,7 +38,7 @@ export function sassPackageOptions(entryFile: string): Pick<sass.Options<"sync">
   return options;
 }
 
-/** Recursively collect non-partial SCSS files under `dir`. */
+/** Recursively collect the non-partial stylesheets under `dir`: `.scss`, and plain `.css`, which Sass compiles too. */
 export async function collectScssFiles(dir: string): Promise<string[]> {
   const files: string[] = [];
   async function walk(current: string) {
@@ -50,7 +50,7 @@ export async function collectScssFiles(dir: string): Promise<string[]> {
       const full = join(current, entry.name);
       if (entry.isDirectory()) {
         await walk(full);
-      } else if (extname(entry.name) === ".scss" && !entry.name.startsWith("_")) {
+      } else if ((extname(entry.name) === ".scss" || extname(entry.name) === ".css") && !entry.name.startsWith("_")) {
         files.push(full);
       }
     }

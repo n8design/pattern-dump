@@ -323,8 +323,8 @@ describe("pd build — the storefront root", () => {
     const b = await tree(join(root, "..", "wb-none"));
     expect([...a.keys()].sort()).toEqual([...b.keys()].sort());
     const differing = [...a].filter(([k, v]) => !v.bytes.equals(b.get(k)!.bytes)).map(([k]) => k);
-    // A layout's detail lists the pages that render with it (relationships.pages), which only a site has: that, and
-    // nothing else, differs.
+    // A layout's detail lists the pages that render with it (relationships.pages), which only a site has: that, the
+    // graph's pages and the shell config's site flag (below), and nothing else, differ.
     const layouts = ["article", "doc", "home", "listing", "page"].map(l => `api/component/layouts/${l}/index.json`);
     // The generated pages' layouts list the tag and category pages and their indexes, each with what generated it.
     const generated: Record<string, unknown[]> = {
@@ -334,7 +334,23 @@ describe("pd build — the storefront root", () => {
       tags: [{ route: "/tags/", source: "generated", generated: { kind: "tag" } }],
     };
     const generatedKeys = Object.keys(generated).map(l => `api/component/layouts/${l}/index.json`);
-    expect(differing.sort()).toEqual([...layouts, ...generatedKeys].sort());
+    // And the project graph, which has the site's pages too: without the page nodes and the edges from them, it is
+    // the graph of the build without a site.
+    expect(differing.sort()).toEqual([...layouts, ...generatedKeys, "api/config.json", "api/graph.json"].sort());
+    // The shell's config says whether there is a site (the Nav Rail's Site folder), and nothing else differs in it.
+    const shellWith = JSON.parse(a.get("api/config.json")!.bytes.toString("utf8")) as { site: boolean };
+    const shellWithout = JSON.parse(b.get("api/config.json")!.bytes.toString("utf8")) as { site: boolean };
+    expect([shellWith.site, shellWithout.site]).toEqual([true, false]);
+    expect({ ...shellWith, site: false }).toEqual(shellWithout);
+    type Graph = { nodes: Array<{ id: string; kind: string }>; edges: Array<{ from: string }> };
+    const siteGraph = JSON.parse(a.get("api/graph.json")!.bytes.toString("utf8")) as Graph;
+    expect(siteGraph.nodes.filter(n => n.kind === "page").length).toBeGreaterThan(0);
+    const withoutPages = {
+      ...siteGraph,
+      nodes: siteGraph.nodes.filter(n => n.kind !== "page"),
+      edges: siteGraph.edges.filter(e => !e.from.startsWith("page:")),
+    };
+    expect(withoutPages).toEqual(JSON.parse(b.get("api/graph.json")!.bytes.toString("utf8")));
     for (const [l, pages] of Object.entries(generated)) {
       const k = `api/component/layouts/${l}/index.json`;
       const withSite = JSON.parse(a.get(k)!.bytes.toString("utf8")) as { relationships: { pages?: unknown[] } };

@@ -77,6 +77,8 @@ export interface ResolvedConfig {
 
   /** How image variants are encoded: `images` from the config over the defaults (quality 75, effort 4). */
   readonly images: ImageEncoding;
+  /** The host the MCP server answers on (config `mcp.host`, default mcp.localhost), lowercase. */
+  readonly mcpHost: string;
   /** The storefront, when the project has one: its folders resolved against the root, and the host
    *  `pd dev` serves it on. null without a `storefront` block — every host then serves the workbench. */
   readonly storefront: {
@@ -241,6 +243,7 @@ export function resolveServerConfig(
     scriptsDir:     scriptsDirs[0] ?? null,
     globalScripts,
     withGlobalScripts: (own) => [...new Set([...globalScripts, ...(own ?? [])])],
+    mcpHost: (config.mcp?.host ?? PD_HOSTS.mcp).toLowerCase(),
     storefront: config.storefront ? {
       pagesDir: resolve(cwd, config.storefront.pagesDir),
       outDir: resolve(cwd, config.storefront.outDir),

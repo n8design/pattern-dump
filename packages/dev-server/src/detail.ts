@@ -1,7 +1,7 @@
 // Component detail — the payload behind /api/component/:id.
 //
-// The widest fan-out in the package: it reaches layout-mode, markdown, css-closure, requires and
-// the style index. That direction is one-way by design — NOTHING may import this module, or the
+// The widest fan-out in the package: it reaches layout-mode, markdown, requires and the project
+// graph (its Relationships fields are the graph's, graph/queries.ts). That direction is one-way by design — NOTHING may import this module, or the
 // graph cycles.
 //
 // Two behaviours worth knowing before editing:
@@ -22,11 +22,11 @@ import type {
 import { highlight, wrapWithCopyButton } from "@pattern-dump/renderer";
 import { resolveLayoutMode } from "./layout-mode.js";
 import { renderDoc } from "./markdown.js";
-import { deriveClassBorrowingFields } from "./css-closure.js";
+import { hasInlineStyles } from "./css-closure.js";
+import type { ProjectGraph } from "./graph/build.js";
+import { relationshipsOf } from "./graph/queries.js";
 import { aggregateRequires } from "./requires.js";
 import { frontmatterString, readFrontmatter } from "./frontmatter.js";
-import type { CompositionRegistry } from "./composition.js";
-import type { ScssModuleGraph, ClassOwnerIndex, BaseProvenanceIndex } from "./style-index.js";
 
 /** A component's title as the Inspector shows it: its .md `title:`, else `name` (the last segment of its id). */
 export function titleFromMd(rawMd: string, name: string): string {
@@ -54,11 +54,8 @@ export async function buildComponentDetail(
   tracker: { css: string },
   defaultTheme?: string,
   flatNameToPath?: Map<string, string>,
-  compositionReg?: CompositionRegistry,
-  scssGraph?: ScssModuleGraph,
-  classOwnerIndex?: ClassOwnerIndex,
+  graph?: ProjectGraph,
   discoveryMap?: DiscoveryMap,
-  baseProvenance?: BaseProvenanceIndex
 ): Promise<ComponentDetail> {
   const parts    = componentId.split("/");
   const name     = parts[parts.length - 1];
@@ -158,20 +155,25 @@ export async function buildComponentDetail(
     if (requires.assets.length)  requireAssets  = requires.assets;
   }
 
-  const classBorrowing = classOwnerIndex
-    ? deriveClassBorrowingFields(hbs, componentId, classOwnerIndex, baseProvenance)
-    : { styleUses: [], styleModules: [], inlineStyles: false, utilityClasses: false, unattributedClasses: [] };
+  // From the graph, in the fields' order; without one (a unit test of the rest), none.
+  const fromGraph = graph
+    ? relationshipsOf(graph, componentId)
+    : { uses: [], usedBy: [], styleUses: [], styleUsesModules: [], styleModules: [], unattributedClasses: [], stylesheets: [], stylesClassesOf: [], classesStyledBy: [] };
 
   const relationships: RelationshipsAvailable = {
     available: true,
-    uses:               compositionReg?.uses.get(componentId)         ?? [],
-    usedBy:             compositionReg?.usedBy.get(componentId)        ?? [],
-    styleUses:          classBorrowing.styleUses,
-    styleUsesModules:   scssGraph?.styleUsesModules.get(componentId)   ?? [],
-    styleModules:       classBorrowing.styleModules,
-    inlineStyles:       classBorrowing.inlineStyles,
-    utilityClasses:     classBorrowing.utilityClasses,
-    unattributedClasses: classBorrowing.unattributedClasses,
+    uses:               fromGraph.uses,
+    usedBy:             fromGraph.usedBy,
+    styleUses:          fromGraph.styleUses,
+    styleUsesModules:   fromGraph.styleUsesModules,
+    styleModules:       fromGraph.styleModules,
+    inlineStyles:       hasInlineStyles(hbs),
+    // No utility framework is registered: always false.
+    utilityClasses:     false,
+    unattributedClasses: fromGraph.unattributedClasses,
+    stylesheets:        fromGraph.stylesheets,
+    stylesClassesOf:    fromGraph.stylesClassesOf,
+    classesStyledBy:    fromGraph.classesStyledBy,
   };
 
   return {

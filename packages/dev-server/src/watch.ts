@@ -478,6 +478,10 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
       forgetInside(path);
     }
     const done = () => {
+      // Every handled event moves the generation at its start and at its end (before its reload messages go
+      // out), so a value derived from files (the graph, graph/current.ts) built during a handler is never taken
+      // for one built after it.
+      if (basename(path) !== BARRIER) state.watchGeneration++;
       const sending = outbox;
       outbox = null;
       // A throw here (a socket that fails to send, the test hook) is reported and stops nothing: finish() always
@@ -503,6 +507,7 @@ function on(event: "add" | "addDir" | "change" | "unlink" | "unlinkDir", handler
     // on the open pages, like any other, and pd dev keeps running: nothing is left to reject unhandled.
     const failed = (e: unknown): void => { reportHandlerFailure(event, path, e); };
     const run = (): void => {
+      state.watchGeneration++;
       let result: unknown;
       try {
         const fail = (globalThis as { __testOnly_failHandler?: TestOnlyFailHandler }).__testOnly_failHandler?.(event, path);
@@ -729,6 +734,12 @@ const close = async (): Promise<void> => {
 // Shared handler for component/base SCSS file creation ("add") and edits ("change").
 // Accumulates css-link-swap messages, then attaches orderedHrefs for state.lastComponentId
 // computed AFTER all cache updates — so a newly-populated entry is visible in the closure.
+/** A plain `.css` file in a styles folder: Sass reads it as it reads a `.scss` file (`@use "plain"`, or an entry of its
+ *  own), so a save is handled as a stylesheet's. Anywhere else a `.css` file is an asset. */
+function isPlainStylesheet(filePath: string): boolean {
+  return extname(filePath) === ".css" && styleRootOf(resolve(filePath)) !== null && !themeDirOf(filePath);
+}
+
 async function handleComponentScss(filePath: string): Promise<void> {
   // From here until the save is written into the style data, no full build is installed or started: one
   // in flight was built before the save (server-state.ts, hazard 5). Released stale unless a full restyle
@@ -1107,8 +1118,8 @@ on("change", async (filePath) => {
   }
 
   const themesDir = themeDirOf(filePath);
-  if (ext === ".scss") {
-    if (themesDir) {
+  if (ext === ".scss" || isPlainStylesheet(filePath)) {
+    if (themesDir && ext === ".scss") {
       // Theme SCSS changed → recompile theme, push content-swap so iframe picks up new link.
       const themeName = basename(filePath, ".theme.scss");
       try {
@@ -1281,7 +1292,7 @@ on("add", async (filePath) => {
   if (await handleReloadable(filePath, "add")) return;
   const ext = extname(filePath);
   const patternRoot = patternRootOf(filePath);
-  if (ext === ".scss" && !themeDirOf(filePath)) {
+  if ((ext === ".scss" && !themeDirOf(filePath)) || isPlainStylesheet(filePath)) {
     await handleComponentScss(filePath);
   } else if (ext === ".hbs" && patternRoot) {
     await rebuildAndSignalTree(`Pattern added: ${relative(patternRoot, filePath)}`);
@@ -1306,7 +1317,7 @@ on("unlink", async (filePath) => {
     state.themeTokens.delete(themeName);
     hmr.push({ type: "content-swap", componentId: state.lastComponentId });
     console.log(`[dev-server] Theme removed: ${themeName}`);
-  } else if (extname(filePath) === ".scss") {
+  } else if (extname(filePath) === ".scss" || isPlainStylesheet(filePath)) {
     await handleRemovedScss(filePath);
   } else if (extname(filePath) === ".ts" && scriptDirOf(filePath)) {
     // As for a change: the next request compiles again, and finds the script gone (404).

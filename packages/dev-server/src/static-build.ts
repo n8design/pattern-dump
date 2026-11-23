@@ -549,6 +549,14 @@ async function buildOnce(
         log("… corpus audit left out (build.audit: false / --no-audit)");
       }
 
+      // The project graph, unless the config leaves it out (build.graph: false): what pd graph --json prints.
+      if (config.build?.graph !== false) {
+        await capture(PD_ROUTES.graph);
+        log("… project graph");
+      } else {
+        log("… project graph left out (build.graph: false)");
+      }
+
       // ---- 5. Assets, copied as served: /assets/<root name>/…, and the single-root mirror. A root
       // hidden by an earlier one of the same name is never served by `pd dev`, so it is left out here
       // too rather than copied over (or under) the root that wins. ----

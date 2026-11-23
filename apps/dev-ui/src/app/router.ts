@@ -32,7 +32,7 @@ function findTreeNode(path: string): TreeNode | null {
   return findNode(session.tree.roots);
 }
 
-function resolvePathKind(path: string): "component" | "group" | null {
+export function resolvePathKind(path: string): "component" | "group" | null {
   return findTreeNode(path)?.kind ?? null;
 }
 
@@ -56,6 +56,12 @@ export async function routeFromCurrentLocation(): Promise<void> {
   }
 
   const path = routeFromPathname(window.location.pathname).slice(1);
+  // The root opens the configured start item (shell.start), in place: the URL names it, and Back leaves the workbench
+  // rather than returning to an empty root.
+  if (!path && !window.location.hash && session.startItem) {
+    history.replaceState(history.state, "", routeHref(`/${session.startItem}`) + window.location.search);
+    return routeFromCurrentLocation();
+  }
   // A PatternLab-style link names the route in the hash (/#/pages/home). Move it into the path, which
   // is where routes live here; a variant hash (#ghost) never starts with a slash.
   if (!path && window.location.hash.startsWith("#/")) {

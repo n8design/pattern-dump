@@ -280,6 +280,15 @@ export interface AuditComponentRollup {
  *  `buildAuditRollup`; `md`/`text`/`json` (and the workbench facet) are renderers over this object,
  *  never independent string builders. A CI consumer reading the `json` gets `scope` (what the audit covers)
  *  and `headline` alongside the count, never a bare number. */
+/** The style couplings of the audited components, from the project graph: information beside the findings, never a
+ *  defect, never in a count. `borrowed`: a template writes a class another component's stylesheet owns, without
+ *  including that component (so its stylesheet is linked too: STYLE_BORROWED). `couplings`: a component's stylesheet
+ *  styles another component's class in context (a rename of that class breaks it). Sorted by component. */
+export interface AuditStyle {
+  borrowed: Array<{ component: ComponentId; owner: ComponentId; classes: string[] }>;
+  couplings: Array<{ from: ComponentId } & StyleCoupling>;
+}
+
 export interface AuditRollup {
   subjectSha?: string;
   /** The headline sentence, plain (no markdown emphasis); renderers wrap/position it. */
@@ -290,12 +299,14 @@ export interface AuditRollup {
   perComponent: AuditComponentRollup[];
   /** What the audit covers and leaves out (AUDIT_SCOPE). Carried in every format. */
   scope: AuditScope;
+  /** The style couplings, when the caller had the project graph (pd audit, the workbench's /api/audit). */
+  style?: AuditStyle;
 }
 
 /** Build the structured rollup from the graph — the numbers exist as data here, not only as strings.
  *  PURE: same graph → same rollup, no I/O or clock. The one builder both the CLI report renderers and
  *  the workbench audit facet call. */
-export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: string } = {}): AuditRollup {
+export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: string; style?: AuditStyle } = {}): AuditRollup {
   const total = graph.components.length;
   const affected = new Set(graph.occurrences.map(o => o.component));
   const cleanPct = total > 0 ? Math.round((100 * (total - affected.size)) / total) : 100;
@@ -335,6 +346,7 @@ export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: s
     rulesByBlast,
     perComponent,
     scope: AUDIT_SCOPE,
+    ...(opts.style ? { style: opts.style } : {}),
   };
 }
 
@@ -480,11 +492,28 @@ export interface RelationshipsAvailable {
   inlineStyles: boolean;
   /** True if any used class is owned by a registered utility source (e.g. Tailwind). */
   utilityClasses: boolean;
-  /** CSS classes used in markup whose ownership is unrecognised (typos, dead, unregistered). */
+  /** CSS classes used in markup that no stylesheet defines (typos, dead, unregistered): not a compiled stylesheet,
+   *  an assets.css file nor a template's <style>. */
   unattributedClasses: string[];
+  /** Its own stylesheets: the one named after it, its template's `<style>`, and a sheet its template links (never
+   *  read). Empty when it has none. From the project graph. */
+  stylesheets: Array<{ file: string; source: import("./graph").StylesheetSource }>;
+  /** Other components whose classes its stylesheets style in context (`.card-body > .button`): renaming one of
+   *  those classes breaks a rule of its own. By component, each with the classes and the first selector. */
+  stylesClassesOf: StyleCoupling[];
+  /** The reverse: other components' stylesheets that style its classes in context. */
+  classesStyledBy: StyleCoupling[];
   /** A layout of a project with a website: every page that renders with it, by path, and how each got it.
    *  Absent for any other component, and in a project without a website. */
   pages?: LayoutPageUse[];
+}
+
+/** One component's stylesheet styling another's classes in context: the other component, the stylesheet that does it
+ *  (root-relative, a package's as `<name>/<path>`), and each class with the first selector that names it. */
+export interface StyleCoupling {
+  component: ComponentId;
+  stylesheet: string;
+  classes: Array<{ name: string; selector: string }>;
 }
 
 /** A storefront page that renders with a layout, and where its layout came from: a page file, or a page Pattern Dump
@@ -641,6 +670,8 @@ export const PD_ROUTES = {
   tree: "/api/tree",
   /** GET → AuditResponse (500 → ApiError) */
   audit: "/api/audit",
+  /** GET → ProjectGraphJson: the project graph (graph.ts). */
+  graph: "/api/graph",
   /** GET → ThemeSummary[] */
   themes: "/api/themes",
   /** GET → VersionInfo */
@@ -679,6 +710,8 @@ export const PD_ROUTES = {
 export const PD_HOSTS = {
   storefront: "live.localhost",
   workbench: "pd.localhost",
+  /** The MCP server's default host (config `mcp.host`). */
+  mcp: "mcp.localhost",
 } as const;
 
 /** Prefixes of the parameterised routes. routes.ts matches with these; the builders emit them. */
@@ -758,10 +791,12 @@ export type ThemeSwitch = "attribute" | "stylesheet";
 /** GET /api/config — the server-declared settings the shell reads once at startup. */
 export interface ShellClientConfig {
   /** The project's `shell` config block, or null when it has none. */
-  shell: { brand?: import("./index").ShellBrandConfig } | null;
+  shell: { brand?: import("./index").ShellBrandConfig; start?: string; inset?: number } | null;
   themeSwitch: ThemeSwitch;
   /** The configured default theme — what an un-themed preview actually shows. "" when none. */
   defaultTheme: string;
+  /** Whether the project has a site (a `site` block): the Nav Rail then groups the site's folders under "Site". */
+  site: boolean;
 }
 
 /** One storefront page: a markdown file in `storefront.pagesDir`, at the route its path defines. */
@@ -811,6 +846,8 @@ export interface AuditResponse extends DiagnosticsGraph {
   /** Surgical HMR re-audits since startup — a debug instrument (rises by exactly 1 per .hbs edit,
    *  0 per .scss edit). Not part of the graph; the leading underscore marks it as diagnostic. */
   _liveReaudits: number;
+  /** The style couplings of the audited components (AuditStyle), from the project graph as it is now. */
+  style?: AuditStyle;
 }
 
 /** GET /_pd/rule-tiers.json — the generated axe rule classification (packages/a11y classifier). */

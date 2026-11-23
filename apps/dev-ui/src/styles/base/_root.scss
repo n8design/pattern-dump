@@ -31,7 +31,7 @@
   --pd-divider: light-dark(var(--pd-warm-sand), var(--pd-warm-sand)); /* dark: stub */
 
   --pd-rail-icon-size: 2rem; /* icon-button hit target — applies to .rail-toggle and .rail-vp-btn */
-  --pd-rail-min: 18rem;      /* track floor: 7 icons + readout/label row clears overflow:hidden */
+  --pd-rail-min: 19.75rem;   /* track floor: 8 icons + readout/label row clears overflow:hidden */
 
   --pd-mark:           var(--pd-border-active); /* corner crop-mark color — firmer hairline for readability */
   --pd-mark-size:      12px; /* arm length */

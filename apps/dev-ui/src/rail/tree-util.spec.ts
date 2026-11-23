@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { TreeNode } from "@pattern-dump/contracts";
-import { extractFolderPaths, buildSidebarHtml, isEffectivelyPrivate, buildNodeHtml, isEffectivelyPackage, hasPackageComponents } from "./tree-util.js";
+import { extractFolderPaths, buildSidebarHtml, isEffectivelyPrivate, buildNodeHtml, isEffectivelyPackage, hasPackageComponents, buildRailHtml, splitSiteRoots } from "./tree-util.js";
 
 const leaf = (path: string, title = path, extra: Partial<TreeNode> = {}): TreeNode =>
   ({ path, title, kind: "component", ...extra }) as TreeNode;
@@ -160,3 +160,31 @@ describe("buildSidebarHtml", () => {
     expect(buildSidebarHtml([], 0)).toBe("");
   });
 });
+
+describe("buildRailHtml: the Site folder", () => {
+  const roots = [
+    folder("atoms", [leaf("atoms/button")]), folder("layouts", [leaf("layouts/page")]),
+    folder("components", [leaf("components/toc")]), folder("partials", [leaf("partials/base")]), folder("views", [leaf("views/list")]),
+  ];
+
+  it("splits the site's folders from the project's own, each in tree order", () => {
+    const { own, site } = splitSiteRoots(roots);
+    expect(own.map(n => n.path)).toEqual(["atoms", "components"]);
+    expect(site.map(n => n.path)).toEqual(["layouts", "partials", "views"]);
+  });
+
+  it("with a site: the project's folders, then Site (closed) holding the site's", () => {
+    const html = buildRailHtml(roots, true);
+    expect(html.indexOf(`data-path="components"`)).toBeLessThan(html.indexOf(`data-path="pd:site"`));
+    expect(html.indexOf(`data-path="pd:site"`)).toBeLessThan(html.indexOf(`data-path="layouts"`));
+    expect(html).toContain(`<span class="tree-folder-label">Site</span>`);
+    expect(html).not.toMatch(/data-path="pd:site">[^]*?<details[^>]* open/);
+  });
+
+  it("without a site, or a site with none of those folders, the tree as before", () => {
+    expect(buildRailHtml(roots, false)).toBe(buildSidebarHtml(roots, 0));
+    const own = roots.filter(r => r.path === "atoms");
+    expect(buildRailHtml(own, true)).toBe(buildSidebarHtml(own, 0));
+  });
+});
+

@@ -57,7 +57,7 @@ describe("data-overlay variant sidecars", () => {
   it("the detail shows the variant's own title, description and docs", async () => {
     const dir = await patterns(FILES);
     const { discoveryMap } = await buildDiscoveryMap(dir);
-    const detail = await buildComponentDetail("atoms/chip~danger", dir, noRender, { css: "" }, undefined, new Map(), undefined, undefined, undefined, discoveryMap);
+    const detail = await buildComponentDetail("atoms/chip~danger", dir, noRender, { css: "" }, undefined, new Map(), undefined, discoveryMap);
     expect(detail.title).toBe("Danger chip");
     expect(detail.description).toBe("For destructive actions.");
     expect(detail.doc).toContain("The danger chip's own docs.");
@@ -68,7 +68,7 @@ describe("data-overlay variant sidecars", () => {
   it("a variant without a .md of its own still shows the base's docs", async () => {
     const dir = await patterns(FILES);
     const { discoveryMap } = await buildDiscoveryMap(dir);
-    const detail = await buildComponentDetail("atoms/chip~quiet", dir, noRender, { css: "" }, undefined, new Map(), undefined, undefined, undefined, discoveryMap);
+    const detail = await buildComponentDetail("atoms/chip~quiet", dir, noRender, { css: "" }, undefined, new Map(), undefined, discoveryMap);
     expect(detail.doc).toContain("The base chip's docs.");
   });
 });

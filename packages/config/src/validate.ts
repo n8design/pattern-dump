@@ -10,7 +10,7 @@ type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
-  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "plain-object" | "hbs-file"
+  | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "inset" | "plain-object" | "hbs-file"
   | "quality" | "effort" | "categories" | "tags" | "term-pages" | "skip-checks";
 type Shape = Readonly<Record<string, Rule>>;
 
@@ -54,12 +54,14 @@ const SHAPE: Shape = {
   documentBase: "strings",
   overviews: "boolean",
   shell: {
-    keys: { brand: { keys: { title: "string", logo: "logo", logoAlt: "string", href: "string" } } },
+    keys: { brand: { keys: { title: "string", logo: "logo", logoAlt: "string", href: "string" } }, start: "string", inset: "inset" },
   },
   packages: "packages",
   exclude: "strings",
-  build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks", workbench: "boolean" } },
+  build: { keys: { outDir: "string", basePath: "string", audit: "boolean", skipChecks: "skip-checks", workbench: "boolean", graph: "boolean" } },
   images: IMAGES,
+  // The MCP server of pd dev (and pd mcp): the host name it answers on.
+  mcp: { keys: { host: "host" } },
   // The website. Written `storefront` before 0.8.0, with `globals` as `site` (legacyKeys reads the old names).
   site: {
     keys: {
@@ -220,6 +222,10 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     }
     return;
   }
+  if (rule === "inset") {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 8) fail("a number of rem from 0 to 8, such as 1 (0 for none)");
+    return;
+  }
   if (rule === "quality") {
     if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 100) fail("a whole number from 1 to 100 (WebP quality)");
     return;
@@ -315,9 +321,23 @@ export class ConfigError extends Error {
 }
 
 /** Checks across keys, run once every key has the right type. */
+/** The host names pd dev answers to of its own: the MCP host must be none of them, nor the site's. */
+const RESERVED_HOSTS = ["localhost", "127.0.0.1", "pd.localhost"];
+
 function checkRelations(raw: Record<string, unknown>, problems: string[]): void {
   const sf = raw.site;
+  // The MCP host: a name of its own, so its requests are told apart from the workbench's and the site's.
+  const mcpHost = isObject(raw.mcp) && typeof raw.mcp.host === "string" ? raw.mcp.host.toLowerCase() : undefined;
+  if (mcpHost !== undefined) {
+    const siteHost = isObject(sf) && typeof sf.host === "string" ? sf.host.toLowerCase() : isObject(sf) ? "live.localhost" : undefined;
+    if (RESERVED_HOSTS.includes(mcpHost)) problems.push(`"mcp.host": "${mcpHost}" is the workbench's: give the MCP server a name of its own, such as "mcp.localhost"`);
+    else if (mcpHost === siteHost) problems.push(`"mcp.host": "${mcpHost}" is the site's host as well: give the MCP server a name of its own, such as "mcp.localhost"`);
+  }
   if (!isObject(sf)) return;
+  // site.workbenchUrl reaches templates as site.workbenchUrl: a global of that name would be silently replaced.
+  if (isObject(sf.globals) && Object.hasOwn(sf.globals, "workbenchUrl")) {
+    problems.push(`"site.globals.workbenchUrl": templates get site.workbenchUrl from Pattern Dump (site.workbenchUrl, or pd dev's own workbench): remove this global and use site.workbenchUrl`);
+  }
   // Tag pages and category pages each under a path of their own (when both are on).
   const pathOf = (v: unknown, fallback: string): string | undefined =>
     v === false ? undefined : isObject(v) && typeof v.path === "string" ? v.path : fallback;

@@ -491,3 +491,61 @@ describe("relationships derivation — attribution regression guard", () => {
     });
   }, 15000);
 });
+
+// ---- Stylesheets and style couplings (from the project graph) ----
+
+type StyleFields = {
+  stylesheets: Array<{ file: string; source: string }>;
+  stylesClassesOf: Array<{ component: string; stylesheet: string; classes: Array<{ name: string; selector: string }> }>;
+  classesStyledBy: Array<{ component: string; stylesheet: string; classes: Array<{ name: string; selector: string }> }>;
+  unattributedClasses: string[];
+};
+const styleFields = async (port: number, id: string): Promise<StyleFields> =>
+  (await fetchRaw(port, id) as { relationships: StyleFields }).relationships;
+
+describe("relationships — a component's stylesheets and what they style", () => {
+  it("names its own stylesheets: the one named after it, and its template's <style>", async () => {
+    await withServer(async (port) => {
+      const r = await styleFields(port, "molecules/coupled");
+      expect(r.stylesheets).toEqual([
+        { file: "src/patterns/molecules/coupled/coupled.hbs", source: "inline" },
+        { file: "src/styles/02-molecules/coupled.scss", source: "scss" },
+      ]);
+    });
+  }, 15000);
+
+  it("names the classes of another component its stylesheets style, with the selector, both ways", async () => {
+    await withServer(async (port) => {
+      const coupled = await styleFields(port, "molecules/coupled");
+      expect(coupled.stylesClassesOf).toEqual([
+        { component: "atoms/button", stylesheet: "src/patterns/molecules/coupled/coupled.hbs",
+          classes: [{ name: "df-button", selector: ".tb-coupled-note + .df-button" }] },
+        { component: "atoms/button", stylesheet: "src/styles/02-molecules/coupled.scss",
+          classes: [{ name: "df-button", selector: ".tb-coupled > .df-button" }] },
+      ]);
+      const button = await styleFields(port, "atoms/button");
+      expect(button.classesStyledBy).toContainEqual(
+        { component: "molecules/coupled", stylesheet: "src/styles/02-molecules/coupled.scss",
+          classes: [{ name: "df-button", selector: ".tb-coupled > .df-button" }] });
+      expect(button.stylesClassesOf).toEqual([]);
+    });
+  }, 15000);
+});
+
+describe("relationships — stylesheets Sass doesn't compile", () => {
+  const sources = join(here, "fixtures/graph-sources");
+  const cfg = defineConfig({
+    sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
+    styles: { strategy: "parallel", dir: "./src/styles" },
+    assets: { dir: "./assets", css: ["css/vendor.css"] },
+  });
+
+  it("a sheet the template links is its stylesheet, and a class an assets.css file defines is not unattributed", async () => {
+    const server = await startDevServer(cfg, sources, { port: 0, wsPort: 0 });
+    try {
+      const r = await styleFields(server.port, "atoms/linked");
+      expect(r.stylesheets).toEqual([{ file: "https://styles.example.test/linked.css", source: "external" }]);
+      expect(r.unattributedClasses).toEqual([]);
+    } finally { await server.close(); }
+  }, 15000);
+});

@@ -21,7 +21,7 @@ import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile } from "node:fs/promises";
-import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap, type StorefrontPage } from "@pattern-dump/contracts";
+import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap, type DiscoveryResult, type ProjectGraphJson, type StorefrontPage } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
@@ -32,6 +32,11 @@ import { sameHostWorkbenchPath } from "@pattern-dump/config";
 import type { ResolvedConfig } from "./server-config.js";
 import { compositionFor, currentDiscovery, type ServerState } from "./server-state.js";
 import { createDisplayPath } from "./display-path.js";
+import { buildGraph, graphJson, type ProjectGraph } from "./graph/build.js";
+import { gatherGraphInputs } from "./graph/inputs.js";
+import { auditStyleOf, layoutPagesOf } from "./graph/queries.js";
+import { createMcpHandler, type McpHandler } from "./mcp/server.js";
+import { handleMcpHttp, mcpEndpoint } from "./mcp/http.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 import { buildShellHtml, json, mimeType, serveFile, servesShell, workbenchTitle } from "./http-utils.js";
@@ -52,13 +57,14 @@ import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.j
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
-  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, refreshDiagnosticsGraph, styleBorrowedDiagnostics,
+  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, readDiagnosticsArtifact, refreshDiagnosticsGraph, styleBorrowedDiagnostics,
 } from "./diagnostics.js";
 import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
 import { resolveAxeCore } from "./assets.js";
 import { ruleTiers } from "@pattern-dump/a11y";
-import { layoutPages, readPages, todayOf } from "./storefront/pages.js";
+import { readPages, todayOf } from "./storefront/pages.js";
+import { sitePagesRead } from "./storefront/site-pages.js";
 import { createPagesCache, type PagesCache } from "./storefront/pages-cache.js";
 import { assetFile } from "./asset-file.js";
 import { decodePath } from "./contained-file.js";
@@ -85,21 +91,78 @@ const pagesCaches = new WeakMap<RouteContext, PagesCache>();
 /** The website's pages as this server serves them: pd dev shows drafts and scheduled pages; pd build leaves them out,
  *  as if their files weren't there. */
 async function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>, discoveryMap?: DiscoveryMap): ReturnType<typeof readPages> {
-  const today = ctx.today ?? todayOf(ctx.now());
-  // The skin's layouts, by name (layout-index.ts): tag and category pages are generated through them (terms.ts).
-  const layouts = discoveryMap ? [...(await layoutIndex(discoveryMap)).names] : undefined;
+  const { key, read } = await sitePagesRead(sf, { live: ctx.live, today: ctx.today ?? todayOf(ctx.now()), ...(discoveryMap ? { discoveryMap } : {}) });
   // Not read again for every request (pages-cache.ts): once in pd build, and in pd dev until the folder changes.
   let cache = pagesCaches.get(ctx);
   if (!cache) { cache = createPagesCache(sf.pagesDir, ctx.pagesOnce === true); pagesCaches.set(ctx, cache); }
-  return cache.get(JSON.stringify([today, layouts ?? null]), () => readPages(sf.pagesDir, {
-    workbenchPath: sameHostWorkbenchPath(sf), drafts: ctx.live ? "show" : "leave-out", scheduled: ctx.live ? "show" : "leave-out",
-    today, categories: sf.categories, tags: sf.tags, tagPages: sf.tagPages, categoryPages: sf.categoryPages,
-    ...(layouts ? { layouts: new Set(layouts) } : {}),
-  }));
+  return cache.get(key, read);
+}
+
+/**
+ * The project graph as it is now: built from the discovery, include graph, style data and page model, and kept until
+ * one of them, or the watch generation, moves (graph/current.ts). The generation is read first, so a save that lands
+ * while the inputs are gathered leaves a key the next request no longer matches. A request that has taken its
+ * discovery passes it (server-state.ts, hazard 4: a request takes it once), so the graph is the one of that discovery.
+ */
+export async function currentGraph(ctx: RouteContext, taken?: DiscoveryResult): Promise<ProjectGraph> {
+  const { cfg, state } = ctx;
+  const generation = state.watchGeneration;
+  const discovery = taken ?? await currentDiscovery(state, cfg.patternRoots);
+  const style = await state.style.get(() => buildAllStyleData(cfg.styleRoots, baseComponentIds(discovery)));
+  const composition = await compositionFor(state, discovery, cfg.patternDirs);
+  const pages = cfg.storefront ? await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap) : null;
+  return state.graph.get([generation, discovery, style, composition, pages], async () => {
+    const inputs = await gatherGraphInputs({
+      discovery, composition, style, pages,
+      assetsCss: cfg.assetsCss, assetRoots: cfg.assetRoots, assetRootNames: cfg.assetRootNames,
+      display: createDisplayPath(cfg.cwd, cfg.packages),
+    });
+    if (verboseTiming) console.time("[dev-server:timing] graph build");
+    const graph = buildGraph(inputs);
+    if (verboseTiming) console.timeEnd("[dev-server:timing] graph build");
+    return graph;
+  });
+}
+
+/** Per server, the MCP server's message handler (mcp/server.ts). */
+const mcpHandlers = new WeakMap<RouteContext, McpHandler>();
+
+/**
+ * The MCP server of this pd dev: tools that read the project as this server holds it. Each tool call takes the
+ * discovery once and reads everything from it (server-state.ts, hazard 4). `checks` reads the audit this server has
+ * run, else the one a pd audit or an earlier pd dev saved; it never starts one.
+ */
+export function mcpHandlerFor(ctx: RouteContext): McpHandler {
+  let handler = mcpHandlers.get(ctx);
+  if (handler) return handler;
+  const { cfg, state } = ctx;
+  const display = createDisplayPath(cfg.cwd, cfg.packages);
+  const pagesPrefix = cfg.storefront ? `${relative(cfg.cwd, cfg.storefront.pagesDir).split("\\").join("/")}/` : undefined;
+  handler = createMcpHandler(() => {
+    let taken: Promise<DiscoveryResult> | undefined;
+    const discovery = (): Promise<DiscoveryResult> => (taken ??= currentDiscovery(state, cfg.patternRoots));
+    return {
+      graph: async () => currentGraph(ctx, await discovery()),
+      discoveryMap: async () => (await discovery()).discoveryMap,
+      tree: async () => buildComponentTree(cfg.patternDirs, cfg.overviewsEnabled, (await discovery()).discoveryMap),
+      audit: async () => {
+        const slices = await state.audit.peek();
+        if (slices) return { graph: assembleGraph([...slices.values()].map(s => s.audit)), from: "workbench" as const };
+        const saved = await readDiagnosticsArtifact(cfg.cwd);
+        return saved ? { graph: saved.graph, from: "last audit" as const } : null;
+      },
+      root: cfg.cwd, display,
+      ...(pagesPrefix ? { pagesPrefix } : {}),
+    };
+  }, ctx.version);
+  mcpHandlers.set(ctx, handler);
+  return handler;
 }
 
 export interface RouteContext {
   readonly cfg: ResolvedConfig;
+  /** Pattern Dump's version, as the MCP server names itself (DevServerOptions.version). */
+  readonly version: string;
   readonly state: ServerState;
   /** The renderer and the global data it was built with: one object, taken once per request. */
   readonly rendering: RenderingHandle;
@@ -162,7 +225,7 @@ export async function handleRequest(
   const { cfg } = ctx;
   // Only requests addressed to pd dev itself: one of its own host names at the port this request came in
   // on. A page on another site that gets a name of its own to resolve to 127.0.0.1 still sends that name.
-  if (!isOwnHost(req.headers.host, ownHosts(cfg.storefront?.host), req.socket.localPort ?? -1)) {
+  if (!isOwnHost(req.headers.host, ownHosts(cfg.storefront?.host, cfg.mcpHost), req.socket.localPort ?? -1)) {
     res.writeHead(403, { "Content-Type": "text/plain" });
     res.end("Forbidden: this server answers only to its own host names");
     return;
@@ -170,6 +233,16 @@ export async function handleRequest(
   // On the storefront's host, every HTML and CSS response leaves with its references to served files
   // stamped with their content hashes (storefront/asset-stamps.ts). The workbench's hosts are not stamped.
   const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
+  // The MCP server (mcp/http.ts): its own host, and /mcp on localhost and 127.0.0.1.
+  const mcp = mcpEndpoint(host, new URL(req.url ?? "/", "http://x").pathname, cfg.mcpHost);
+  if (mcp === "mcp") {
+    return handleMcpHttp(req, res, mcpHandlerFor(ctx), { hosts: ownHosts(cfg.storefront?.host, cfg.mcpHost), port: req.socket.localPort ?? -1 });
+  }
+  if (mcp === "elsewhere") {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end(`Not Found: this host is the MCP server's, at / (POST)`);
+    return;
+  }
   if (cfg.storefront && host === cfg.storefront.host) {
     if (!underBasePath(req, res, cfg.storefront.basePath)) return;
     return stampedResponse(req, res, ctx);
@@ -459,6 +532,12 @@ async function routeRequest(
       return;
     }
 
+    // The project graph (graph/), as its JSON: what `pd graph --json` prints and the static build writes.
+    if (pathname === PD_ROUTES.graph) {
+      json(res, 200, graphJson(await currentGraph(ctx)) satisfies ProjectGraphJson);
+      return;
+    }
+
     // Diagnostics graph — the whole-corpus static-defect sweep.
     // Reuses the exact per-component check unit; component nodes key on the discovery id. Persisted
     // + hash-delta: only components whose content hash changed are re-audited (§3/§4).
@@ -507,7 +586,10 @@ async function routeRequest(
         await persistSlices(cwd, slices);
         // _liveReaudits: total surgical HMR re-audits since startup — the incremental-proof instrument
         // (rises by exactly 1 per .hbs edit, 0 per .scss edit). Debug envelope field, not the graph.
-        json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount } satisfies AuditResponse);
+        // The style couplings beside the findings, from the graph as it is now (never cached with the findings: a
+        // stylesheet save re-audits nothing, so they can't live in the slices).
+        const style = auditStyleOf(await currentGraph(ctx, discovery), auditedComponentIds(discovery));
+        json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount, style } satisfies AuditResponse);
       } catch (e) {
         json(res, 500, { error: e instanceof Error ? e.message : String(e) } satisfies ApiError);
       }
@@ -533,10 +615,10 @@ async function routeRequest(
         // later save overtook (server-state.ts, hazard 5).
         await state.style.get(() => buildAllStyleData(styleRoots, baseComponentIds(discovery)));
         const compReg = await compositionFor(state, discovery, patternDirs);
+        // Its Relationships fields are the project graph's (graph/queries.ts).
+        const graph = await currentGraph(ctx, discovery);
         const detail = await buildComponentDetail(
-          componentId, patternDirs, render, tracker, defaultTheme, handleMap, compReg,
-          state.scssModuleGraph ?? undefined, state.classOwnerIndex ?? undefined,
-          discovery.discoveryMap, state.baseProvenance ?? undefined
+          componentId, patternDirs, render, tracker, defaultTheme, handleMap, graph, discovery.discoveryMap,
         );
 
         // Phase 2: render + static checks — the single per-component check unit (also driven by
@@ -546,15 +628,16 @@ async function routeRequest(
         const layouts = await layoutIndex(discovery.discoveryMap);
         const layoutName = layouts.nameOf(componentId);
         if (cfg.storefront && layoutName !== undefined) {
-          // With the discovery map, so the tag and category pages its layouts generate are in the model too.
-          detail.relationships.pages = layoutPages(await readStorefrontPages(ctx, cfg.storefront, discovery.discoveryMap), layoutName);
+          // The graph's page model is read with the discovery map, so the tag and category pages its layouts generate
+          // are in it too.
+          detail.relationships.pages = layoutPagesOf(graph, componentId);
         }
         const quarantineEntry = discovery.quarantineMap.get(componentId);
         const checked = await checkComponent(componentId, variant, render, quarantineEntry);
         const { previewHtml } = checked;
         // The stylesheets it links by borrowing a class (info, the detail only: diagnostics.ts).
-        const diagnostics = quarantineEntry || !state.classOwnerIndex ? checked.diagnostics : [...checked.diagnostics,
-          ...await styleBorrowedDiagnostics(componentId, variant, discovery.discoveryMap, compReg, state.classOwnerIndex)];
+        const diagnostics = quarantineEntry ? checked.diagnostics : [...checked.diagnostics,
+          ...styleBorrowedDiagnostics(componentId, variant, graph)];
         // Its layout problems (layout-index.ts): a misplaced x-pd-layout, or a layout name it shares with another.
         if (!quarantineEntry) {
           for (const message of layouts.problemsOf(componentId, createDisplayPath(cwd, cfg.packages))) {
@@ -621,7 +704,7 @@ async function routeRequest(
       // ?theme= the preview falls back to it (see the /preview/ branch below), so without this the
       // shell had no way to know what it was showing and displayed "— no theme —" over a themed
       // document. Read-only: the client never sends it back.
-      json(res, 200, { shell: config.shell ?? null, themeSwitch, defaultTheme: defaultTheme ?? "" } satisfies ShellClientConfig);
+      json(res, 200, { shell: config.shell ?? null, themeSwitch, defaultTheme: defaultTheme ?? "", site: cfg.storefront !== null } satisfies ShellClientConfig);
       return;
     }
 
@@ -763,10 +846,14 @@ async function routeRequest(
       // In pd dev a page links to the workbench of this same process, whatever the config's build-time
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
+      const ownWorkbench = `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`;
+      // site.workbenchUrl for templates: the configured one in pd build, this process's workbench in pd dev.
+      const siteWorkbenchUrl = ctx.storefrontWorkbenchUrl ?? (ctx.live ? ownWorkbench : undefined);
       const page = await assemblePage(target, model, {
         discoveryMap, handleMap: discovery.handleMap, shown: createDisplayPath(cwd, cfg.packages),
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
-        workbenchUrl: ctx.storefrontWorkbenchUrl ?? `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`,
+        workbenchUrl: ctx.storefrontWorkbenchUrl ?? ownWorkbench,
+        ...(siteWorkbenchUrl !== undefined ? { siteWorkbenchUrl } : {}),
         head: (layoutId, html, placed) => pageStylesheets(cfg, state, discovery, layoutId, html, placed),
         symbolSets: roots => pageSymbolSets(cfg, discovery, roots),
         borrowed: roots => pageBorrowedStyles(state, discovery, patternDirs, roots),

@@ -25,6 +25,23 @@ const openAuditTab = async (page: import("@playwright/test").Page) => {
 const auditPanel = ".panel-content .audit-panel";
 
 test.describe("Audit facet — corpus diagnostics", () => {
+  test("lists the style couplings as pd audit does: information, after the findings", async ({ page }) => {
+    await gotoComponent(page, "atoms/button");
+    await openAuditTab(page);
+    const heading = page.locator(`${auditPanel} .audit-h`, { hasText: "Style couplings (information, not defects)" });
+    await expect(heading).toBeVisible();
+    const rows = page.locator(`${auditPanel} .audit-style > .audit-rule`);
+    // test-bench's molecules/coupled: its stylesheet and its template's <style> reach into Button's class.
+    await expect(rows.filter({ hasText: ".tb-coupled > .df-button" })).toHaveText(
+      "molecules/coupled styles .df-button (.tb-coupled > .df-button) of atoms/button, in src/styles/02-molecules/coupled.scss");
+    // organisms/toolbar writes Button's classes without including it.
+    await expect(rows.filter({ hasText: "organisms/toolbar uses" })).toHaveText(
+      "organisms/toolbar uses .df-button, .df-button--ghost, .df-button--primary of atoms/button without including it");
+    await expect(rows.filter({ hasText: "organisms/toolbar uses" }).locator("a.audit-link").first()).toHaveAttribute("href", "/organisms/toolbar");
+    // Information: the totals don't count them (the defect count is the findings' alone).
+    await expect(page.locator(`${auditPanel} .audit-style`)).toBeVisible();
+  });
+
   test("renders the rollup: headline, totals, rules-by-blast and per-component pivots", async ({ page }) => {
     await gotoComponent(page, "atoms/button");
     await openAuditTab(page);

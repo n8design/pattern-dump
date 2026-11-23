@@ -11,6 +11,7 @@
 // belong in session.ts, which is for state shared ACROSS regions.
 
 import { dom } from "../core/dom.js";
+import { followSchemeChanges, syncFrameGround } from "./frame-ground.js";
 import { session } from "../core/session.js";
 import { store } from "../core/store.js";
 import { setupRadiogroupKeyboard } from "../core/radiogroup.js";
@@ -267,7 +268,9 @@ export function initViewport(onFullscreen: () => void): void {
     measureContentWidth(dom.iframe);
     updateReadout();
     syncFrameFocusListeners();
+    syncFrameGround();
   });
+  followSchemeChanges();
 
   // Leave path: any shell element gaining focus means the iframe lost it.
   // focusin doesn't cross iframe boundaries so this only fires for parent-doc focus.

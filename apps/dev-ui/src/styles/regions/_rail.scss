@@ -401,18 +401,18 @@
 }
 
 // ---- Viewport cluster ----
-// 7-col grid: row 1 = icons auto-placed, row 2 = readout (3 cols) + mode-label (3 cols) + the
-// "Full height" toggle (1 col, under Full page). The toggle sits on row 2 because the rail's minimum
-// width (--pd-rail-min) holds exactly seven icon columns.
+// 8-col grid: row 1 = the icons, auto-placed (the five viewports, Disco, Full height, Full page), row 2 =
+// readout (4 cols) + mode-label (4 cols). The rail's minimum width (--pd-rail-min) holds the eight icon
+// columns: 8 x 2rem + 7 gaps + the padding.
 // Fixed 2rem (32px) columns + justify-content:start packs the grid left; free space trails right.
 
 .rail-vp-cluster {
   display: grid;
-  grid-template-columns: repeat(7, 2rem);
+  grid-template-columns: repeat(8, 2rem);
   justify-content: start;
   grid-template-areas:
-    ". . . . . . ."
-    "readout readout readout label label label height";
+    ". . . . . . . ."
+    "readout readout readout readout label label label label";
   gap: 0.375rem;
   align-items: center;
   padding: 0.25rem 0.5rem;
@@ -426,7 +426,7 @@
 }
 
 // Icon-button reset — same primitive as .rail-toggle.
-// grid-row: 1 locks all 7 buttons to the icon row; auto-flow assigns columns left→right.
+// grid-row: 1 locks all 8 buttons to the icon row; auto-flow assigns columns left→right.
 .rail-vp-btn {
   grid-row: 1;
   display: inline-flex;
@@ -470,16 +470,11 @@
   }
 }
 
-// The "Full height" toggle (stage/layout-toggle.ts): row 2, last column. On/off reads from the glyph
-// weight and the opacity rule above, not the accent: the cluster keeps one accent (active viewport or
-// Disco).
-.rail-vp-btn.layout-toggle-btn {
-  grid-row: auto;
-  grid-area: height;
-
-  &[hidden] {
-    display: none;
-  }
+// The "Full height" toggle (stage/layout-toggle.ts): in the icon row, between Disco and Full page. On/off
+// reads from the glyph weight and the opacity rule above, not the accent: the cluster keeps one accent
+// (active viewport or Disco). Hidden with no pattern on stage, and then takes no column.
+.rail-vp-btn.layout-toggle-btn[hidden] {
+  display: none;
 }
 
 // Active viewport mode = accent, but ONLY while disco isn't engaged. Disco engaged = accent. The
@@ -495,7 +490,7 @@
   color: var(--pd-accent);
 }
 
-// Readout — grid area row 2 left (3 cols).
+// Readout — grid area row 2 left (4 cols).
 .vp-readout {
   grid-area: readout;
   justify-self: start;

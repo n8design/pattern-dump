@@ -1,6 +1,7 @@
 // @pattern-dump/core
 // Orchestration: load config, start dev server, run the diagnostics audit.
 import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite, ensureScratchDir } from "@pattern-dump/dev-server";
+import { readProjectGraph, graphJson, describeOf, affectedOf } from "@pattern-dump/dev-server";
 import type { DevServerOptions, AuditFormat } from "@pattern-dump/dev-server";
 import { PD_HOSTS, PD_ROUTES, type DiagnosticsGraph, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { request as httpRequest } from "node:http";
@@ -9,6 +10,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile, unlink, mkdir } from "node:fs/promises";
 import { basename, join, dirname, resolve, relative, isAbsolute } from "node:path";
 import { tmpdir } from "node:os";
+import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { ConfigError, configWarnings, validateConfig, withOwnManifest, type PatternDumpConfig } from "@pattern-dump/config";
@@ -23,6 +25,36 @@ export async function runDev(
   const file = configFileOf(root, configPath);
   await startDevServer(config, root, { ...opts, configPath: file, reloadConfig: () => loadConfig(root, configPath) });
   // dev-server runs indefinitely; do not close unless signalled.
+}
+
+/**
+ * `pd mcp`: the MCP server over stdio, for a client that starts a process (Claude Code's .mcp.json, the Claude desktop
+ * app). One JSON-RPC message per line in, one answer per line out. It runs the project's own pd dev in this process
+ * (on free loopback ports, with its watcher), so its answers are pd dev's and follow every save. stdout carries the
+ * protocol only: whatever else would be printed goes to stderr. Ends when stdin closes.
+ */
+export async function runMcp(root: string, configPath: string | undefined, version: string): Promise<void> {
+  const out = process.stdout.write.bind(process.stdout);
+  process.stdout.write = process.stderr.write.bind(process.stderr) as typeof process.stdout.write;
+  console.log = console.error;
+  console.info = console.error;
+  const config = await loadConfig(root, configPath);
+  const file = configFileOf(root, configPath);
+  const server = await startDevServer(config, root, {
+    port: 0, wsPort: 0, version, configPath: file, reloadConfig: () => loadConfig(root, configPath),
+  });
+  const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  for await (const line of lines) {
+    if (!line.trim()) continue;
+    let message: unknown;
+    try { message = JSON.parse(line); } catch {
+      out(`${JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "the line is not JSON" } })}\n`);
+      continue;
+    }
+    const answer = await server.mcp(message);
+    if (answer) out(`${JSON.stringify(answer)}\n`);
+  }
+  await server.close();
 }
 
 /**
@@ -166,8 +198,8 @@ export async function runAudit(
   root: string, configPath?: string, format: AuditFormat = "md", opts: { strict?: boolean } = {},
 ): Promise<{ failed: boolean }> {
   const config = await loadConfig(root, configPath);
-  const { graph, reaudited, reused, artifactPath, imageWarning } = await runDiagnosticsAudit(config, root);
-  const report = formatAudit(graph, format);
+  const { graph, style, reaudited, reused, artifactPath, imageWarning } = await runDiagnosticsAudit(config, root);
+  const report = formatAudit(graph, format, { style });
   const ext = format === "json" ? "json" : format === "text" ? "txt" : "md";
   const reportPath = join(dirname(artifactPath), `diagnostics-report.${ext}`);
   await writeFile(reportPath, report, "utf-8");
@@ -244,6 +276,56 @@ function assertOutsideRoot(outDir: string, root: string): void {
  * verbatim — it does not auto-repair drift. Same discipline as the flattening diagnostic (report,
  * don't fix) and the D1 thesis (read what the subject declares, don't impose).
  */
+/** `pd graph`: the project graph, as JSON (the same as /api/graph), or a summary of its nodes and edges by kind. */
+export async function runGraph(root: string, configPath: string | undefined, json: boolean): Promise<string> {
+  const { graph } = await readProjectGraph(await loadConfig(root, configPath), root);
+  const g = graphJson(graph);
+  if (json) return JSON.stringify(g);
+  const count = (xs: ReadonlyArray<{ kind: string }>): string => {
+    const by = new Map<string, number>();
+    for (const x of xs) by.set(x.kind, (by.get(x.kind) ?? 0) + 1);
+    return [...by].sort(([a], [b]) => a.localeCompare(b)).map(([k, n]) => `${n} ${k}`).join(", ");
+  };
+  return [`Project graph (version ${g.version})`, `  ${g.nodes.length} nodes: ${count(g.nodes)}`, `  ${g.edges.length} edges: ${count(g.edges)}`,
+    "", "pd graph --json prints it whole; pd describe <id> answers for one component."].join("\n");
+}
+
+/** `pd describe <id>`: its contract, usage, ownership and blast radius, as JSON or a short text. */
+export async function runDescribe(root: string, configPath: string | undefined, id: string, json: boolean): Promise<string> {
+  const { graph, discoveryMap } = await readProjectGraph(await loadConfig(root, configPath), root);
+  const d = await describeOf(graph, id, discoveryMap);
+  if (json) return JSON.stringify(d, null, 2);
+  const list = (xs: string[]): string => (xs.length ? [...new Set(xs)].join(", ") : "none");
+  return [
+    `${d.id} (${d.contract.role}${"package" in d.contract.origin ? `, from ${d.contract.origin.package}` : ""})`,
+    `  Contract: ${d.contract.schema === null ? "no schema" : "a schema"}; variants: ${list(d.contract.variants.map(v => v.id))}`,
+    `  Used by: ${list(d.usage.components)}; on pages: ${list([...new Set(d.usage.pages.map(p => p.route))])}`,
+    `  Stylesheets: ${list(d.ownership.stylesheets.map(s => s.file))}`,
+    `  Styles classes of: ${list(d.ownership.stylesClassesOf.map(c => c.component))}; its classes are styled by: ${list(d.ownership.classesStyledBy.map(c => c.component))}`,
+    `  Blast radius: ${d.blastRadius.components.length} components, ${d.blastRadius.stylesheets.length} stylesheets, ${d.blastRadius.pages.length} pages`,
+    "", "pd describe <id> --json gives each part in full, with the path to everything in the blast radius.",
+  ].join("\n");
+}
+
+/** `pd affected <id|file>...`: everything the change reaches. A target that names a file (from `cwd`) is a changed
+ *  file; anything else a component id. */
+export async function runAffected(root: string, configPath: string | undefined, targets: readonly string[], json: boolean, cwd: string): Promise<string> {
+  const { graph, pagesPrefix, display } = await readProjectGraph(await loadConfig(root, configPath), root);
+  const files: string[] = [];
+  const ids: string[] = [];
+  for (const t of targets) {
+    const abs = resolve(cwd, t);
+    if (existsSync(abs)) files.push(display(abs)); else ids.push(t);
+  }
+  const a = affectedOf(graph, { ids, files }, pagesPrefix);
+  if (json) return JSON.stringify(a, null, 2);
+  return [
+    `Changed: ${a.changed.join(", ") || "nothing the graph knows"}${a.unknown.length ? ` (not in the graph: ${a.unknown.join(", ")})` : ""}`,
+    `  ${a.components.length} components: ${a.components.join(", ") || "none"}`,
+    `  ${a.pages.length} pages: ${a.pages.join(", ") || "none"}`,
+  ].join("\n");
+}
+
 export async function runExport(root: string, configPath?: string, outDir?: string): Promise<void> {
   const config = await loadConfig(root, configPath);
   const patternsDir = resolve(root, config.patternsDir);

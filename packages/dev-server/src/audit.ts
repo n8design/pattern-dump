@@ -13,7 +13,7 @@
 
 import { createImageService } from "./image-service.js";
 import type { PatternDumpConfig } from "@pattern-dump/config";
-import type { DiagnosticsGraph } from "@pattern-dump/contracts";
+import type { AuditStyle, DiagnosticsGraph } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
 import { assertInstalledAxe } from "@pattern-dump/a11y";
@@ -25,6 +25,8 @@ import { auditInputs, refreshDiagnosticsGraph, graphArtifactPath, type CheckRend
 import { resolveServerConfig } from "./server-config.js";
 import { loadPatternPackages } from "./packages.js";
 import { createDisplayPath } from "./display-path.js";
+import { buildProjectGraph } from "./graph/standalone.js";
+import { auditStyleOf } from "./graph/queries.js";
 
 /**
  * Headless `pd audit` — build (or hash-refresh) the diagnostics graph WITHOUT starting the HTTP server.
@@ -34,7 +36,7 @@ import { createDisplayPath } from "./display-path.js";
  */
 export async function runDiagnosticsAudit(
   config: PatternDumpConfig, cwd: string,
-): Promise<{ graph: DiagnosticsGraph; reaudited: string[]; reused: number; artifactPath: string; imageWarning?: string }> {
+): Promise<{ graph: DiagnosticsGraph; style: AuditStyle; reaudited: string[]; reused: number; artifactPath: string; imageWarning?: string }> {
   // Once for the whole audit, before any component: the producer would otherwise report the same mismatch as a
   // defect of every component.
   assertInstalledAxe();
@@ -68,5 +70,8 @@ export async function runDiagnosticsAudit(
   const { graph, reaudited, reused } = await refreshDiagnosticsGraph(cwd, auditedComponentIds(discovery), render, discovery.quarantineMap, inputs);
   // Headless one-shot also emits the flattening side artifact.
   await surfaceFlattening(discovery.discoveryMap, registry, cwd);
-  return { graph, reaudited, reused, artifactPath: graphArtifactPath(cwd), ...(imageWarning ? { imageWarning } : {}) };
+  // The style couplings beside the findings, from the project graph of the same discovery (graph/standalone.ts), as
+  // the workbench's /api/audit has them: never findings, never counted.
+  const style = auditStyleOf(await buildProjectGraph(cfg, { live: true, discovery, composition: registry }), auditedComponentIds(discovery));
+  return { graph, style, reaudited, reused, artifactPath: graphArtifactPath(cwd), ...(imageWarning ? { imageWarning } : {}) };
 }

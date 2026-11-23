@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @pattern-dump/cli — the `pd` binary. Parsing is pure (./args.ts); this file only runs the result.
-import { checkSitePages, runDev, runAudit, runBuild, runExport } from "@pattern-dump/core";
+import { checkSitePages, runDev, runAudit, runBuild, runExport, runGraph, runDescribe, runAffected, runMcp } from "@pattern-dump/core";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -15,7 +15,7 @@ const command = parseCommand(process.argv.slice(2), process.cwd());
  *  config, so it gets its message alone; anything else keeps its stack trace. Matched by name, not
  *  class, so the CLI needs no import beyond core. */
 function describeError(e: unknown): unknown {
-  return e instanceof Error && (e.name === "ConfigError" || e.name === "AxeVersionError") ? e.message : e;
+  return e instanceof Error && (e.name === "ConfigError" || e.name === "AxeVersionError" || e.name === "UnknownIdError") ? e.message : e;
 }
 
 switch (command.kind) {
@@ -54,6 +54,7 @@ switch (command.kind) {
 
   case "dev":
     runDev(command.root, {
+      version: PD_VERSION,
       ...(command.port !== undefined ? { port: command.port } : {}),
       ...(command.wsPort !== undefined ? { wsPort: command.wsPort } : {}),
     }, command.configPath).catch((e: unknown) => {
@@ -100,6 +101,26 @@ switch (command.kind) {
     runExport(command.root, command.configPath, command.out)
       .then(() => { process.exitCode = 0; })
       .catch((e) => { console.error("[pd] Error:", describeError(e)); process.exitCode = 1; });
+    break;
+
+  case "graph":
+  case "describe":
+  case "affected": {
+    // Printed whole, then an explicit exit once stdout has drained (as for audit: a pipe writes asynchronously).
+    // An unknown id is exit code 1, with the nearest ids.
+    const run = command.kind === "graph" ? runGraph(command.root, command.configPath, command.json)
+      : command.kind === "describe" ? runDescribe(command.root, command.configPath, command.id, command.json)
+        : runAffected(command.root, command.configPath, command.targets, command.json, process.cwd());
+    run.then(out => process.stdout.write(`${out}\n`, () => process.exit(0)))
+      .catch((e) => { console.error("[pd] Error:", describeError(e)); process.exit(1); });
+    break;
+  }
+
+  case "mcp":
+    // Runs until the client closes stdin; then the server is closed and the process exits.
+    runMcp(command.root, command.configPath, PD_VERSION)
+      .then(() => process.exit(0))
+      .catch((e) => { console.error("[pd] Error:", describeError(e)); process.exit(1); });
     break;
 
   case "help":

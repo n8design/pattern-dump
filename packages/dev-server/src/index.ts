@@ -19,7 +19,7 @@
 //   /source/:id/data             — Shiki-highlighted JSON data fragment
 //   *                            — SPA shell
 import { createSymbolService, type SymbolReport } from "./symbol-service.js";
-import type { PatternDumpConfig } from "@pattern-dump/config";
+import { ConfigError, suggest, type PatternDumpConfig } from "@pattern-dump/config";
 import { PD_HOSTS, type Diagnostic, type DiscoveryResult, type Render } from "@pattern-dump/contracts";
 import { buildDiscoveryMap } from "@pattern-dump/discovery";
 // Re-exported so the export/CLI orchestration (core) can key its report on the SAME handle derivation
@@ -31,6 +31,7 @@ import {
 import { createSassDependencyTracker, compileSassFile } from "@pattern-dump/build";
 import { createHotReloader, type HotReloader } from "@pattern-dump/hotreloader";
 import { isOwnOrigin, ownHosts } from "./own-hosts.js";
+import type { McpHandler } from "./mcp/server.js";
 
 /** Headless servers (pd build) push nowhere: no socket is opened and nothing is retained. */
 const SILENT_RELOADER: HotReloader = {
@@ -64,6 +65,10 @@ import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 import { surfaceAssetRoots, surfaceCollisions, surfaceDefaultTheme, surfaceDocumentBase, surfaceFlattening } from "./surfacing.js";
 // Headless `pd audit`. Re-exported: packages/core imports it.
 export { runDiagnosticsAudit } from "./audit.js";
+// The project graph and its answers, for pd graph, pd describe and pd affected (packages/core).
+export { readProjectGraph, type ProjectGraphRead } from "./graph/project.js";
+export { graphJson, type ProjectGraph } from "./graph/build.js";
+export { affectedOf, blastRadiusOf, contractOf, describeOf, ownershipOf, usageOf, UnknownIdError } from "./graph/answers.js";
 export { buildStaticSite } from "./static-build.js";
 export { withBasePath } from "./snapshot-writer.js";
 export { loadProjectPagefind, PAGEFIND_INSTALL } from "./storefront/search.js";
@@ -79,7 +84,7 @@ import { applyStyleData, cachedDiscovery, compositionFor, createServerState, cur
 import { resolveServerConfig } from "./server-config.js";
 import { createImageService } from "./image-service.js";
 // HTTP route handling — takes an explicit RouteContext instead of closing over this scope.
-import { handleRequest, type RouteContext, type BootStamp } from "./routes.js";
+import { handleRequest, mcpHandlerFor, type RouteContext, type BootStamp } from "./routes.js";
 import { createSiteValues } from "./storefront/site-values.js";
 import { resolveDevUiDist, servedAxeVersion } from "./assets.js";
 import { assertAxeVersion } from "@pattern-dump/a11y";
@@ -130,6 +135,8 @@ export type { AuditRollup, AuditRuleRollup, AuditComponentRollup } from "@patter
 
 export interface DevServerOptions {
   port?: number;
+  /** Pattern Dump's version, as the MCP server names itself in `initialize`. Default: "0.0.0-dev". */
+  version?: string;
   wsPort?: number;
   /** false = headless: no live-reload socket and no file watcher. Used by `pd build`, which only
    *  reads the routes once. Default true. */
@@ -165,6 +172,8 @@ export interface DevServerOptions {
 }
 export interface DevServer {
   port: number;
+  /** The MCP server's message handler, for pd mcp's stdio: the same tools, answering from this server. */
+  mcp: McpHandler;
   close(): Promise<void>;
   /** For pd build's style checks (class-check.ts, property-check.ts), not part of the HTTP contract: every compiled
    *  stylesheet of the style guide (each component's, the base layer, each theme; project and packages) and every
@@ -282,7 +291,7 @@ export async function startDevServer(
   // A live-reload connection from a browser page is accepted only from a page pd dev served: one of its own
   // hosts, at its HTTP port (known once it listens; until then no page of it exists).
   let httpPort = -1;
-  const hosts = ownHosts(cfg.storefront?.host);
+  const hosts = ownHosts(cfg.storefront?.host, cfg.mcpHost);
   // Before binding anything: a port another server holds on IPv4 or IPv6 stops pd dev (ports.ts, assertPortFree).
   const wsPortChosen = opts.wsPort !== undefined || process.env["PD_WS_PORT"] !== undefined;
   if (live) await assertPortFree(wsPort, "live reload", { http: port, wsChosen: wsPortChosen });
@@ -336,6 +345,13 @@ export async function startDevServer(
   // Initial index build: one compile pass per SCSS file produces all style data.
   {
     const dr = await buildDiscoveryMap(patternRoots);
+    // The workbench's start item names a component that exists, or pd dev (and pd build, which runs it) stops here.
+    const start = config.shell?.start;
+    if (start !== undefined && !dr.discoveryMap.has(start)) {
+      await hotreloader.close().catch(() => {});
+      const near = suggest(start, [...dr.discoveryMap.keys()]);
+      throw new ConfigError(`"shell.start": there is no component "${start}"${near ? `: did you mean "${near}"?` : ""}`);
+    }
     setDiscovery(state, dr);
     await surfaceCollisions(dr.collisions, cwd, hotreloader, dr.orphanVariants);
     for (const o of dr.overrides) {
@@ -383,7 +399,7 @@ export async function startDevServer(
   let settleWatcher: (() => Promise<void>) | null = null;
   const testHooks = live && process.env["PD_TEST_HOOKS"] === "1";
   const routeCtx: RouteContext = {
-    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
+    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, version: opts.version ?? "0.0.0-dev", ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
     ...(opts.pagesOnce ? { pagesOnce: true } : {}),
     images: async () => { await images.ready(generationNow()); return images.lookup; },
     symbols,
@@ -410,6 +426,7 @@ export async function startDevServer(
   if (live) {
     if (cfg.storefront) console.log(`[dev-server] Website:   http://${cfg.storefront.host}:${actualPort}${cfg.storefront.basePath}`);
     console.log(`[dev-server] Workbench: http://${cfg.storefront ? PD_HOSTS.workbench : "localhost"}:${actualPort}/`);
+    console.log(`[dev-server] MCP:       http://${cfg.mcpHost}:${actualPort}/ (or http://localhost:${actualPort}/mcp)`);
     // Search is built by pd build only: an index on every save would slow it down.
     if (cfg.storefront && cfg.storefront.search !== false && (cfg.storefront.search === true || projectPagefindEntry(cfg.cwd) !== undefined)) {
       console.log(`[dev-server] Search: the index is built by pd build, so the site's search finds nothing in pd dev`);
@@ -443,6 +460,7 @@ export async function startDevServer(
 
   return {
     port: actualPort,
+    mcp: mcpHandlerFor(routeCtx),
     async styleGuide() {
       const discovery = await currentDiscovery(state, patternRoots);
       await state.style.get(() => buildAllStyleData(styleRoots, baseComponentIds(discovery)));

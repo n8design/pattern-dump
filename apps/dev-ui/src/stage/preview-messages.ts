@@ -17,6 +17,7 @@ import { dom } from "../core/dom.js";
 import { showFullpageChrome } from "./fullpage.js";
 import { acceptContentHeightMessage } from "./content-height.js";
 import { acceptContentWidth } from "./content-width.js";
+import { syncFrameGround } from "./frame-ground.js";
 import { updateReadout } from "./viewport.js";
 
 export function listenForPreviewMessages(): void {
@@ -37,6 +38,8 @@ export function listenForPreviewMessages(): void {
       // stage and a taller page scrolls INSIDE it. documentElement.scrollHeight stays the measurement
       // (glyph-ink + margin-collapse correct).
       acceptContentHeightMessage(e, document.querySelectorAll("iframe"));
+      // A height message follows a load and a restyle (a stylesheet swapped by live reload): the ground may have moved.
+      if (e.source === dom.iframe.contentWindow) syncFrameGround();
     } else if (data.type === "pd-width" && typeof data.width === "number" && typeof data.at === "number") {
       const { width, at } = data;
       const scroll = typeof data.scroll === "number" ? data.scroll : at;

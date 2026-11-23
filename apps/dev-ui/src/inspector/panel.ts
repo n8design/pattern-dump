@@ -7,7 +7,7 @@
 //
 // Depends on ./audit.js, never the reverse — the audit facet does not know the panel exists.
 
-import type { StyleModuleId } from "@pattern-dump/contracts";
+import type { StyleCoupling, StyleModuleId } from "@pattern-dump/contracts";
 import { dom } from "../core/dom.js";
 import { session } from "../core/session.js";
 import { routeHref } from "../core/runtime.js";
@@ -42,7 +42,7 @@ export async function renderPanel(): Promise<void> {
     // Helper: render a group of navigable component ids, grouped by category.
     // Component items are nested inside their category's own <ul> (structural hierarchy).
     function appendComponentGroup(
-      label: string, ids: string[], container: HTMLElement, headingTag: "h3" | "h4" = "h3"
+      label: string, ids: string[], container: HTMLElement, headingTag: "h3" | "h4" = "h3", emptyText = "none"
     ): void {
       const h = document.createElement(headingTag);
       h.className = "rel-group-heading";
@@ -52,7 +52,7 @@ export async function renderPanel(): Promise<void> {
       if (ids.length === 0) {
         const empty = document.createElement("p");
         empty.className = "rel-empty";
-        empty.textContent = "none";
+        empty.textContent = emptyText;
         container.appendChild(empty);
         return;
       }
@@ -100,7 +100,7 @@ export async function renderPanel(): Promise<void> {
           const a = document.createElement("a");
           a.className = "rel-link";
           a.href = routeHref(`/${id}`);
-          a.textContent = meta?.title ?? id;
+          a.textContent = shownName(id);
           li.appendChild(a);
           if (isPrivate) {
             const badge = document.createElement("span");
@@ -116,9 +116,66 @@ export async function renderPanel(): Promise<void> {
       container.appendChild(list);
     }
 
+    // Helper: how a component is named, by its title; a variant (atoms/price~sale) by its base's title and its name.
+    function shownName(id: string): string {
+      const tilde = id.indexOf("~");
+      if (tilde < 0) return session.componentRegistry.get(id)?.title ?? id;
+      const base = id.slice(0, tilde);
+      return `${session.componentRegistry.get(base)?.title ?? base} · ${id.slice(tilde + 1)}`;
+    }
+
+    // Helper: a sub-group of style couplings, each a link to the other component, its stylesheet and its classes.
+    function appendCouplings(label: string, couplings: StyleCoupling[], container: HTMLElement, emptyText: string, own: boolean): void {
+      const h = document.createElement("h4");
+      h.className = "rel-group-heading";
+      h.textContent = label;
+      container.appendChild(h);
+      if (couplings.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "rel-empty";
+        empty.textContent = emptyText;
+        container.appendChild(empty);
+        return;
+      }
+      const list = document.createElement("ul");
+      list.className = "rel-list rel-couplings";
+      for (const c of couplings) {
+        const li = document.createElement("li");
+        li.className = "rel-coupling";
+        const a = document.createElement("a");
+        a.className = "rel-link";
+        a.href = routeHref(`/${c.component}`);
+        a.textContent = shownName(c.component);
+        li.appendChild(a);
+        const where = document.createElement("span");
+        where.className = "rel-coupling-sheet";
+        // A template's <style> is named as such: its own as in the Stylesheet group above, another's by its template.
+        const inline = c.stylesheet.endsWith(".hbs");
+        where.textContent = !inline ? ` in ${c.stylesheet}`
+          : own ? " in its template's <style>" : ` in the <style> of ${c.stylesheet}`;
+        li.appendChild(where);
+        const classes = document.createElement("ul");
+        classes.className = "rel-coupling-classes";
+        for (const cls of c.classes) {
+          const ci = document.createElement("li");
+          const code = document.createElement("code");
+          code.textContent = `.${cls.name}`;
+          ci.appendChild(code);
+          ci.append(" in ");
+          const sel = document.createElement("code");
+          sel.textContent = cls.selector;
+          ci.appendChild(sel);
+          classes.appendChild(ci);
+        }
+        li.appendChild(classes);
+        list.appendChild(li);
+      }
+      container.appendChild(list);
+    }
+
     // Helper: render a plain-text (non-navigable) group.
     function appendPlainGroup(
-      label: string, ids: StyleModuleId[], container: HTMLElement, headingTag: "h3" | "h4" = "h3"
+      label: string, ids: StyleModuleId[], container: HTMLElement, headingTag: "h3" | "h4" = "h3", emptyText = "none"
     ): void {
       const h = document.createElement(headingTag);
       h.className = "rel-group-heading";
@@ -127,7 +184,7 @@ export async function renderPanel(): Promise<void> {
       if (ids.length === 0) {
         const empty = document.createElement("p");
         empty.className = "rel-empty";
-        empty.textContent = "none";
+        empty.textContent = emptyText;
         container.appendChild(empty);
         return;
       }
@@ -159,14 +216,23 @@ export async function renderPanel(): Promise<void> {
       }), section);
     }
 
-    // Style umbrella: groups Style uses + Style modules under a shared heading.
+    // Style umbrella: its own stylesheets, the classes it borrows, the style couplings both ways, and the modules.
     const styleUmbrella = document.createElement("div");
     styleUmbrella.className = "rel-style-umbrella";
     const styleH = document.createElement("h3");
     styleH.className = "rel-group-heading rel-umbrella-heading";
     styleH.textContent = "Style";
     styleUmbrella.appendChild(styleH);
-    appendComponentGroup("Style uses",    relAvail.styleUses,             styleUmbrella, "h4");
+    appendPlainGroup("Stylesheet", (relAvail.stylesheets ?? []).map(sheet =>
+      sheet.source === "inline" ? "its template's <style>"
+        : sheet.source === "external" ? `${sheet.file} (on another host, not read)`
+          : sheet.file), styleUmbrella, "h4", "None: no stylesheet is named after it");
+    appendComponentGroup("Borrows classes from", relAvail.styleUses, styleUmbrella, "h4",
+      "None: its template uses only its own classes and the base layer");
+    appendCouplings("Styles classes of", relAvail.stylesClassesOf ?? [], styleUmbrella,
+      "None: its stylesheets style only its own classes", true);
+    appendCouplings("Its classes are styled by", relAvail.classesStyledBy ?? [], styleUmbrella,
+      "None: no other component's stylesheet styles its classes", false);
     // "Style modules" surfaces two distinct relationships as one plain list (separable in the
     // payload): @use dependencies (styleUsesModules) + class-borrowed shared modules (styleModules).
     const styleModulesAll = [...new Set([
@@ -176,28 +242,34 @@ export async function renderPanel(): Promise<void> {
     appendPlainGroup("Style modules",     styleModulesAll,                styleUmbrella, "h4");
     section.appendChild(styleUmbrella);
 
-    // Leftover chips: inlineStyles, utilityClasses, unattributedClasses.
-    const hasChips = relAvail.inlineStyles || relAvail.utilityClasses || (relAvail.unattributedClasses?.length ?? 0) > 0;
-    if (hasChips) {
+    // Leftovers: inline styles and utility classes, a sentence each; the classes no stylesheet defines, as chips
+    // under a heading of their own.
+    const unattributed = relAvail.unattributedClasses ?? [];
+    if (relAvail.inlineStyles || relAvail.utilityClasses || unattributed.length > 0) {
       const chips = document.createElement("div");
       chips.className = "rel-chips";
-      if (relAvail.inlineStyles) {
-        const chip = document.createElement("span");
-        chip.className = "rel-chip rel-chip--inline-styles";
-        chip.textContent = "Inline styles";
-        chips.appendChild(chip);
-      }
-      if (relAvail.utilityClasses) {
-        const chip = document.createElement("span");
-        chip.className = "rel-chip rel-chip--utility-classes";
-        chip.textContent = "Utility classes";
-        chips.appendChild(chip);
-      }
-      for (const cls of (relAvail.unattributedClasses ?? [])) {
-        const chip = document.createElement("span");
-        chip.className = "rel-chip rel-chip--unattributed";
-        chip.textContent = cls;
-        chips.appendChild(chip);
+      const note = (cls: string, label: string, text: string): void => {
+        const p = document.createElement("p");
+        p.className = `rel-note ${cls}`;
+        const b = document.createElement("span");
+        b.className = "rel-chip";
+        b.textContent = label;
+        p.append(b, ` ${text}`);
+        chips.appendChild(p);
+      };
+      if (relAvail.inlineStyles) note("rel-chip--inline-styles", "Inline styles", "Its template has a style attribute or a <style> element.");
+      if (relAvail.utilityClasses) note("rel-chip--utility-classes", "Utility classes", "Its template uses classes of a utility framework.");
+      if (unattributed.length > 0) {
+        const h = document.createElement("h4");
+        h.className = "rel-group-heading rel-unattributed-heading";
+        h.textContent = "Classes no stylesheet defines";
+        chips.appendChild(h);
+        for (const cls of unattributed) {
+          const chip = document.createElement("span");
+          chip.className = "rel-chip rel-chip--unattributed";
+          chip.textContent = cls;
+          chips.appendChild(chip);
+        }
       }
       section.appendChild(chips);
     }
