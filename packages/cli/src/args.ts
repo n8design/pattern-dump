@@ -14,6 +14,9 @@ export type Command =
   | { kind: "dev"; root: string; configPath?: string; port?: number; wsPort?: number }
   | { kind: "audit"; root: string; configPath?: string; format: AuditFormat; strict?: boolean }
   | { kind: "export"; root: string; configPath?: string; out?: string }
+  | { kind: "graph"; root: string; configPath?: string; json: boolean }
+  | { kind: "describe"; root: string; configPath?: string; id: string; json: boolean }
+  | { kind: "affected"; root: string; configPath?: string; targets: string[]; json: boolean }
   | { kind: "build"; root: string; configPath?: string; out?: string; base?: string; audit?: boolean; browser?: boolean; checkWorkers?: number; skipChecks?: string[] }
   | { kind: "init"; target: string; yes: boolean; name?: string; brand?: string; examples?: boolean;
       storefront?: boolean; search?: boolean; systemTheme?: boolean; install?: boolean; git?: boolean; pdSource?: string;
@@ -24,7 +27,7 @@ export type Command =
   | { kind: "version" }
   | { kind: "error"; message: string };
 
-const COMMANDS = ["init", "dev", "audit", "build", "export"] as const;
+const COMMANDS = ["init", "dev", "audit", "build", "export", "graph", "describe", "affected"] as const;
 
 /** `--root` and `--config` resolve against the invoking cwd, independently of each other: a config
  *  may live outside the root it opens (a read-only project you don't own). The config's own paths
@@ -83,6 +86,22 @@ export function parseCommand(argv: string[], cwd: string): Command {
         return { kind: "error", message: `--format must be one of md|text|json (got "${format}")` };
       }
       return { kind: "audit", ...base(values, cwd), format, ...(values.strict ? { strict: true } : {}) };
+    }
+
+    if (cmd === "graph" || cmd === "describe" || cmd === "affected") {
+      const { values, positionals } = parseArgs({
+        args: rest, strict: true, allowPositionals: cmd !== "graph",
+        options: { ...rootAndConfig, json: { type: "boolean" } },
+      });
+      if (values.help) return { kind: "help", topic: cmd };
+      const json = values.json === true;
+      if (cmd === "graph") return { kind: "graph", ...base(values, cwd), json };
+      if (cmd === "describe") {
+        if (positionals.length !== 1) return { kind: "error", message: "pd describe takes one component id, such as atoms/button" };
+        return { kind: "describe", ...base(values, cwd), id: positionals[0]!, json };
+      }
+      if (positionals.length === 0) return { kind: "error", message: "pd affected takes one or more component ids or changed files" };
+      return { kind: "affected", ...base(values, cwd), targets: positionals, json };
     }
 
     if (cmd === "build") {
@@ -270,6 +289,19 @@ export const USAGE = `Usage: pd <command> [options]
     --root <path>      Export a specific project root (read-only)
     --out <dir>        Durable output sink (must be outside --root)
     --config <path>    Use a config file outside the root
+
+  graph    Print the project graph: components, stylesheets, classes and pages, and how they connect
+    --root <path>      A specific project root
+    --config <path>    Use a config file outside the root
+    --json             The graph as JSON (the same as the workbench's /api/graph); without it, a summary
+
+  describe <id>  What a component accepts, where it is used, which stylesheets style it, and what breaks
+                 if it changes (its contract, usage, ownership and blast radius)
+    --root <path>, --config <path>, --json   As for graph
+
+  affected <id|file>...  Everything a change reaches: the components and pages to check before handing
+                 over. Takes component ids and changed files (paths from the current folder)
+    --root <path>, --config <path>, --json   As for graph
 
   help     Show this help
   --version, -v        Print the installed version`;

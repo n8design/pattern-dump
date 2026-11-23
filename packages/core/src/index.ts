@@ -1,6 +1,7 @@
 // @pattern-dump/core
 // Orchestration: load config, start dev server, run the diagnostics audit.
 import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite, ensureScratchDir } from "@pattern-dump/dev-server";
+import { readProjectGraph, graphJson, describeOf, affectedOf } from "@pattern-dump/dev-server";
 import type { DevServerOptions, AuditFormat } from "@pattern-dump/dev-server";
 import { PD_HOSTS, PD_ROUTES, type DiagnosticsGraph, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { request as httpRequest } from "node:http";
@@ -244,6 +245,56 @@ function assertOutsideRoot(outDir: string, root: string): void {
  * verbatim — it does not auto-repair drift. Same discipline as the flattening diagnostic (report,
  * don't fix) and the D1 thesis (read what the subject declares, don't impose).
  */
+/** `pd graph`: the project graph, as JSON (the same as /api/graph), or a summary of its nodes and edges by kind. */
+export async function runGraph(root: string, configPath: string | undefined, json: boolean): Promise<string> {
+  const { graph } = await readProjectGraph(await loadConfig(root, configPath), root);
+  const g = graphJson(graph);
+  if (json) return JSON.stringify(g);
+  const count = (xs: ReadonlyArray<{ kind: string }>): string => {
+    const by = new Map<string, number>();
+    for (const x of xs) by.set(x.kind, (by.get(x.kind) ?? 0) + 1);
+    return [...by].sort(([a], [b]) => a.localeCompare(b)).map(([k, n]) => `${n} ${k}`).join(", ");
+  };
+  return [`Project graph (version ${g.version})`, `  ${g.nodes.length} nodes: ${count(g.nodes)}`, `  ${g.edges.length} edges: ${count(g.edges)}`,
+    "", "pd graph --json prints it whole; pd describe <id> answers for one component."].join("\n");
+}
+
+/** `pd describe <id>`: its contract, usage, ownership and blast radius, as JSON or a short text. */
+export async function runDescribe(root: string, configPath: string | undefined, id: string, json: boolean): Promise<string> {
+  const { graph, discoveryMap } = await readProjectGraph(await loadConfig(root, configPath), root);
+  const d = await describeOf(graph, id, discoveryMap);
+  if (json) return JSON.stringify(d, null, 2);
+  const list = (xs: string[]): string => (xs.length ? [...new Set(xs)].join(", ") : "none");
+  return [
+    `${d.id} (${d.contract.role}${"package" in d.contract.origin ? `, from ${d.contract.origin.package}` : ""})`,
+    `  Contract: ${d.contract.schema === null ? "no schema" : "a schema"}; variants: ${list(d.contract.variants.map(v => v.id))}`,
+    `  Used by: ${list(d.usage.components)}; on pages: ${list([...new Set(d.usage.pages.map(p => p.route))])}`,
+    `  Stylesheets: ${list(d.ownership.stylesheets.map(s => s.file))}`,
+    `  Styles classes of: ${list(d.ownership.stylesClassesOf.map(c => c.component))}; its classes are styled by: ${list(d.ownership.classesStyledBy.map(c => c.component))}`,
+    `  Blast radius: ${d.blastRadius.components.length} components, ${d.blastRadius.stylesheets.length} stylesheets, ${d.blastRadius.pages.length} pages`,
+    "", "pd describe <id> --json gives each part in full, with the path to everything in the blast radius.",
+  ].join("\n");
+}
+
+/** `pd affected <id|file>...`: everything the change reaches. A target that names a file (from `cwd`) is a changed
+ *  file; anything else a component id. */
+export async function runAffected(root: string, configPath: string | undefined, targets: readonly string[], json: boolean, cwd: string): Promise<string> {
+  const { graph, pagesPrefix, display } = await readProjectGraph(await loadConfig(root, configPath), root);
+  const files: string[] = [];
+  const ids: string[] = [];
+  for (const t of targets) {
+    const abs = resolve(cwd, t);
+    if (existsSync(abs)) files.push(display(abs)); else ids.push(t);
+  }
+  const a = affectedOf(graph, { ids, files }, pagesPrefix);
+  if (json) return JSON.stringify(a, null, 2);
+  return [
+    `Changed: ${a.changed.join(", ") || "nothing the graph knows"}${a.unknown.length ? ` (not in the graph: ${a.unknown.join(", ")})` : ""}`,
+    `  ${a.components.length} components: ${a.components.join(", ") || "none"}`,
+    `  ${a.pages.length} pages: ${a.pages.join(", ") || "none"}`,
+  ].join("\n");
+}
+
 export async function runExport(root: string, configPath?: string, outDir?: string): Promise<void> {
   const config = await loadConfig(root, configPath);
   const patternsDir = resolve(root, config.patternsDir);

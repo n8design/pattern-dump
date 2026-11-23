@@ -156,3 +156,27 @@ describe("help and errors", () => {
     expect(parseCommand(["dev", "--port"], cwd)).toMatchObject({ kind: "error" });
   });
 });
+
+describe("pd graph, pd describe, pd affected", () => {
+  it("pd graph: --root, --config and --json, no positional", () => {
+    expect(parseCommand(["graph"], cwd)).toEqual({ kind: "graph", root: cwd, json: false });
+    expect(parseCommand(["graph", "--json", "--root", "../ds"], cwd)).toEqual({ kind: "graph", root: "/work/ds", json: true });
+    expect(parseCommand(["graph", "atoms/button"], cwd)).toMatchObject({ kind: "error" });
+  });
+
+  it("pd describe takes exactly one id", () => {
+    expect(parseCommand(["describe", "atoms/button", "--json"], cwd)).toEqual({ kind: "describe", root: cwd, id: "atoms/button", json: true });
+    expect(parseCommand(["describe"], cwd)).toEqual({ kind: "error", message: "pd describe takes one component id, such as atoms/button" });
+    expect(parseCommand(["describe", "a/b", "c/d"], cwd)).toMatchObject({ kind: "error" });
+  });
+
+  it("pd affected takes one or more ids or files", () => {
+    expect(parseCommand(["affected", "src/styles/_tokens.scss", "atoms/button"], cwd))
+      .toEqual({ kind: "affected", root: cwd, targets: ["src/styles/_tokens.scss", "atoms/button"], json: false });
+    expect(parseCommand(["affected"], cwd)).toEqual({ kind: "error", message: "pd affected takes one or more component ids or changed files" });
+  });
+
+  it("each is in the help", () => {
+    for (const cmd of ["graph", "describe <id>", "affected <id|file>..."]) expect(USAGE).toContain(`  ${cmd}`);
+  });
+});
