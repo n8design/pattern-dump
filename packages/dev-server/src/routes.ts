@@ -35,6 +35,8 @@ import { createDisplayPath } from "./display-path.js";
 import { buildGraph, graphJson, type ProjectGraph } from "./graph/build.js";
 import { gatherGraphInputs } from "./graph/inputs.js";
 import { auditStyleOf, layoutPagesOf } from "./graph/queries.js";
+import { createMcpHandler, type McpHandler } from "./mcp/server.js";
+import { handleMcpHttp, mcpEndpoint } from "./mcp/http.js";
 
 /** A script with no entry point: a 404 that names where it was looked for, never stored. */
 import { buildShellHtml, json, mimeType, serveFile, servesShell, workbenchTitle } from "./http-utils.js";
@@ -55,7 +57,7 @@ import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.j
 import { buildAllStyleData } from "./style-index.js";
 import { discoverThemes } from "./themes.js";
 import {
-  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, refreshDiagnosticsGraph, styleBorrowedDiagnostics,
+  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, readDiagnosticsArtifact, refreshDiagnosticsGraph, styleBorrowedDiagnostics,
 } from "./diagnostics.js";
 import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
@@ -122,8 +124,45 @@ export async function currentGraph(ctx: RouteContext, taken?: DiscoveryResult): 
   });
 }
 
+/** Per server, the MCP server's message handler (mcp/server.ts). */
+const mcpHandlers = new WeakMap<RouteContext, McpHandler>();
+
+/**
+ * The MCP server of this pd dev: tools that read the project as this server holds it. Each tool call takes the
+ * discovery once and reads everything from it (server-state.ts, hazard 4). `checks` reads the audit this server has
+ * run, else the one a pd audit or an earlier pd dev saved; it never starts one.
+ */
+export function mcpHandlerFor(ctx: RouteContext): McpHandler {
+  let handler = mcpHandlers.get(ctx);
+  if (handler) return handler;
+  const { cfg, state } = ctx;
+  const display = createDisplayPath(cfg.cwd, cfg.packages);
+  const pagesPrefix = cfg.storefront ? `${relative(cfg.cwd, cfg.storefront.pagesDir).split("\\").join("/")}/` : undefined;
+  handler = createMcpHandler(() => {
+    let taken: Promise<DiscoveryResult> | undefined;
+    const discovery = (): Promise<DiscoveryResult> => (taken ??= currentDiscovery(state, cfg.patternRoots));
+    return {
+      graph: async () => currentGraph(ctx, await discovery()),
+      discoveryMap: async () => (await discovery()).discoveryMap,
+      tree: async () => buildComponentTree(cfg.patternDirs, cfg.overviewsEnabled, (await discovery()).discoveryMap),
+      audit: async () => {
+        const slices = await state.audit.peek();
+        if (slices) return { graph: assembleGraph([...slices.values()].map(s => s.audit)), from: "workbench" as const };
+        const saved = await readDiagnosticsArtifact(cfg.cwd);
+        return saved ? { graph: saved.graph, from: "last audit" as const } : null;
+      },
+      root: cfg.cwd, display,
+      ...(pagesPrefix ? { pagesPrefix } : {}),
+    };
+  }, ctx.version);
+  mcpHandlers.set(ctx, handler);
+  return handler;
+}
+
 export interface RouteContext {
   readonly cfg: ResolvedConfig;
+  /** Pattern Dump's version, as the MCP server names itself (DevServerOptions.version). */
+  readonly version: string;
   readonly state: ServerState;
   /** The renderer and the global data it was built with: one object, taken once per request. */
   readonly rendering: RenderingHandle;
@@ -186,7 +225,7 @@ export async function handleRequest(
   const { cfg } = ctx;
   // Only requests addressed to pd dev itself: one of its own host names at the port this request came in
   // on. A page on another site that gets a name of its own to resolve to 127.0.0.1 still sends that name.
-  if (!isOwnHost(req.headers.host, ownHosts(cfg.storefront?.host), req.socket.localPort ?? -1)) {
+  if (!isOwnHost(req.headers.host, ownHosts(cfg.storefront?.host, cfg.mcpHost), req.socket.localPort ?? -1)) {
     res.writeHead(403, { "Content-Type": "text/plain" });
     res.end("Forbidden: this server answers only to its own host names");
     return;
@@ -194,6 +233,16 @@ export async function handleRequest(
   // On the storefront's host, every HTML and CSS response leaves with its references to served files
   // stamped with their content hashes (storefront/asset-stamps.ts). The workbench's hosts are not stamped.
   const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
+  // The MCP server (mcp/http.ts): its own host, and /mcp on localhost and 127.0.0.1.
+  const mcp = mcpEndpoint(host, new URL(req.url ?? "/", "http://x").pathname, cfg.mcpHost);
+  if (mcp === "mcp") {
+    return handleMcpHttp(req, res, mcpHandlerFor(ctx), { hosts: ownHosts(cfg.storefront?.host, cfg.mcpHost), port: req.socket.localPort ?? -1 });
+  }
+  if (mcp === "elsewhere") {
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.end(`Not Found: this host is the MCP server's, at / (POST)`);
+    return;
+  }
   if (cfg.storefront && host === cfg.storefront.host) {
     if (!underBasePath(req, res, cfg.storefront.basePath)) return;
     return stampedResponse(req, res, ctx);
