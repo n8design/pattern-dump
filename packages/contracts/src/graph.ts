@@ -14,7 +14,19 @@ export const GRAPH_VERSION = 1;
 /** Where a node comes from: the project, or a pattern package (its npm name). */
 export type GraphOrigin = { project: true } | { package: string };
 
-export type ComponentRole = "component" | "layout" | "partial" | "view";
+// The kinds and values the graph has, as lists, so a test can ask that a fixture has each one and a new one can't be
+// added without it (graph-fixtures.spec.ts). The types below are these lists'.
+
+export const GRAPH_NODE_KINDS = ["component", "variant", "stylesheet", "module", "class", "page", "asset"] as const;
+export const GRAPH_EDGE_KINDS = [
+  "includes", "variant-of", "styled-by", "defines", "mentions", "borrows", "imports", "renders", "places", "requires",
+] as const;
+export const COMPONENT_ROLES = ["component", "layout", "partial", "view"] as const;
+export const STYLESHEET_SOURCES = ["scss", "css", "asset", "inline", "external"] as const;
+export const PLACES_HOW = ["tag", "pattern", "view", "card"] as const;
+export const RENDERS_SOURCES = ["own", "folder", "default", "generated"] as const;
+
+export type ComponentRole = typeof COMPONENT_ROLES[number];
 
 export interface ComponentNode {
   id: `component:${string}`;
@@ -39,7 +51,7 @@ export interface VariantNode {
   file: string;
 }
 
-export type StylesheetSource = "scss" | "css" | "asset" | "inline" | "external";
+export type StylesheetSource = typeof STYLESHEET_SOURCES[number];
 
 export interface StylesheetNode {
   id: `stylesheet:${string}`;
@@ -90,6 +102,9 @@ export interface AssetNode {
 
 export type GraphNode = ComponentNode | VariantNode | StylesheetNode | ModuleNode | ClassNode | PageNode | AssetNode;
 export type GraphNodeKind = GraphNode["kind"];
+// Each list is exactly its union: a kind in one and not the other fails the typecheck.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+const nodeKindsMatch: Same<GraphNodeKind, typeof GRAPH_NODE_KINDS[number]> = true;
 
 interface EdgeBase { from: string; to: string }
 
@@ -109,9 +124,9 @@ export interface BorrowsEdge extends EdgeBase { kind: "borrows" }
 export interface ImportsEdge extends EdgeBase { kind: "imports" }
 /** A page renders with a layout: its own `layout:`, a folder's `childLayout` (`via`: that index.md, relative to the
  *  pages folder), the default, or as a generated page. */
-export interface RendersEdge extends EdgeBase { kind: "renders"; source: "own" | "folder" | "default" | "generated"; via?: string }
+export interface RendersEdge extends EdgeBase { kind: "renders"; source: typeof RENDERS_SOURCES[number]; via?: string }
 /** A page places a component: a `pd-` tag (a child tag too), a `pattern` fence, its listing's view, or the view's card. */
-export interface PlacesEdge extends EdgeBase { kind: "places"; how: "tag" | "pattern" | "view" | "card" }
+export interface PlacesEdge extends EdgeBase { kind: "places"; how: typeof PLACES_HOW[number] }
 /** A component requires a script or an SVG set (`requireScript`, `requireAssets`). */
 export interface RequiresEdge extends EdgeBase { kind: "requires"; key: "requireScript" | "requireAssets" }
 
@@ -119,6 +134,8 @@ export type GraphEdge =
   | IncludesEdge | VariantOfEdge | StyledByEdge | DefinesEdge | MentionsEdge | BorrowsEdge | ImportsEdge
   | RendersEdge | PlacesEdge | RequiresEdge;
 export type GraphEdgeKind = GraphEdge["kind"];
+const edgeKindsMatch: Same<GraphEdgeKind, typeof GRAPH_EDGE_KINDS[number]> = true;
+void nodeKindsMatch; void edgeKindsMatch;
 
 /** The whole graph as JSON: `pd graph --json`, and `graph.json` in a build. */
 export interface ProjectGraphJson {

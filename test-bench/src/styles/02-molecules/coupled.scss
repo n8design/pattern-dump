@@ -1,0 +1,10 @@
+// The graph fixture for a stylesheet that styles another component's class: renaming .df-button breaks this rule,
+// so the graph has a mentions edge from this stylesheet to Button's class (and the template's <style> has one too).
+.tb-coupled {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.tb-coupled > .df-button {
+  justify-self: start;
+}
