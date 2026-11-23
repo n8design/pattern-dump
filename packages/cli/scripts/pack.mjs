@@ -133,7 +133,7 @@ const pkg = {
   ],
   author: { name: "Stefan Bauer (N8D e.U.)", email: "stefan.bauer@n8d.at", url: "https://n8d.at" },
   license: "MIT",
-  homepage: `${REPO_URL}#readme`,
+  homepage: "https://pattern-dump.design",
   repository: { type: "git", url: `git+${REPO_URL}.git` },
   bugs: `${REPO_URL}/issues`,
   funding: [
