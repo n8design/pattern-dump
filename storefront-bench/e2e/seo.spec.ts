@@ -64,6 +64,8 @@ for (const [route, title, [image, width, height]] of PAGES) {
     expect(res.headers()["content-type"]).toContain(image.endsWith(".jpg") ? "image/jpeg" : "image/png");
     const stamp = createHash("sha256").update(await res.body()).digest("hex").slice(0, 10);
     expect(head.meta["og:image"]).toBe(`${new URL(image.slice(1), site).href}?v=${stamp}`);
+    // X reads its own tag: the same image, at the same stamped address.
+    expect(head.meta["twitter:image"]).toBe(head.meta["og:image"]);
     expect(head.meta["robots"]).toBeUndefined();
     expect(head.lang).toBe("en");
 

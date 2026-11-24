@@ -1340,7 +1340,7 @@ or with a path, such as `https://example.github.io/project/`, for a site publish
 
 - a canonical URL, and `og:url`
 - Open Graph (`og:type`, `og:site_name`, `og:title`, `og:description`, `og:image` with its width and height)
-  and a Twitter card, large when the page has an image
+  and a Twitter card, large when the page has an image, with `twitter:image` naming the same image
 - one JSON-LD graph: the `WebSite`, the `WebPage` with its date (`datePublished`: its `date`, else its first
   commit) and its last real change (`dateModified`: its `updated`, else none), and a `BreadcrumbList` from Home
   down to the page

@@ -264,7 +264,7 @@ export function articleOf(route: string, model: PageModel, ownDate: string | und
 /**
  * A page's search and link-preview tags, after its title and description. Without the site's address only
  * what needs none: robots. With it: canonical, Open Graph (og:image with its size when the page has an
- * image) and the Twitter card, large only with an image.
+ * image) and the Twitter card, large only with an image, which twitter:image then names too.
  */
 export function seoTags(p: {
   route: string; title: string; description: string | undefined; siteTitle: string | undefined;
@@ -297,6 +297,7 @@ export function seoTags(p: {
       `<meta property="og:image" content="${escapeAttr(abs(p.image.path))}">`,
       `<meta property="og:image:width" content="${p.image.width}">`,
       `<meta property="og:image:height" content="${p.image.height}">`,
+      `<meta name="twitter:image" content="${escapeAttr(abs(p.image.path))}">`,
     );
   }
   tags.push(`<meta name="twitter:card" content="${p.image ? "summary_large_image" : "summary"}">`);
