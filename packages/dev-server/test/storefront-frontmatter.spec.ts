@@ -199,7 +199,7 @@ describe("checkPageFrontmatter — the build's own keys: redirectFrom, index, im
     const r = await check("---\ntitle: T\nredirectFrom: [/old/, /older/page/]\nindex: false\nimage: /assets/images/share.png\n---\n");
     expect(r.problems).toEqual([]);
     expect(r.values).toEqual({ title: "T" });
-    expect(r.build).toEqual({ redirectFrom: ["/old/", "/older/page/"], index: false, image: "/assets/images/share.png" });
+    expect(r.build).toEqual({ redirectFrom: ["/old/", "/older/page/"], index: false, image: "/assets/images/share.png", imageAs: { written: "/assets/images/share.png" } });
   });
 
   it("takes one old route written alone, and index: true", async () => {
@@ -218,10 +218,26 @@ describe("checkPageFrontmatter — the build's own keys: redirectFrom, index, im
     expect((await check("---\ntitle: T\nindex: no\n---\n")).problems).toEqual([P(3, "index must be true or false")]);
   });
 
-  it("refuses an image that is not a path in the assets", async () => {
-    for (const bad of ["images/share.png", "/images/share.png", "https://example.com/share.png", "/assets/", "[/assets/a.png, /assets/b.png]"]) {
+  it("resolves a relative image against the page's folder, or the index.md whose childDefaults gave it", async () => {
+    for (const [written, beside] of [["./share.png", "guides/share.png"], ["share.png", "guides/share.png"], ["../shared/share.png", "shared/share.png"]] as const) {
+      const r = await check(`---\ntitle: T\nimage: ${written}\n---\n`);
+      expect(r.problems, written).toEqual([]);
+      expect(r.build, written).toEqual({ image: `/${beside}`, imageAs: { written, beside } });
+    }
+    const fromDefaults = { ...pageFile("---\ntitle: T\nimage: ./cover.png\n---\n", "guides/deep/setup.md"),
+      defaults: { image: { from: "guides/index.md", line: 4 } } };
+    expect((await checkPageFrontmatter(fromDefaults, map)).build.image).toBe("/guides/cover.png");
+  });
+
+  it("refuses a relative image that leaves the pages folder", async () => {
+    expect((await check(`---\ntitle: T\nimage: ../../share.png\n---\n`)).problems)
+      .toEqual([P(3, `image "../../share.png" is outside the pages folder: a relative image stays inside site.pagesDir`)]);
+  });
+
+  it("refuses an image that is neither a path in the assets nor one beside the page", async () => {
+    for (const bad of ["/images/share.png", "https://example.com/share.png", "/assets/", "[/assets/a.png, /assets/b.png]"]) {
       expect((await check(`---\ntitle: T\nimage: ${bad}\n---\n`)).problems, bad)
-        .toEqual([P(3, `image must be a path to a file in the assets, such as "/assets/images/share.png"`)]);
+        .toEqual([P(3, `image must be a path to a file in the assets, such as "/assets/images/share.png", or an image beside the page, such as "./share.png"`)]);
     }
   });
 

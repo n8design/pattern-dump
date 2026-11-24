@@ -934,6 +934,8 @@ export function staticPathFor(liveUrl: string): string {
     }
   }
   if (path.startsWith("/_pd/") || path.startsWith(PD_ROUTE_PREFIX.assets)) return path.slice(1);
+  // An image beside a site's pages (/guide/shot.png): a file, under its own name. A route never ends in one.
+  if (/\/[^/]+\.(?:png|jpe?g|gif|webp|svg)$/.test(path)) return path.slice(1);
   // The root files a static host reads by name, written under that name, never as a folder.
   if (path === PD_ROUTES.sitemap || path === PD_ROUTES.robots || path === PD_ROUTES.notFound) return path.slice(1);
   // Anything else is a shell route: one index.html per route, so deep links load without rewrites.

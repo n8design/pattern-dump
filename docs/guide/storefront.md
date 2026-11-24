@@ -61,7 +61,8 @@ pages/
 - `index.md` at the top is the home page, and every folder that holds pages needs its own `index.md`,
   the folder's page.
 - File and folder names are part of the URL: lowercase letters, digits and hyphens only.
-- Only `.md` files belong here. Images and other files go in the project's [assets](authoring.md).
+- Besides `.md` files, only images belong here: PNG, JPEG, GIF, WebP and SVG, beside the pages that show them
+  (see [Images beside a page](#images-beside-a-page)). Other files go in the project's [assets](authoring.md).
   Files starting with a dot are ignored.
 - **Adding a page is adding a file.** A top-level page, or a page one folder deep, appears in the navigation
   with no other change; a page deeper than that is reached by its links, since the navigation is one level deep.
@@ -279,7 +280,7 @@ lede: Three folders make a site.
 | `childLayout` | On a folder's `index.md` only: the layout of the pages under it that name none. See [A folder's default layout](#a-folders-default-layout) |
 | `order` | Its position in the navigation, see [Pages](#pages) |
 | `nav` | `false` leaves the page out of the navigation (`nav`, and its folder's `children`) and out of `prev` and `next`, its own and its neighbours'. It still renders, and stays searchable and in the sitemap and `llms.txt`. On a folder's `index.md`, the folder's entry and its pages are left out. `true`, the default, lists it. The layout's `nav`, the navigation itself, is filled as before. See [Pages](#pages) |
-| `image` | Its link-preview image: a raster file in the assets (PNG, JPEG, GIF or WebP), such as `/assets/images/setup.png`. An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `site.image` |
+| `image` | Its link-preview image: a raster file (PNG, JPEG, GIF or WebP) in the assets, such as `/assets/images/setup.png`, or beside the page, such as `./setup.png` (see [Images beside a page](#images-beside-a-page)). An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `site.image` |
 | `index` | `false` keeps the page out of search engines: `noindex`, and no sitemap entry |
 | `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. See [Redirects](#redirects) |
 | `date` | The page's date, a real calendar date written `YYYY-MM-DD`: what a listing sorts and shows, and its JSON-LD `datePublished`. Without it, the day git first saw the page. A date after today holds the page back from `pd build` until that day, see [Scheduled pages](#scheduled-pages). See [Collections](#collections) |
@@ -1175,7 +1176,49 @@ schema:
 - An SVG from the assets is written at its own size and needs no slot. A raster image on a page whose layout
   declares no slot is a problem that names the layout.
 - An image from another site is written as markdown writes it, and has no size (see the checks below): host it in
-  the assets instead.
+  the assets or beside the page instead.
+
+### Images beside a page
+
+An image can sit in the pages folder, next to the markdown that shows it, and a page names it by a relative path:
+
+```
+pages/
+  guide/
+    index.md        ![The settings screen](./settings.png)
+    settings.png    → /guide/settings.png
+  shared/
+    diagram.svg     → /shared/diagram.svg, from guide/index.md as ../shared/diagram.svg
+```
+
+From there it is an image like one from the assets: the same variants in the layout's slot, `eager`, captions, a
+`<name>-dark.<ext>` file beside it as its dark version, an SVG at its own size, and the alt-text rule. The page is
+written with absolute URLs (`/_pd/images/guide/settings.<hash>.960.webp`, `/shared/diagram.svg`), so it doesn't
+matter whether its address ends in a slash, and the site's path from `site.url` goes in front of them as for every
+other address.
+
+- **The path** is resolved against the page's own folder, `./settings.png` and `settings.png` alike, and must stay
+  inside the pages folder. A frontmatter `image` is resolved the same way; one a folder's `childDefaults` sets is
+  resolved against that folder's `index.md`.
+- **The name** is part of the URL, so it follows the rule for page names: lowercase letters, digits and hyphens, then
+  the extension in lowercase. Any other name is a problem that gives the name to use.
+- **What `pd build` writes** is what a page references: the variants of a raster image, the SVG or the link-preview
+  image itself. An image no page uses stays out of the site. An image two pages show is written once.
+- **Variants share their folder with the assets'.** An image at `assets/guide/shot.png` and one at
+  `pages/guide/shot.png` both have variants named `guide/shot`; the hash in each URL tells them apart, and identical
+  files share one set.
+- **`pd dev`** reloads the open page when an image beside it is added, changed or removed.
+- **Not here:** an image in the folders `pd dev` serves itself (`assets/`, `preview/`, `api/`, `source/`) or under the
+  path of a workbench on the same host. Each is a problem.
+
+The problems, each failing the page or the site:
+
+| Problem | Message |
+|---|---|
+| A file that is neither a page nor an image | `notes.txt is not a page or an image: only .md files and images (PNG, JPEG, GIF, WebP or SVG) belong in the pages folder (other files go in the project's assets)` |
+| An image name that can't be part of a URL | `Guest_Access.PNG: an image's file name is part of its URL, so it is lowercase letters, digits and hyphens only, then its extension: rename it to guest-access.png` |
+| A path that leaves the pages folder | `guide/index.md:5: the image ../../x.png is outside the pages folder: a relative image stays inside site.pagesDir (an image from elsewhere goes in the assets, as /assets/…)` |
+| A file that isn't there | `guide/index.md:5: the image ./gone.png is not beside the page: there is no guide/gone.png in the pages folder` |
 
 ### `sizes="auto"`
 

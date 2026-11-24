@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **A page's images can sit beside its markdown file.** Write `![Alt](./shot.png)` and the image gets the same WebP
+  variants, caption and dark version as one from the assets. See [Images beside a page](docs/guide/storefront.md#images-beside-a-page).
+- **A page's `image` can be a relative path too.** `image: ./share.png` names the link-preview image beside the page.
+- **A badly named image in the pages folder fails with the name to use.** `Guest_Access.PNG` is reported with
+  `guest-access.png`, since the name becomes part of the URL.
+
 ## 0.9.0 (2026-11-23)
 
 ### Added

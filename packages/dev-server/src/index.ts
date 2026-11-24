@@ -241,7 +241,7 @@ export async function startDevServer(
   let generationNow = (): string => "";
   const images = createImageService({
     assetRoots: cfg.assetRoots, assetRootNames: cfg.assetRootNames, images: cfg.images,
-    ...(cfg.storefront ? { siteImages: cfg.storefront.images } : {}),
+    ...(cfg.storefront ? { siteImages: cfg.storefront.images, pagesDir: cfg.storefront.pagesDir } : {}),
     build: opts.live === false, warn: message => console.warn(`[dev-server] ${message}`),
   });
   // The symbol images in the asset roots' symbols/ folders (symbol-service.ts), for storefront pages.

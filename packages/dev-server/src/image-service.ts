@@ -16,6 +16,7 @@ import {
   type ImageEncoding, type ImageIndex,
 } from "@pattern-dump/build";
 import { imageUrl, PD_ROUTE_PREFIX, type ImageLookup, type ImageSource } from "@pattern-dump/contracts";
+import { pageImageFiles } from "./storefront/page-images.js";
 
 export interface ImageServiceOptions {
   assetRoots: readonly string[];
@@ -23,6 +24,8 @@ export interface ImageServiceOptions {
   /** The project's image settings, and the site's (its override over them), when there is a storefront. */
   images: ImageEncoding;
   siteImages?: ImageEncoding;
+  /** The site's pages folder: the images beside its pages are indexed too, at their URLs (/guide/shot.png). */
+  pagesDir?: string;
   /** pd build: every image must be encoded, and every file is read fresh. pd dev and pd audit: not. */
   build: boolean;
   /** Said once, when an original is shown because sharp can't be loaded. */
@@ -63,7 +66,11 @@ export function createImageService(options: ImageServiceOptions, load: () => Pro
     if (current?.generation === generation) return Promise.resolve();
     if (pending?.generation === generation) return pending.promise;
     const promise = (async () => {
-      const index = await indexer.index(await assetFiles(options.assetRoots, options.assetRootNames), { fresh: options.build });
+      const files = [
+        ...await assetFiles(options.assetRoots, options.assetRootNames),
+        ...options.pagesDir !== undefined ? await pageImageFiles(options.pagesDir) : [],
+      ];
+      const index = await indexer.index(files, { fresh: options.build });
       current = { generation, index };
     })();
     pending = { generation, promise };
@@ -83,7 +90,9 @@ export function createImageService(options: ImageServiceOptions, load: () => Pro
       if (!warned) { warned = true; options.warn(`${sharpError.message} Until it loads, images are shown as they are, not as variants.`); }
       return { kind: "single", url: src, width: entry.width, height: entry.height };
     }
-    const name = src.slice(PD_ROUTE_PREFIX.assets.length).replace(/\.[^./]+$/, "");
+    // The variant's name: the path under /assets/, or an image beside the pages' URL path, without the extension. An
+    // asset and a page image may share one (guide/shot); the hash in the URL tells them apart (image-route.ts).
+    const name = (src.startsWith(PD_ROUTE_PREFIX.assets) ? src.slice(PD_ROUTE_PREFIX.assets.length) : src.slice(1)).replace(/\.[^./]+$/, "");
     return {
       kind: "variants", width: entry.width, height: entry.height,
       variantUrl: (width, settings) => imageUrl(name,

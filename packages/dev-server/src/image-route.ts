@@ -1,5 +1,5 @@
 // GET /_pd/images/<name>.<hash>.<width>.webp: a responsive image variant (contracts' imageUrl). `name` is an asset's
-// path without its extension; the source is found the way the asset route finds a file (asset-file.ts, inside its
+// path without its extension, or an image beside the site's pages (page-images.ts); the source is found the way the asset route finds a file (asset-file.ts, inside its
 // root, path containment included), trying each raster extension, and it is the one whose variant key equals
 // `hash`. So two sources with the same name (harbour.jpg, harbour.png) are told apart, and a URL whose source
 // changed no longer matches anything: 404. A width beyond the source's is a 404 too: a variant is never upscaled.
@@ -16,6 +16,7 @@ import {
 } from "@pattern-dump/build";
 import { parseImageUrl, PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
 import { assetFile } from "./asset-file.js";
+import { pageImageFile } from "./storefront/page-images.js";
 import type { ResolvedConfig } from "./server-config.js";
 
 /** The raster formats a variant can be made from, in the order a name's source is looked for. */
@@ -35,9 +36,15 @@ const cacheFor = (cfg: ResolvedConfig): ImageCache => {
 
 /** The source whose variant at `width`, encoded with `encoding`, has the key `hash`; null when none has. */
 async function variantSource(name: string, hash: string, width: number, encoding: ImageEncoding, cfg: ResolvedConfig): Promise<Uint8Array | null> {
-  const base = PD_ROUTE_PREFIX.assets + name.split("/").map(encodeURIComponent).join("/");
-  for (const ext of RASTER) {
-    const file = await assetFile(`${base}.${ext}`, cfg.assetRoots, cfg.assetRootNames);
+  const path = name.split("/").map(encodeURIComponent).join("/");
+  const pagesDir = cfg.storefront?.pagesDir;
+  // The assets first, then the images beside the site's pages: the same name in both is told apart by the hash.
+  const candidates = RASTER.flatMap(ext => [
+    () => assetFile(`${PD_ROUTE_PREFIX.assets}${path}.${ext}`, cfg.assetRoots, cfg.assetRootNames),
+    ...pagesDir !== undefined ? [() => pageImageFile(`/${path}.${ext}`, pagesDir)] : [],
+  ]);
+  for (const find of candidates) {
+    const file = await find();
     if (!file) continue;
     let bytes: Uint8Array;
     try { bytes = await readFile(file); } catch { continue; }

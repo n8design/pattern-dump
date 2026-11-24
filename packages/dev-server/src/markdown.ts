@@ -34,6 +34,7 @@ import type { TocAnchor } from "./storefront/toc.js";
 import { readSchema, type PlacedProblem } from "./storefront/declared-values.js";
 import type { PageHeading } from "./storefront/derived.js";
 import { slug, Slugger } from "./storefront/slug.js";
+import { isRelativePath, resolvePageImage } from "./storefront/page-images.js";
 import { SYMBOLS_FOLDER, symbolId, type SymbolEntry, type SymbolSource } from "./symbols.js";
 
 /**
@@ -95,7 +96,10 @@ export interface DocRegions {
  * With a title and alone on its line (`![Alt](/assets/x.jpg "Caption")`) it is a <figure> with that <figcaption>, as a
  * symbol image is; in a line of text the title stays the <img>'s title. A sibling `<name>-dark.<ext>` in the assets
  * makes it a <picture> with a `(prefers-color-scheme: dark)` <source> in the same widths.
- * Any other image (remote, relative) is left as markdown writes it. Problems carry their line in the page's file.
+ * A relative path (`./shot.png`, `shot.png`, `../shared/diagram.svg`) is an image beside the pages (page-images.ts):
+ * resolved against the page's folder, it must stay inside the pages folder, and is then looked up and written exactly
+ * as one from the assets, under its absolute URL (`/guide/shot.png`). Any other image (remote) is left as markdown
+ * writes it. Problems carry their line in the page's file.
  */
 export interface ProseImages {
   layoutId: string;
@@ -106,6 +110,9 @@ export interface ProseImages {
   /** Lines before the body in its file (the frontmatter). */
   lineOffset: number;
   problems: Array<{ line: number; message: string }>;
+  /** The page's path in the pages folder ("guide/setup.md"): a relative image is resolved against its folder
+   *  (page-images.ts) and looked up at its absolute URL. Without it, a relative image is left as markdown writes it. */
+  pagePath?: string;
 }
 
 /**
@@ -124,6 +131,9 @@ export interface SymbolImages {
 
 const INLINE: DocEmbed = { embed: "inline" };
 
+/** A markdown-it inline rule, as its ruler holds it. */
+type InlineRule = Parameters<MarkdownIt["inline"]["ruler"]["at"]>[1];
+
 /** The docs parser: one configuration, with or without placed components. */
 function createDocMarkdown(placing: boolean): MarkdownIt {
   const md = createMarkdown({ html: false, linkify: false });
@@ -131,10 +141,19 @@ function createDocMarkdown(placing: boolean): MarkdownIt {
   // Positive allowlist: block javascript:, data:, vbscript:, etc.
   // html: false already escapes raw HTML in source; this covers link/image hrefs.
   // pattern: is allowed through so the link resolver can intercept it below.
+  // An image may also have a plain relative path with no scheme (`shot.png`, an image beside a site's page); a link
+  // keeps the list above. `inImage` is set only while markdown-it's image rule runs, which is synchronous.
+  let inImage = false;
   md.validateLink = (url: string) => {
     const t = url.trim();
-    return /^(https?|mailto|tel):/i.test(t) || /^[.#/]/.test(t) || t.startsWith("pattern:");
+    return /^(https?|mailto|tel):/i.test(t) || /^[.#/]/.test(t) || t.startsWith("pattern:") || (inImage && isRelativePath(t));
   };
+  const inlineRules = (md.inline.ruler as unknown as { __rules__: Array<{ name: string; fn: InlineRule }> }).__rules__;
+  const imageRule = inlineRules.find(r => r.name === "image")!.fn;
+  md.inline.ruler.at("image", (state, silent) => {
+    inImage = true;
+    try { return imageRule(state, silent); } finally { inImage = false; }
+  });
 
   // Fence rule set once at instance creation — reads pre-resolved HTML from env,
   // never mutates shared state during render, safe for parallel builds.
@@ -354,9 +373,20 @@ function proseImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, pr
         problem(` has no alt text: write what it shows between the brackets; a decorative image goes in through a component, with alt=""`);
         continue;
       }
-      if (!src.startsWith("/assets/")) continue;
-      const source = prose.lookup(src);
-      if (!source) { problem(` is not an image in the assets`); continue; }
+      // An image beside the pages: at its absolute URL from here on.
+      let url = src;
+      let beside: string | undefined;
+      if (prose.pagePath !== undefined && isRelativePath(src)) {
+        const resolved = resolvePageImage(src, prose.pagePath);
+        if (!resolved.ok) {
+          problem(` is outside the pages folder: a relative image stays inside site.pagesDir (an image from elsewhere goes in the assets, as /assets/…)`);
+          continue;
+        }
+        url = resolved.url;
+        beside = resolved.rel;
+      } else if (!src.startsWith("/assets/")) continue;
+      const source = prose.lookup(url);
+      if (!source) { problem(beside !== undefined ? ` is not beside the page: there is no ${beside} in the pages folder` : ` is not an image in the assets`); continue; }
       if (source.kind === "unavailable") { problem(`: ${source.reason}`); continue; }
       if (source.kind === "variants" && !prose.slot) {
         problem(` needs its layout's slot for prose images: ${prose.layoutId} `
@@ -364,8 +394,8 @@ function proseImages(md: MarkdownIt, tokens: ReturnType<MarkdownIt["parse"]>, pr
         continue;
       }
       // A sibling <name>-dark.<ext> is the image in dark mode: a <picture> with a (prefers-color-scheme: dark) source.
-      const darkSrc = /-dark\.[^./]+$/.test(src) ? undefined : src.replace(/(\.[^./]+)$/, "-dark$1");
-      const dark = darkSrc !== undefined && darkSrc !== src ? prose.lookup(darkSrc) : undefined;
+      const darkSrc = /-dark\.[^./]+$/.test(url) ? undefined : url.replace(/(\.[^./]+)$/, "-dark$1");
+      const dark = darkSrc !== undefined && darkSrc !== url ? prose.lookup(darkSrc) : undefined;
       if (dark?.kind === "unavailable") { problem(`: its dark version ${darkSrc} can't be used: ${dark.reason}`); continue; }
       const title = child.attrGet("title");
       const figure = title !== null && alone;

@@ -27,6 +27,7 @@ import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 import { createSnapshotWriter } from "./snapshot-writer.js";
 import { readPages, todayOf, type ScheduledPage } from "./storefront/pages.js";
+import { isPageImageUrl } from "./storefront/page-images.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
@@ -655,7 +656,7 @@ async function buildOnce(
         report.llms = { pages: llms.pages };
       }
       const stubs = new Set((await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse).pages.flatMap(p => p.redirectFrom ?? []));
-      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !sfFiles.includes(u) && !stubs.has(u)).length;
+      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !isPageImageUrl(u.split("?")[0]!) && !sfFiles.includes(u) && !stubs.has(u)).length;
       report.storefront = { outDir: storefront.outDir, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };
       if (sfBase !== "/") {
         // What the site's robots.txt would have said, for the host's own, if its owner can add to it.
