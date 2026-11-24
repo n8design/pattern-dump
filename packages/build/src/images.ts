@@ -95,9 +95,11 @@ export interface ImageCache {
   sweep(keep: ReadonlySet<string>): Promise<number>;
 }
 
-/** Variants cached in `dir`, one `<key>.webp` file each. Content-addressed, so an entry is never stale. */
-export function createImageCache(dir: string): ImageCache {
-  const file = (key: string): string => join(dir, `${key}.webp`);
+/** Files cached in `dir`, one `<key>.<ext>` each: image variants (`webp`, the default), or social images (`png`).
+ *  Content-addressed, so an entry is never stale. */
+export function createImageCache(dir: string, ext = "webp"): ImageCache {
+  const file = (key: string): string => join(dir, `${key}.${ext}`);
+  const cached = new RegExp(`^([0-9a-f]{10})\\.${ext}$`);
   return {
     async read(key) {
       try { return await readFile(file(key)); } catch { return undefined; }
@@ -113,7 +115,7 @@ export function createImageCache(dir: string): ImageCache {
       try { names = await readdir(dir); } catch { return 0; }
       let removed = 0;
       for (const name of names) {
-        const m = /^([0-9a-f]{10})\.webp$/.exec(name);
+        const m = cached.exec(name);
         if (m && !keep.has(m[1]!)) { await rm(join(dir, name), { force: true }); removed++; }
       }
       return removed;

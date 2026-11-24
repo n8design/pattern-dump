@@ -8,12 +8,15 @@
 // - Its variants are the designs: a folder picks one for its pages with `socialImage` in childDefaults, a page with
 //   its own `socialImage`, nearest wins (folder-defaults.ts); `false` turns it off. Without it: the component itself.
 
-import { basename } from "node:path";
+import { createHash } from "node:crypto";
+import { access } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { suggest } from "@pattern-dump/config";
 import { readSchema } from "./declared-values.js";
 import { designFiles } from "./design-files.js";
 import type { Read } from "./listing-keys.js";
+import type { PageModel } from "./pages.js";
 
 /** What every social image is rendered with, whatever the page: its title, its description, the title of its
  *  top-level folder, its date, and the site's globals. */
@@ -87,4 +90,96 @@ export async function checkSocialComponent(component: string, discoveryMap: Disc
       + `and ${SOCIAL_FIELDS.at(-1)}, and what a variant's data gives`);
   }
   return problems;
+}
+
+// ---- A page's card ----
+//
+// Which card a page gets is decided as its head is written (page.ts): none for the 404 page, for a page with an
+// `image` of its own (or from childDefaults), for `socialImage: false`, and without the site's address (no tag would
+// carry it). Otherwise the variant `socialImage` names, else the component itself; tag and category pages take the
+// component itself.
+//
+// The card's document is the variant rendered with the card's values, in the layers a page of the site has (the
+// document base, the project's asset CSS and the variant's own closure; no theme layer). Its hash is taken over that
+// document stamped as the site serves it (asset-stamps.ts), so it covers everything that decides the picture and
+// nothing else: the template, its partials and helpers through what they render, the values, the variant's data,
+// every stylesheet's bytes and every font and image they load through their stamps. With Pattern Dump's version and
+// the render settings: a new version, or a new way of rendering, makes every card stale.
+
+/** A card as a page's head worked it out: its page (as messages name it), the variant, its hash, its document as the
+ *  site serves it (stamped; site paths), and where its bytes are, when they are anywhere yet. */
+export interface SocialCard { route: string; page: string; variant: string; hash: string; document: string; file?: string }
+
+/** The size of every card, in CSS pixels at 1x. */
+export const CARD = { width: 1200, height: 630 } as const;
+/** How a card is rendered (social-render.ts): part of every hash. Change it with the rendering. */
+export const RENDER_SETTINGS = "png 1200x630 @1x; reduced motion; --font-render-hinting=none --disable-lcd-text --force-color-profile=srgb";
+
+/** The section of the page at `route`: the title of its top-level folder's index.md. None for the home page, a
+ *  top-level page, or a folder without an index.md or without a title. */
+export function sectionOf(route: string, model: Pick<PageModel, "files">): string | undefined {
+  const first = route.split("/").filter(Boolean)[0];
+  if (first === undefined) return undefined;
+  const top = model.files.get(`/${first}/`);
+  if (!top || basename(top.path) !== "index.md") return undefined;
+  const title = top.frontmatter.values["title"];
+  return typeof title === "string" ? title : undefined;
+}
+
+/** The data of a variant (`<component>~<name>.json`), which reaches its card under the fixed fields; {} without one. */
+export async function variantData(variantId: string, discoveryMap: DiscoveryMap): Promise<Record<string, unknown>> {
+  const jsonPath = discoveryMap.get(variantId)?.jsonPath;
+  if (!variantId.includes("~") || !jsonPath) return {};
+  const data = await designFiles(discoveryMap).data(jsonPath);
+  return data !== null && typeof data === "object" && !Array.isArray(data) ? { ...(data as Record<string, unknown>) } : {};
+}
+
+/** What a card is rendered with: the variant's data, then the page's fields over it (a field the page lacks is left
+ *  out, not null). */
+export function cardValues(fields: { title: string; description?: string | undefined; section?: string | undefined;
+  date?: string | undefined; site: Record<string, unknown> }, data: Record<string, unknown> = {}): Record<string, unknown> {
+  return { ...data, ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) };
+}
+
+/** The component's required fields a card's values lack, in the schema's order. */
+export async function missingFields(component: string, values: Record<string, unknown>, discoveryMap: DiscoveryMap): Promise<string[]> {
+  const schema = (await readSchema(discoveryMap.get(component)?.schemaPath, designFiles(discoveryMap))).schema;
+  return (schema?.required ?? []).filter(f => !Object.hasOwn(values, f));
+}
+
+/** How a missing required field is named for a page: what to give it. */
+export function missingFieldMessage(page: string, field: string, variantId: string, component: string): string {
+  const fix = field === "section" ? "give its top-level folder an index.md with a title"
+    : field === "site" ? "set site.globals"
+    : `give the page a ${field}`;
+  return `${page}: the social image needs "${field}", which ${variantId} requires (${basename(component)}.schema.json): `
+    + `${fix}, or set socialImage: false`;
+}
+
+/** A card's document: the stylesheets `head` links, and the rendered variant. */
+export function cardDocument(o: { lang: string; head: string; body: string }): string {
+  return `<!doctype html>\n<html lang="${o.lang}">\n<head>\n<meta charset="utf-8">\n${o.head}\n</head>\n<body>\n${o.body}\n</body>\n</html>\n`;
+}
+
+/** A card's hash: over its document stamped as the site serves it, Pattern Dump's version and the render settings. */
+export function cardHash(stampedDocument: string, version: string): string {
+  return createHash("sha256").update(`${RENDER_SETTINGS}\n${version}\n${stampedDocument}`).digest("hex").slice(0, 10);
+}
+
+/** Where `pd social` writes the site's cards, to be committed: `social/` beside the pages folder. */
+export function socialDir(pagesDir: string): string {
+  return join(dirname(pagesDir), "social");
+}
+
+/** A committed card's file: its route as folders, then `card.<hash>.png` (the home page's at the folder's top). */
+export function committedCardFile(dir: string, route: string, hash: string): string {
+  return join(dir, ...route.split("/").filter(Boolean), `card.${hash}.png`);
+}
+
+/** Where a card's bytes are: the cache (`<hash>.png`), else the committed folder; undefined when neither has them. */
+export async function cardFile(route: string, hash: string, dirs: { cache: string; committed: string }): Promise<string | undefined> {
+  for (const file of [join(dirs.cache, `${hash}.png`), committedCardFile(dirs.committed, route, hash)]) {
+    if (await access(file).then(() => true, () => false)) return file;
+  }
+  return undefined;
 }

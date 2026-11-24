@@ -94,4 +94,19 @@ describe("the cache", () => {
     expect(await cache.sweep(new Set(["abcdefabcd"]))).toBe(1);
     expect((await readdir(join(dir, "images"))).sort()).toEqual(["abcdefabcd.webp"]);
   });
+
+  it("with another extension, keeps and sweeps only its own files, in a folder it shares", async () => {
+    const shared = join(dir, "shared");
+    const images = createImageCache(shared);
+    const social = createImageCache(shared, "png");
+    await images.write("0123456789", new Uint8Array([1]));
+    await social.write("0123456789", new Uint8Array([2]));
+    await social.write("abcdefabcd", new Uint8Array([3]));
+    expect([...(await social.read("0123456789"))!]).toEqual([2]);
+    expect([...(await images.read("0123456789"))!]).toEqual([1]);
+    expect(await social.sweep(new Set(["abcdefabcd"]))).toBe(1);
+    expect((await readdir(shared)).sort()).toEqual(["0123456789.webp", "abcdefabcd.png"]);
+    expect(await images.sweep(new Set())).toBe(1);
+    expect((await readdir(shared)).sort()).toEqual(["abcdefabcd.png"]);
+  });
 });
