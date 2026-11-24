@@ -1,13 +1,15 @@
 // A storefront page's frontmatter, checked against the layout it uses.
 //
-// Fourteen keys belong to the build, not to a layout: `layout` (which layout; when absent, the `childLayout` of the
+// Fifteen keys belong to the build, not to a layout: `layout` (which layout; when absent, the `childLayout` of the
 // nearest folder above the page whose index.md sets one, else `page`), `childLayout` (on a folder's index.md), `order`
 // (where in the nav), `nav` (`false` leaves the page out of the nav; the layout's `nav`, the tree, is filled as
 // before), the page's search and link-preview keys — `redirectFrom` (old routes that forward
 // here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
 // image, a raster file in the assets or beside the page; checked against the files in page-image.ts) — and its listing keys
 // (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` and `view` on a
-// folder's index.md, and `toc` (the table of contents, toc.ts). A layout cannot declare any of the fourteen. Every other key must be declared by the chosen layout's schema — the
+// folder's index.md, `toc` (the table of contents, toc.ts), and `socialImage` (which variant of the social image
+// component the page's link-preview image is rendered from, or `false` for none; social-images.ts). A layout cannot
+// declare any of the fifteen. Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
 // declares. Nothing is inferred: a key the schema does not declare is an error, and a layout with no
 // schema declares nothing. Four more keys are filled by the storefront itself (`body`, the rendered
@@ -30,9 +32,10 @@ import { checkChildDefaults, NOT_DEFAULTABLE, originOf, placeOf } from "./folder
 import { layoutIndex } from "./layout-index.js";
 import { CHILD_DEFAULTS } from "../frontmatter.js";
 import { designFiles } from "./design-files.js";
+import { readSocialImage, socialVariants, type SocialChoice } from "./social-images.js";
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
-export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view", "toc"] as const;
+export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view", "toc", "socialImage"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
 export const ASSEMBLY_KEYS = ["body", "nav", "site", "page"] as const;
 
@@ -71,6 +74,8 @@ export interface BuildKeys {
   sort?: SortBy;
   /** On a folder's index.md: the view its listing is shown in (views.ts checks that it is one). */
   view?: string;
+  /** The variant of the social image component its social image is rendered from; false for none. */
+  socialImage?: string | false;
 }
 
 /** An old route: root-relative, slash-wrapped, plain segments only (no query, fragment, "." or ".."). */
@@ -81,7 +86,9 @@ const ASSET_PATH = /^\/assets\/[^?#]+[^/?#]$/;
 function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, at: (key: string, message: string) => void,
   terms: { categories: CategoryIndex; tags: TermIndex }, renamed: (kind: TermKind, from: string, to: string) => void,
   /** The file a relative `image` is resolved against: the page, or the index.md whose childDefaults gave it. */
-  imageFrom: string = path): BuildKeys {
+  imageFrom: string = path,
+  /** The social image component and its variants, which `socialImage` names one of; undefined when the site has none. */
+  social?: SocialChoice): BuildKeys {
   const out: BuildKeys = {};
   const redirect = values["redirectFrom"];
   if (redirect !== undefined) {
@@ -136,6 +143,11 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
   take("draft", v("draft") === undefined ? undefined : readDraft(v("draft")!));
   take("sort", v("sort") === undefined ? undefined : readSort(v("sort")!, path));
   take("view", v("view") === undefined ? undefined : readView(v("view")!, path));
+  if (v("socialImage") !== undefined) {
+    const r = readSocialImage(v("socialImage")!, social);
+    if (r.ok) out.socialImage = r.value;
+    else at("socialImage", r.message);
+  }
   return out;
 }
 
@@ -164,8 +176,10 @@ export async function layoutNames(discoveryMap: DiscoveryMap): Promise<string[]>
 }
 
 /** `categories` and `tags`: the declared ones (the page model's); no categories and any tag when left out. */
+/** `socialComponent`: site.socialImages.component, whose variants a page's `socialImage` names; undefined when off. */
 export async function checkPageFrontmatter(page: PageFile, discoveryMap: DiscoveryMap, categories: CategoryIndex = categoryIndex(undefined),
-  tags: TermIndex = termIndex("tag", undefined), shownPath: (path: string) => string = p => p): Promise<CheckedPage> {
+  tags: TermIndex = termIndex("tag", undefined), shownPath: (path: string) => string = p => p,
+  socialComponent?: string): Promise<CheckedPage> {
   const { values, errors, lines } = page.frontmatter;
   const problems: PageProblem[] = errors.map(e => ({ file: page.path, line: e.line, message: e.message }));
   // A value a folder set (folder-defaults.ts) is named with the index.md and line it came from, in place of a line.
@@ -179,7 +193,9 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     const w = TERM_WORDS[kind];
     notes.push(`warning: ${where(w.many)}: ${w.one} "${from}" is now "${to}" (renamed in ${w.config}): write "${to}"`);
   };
-  const buildKeys = () => checkBuildKeys(values, page.path, at, { categories, tags }, renamed, imageBase(page));
+  const social: SocialChoice | undefined = socialComponent !== undefined
+    ? { component: socialComponent, variants: socialVariants(socialComponent, discoveryMap) } : undefined;
+  const buildKeys = () => checkBuildKeys(values, page.path, at, { categories, tags }, renamed, imageBase(page), social);
 
   // ---- layout: its own, else its folder's childLayout (pages.ts), else the default ----
   const index = await layoutIndex(discoveryMap);
@@ -203,7 +219,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
       problems.push({ file: page.path, ...(line !== undefined ? { line } : {}), message: `${CHILD_DEFAULTS}.${message}` });
     };
     const defaultable = Object.fromEntries(Object.entries(block.values).filter(([k]) => !(NOT_DEFAULTABLE as readonly string[]).includes(k)));
-    checkBuildKeys(defaultable, page.path, defaultsAt, { categories, tags }, () => {});
+    checkBuildKeys(defaultable, page.path, defaultsAt, { categories, tags }, () => {}, page.path, social);
     const childLayout = block.values["layout"];
     if (childLayout !== undefined) {
       const r = readChildLayout(childLayout, page.path);

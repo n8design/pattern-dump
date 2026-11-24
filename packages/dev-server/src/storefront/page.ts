@@ -32,6 +32,7 @@ import { basename } from "node:path";
 import { renderDoc, type DocRegions, type ProseImages, type SymbolImages } from "../markdown.js";
 import { readSchema, unreadableSchemas, type ObjectSchema, type PlacedProblem } from "./declared-values.js";
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
+import { checkSocialComponent } from "./social-images.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
 import { renderError } from "./pages-cache.js";
 import { designFiles } from "./design-files.js";
@@ -92,6 +93,8 @@ export interface PageAssembly {
   image(path: string, as?: { written: string; beside?: string }): Promise<PageImageCheck>;
   /** storefront.image: the image of every page that names none. */
   siteImage?: string;
+  /** site.socialImages.component: the component social images are rendered from (social-images.ts). */
+  socialComponent?: string;
   /** storefront.head: the site's own head file, by its absolute path and as the config names it. */
   siteHead?: { path: string; name: string };
   /** The path the site is published under ("/project/"), put in front of its references on the way out
@@ -484,7 +487,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (brokenSchemas.length) { siteWide = brokenSchemas; return fail(brokenSchemas); }
 
   const problems: string[] = [...generatedProblems];
-  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags, a.shown);
+  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags, a.shown, a.socialComponent);
   problems.push(...checked.problems.map(p => `${p.file}${p.line !== undefined ? `:${p.line}` : ""}: ${p.message}`));
   if (isNotFound && checked.build.redirectFrom) {
     const line = page.frontmatter.lines["redirectFrom"];
@@ -494,6 +497,12 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const site = await checkSite(a.site, a.discoveryMap, paths.pages, { folders: paths.folders, leftOut: model.drafts });
   siteWide = site.problems;
   problems.push(...site.problems);
+  // The social image component, like partials/base: a problem with it is every page's.
+  if (a.socialComponent !== undefined) {
+    const social = await checkSocialComponent(a.socialComponent, a.discoveryMap);
+    siteWide = [...siteWide, ...social];
+    problems.push(...social);
+  }
 
   // The link-preview image: the page's own, else the site's. A bad site image is the whole site's problem.
   const imageCheck = checked.build.image !== undefined ? await a.image(checked.build.image, checked.build.imageAs)
