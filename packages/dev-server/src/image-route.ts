@@ -27,6 +27,12 @@ export function imageCacheDir(cwd: string): string {
   return join(cwd, "node_modules", ".cache", "pattern-dump", "images");
 }
 
+/** Where a project's social images are cached (social-images.ts): beside the variants, in a folder of their own, so
+ *  each cache keeps and sweeps only its own kind. */
+export function socialCacheDir(cwd: string): string {
+  return join(cwd, "node_modules", ".cache", "pattern-dump", "social");
+}
+
 const caches = new WeakMap<ResolvedConfig, ImageCache>();
 const cacheFor = (cfg: ResolvedConfig): ImageCache => {
   let cache = caches.get(cfg);

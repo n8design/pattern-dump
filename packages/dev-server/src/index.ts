@@ -73,6 +73,7 @@ export { buildStaticSite } from "./static-build.js";
 export { withBasePath } from "./snapshot-writer.js";
 export { loadProjectPagefind, PAGEFIND_INSTALL } from "./storefront/search.js";
 export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
+export type { SocialCard } from "./storefront/social-images.js";
 // Folder overview gallery — public leaves under a group node.
 // Component detail. Widest fan-out in the package — nothing may import it back.
 // Shared timing gate — one flag, so the startup-build and per-save halves cannot drift apart.
@@ -98,6 +99,7 @@ import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching, type WatchHandle } from "./watch.js";
 import { createGitDates } from "./storefront/git-dates.js";
+import type { SocialCard } from "./storefront/social-images.js";
 import { readPages } from "./storefront/pages.js";
 import { projectPagefindEntry, type SearchRecord } from "./storefront/search.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
@@ -184,6 +186,9 @@ export interface DevServer {
   schemaProblems(): Promise<string[]>;
   /** For pd build, not part of the HTTP contract: every symbol image, what can't be used, and what to say about it. */
   symbols(): Promise<SymbolReport>;
+  /** For pd build and pd social, not part of the HTTP contract: each site page's social image, by route, as its head
+   *  last worked it out (social-images.ts). A page gets one in here when it is served. */
+  socialCards(): SocialCard[];
 }
 
 export interface StyleGuideSources {
@@ -399,7 +404,7 @@ export async function startDevServer(
   let settleWatcher: (() => Promise<void>) | null = null;
   const testHooks = live && process.env["PD_TEST_HOOKS"] === "1";
   const routeCtx: RouteContext = {
-    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, version: opts.version ?? "0.0.0-dev", ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
+    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, socialCards: new Map(), version: opts.version ?? "0.0.0-dev", ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
     ...(opts.pagesOnce ? { pagesOnce: true } : {}),
     images: async () => { await images.ready(generationNow()); return images.lookup; },
     symbols,
@@ -469,6 +474,7 @@ export async function startDevServer(
       return { stylesheets: [...state.perComponentCss.values(), state.baseCss, ...state.themeCss.values()], templates };
     },
     symbols: () => symbols.report(),
+    socialCards: () => [...routeCtx.socialCards.values()],
     async schemaProblems() {
       return unreadableSchemas((await currentDiscovery(state, patternRoots)).discoveryMap, displayPath);
     },

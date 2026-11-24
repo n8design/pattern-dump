@@ -13,7 +13,7 @@
 import { describe, it, expect } from "vitest";
 import {
   previewUrl, renderedSourceUrl, dataSourceUrl, overviewUrl,
-  componentUrl, componentCssUrl, themeCssUrl, scriptUrl, imageUrl, parseImageUrl, PD_ROUTES, PD_ROUTE_PREFIX, PD_HOSTS,
+  componentUrl, componentCssUrl, themeCssUrl, scriptUrl, imageUrl, parseImageUrl, socialImageUrl, parseSocialImageUrl, PD_ROUTES, PD_ROUTE_PREFIX, PD_HOSTS,
   staticPathFor, normalizeBasePath,
   buildAuditRollup, AUDIT_SCOPE, PD_PROTOCOL_VERSION,
   type DiagnosticsGraph, type HmrMessage,
@@ -456,5 +456,28 @@ describe("RendererOptions.validateHtml", () => {
     // @ts-expect-error: on or off, not a list of rules
     const wrong: RendererOptions = { patternsDir: "/p", validateHtml: ["element-permitted-content"] };
     expect([without.validateHtml, off.validateHtml, typeof wrong]).toEqual([undefined, false, "object"]);
+  });
+});
+
+describe("socialImageUrl: a page's social image", () => {
+  it("each route a folder, the file of a fixed name", () => {
+    expect(socialImageUrl("/guide/install/", "0123456789")).toBe("/_pd/social/guide/install/card.0123456789.png");
+    expect(socialImageUrl("/", "0123456789")).toBe("/_pd/social/card.0123456789.png");
+    expect(socialImageUrl("/index/", "0123456789")).toBe("/_pd/social/index/card.0123456789.png");
+    expect(staticPathFor(socialImageUrl("/guide/install/", "abcdef0123"))).toBe("_pd/social/guide/install/card.abcdef0123.png");
+  });
+
+  it("reads back what it writes", () => {
+    for (const route of ["/", "/guide/", "/guide/install/", "/tags/design-systems/", "/a b/ü/"]) {
+      expect(parseSocialImageUrl(new URL(socialImageUrl(route, "abcdef0123"), "http://x").pathname), route).toEqual({ route, hash: "abcdef0123" });
+    }
+  });
+
+  it("refuses what isn't one", () => {
+    for (const path of [
+      "/_pd/social/card.png", "/_pd/social/card.012345678.png", "/_pd/social/card.0123456789.webp", "/_pd/social/guide.0123456789.png",
+      "/_pd/social/guide//card.0123456789.png", "/_pd/social/../card.0123456789.png", "/_pd/social/%2E%2E/card.0123456789.png",
+      "/_pd/social/%E0%A4%A/card.0123456789.png", "/_pd/images/card.0123456789.png",
+    ]) expect(parseSocialImageUrl(path), path).toBeNull();
   });
 });

@@ -729,6 +729,8 @@ export const PD_ROUTE_PREFIX = {
    *  token values written in (light, then dark by prefers-color-scheme), for an <img> outside the site, such as a
    *  README. pd build writes it at the same path in each output. */
   symbols: "/_pd/symbols/",
+  /** A page's social image: GET /_pd/social/<route>/card.<hash>.png → image/png, 1200 x 630, immutable (socialImageUrl). */
+  social: "/_pd/social/",
 } as const;
 
 /**
@@ -782,6 +784,33 @@ export function parseImageUrl(pathname: string): { name: string; hash: string; w
     segments.push(seg);
   }
   return { name: segments.join("/"), hash: m[2]!, width: Number(m[3]) };
+}
+
+/**
+ * A site page's social image, served immutable: a PNG rendered from the site's social image component. Each route
+ * is a folder with a file of a fixed name, so no two routes share one: `/guide/install/` gives
+ * `/_pd/social/guide/install/card.<hash>.png`, the home page `/_pd/social/card.<hash>.png`. `hash` is the first 10 hex
+ * digits of a SHA-256 over what decides the picture. Each segment of the route is encoded.
+ */
+export function socialImageUrl(route: string, hash: string): string {
+  const folders = route.split("/").filter(Boolean).map(s => `${encodeURIComponent(s)}/`).join("");
+  return `${PD_ROUTE_PREFIX.social}${folders}card.${hash}.png`;
+}
+
+/** A social image URL's route (slash-wrapped, segments decoded) and hash, or null when the path is not one: an empty,
+ *  "." or ".." segment, a segment that doesn't decode, a hash that isn't 10 hex digits. */
+export function parseSocialImageUrl(pathname: string): { route: string; hash: string } | null {
+  if (!pathname.startsWith(PD_ROUTE_PREFIX.social)) return null;
+  const m = /^((?:[^/]+\/)*)card\.([0-9a-f]{10})\.png$/.exec(pathname.slice(PD_ROUTE_PREFIX.social.length));
+  if (!m) return null;
+  const segments: string[] = [];
+  for (const raw of m[1]!.split("/").filter(Boolean)) {
+    let seg: string;
+    try { seg = decodeURIComponent(raw); } catch { return null; }
+    if (seg === "." || seg === ".." || seg.includes("/") || seg.includes("\\")) return null;
+    segments.push(seg);
+  }
+  return { route: segments.length ? `/${segments.join("/")}/` : "/", hash: m[2]! };
 }
 
 /** How the shell switches component themes in the preview: toggle `data-theme` on one set of

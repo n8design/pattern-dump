@@ -22,7 +22,8 @@ import {
 } from "@pattern-dump/contracts";
 import { startDevServer } from "./index.js";
 import { buildShellHtml } from "./http-utils.js";
-import { imageCacheDir } from "./image-route.js";
+import { imageCacheDir, socialCacheDir } from "./image-route.js";
+import { socialDir } from "./storefront/social-images.js";
 import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 import { createSnapshotWriter } from "./snapshot-writer.js";
@@ -204,6 +205,8 @@ async function buildOnce(
     ...cfg.assetRoots.map(path => ({ kind: "the asset folder", path })),
     ...(storefront ? [{ kind: "the pages folder", path: storefront.pagesDir }] : []),
     ...(storefront?.head ? [{ kind: "the site's head file", path: storefront.head }] : []),
+    // The cards pd social committed: read for a page whose card has their hash (social-images.ts).
+    ...(storefront?.socialImages ? [{ kind: "the social images folder", path: socialDir(storefront.pagesDir) }] : []),
   ];
   /** Refuses an output root that is, holds, or sits inside anything the build reads. */
   const clearOfInputs = (name: string, out: string): void => {
@@ -282,7 +285,8 @@ async function buildOnce(
   // A storefront page's notes, once each however often the page is fetched: the report's notes.
   const storefrontNotes = new Set<string>();
   const server = await startDevServer(config, root, {
-    port: 0, live: false, now, today, pagesOnce: true, ...(skipped.has("html") ? { validateHtml: false } : {}),
+    // The version is part of every social image's hash, so pd dev and pd build name a card alike.
+    port: 0, live: false, now, today, pagesOnce: true, version: opts.pdVersion, ...(skipped.has("html") ? { validateHtml: false } : {}),
     ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
     onStorefrontNote: note => { storefrontNotes.add(note); },
     ...(pagefind ? { onSearchRecord: (r: SearchRecord) => { searchRecords.set(r.route, r); } } : {}),
@@ -715,6 +719,12 @@ async function buildOnce(
       }
     }
     await createImageCache(imageCacheDir(cfg.cwd)).sweep(used);
+    // And the social image cache, the cards written to the site (/_pd/social/<route>/card.<hash>.png).
+    if (storefront?.socialImages) {
+      const cards = await readdir(join(storefront.outDir, "_pd", "social"), { recursive: true }).catch(() => [] as string[]);
+      const keep = new Set(cards.map(f => /(?:^|[\\/])card\.([0-9a-f]{10})\.png$/.exec(String(f))?.[1]).filter((h): h is string => h !== undefined));
+      await createImageCache(socialCacheDir(cfg.cwd), "png").sweep(keep);
+    }
 
     // Deliberately no 404.html shell: every route has its own index.html, and a host that served the
     // shell for a missing preview would boot a second workbench inside the preview iframe.
