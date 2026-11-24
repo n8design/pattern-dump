@@ -5,7 +5,7 @@
 // (where in the nav), `nav` (`false` leaves the page out of the nav; the layout's `nav`, the tree, is filled as
 // before), the page's search and link-preview keys — `redirectFrom` (old routes that forward
 // here), `index` (`false` keeps the page out of search engines and the sitemap) and `image` (its link-preview
-// image, a raster file in the assets; checked against the files in page-image.ts) — and its listing keys
+// image, a raster file in the assets or beside the page; checked against the files in page-image.ts) — and its listing keys
 // (listing-keys.ts): `date`, `updated`, `tags`, `categories` (declared in storefront.categories), `draft`, and `sort` and `view` on a
 // folder's index.md, and `toc` (the table of contents, toc.ts). A layout cannot declare any of the fourteen. Every other key must be declared by the chosen layout's schema — the
 // `<stem>.schema.json` beside `layouts/<name>/<name>.hbs` — and is coerced to the type the schema
@@ -20,7 +20,8 @@
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import { suggest } from "@pattern-dump/config";
 import { checkDeclared, readSchema, type PropertySchema } from "./declared-values.js";
-import { DEFAULT_LAYOUT, type PageFile } from "./pages.js";
+import { DEFAULT_LAYOUT, imageBase, type PageFile } from "./pages.js";
+import { isRelativePath, resolvePageImage } from "./page-images.js";
 import type { FrontmatterValue } from "../frontmatter.js";
 import { readChildLayout, readDate, readDraft, readSort, readTerms, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
 import { categoryIndex, termIndex, TERM_WORDS, type CategoryIndex, type TermIndex, type TermKind } from "./categories.js";
@@ -54,7 +55,10 @@ export interface BuildKeys {
   /** false: the page is left out of the nav, and so has no prev or next and is no neighbour's (pages.ts). */
   nav?: boolean;
   /** A /assets/… path. */
+  /** Its link-preview image's URL: a path in the assets, or an image beside the pages (/guide/share.png). */
   image?: string;
+  /** The image as the frontmatter writes it ("./share.png"), for messages; the image beside the pages it names. */
+  imageAs?: { written: string; beside?: string };
   /** The page's date, YYYY-MM-DD. */
   date?: string;
   /** The page's last real change, YYYY-MM-DD: set by its author, never before `date`. */
@@ -75,7 +79,9 @@ const OLD_ROUTE = /^\/(?:(?!\.\.?\/)[^/?#\s]+\/)+$/;
 const ASSET_PATH = /^\/assets\/[^?#]+[^/?#]$/;
 
 function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, at: (key: string, message: string) => void,
-  terms: { categories: CategoryIndex; tags: TermIndex }, renamed: (kind: TermKind, from: string, to: string) => void): BuildKeys {
+  terms: { categories: CategoryIndex; tags: TermIndex }, renamed: (kind: TermKind, from: string, to: string) => void,
+  /** The file a relative `image` is resolved against: the page, or the index.md whose childDefaults gave it. */
+  imageFrom: string = path): BuildKeys {
   const out: BuildKeys = {};
   const redirect = values["redirectFrom"];
   if (redirect !== undefined) {
@@ -104,8 +110,13 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
   }
   const image = values["image"];
   if (image !== undefined) {
-    if (typeof image === "string" && ASSET_PATH.test(image)) out.image = image;
-    else at("image", `image must be a path to a file in the assets, such as "/assets/images/share.png"`);
+    if (typeof image === "string" && ASSET_PATH.test(image)) { out.image = image; out.imageAs = { written: image }; }
+    else if (typeof image === "string" && isRelativePath(image)) {
+      const r = resolvePageImage(image, imageFrom);
+      if (r.ok) { out.image = r.url; out.imageAs = { written: image, beside: r.rel }; }
+      else at("image", `image "${image}" is outside the pages folder: a relative image stays inside site.pagesDir`);
+    }
+    else at("image", `image must be a path to a file in the assets, such as "/assets/images/share.png", or an image beside the page, such as "./share.png"`);
   }
   const take = <K extends "date" | "updated" | "draft" | "sort" | "view">(key: K, r: Read<NonNullable<BuildKeys[K]>> | undefined): void => {
     if (r === undefined) return;
@@ -168,7 +179,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     const w = TERM_WORDS[kind];
     notes.push(`warning: ${where(w.many)}: ${w.one} "${from}" is now "${to}" (renamed in ${w.config}): write "${to}"`);
   };
-  const buildKeys = () => checkBuildKeys(values, page.path, at, { categories, tags }, renamed);
+  const buildKeys = () => checkBuildKeys(values, page.path, at, { categories, tags }, renamed, imageBase(page));
 
   // ---- layout: its own, else its folder's childLayout (pages.ts), else the default ----
   const index = await layoutIndex(discoveryMap);

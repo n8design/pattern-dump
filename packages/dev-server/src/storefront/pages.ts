@@ -17,11 +17,12 @@
 // What cannot be a sound site is reported in `problems`, not guessed around, and every problem is fatal
 // to the caller (D7): a folder of pages with no `index.md` (its nav entry would have no page to link to);
 // two files that claim the same route; a file or folder whose name is not lowercase letters, digits and
-// hyphens (the name is the URL); a file that is not a page; a pages folder that does not exist; and a
-// folder with no `index.md` at its top, so no home page (an empty folder included). Dotfiles and
+// hyphens (the name is the URL); a file that is neither a page nor an image; a pages folder that does not exist;
+// and a folder with no `index.md` at its top, so no home page (an empty folder included). Dotfiles and
 // dot-folders are ignored.
-// Images and other files for pages belong in the project's assets, not here. Pages are read with the strict
-// frontmatter reader; its errors are left to the caller, which validates every page.
+// Images may sit beside the pages (page-images.ts), under the same naming rule; other files belong in the project's
+// assets. Pages are read with the strict frontmatter reader; its errors are left to the caller, which validates
+// every page.
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
@@ -35,6 +36,7 @@ import type { StorefrontCategory, StorefrontTermPages } from "@pattern-dump/conf
 import { termPages, type GeneratedPage } from "./terms.js";
 import { applyFolderDefaults, type DefaultOrigin } from "./folder-defaults.js";
 import { teaserOf } from "./teaser.js";
+import { isImageName, isValidImageName, PAGE_IMAGE_FORMATS, isRelativePath, reservedPrefixOf, resolvePageImage, suggestImageName, URL_NAME } from "./page-images.js";
 
 /** The layout a page uses when its frontmatter names none. */
 export const DEFAULT_LAYOUT = "page";
@@ -68,7 +70,7 @@ export interface PageEntryFields {
   date: string | null;
   /** Its frontmatter updated, YYYY-MM-DD, or null. */
   updated: string | null;
-  /** Its image, a path in the assets, or null. */
+  /** Its image: a path in the assets, or the URL of an image beside the pages (page-images.ts); else null. */
   image: string | null;
   /** Its tags, resolved (an old key as the tag it is now). */
   tags: Term[];
@@ -119,6 +121,8 @@ export interface PageModel extends StorefrontPagesResponse {
   tags: TermIndex;
   /** The tag and category pages (terms.ts), by route: in `pages` too, never in `files`, the nav or a listing. */
   generated: Map<string, GeneratedPage>;
+  /** The images beside the pages (page-images.ts), by their path in the pages folder, sorted. */
+  images: string[];
   /** Problems with the folder as a whole, one line each. Empty when it is a sound site. */
   problems: string[];
 }
@@ -131,11 +135,12 @@ export function routeFor(path: string): string {
 }
 
 /** A page file's stem or a folder's name: it is part of the URL. */
-const NAME = /^[a-z0-9-]+$/;
+const NAME = URL_NAME;
 
-/** Every page file under `dir`, relative to `root` with forward slashes. Names that cannot be part of a
- *  URL, and files that are not pages, go to `problems`; a folder with such a name is not read. */
-async function markdownFiles(dir: string, root: string, problems: string[]): Promise<string[]> {
+/** Every page file under `dir`, relative to `root` with forward slashes; the images beside them go to `images`.
+ *  Names that cannot be part of a URL, and files that are neither, go to `problems`; a folder with such a name is
+ *  not read. */
+async function markdownFiles(dir: string, root: string, problems: string[], images: string[]): Promise<string[]> {
   const out: string[] = [];
   const entries = (await readdir(dir, { withFileTypes: true }).catch(() => [])).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   for (const e of entries) {
@@ -144,9 +149,19 @@ async function markdownFiles(dir: string, root: string, problems: string[]): Pro
     const rel = relative(root, p).split(sep).join("/");
     if (e.isDirectory()) {
       if (!NAME.test(e.name)) { problems.push(`${rel}/: a folder name is part of the URL, so it is lowercase letters, digits and hyphens only`); continue; }
-      out.push(...await markdownFiles(p, root, problems));
+      out.push(...await markdownFiles(p, root, problems, images));
+    } else if (isImageName(e.name)) {
+      if (!isValidImageName(e.name)) {
+        const suggested = suggestImageName(e.name);
+        problems.push(`${rel}: an image's file name is part of its URL, so it is lowercase letters, digits and hyphens only, then its extension`
+          + (suggested ? `: rename it to ${suggested}` : ""));
+        continue;
+      }
+      const reserved = reservedPrefixOf(`/${rel}`);
+      if (reserved) { problems.push(`${rel}: the image /${rel} is under ${reserved}, which Pattern Dump serves itself: move it to another folder`); continue; }
+      images.push(rel);
     } else if (!e.name.endsWith(".md")) {
-      problems.push(`${rel} is not a page: only .md files belong in the pages folder (images and other files go in the project's assets)`);
+      problems.push(`${rel} is not a page or an image: only .md files and images (${PAGE_IMAGE_FORMATS}) belong in the pages folder (other files go in the project's assets)`);
     } else if (!NAME.test(e.name.slice(0, -".md".length))) {
       problems.push(`${rel}: a page's file name is part of the URL, so it is lowercase letters, digits and hyphens only, then .md`);
     } else {
@@ -157,6 +172,19 @@ async function markdownFiles(dir: string, root: string, problems: string[]): Pro
 }
 
 const scalar = (v: string | string[] | undefined): string | undefined => typeof v === "string" ? v : undefined;
+
+/** The file a page's frontmatter `image` is relative to: the index.md whose childDefaults gave it, else the page. */
+export const imageBase = (f: Pick<PageFile, "path" | "defaults">): string => f.defaults?.["image"]?.from ?? f.path;
+
+/** A listing's image: a path in the assets as written, or an image beside the pages at its URL; else null (the page's
+ *  own check reports it). */
+function listedImage(image: string | undefined, f: PageFile, images: ReadonlySet<string>): string | null {
+  if (image === undefined) return null;
+  if (/^\/assets\/[^?#]+[^/?#]$/.test(image)) return image;
+  if (!isRelativePath(image)) return null;
+  const r = resolvePageImage(image, imageBase(f));
+  return r.ok && images.has(r.rel) ? r.url : null;
+}
 
 /**
  * `workbenchPath`: the path of a workbench published on the storefront's host (sameHostWorkbenchPath), where no
@@ -187,10 +215,11 @@ export async function readPages(pagesDir: string, opts: {
   const files = new Map<string, PageFile>();
   let notFound: PageFile | undefined;
   if (!await stat(pagesDir).then(s => s.isDirectory(), () => false)) {
-    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], draftsByDefaults: [], scheduled: [], categories, tags, generated, problems: [`the pages folder ${pagesDir} does not exist`] };
+    return { pages: [], nav: [], files, entries: new Map(), folders: new Map(), drafts: [], draftsByDefaults: [], scheduled: [], categories, tags, generated, images: [], problems: [`the pages folder ${pagesDir} does not exist`] };
   }
   const bodies = new Map<string, string>();
-  for (const path of (await markdownFiles(pagesDir, pagesDir, problems)).sort()) {
+  const images: string[] = [];
+  for (const path of (await markdownFiles(pagesDir, pagesDir, problems, images)).sort()) {
     const route = routeFor(path);
     const other = files.get(route);
     if (other) { problems.push(`${other.path} and ${path} are both the page at ${route}`); continue; }
@@ -368,6 +397,9 @@ export async function readPages(pagesDir: string, opts: {
     for (const f of files.values()) {
       if (f.route.startsWith(workbenchPath)) problems.push(`${f.path}: the page ${f.route} is ${workbenchPlace(f.route, workbenchPath)}`);
     }
+    for (const rel of images) {
+      if (`/${rel}`.startsWith(workbenchPath)) problems.push(`${rel}: the image /${rel} is ${workbenchPlace(`/${rel}`, workbenchPath)}`);
+    }
   }
   // Redirects across pages: an old route that is a page, or that two pages claim.
   problems.push(...redirectProblems(files, workbenchPath));
@@ -379,6 +411,7 @@ export async function readPages(pagesDir: string, opts: {
     return r.ok ? r.value : undefined;
   };
   const entries = new Map<string, PageEntryFields>();
+  const imageSet = new Set(images);
   const termKeys = new Map<string, { tags: string[]; categories: string[] }>();
   for (const route of routes) {
     const v = files.get(route)!.frontmatter.values;
@@ -415,7 +448,7 @@ export async function readPages(pagesDir: string, opts: {
       description: description ?? teaserOf(frontmatterBody(bodies.get(route)!)),
       date,
       updated: ok(v["updated"], x => readUpdated(x, date ?? undefined)) ?? null,
-      image: image !== undefined && /^\/assets\/[^?#]+[^/?#]$/.test(image) ? image : null,
+      image: listedImage(image, f, imageSet),
       tags: termsOf(tags, termKeys.get(route)!.tags),
       categories: termsOf(categories, termKeys.get(route)!.categories),
       draft: ok(v["draft"], readDraft) ?? false,
@@ -436,5 +469,5 @@ export async function readPages(pagesDir: string, opts: {
     pages.push({ route: g.route, title: g.title, layout: g.layout, ...(g.redirectFrom.length ? { redirectFrom: g.redirectFrom } : {}) });
   }
   return { pages, nav, files: new Map(routes.map(r => [r, files.get(r)!])), entries, folders: listings, drafts, draftsByDefaults, scheduled, categories, tags, generated,
-    problems, ...(notFound ? { notFound } : {}) };
+    images: images.sort(), problems, ...(notFound ? { notFound } : {}) };
 }

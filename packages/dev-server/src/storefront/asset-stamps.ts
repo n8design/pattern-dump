@@ -1,5 +1,5 @@
 // Content stamps on the storefront host. Every reference a storefront response makes to a file the site
-// serves (`/_pd/…`, `/assets/…`) gets `?v=<content hash>` of that file as served (content-hash.ts), so a
+// serves (`/_pd/…`, `/assets/…`, an image beside the pages such as `/guide/shot.svg`) gets `?v=<content hash>` of that file as served (content-hash.ts), so a
 // visitor's browser fetches a stylesheet, script, font or image again exactly when it changed, and the URL is
 // the same on every machine and checkout.
 //
@@ -23,7 +23,8 @@ import { ATTRIBUTE, startTags } from "./html-tags.js";
 /** The stamp of a served path, or undefined when nothing is served there. */
 export type HashOf = (path: string) => Promise<string | undefined>;
 
-const SERVED = String.raw`\/(?:_pd|assets)\/[^"'()\s?#]+`;
+// The last alternative is an image beside the pages (page-images.ts): URL names, then an image extension.
+const SERVED = String.raw`\/(?:_pd|assets)\/[^"'()\s?#]+|\/(?:[a-z0-9-]+\/)*[a-z0-9-]+\.(?:png|jpe?g|gif|webp|svg)`;
 
 /** `path` or `path?v=…`: the path, when the reference may be stamped; otherwise null. An image variant
  *  (/_pd/images/…) is already named by its key, and looking its stamp up would encode it: never stamped. */

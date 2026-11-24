@@ -70,6 +70,7 @@ import { assetFile } from "./asset-file.js";
 import { decodePath } from "./contained-file.js";
 import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
+import { isPageImageUrl, pageImageFile } from "./storefront/page-images.js";
 import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
@@ -804,6 +805,7 @@ async function routeRequest(
     // workbench's hosts are the only ones (a request for any other host was refused at the top).
     const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
     if (cfg.storefront && host === cfg.storefront.host) {
+      const storefront = cfg.storefront;
       const discovery = await currentDiscovery(state, patternRoots);
       const discoveryMap = discovery.discoveryMap;
       const model = await readStorefrontPages(ctx, cfg.storefront, discoveryMap);
@@ -829,6 +831,13 @@ async function routeRequest(
         res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
         res.end(sitemapXml(sitemapEntries(model, siteUrl)));
         return;
+      }
+      // An image beside the pages (page-images.ts): the file, at its path in the pages folder. A route has no extension,
+      // so it takes no page's place.
+      const imagePath = decodePath(pathname) ?? "";
+      if (isPageImageUrl(imagePath) && model.images.includes(imagePath.slice(1))) {
+        const file = await pageImageFile(pathname, cfg.storefront.pagesDir);
+        if (file !== null) return await serveFile(res, file, mimeType(extname(file)));
       }
       // A page route is a folder path; /about is /about/, as a static host serves it.
       const route = /\.[a-z0-9]+$/i.test(pathname) ? null : pathname.endsWith("/") ? pathname : `${pathname}/`;
@@ -859,7 +868,8 @@ async function routeRequest(
         borrowed: roots => pageBorrowedStyles(state, discovery, patternDirs, roots),
         ...(ctx.dates ? { dates: ctx.dates } : {}),
         ...(ctx.live ? { live: { wsPort, generation: generation ?? "", basePath: cfg.storefront.basePath } } : {}),
-        image: path => checkPageImage(path, assetRoots, assetRootNames),
+        image: (path, as) => checkPageImage(path, assetRoots, assetRootNames,
+          { written: as?.written, beside: as?.beside, pagesDir: storefront.pagesDir }),
         ...(siteUrl !== undefined ? { siteUrl } : {}),
         lang: cfg.storefront.lang, siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
         ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),

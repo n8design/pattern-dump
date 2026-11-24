@@ -15,6 +15,7 @@
 //
 // Site pages are the storefront's pages and its 404 page. Component previews and redirect stubs are not checked as
 // sources, but are valid targets.
+import { isPageImageUrl } from "./page-images.js";
 import { attributesOf, startTags } from "./html-tags.js";
 
 export interface LinkSite {
@@ -176,7 +177,7 @@ export function checkLinks(site: LinkSite): LinkCheck {
         }
         if (!served.startsWith(base)) { say(`${served} is outside ${base}, the path the site is published under (site.url)`); continue; }
         const path = `/${served.slice(base.length)}`;
-        if (site.pagesOnly && /^\/(?:_pd|assets|preview)\//.test(path)) continue;
+        if (site.pagesOnly && (/^\/(?:_pd|assets|preview)\//.test(path) || isPageImageUrl(path))) continue;
         const target = builtAs(path);
         if (target === undefined) {
           // Written with the site's path already: the pass put it in front a second time.

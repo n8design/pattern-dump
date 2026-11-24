@@ -8,6 +8,7 @@
 
 import { request } from "node:http";
 import { PD_ROUTES, type StorefrontPagesResponse } from "@pattern-dump/contracts";
+import { isPageImageUrl } from "./page-images.js";
 
 /** fetch() for the storefront host: node:http with the Host header set (fetch() ignores an overridden Host). It
  *  asks for a site path ("/guides/setup/"); a site published under a path (`basePath`) is asked under it. */
@@ -35,7 +36,11 @@ const unescapeHtml = (s: string): string => s.replace(/&lt;/g, "<").replace(/&gt
 const toSite = (ref: string, base: string): string | null =>
   base === "/" ? ref : ref.startsWith(base) ? `/${ref.slice(base.length)}` : null;
 
-/** Root-relative references a document makes to files PD serves, and the page's link-preview image (an
+/** An image beside the pages (page-images.ts), stamped or not: only the ones a page references are written. */
+const isPageImageRef = (u: string): boolean => isPageImageUrl(decodeURIComponentSafe(u.replace(/\?v=[^#&]*$/, "")));
+const decodeURIComponentSafe = (s: string): string => { try { return decodeURIComponent(s); } catch { return s; } };
+
+/** Root-relative references a document makes to files PD serves (images beside the pages included), and the page's link-preview image (an
  *  absolute URL on the site's own address, so its path is taken), as site paths. Page routes are crawled from the
  *  page list. */
 const markupRefs = (html: string, base: string): string[] => [
@@ -43,7 +48,7 @@ const markupRefs = (html: string, base: string): string[] => [
   // Each candidate of a srcset: its URL, before the width or density that describes it.
   ...[...html.matchAll(/srcset="([^"]+)"/g)].flatMap(m => unescapeHtml(m[1]!).split(",").map(c => c.trim().split(/\s+/)[0] ?? "")),
   ...[...html.matchAll(/<meta property="og:image" content="https?:\/\/[^/"]+(\/[^"]+)">/g)].map(m => unescapeHtml(m[1]!)),
-].map(u => toSite(u, base)).filter((u): u is string => u !== null && /^\/(?:_pd|assets|preview)\//.test(u));
+].map(u => toSite(u, base)).filter((u): u is string => u !== null && (/^\/(?:_pd|assets|preview)\//.test(u) || isPageImageRef(u)));
 const cssRefs = (css: string, base: string): string[] =>
   [...css.matchAll(/url\(\s*(['"]?)(\/[^'")\s]+)\1\s*\)/g)].map(m => toSite(m[2]!, base))
     .filter((u): u is string => u !== null && /^\/(?:_pd|assets)\//.test(u));

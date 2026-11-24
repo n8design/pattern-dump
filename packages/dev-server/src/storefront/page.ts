@@ -87,8 +87,9 @@ export interface PageAssembly {
   live?: { wsPort: number; generation: string; basePath: string };
   /** The pages' dates from git (git-dates.ts). Without it, a layout's page.created is null. */
   dates?: GitDates;
-  /** Checks a link-preview image path against the project's assets (page-image.ts). */
-  image(path: string): Promise<PageImageCheck>;
+  /** Checks a link-preview image path against the project's assets, or an image beside the pages when `beside` is
+   *  its path in the pages folder (page-image.ts). */
+  image(path: string, as?: { written: string; beside?: string }): Promise<PageImageCheck>;
   /** storefront.image: the image of every page that names none. */
   siteImage?: string;
   /** storefront.head: the site's own head file, by its absolute path and as the config names it. */
@@ -494,7 +495,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   problems.push(...site.problems);
 
   // The link-preview image: the page's own, else the site's. A bad site image is the whole site's problem.
-  const imageCheck = checked.build.image !== undefined ? await a.image(checked.build.image)
+  const imageCheck = checked.build.image !== undefined ? await a.image(checked.build.image, checked.build.imageAs)
     : a.siteImage !== undefined ? await a.image(a.siteImage) : undefined;
   if (imageCheck && !imageCheck.ok) {
     if (checked.build.image !== undefined) problems.push(`${placeOf(page, "image")}: ${imageCheck.message}`);
@@ -525,6 +526,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const renderBody = async (takenIds: string[] = []) => {
     const prose: ProseImages | undefined = imageLookup ? {
       layoutId: checked.layoutId, lookup: imageLookup, lineOffset: frontmatterBodyOffset(source), problems: [],
+      // A page from the pages folder: its relative images are the ones beside it (page-images.ts).
+      ...(page.file !== "" ? { pagePath: page.path } : {}),
       ...(proseSlot.slot ? { slot: proseSlot.slot } : {}), ...(proseSlot.problem ? { slotProblem: proseSlot.problem } : {}),
     } : undefined;
     const symbols: SymbolImages | undefined = symbolIndex ? {

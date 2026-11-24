@@ -222,12 +222,13 @@ describe("readPages — problems (each one fatal to the caller)", () => {
     expect(model.pages.map(p => p.route)).toEqual(["/"]);
   });
 
-  it("a file that is not a page", async () => {
-    const model = await readPages(await pages({ "index.md": page("Home"), "logo.png": "png", "guides/index.md": page("G"), "guides/notes.txt": "x" }));
+  it("a file that is neither a page nor an image; an image beside the pages is no problem", async () => {
+    const model = await readPages(await pages({ "index.md": page("Home"), "logo.png": "png", "guides/index.md": page("G"), "guides/notes.txt": "x", "guides/data.json": "{}" }));
     expect(model.problems).toEqual([
-      "guides/notes.txt is not a page: only .md files belong in the pages folder (images and other files go in the project's assets)",
-      "logo.png is not a page: only .md files belong in the pages folder (images and other files go in the project's assets)",
+      "guides/data.json is not a page or an image: only .md files and images (PNG, JPEG, GIF, WebP or SVG) belong in the pages folder (other files go in the project's assets)",
+      "guides/notes.txt is not a page or an image: only .md files and images (PNG, JPEG, GIF, WebP or SVG) belong in the pages folder (other files go in the project's assets)",
     ]);
+    expect(model.images).toEqual(["logo.png"]);
   });
 
   it("ignores dotfiles and dot-folders", async () => {
@@ -239,7 +240,7 @@ describe("readPages — problems (each one fatal to the caller)", () => {
   it("an empty pages folder has no home page", async () => {
     const model = await readPages(await pages({}));
     expect(model).toEqual({
-      pages: [], nav: [], files: new Map(), entries: new Map(), folders: new Map(), drafts: [], draftsByDefaults: [], scheduled: [], categories: { kind: "category", declared: true, list: [], byKey: new Map(), aliases: new Map() }, tags: { kind: "tag", declared: false, list: [], byKey: new Map(), aliases: new Map() }, generated: new Map(), 
+      pages: [], nav: [], files: new Map(), entries: new Map(), folders: new Map(), drafts: [], draftsByDefaults: [], scheduled: [], categories: { kind: "category", declared: true, list: [], byKey: new Map(), aliases: new Map() }, tags: { kind: "tag", declared: false, list: [], byKey: new Map(), aliases: new Map() }, generated: new Map(), images: [],
       problems: ["there is no home page: the pages folder needs an index.md at its top, the page at /"],
     });
   });
@@ -252,7 +253,7 @@ describe("readPages — problems (each one fatal to the caller)", () => {
 
   it("a pages folder that does not exist", async () => {
     const missing = join(await pages({}), "no-such-folder");
-    expect(await readPages(missing)).toEqual({ pages: [], nav: [], files: new Map(), entries: new Map(), folders: new Map(), drafts: [], draftsByDefaults: [], scheduled: [], categories: { kind: "category", declared: true, list: [], byKey: new Map(), aliases: new Map() }, tags: { kind: "tag", declared: false, list: [], byKey: new Map(), aliases: new Map() }, generated: new Map(), problems: [`the pages folder ${missing} does not exist`] });
+    expect(await readPages(missing)).toEqual({ pages: [], nav: [], files: new Map(), entries: new Map(), folders: new Map(), drafts: [], draftsByDefaults: [], scheduled: [], categories: { kind: "category", declared: true, list: [], byKey: new Map(), aliases: new Map() }, tags: { kind: "tag", declared: false, list: [], byKey: new Map(), aliases: new Map() }, generated: new Map(), images: [], problems: [`the pages folder ${missing} does not exist`] });
   });
 
   it("a pages path that is a file, not a folder", async () => {
