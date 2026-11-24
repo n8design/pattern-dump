@@ -31,7 +31,7 @@ import { isPageImageUrl } from "./storefront/page-images.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
-import { loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule } from "./storefront/browser-checks.js";
+import { launchChromium, loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule, type PwBrowser } from "./storefront/browser-checks.js";
 import { PageCheckError, runPagesA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { checkClasses } from "./storefront/class-check.js";
@@ -287,7 +287,9 @@ async function buildOnce(
     onStorefrontNote: note => { storefrontNotes.add(note); },
     ...(pagefind ? { onSearchRecord: (r: SearchRecord) => { searchRecords.set(r.route, r); } } : {}),
   });
-  // From here on a failure anywhere closes the server and removes the stage folders (finally, below).
+  /** Chromium, once launched (launchChromium): open until the build ends, closed in the finally below. */
+  let browser: PwBrowser | undefined;
+  // From here on a failure anywhere closes the server and the browser, and removes the stage folders (finally, below).
   try {
     log("… server ready");
     if (skipped.has("html")) log("… HTML validation skipped (skipChecks: html)");
@@ -443,7 +445,8 @@ async function buildOnce(
       let imageWarnings: string[] | undefined;
       const browserWarnings: string[] = [];
       if (playwright) {
-        const checked = await runBrowserChecks({ pages, get: sfGet, playwright, basePath: sfBase, ...(searchFiles ? { search: { files: searchFiles, word: searchWord([...searchRecords.values()]) } } : {}) });
+        browser ??= await launchChromium(playwright);
+        const checked = await runBrowserChecks({ pages, get: sfGet, browser, basePath: sfBase, ...(searchFiles ? { search: { files: searchFiles, word: searchWord([...searchRecords.values()]) } } : {}) });
         if (checked.errors.length) {
           throw new Error(`pd build: the site has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
         }
@@ -720,6 +723,7 @@ async function buildOnce(
     report.ms = Math.round(performance.now() - started);
     return report;
   } finally {
+    await browser?.close();
     await server.close();
     // A build that stopped leaves nothing of its own beside the outputs.
     await rm(wbStage, { recursive: true, force: true });

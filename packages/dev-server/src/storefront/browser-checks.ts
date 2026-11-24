@@ -32,9 +32,10 @@ const typeOf = (path: string): string => path.endsWith(".js") ? "text/javascript
 
 /** The part of Playwright this uses. */
 export interface PlaywrightModule {
-  chromium: { launch(options?: { headless?: boolean }): Promise<PwBrowser> };
+  chromium: { launch(options?: { headless?: boolean; args?: string[] }): Promise<PwBrowser> };
 }
-interface PwBrowser { newContext(o: { viewport: { width: number; height: number }; deviceScaleFactor: number }): Promise<PwContext>; close(): Promise<void> }
+/** The part of a Playwright browser this uses. Whoever launches it closes it. */
+export interface PwBrowser { newContext(o: { viewport: { width: number; height: number }; deviceScaleFactor: number }): Promise<PwContext>; close(): Promise<void> }
 interface PwContext {
   route(url: string, handler: (route: PwRoute) => Promise<void>): Promise<void>;
   newPage(): Promise<PwPage>;
@@ -68,6 +69,15 @@ export async function loadProjectPlaywright(root: string): Promise<PlaywrightMod
   throw new BrowserUnavailableError(`pd build --browser needs Playwright in this project: ${INSTALL}`);
 }
 
+/** Chromium from `playwright`, headless; `command` names who asked, in the message when it won't start. */
+export async function launchChromium(playwright: PlaywrightModule, command = "pd build --browser", args?: string[]): Promise<PwBrowser> {
+  try {
+    return await playwright.chromium.launch({ headless: true, ...(args ? { args } : {}) });
+  } catch (e) {
+    throw new BrowserUnavailableError(`${command} couldn't start Chromium (${(e instanceof Error ? e.message : String(e)).split("\n")[0]}): ${INSTALL}`);
+  }
+}
+
 export const VIEWPORTS = [
   { name: "1000×720", viewport: { width: 1000, height: 720 }, dpr: 1 },
   { name: "390×844", viewport: { width: 390, height: 844 }, dpr: 2 },
@@ -86,22 +96,18 @@ interface AxeViolation { id: string; impact?: string | null; tags: string[]; hel
 interface ImageSeen { src: string; sizes: string; box: number; chosen: number | null; candidates: number[] }
 
 /** The browser checks over `pages` (site paths), each fetched through `get` (the build's server, as the crawl fetches
- *  it, by site path). `basePath`: the path the site is published under; pages are opened under it, as served. */
+ *  it, by site path), in `browser` (launchChromium), which stays open: the caller closes it. `basePath`: the path the
+ *  site is published under; pages are opened under it, as served. */
 export async function runBrowserChecks(o: {
   pages: readonly string[];
   get: (url: string) => Promise<Response>;
-  playwright: PlaywrightModule;
+  browser: PwBrowser;
   basePath?: string;
   /** The site's search index, by path under _pd/search/, and a word to search for that finds a page. */
   search?: { files: ReadonlyMap<string, Uint8Array>; word: string };
 }): Promise<BrowserCheckResult> {
   const base = o.basePath ?? "/";
-  let browser: PwBrowser;
-  try {
-    browser = await o.playwright.chromium.launch({ headless: true });
-  } catch (e) {
-    throw new BrowserUnavailableError(`pd build --browser couldn't start Chromium (${(e instanceof Error ? e.message : String(e)).split("\n")[0]}): ${INSTALL}`);
-  }
+  const { browser } = o;
   const origin = "http://site.invalid";
   const axe = axeScript();
   // Keyed by what was found, with the viewports it was found at.
@@ -115,122 +121,118 @@ export async function runBrowserChecks(o: {
   let current = "";
   /** The results the pages loaded from the search index (its fragments). */
   let fragments = 0;
-  try {
-    for (const vp of VIEWPORTS) {
-      const context = await browser.newContext({ viewport: vp.viewport, deviceScaleFactor: vp.dpr });
-      // The site from the build's server; anything else (another host) is not fetched.
-      await context.route("**/*", async route => {
-        const url = new URL(route.request().url());
-        if (url.origin !== origin) { await route.abort(); return; }
-        const searchAt = `${base}${SEARCH_PATH.slice(1)}`;
-        if (o.search && url.pathname.startsWith(searchAt)) {
-          const file = o.search.files.get(url.pathname.slice(searchAt.length));
-          if (file === undefined) {
-            const text = `${current}: a request to ${url.pathname} is under ${searchAt}, and the search index has no such file`;
-            note("error", text, text, vp.name);
-            await route.fulfill({ status: 404, body: Buffer.from("") });
-            return;
-          }
-          if (url.pathname.startsWith(`${searchAt}fragment/`)) fragments++;
-          await route.fulfill({ status: 200, headers: { "content-type": typeOf(url.pathname) }, body: Buffer.from(file) });
-          return;
-        }
-        if (!url.pathname.startsWith(base)) {
-          // The browser's own favicon request is not the page's.
-          if (url.pathname !== "/favicon.ico") {
-            const text = `${current}: a request to ${url.pathname}${url.search} is outside ${base}, the path the site is published under `
-              + `(site.url): a script that builds this URL needs the site's path, which <meta name="pd-base-path"> names`;
-            note("error", `outside ${text}`, text, vp.name);
-          }
+  for (const vp of VIEWPORTS) {
+    const context = await browser.newContext({ viewport: vp.viewport, deviceScaleFactor: vp.dpr });
+    // The site from the build's server; anything else (another host) is not fetched.
+    await context.route("**/*", async route => {
+      const url = new URL(route.request().url());
+      if (url.origin !== origin) { await route.abort(); return; }
+      const searchAt = `${base}${SEARCH_PATH.slice(1)}`;
+      if (o.search && url.pathname.startsWith(searchAt)) {
+        const file = o.search.files.get(url.pathname.slice(searchAt.length));
+        if (file === undefined) {
+          const text = `${current}: a request to ${url.pathname} is under ${searchAt}, and the search index has no such file`;
+          note("error", text, text, vp.name);
           await route.fulfill({ status: 404, body: Buffer.from("") });
           return;
         }
-        const res = await o.get(`/${url.pathname.slice(base.length)}${url.search}`);
-        const headers: Record<string, string> = {};
-        const type = res.headers.get("content-type");
-        if (type) headers["content-type"] = type;
-        await route.fulfill({ status: res.status, headers, body: Buffer.from(await res.arrayBuffer()) });
-      });
-      const page = await context.newPage();
-      let searched = false;
-      for (const path of o.pages) {
-        current = path;
-        await page.goto(`${origin}${base}${path.slice(1)}`, { waitUntil: "load" });
-        await page.addScriptTag({ content: axe });
-        const runAxe = async (state: string) => {
-          const violations = await page.evaluate(async (rules: string[]) => {
-            const r = await (window as unknown as { axe: { run(c: unknown, o: unknown): Promise<{ violations: unknown[] }> } }).axe
-              .run(document, { runOnly: { type: "rule", values: rules }, resultTypes: ["violations"], iframes: false });
-            return r.violations;
-          }, pageRuleTiers.browser) as AxeViolation[];
-          for (const v of violations) {
-            const where = v.nodes.map(n => n.target.map(String).join(" ")).join(", ");
-            const text = `${path}${state}: ${v.id} (${v.impact ?? "minor"}): ${v.help}, on ${where} (${v.helpUrl})`;
-            note(severityOf(v.impact, v.tags) === "error" ? "error" : "a11y", `a11y ${text}`, text, vp.name);
-          }
-        };
-        await runAxe("");
-        // Each image with variants, in view (a lazy one loads), then its chosen candidate against its box.
-        const images = await page.evaluate(async () => {
-          const seen: ImageSeen[] = [];
-          for (const img of Array.from(document.querySelectorAll<HTMLImageElement>("img[srcset]"))) {
-            img.scrollIntoView({ block: "center", inline: "center" });
-            if (!img.complete || img.naturalWidth === 0) {
-              await new Promise<void>(resolve => {
-                const done = () => resolve();
-                img.addEventListener("load", done, { once: true });
-                img.addEventListener("error", done, { once: true });
-                setTimeout(done, 5000);
-              });
-            }
-            const candidates = img.srcset.split(",").map(c => c.trim().split(/\s+/)).map(([u, d]) => ({ url: new URL(u!, location.href).href, w: parseInt(d ?? "", 10) }));
-            const chosen = candidates.find(c => c.url === img.currentSrc);
-            seen.push({ src: img.getAttribute("src") ?? "", sizes: img.sizes, box: img.getBoundingClientRect().width,
-              chosen: chosen && !Number.isNaN(chosen.w) ? chosen.w : null, candidates: candidates.map(c => c.w).filter(w => !Number.isNaN(w)) });
-          }
-          return seen;
-        }, undefined) as ImageSeen[];
-        // The search field, used (its images are read already): a word that finds a page, submitted, must load a result.
-        if (o.search && !searched && await page.evaluate((field: string) => document.querySelector(field) !== null, FIELD)) {
-          searched = true;
-          const before = fragments;
-          await page.fill(FIELD, o.search.word);
-          await page.press(FIELD, "Enter");
-          for (let waited = 0; fragments === before && waited < 5000; waited += 100) await page.waitForTimeout(100);
-          if (fragments === before) {
-            const text = `${path}: searching for "${o.search.word}" in its search field (${FIELD}) showed no result within 5 s, `
-              + `though the index has a page with it: the search component loads ${SEARCH_PATH}pagefind.js under the site's path `
-              + `(<meta name="pd-base-path">) and shows each result's data()`;
-            note("error", text, text, vp.name);
-          } else {
-            await page.addScriptTag({ content: axe });
-            await runAxe(` (showing the results for "${o.search.word}")`);
-          }
+        if (url.pathname.startsWith(`${searchAt}fragment/`)) fragments++;
+        await route.fulfill({ status: 200, headers: { "content-type": typeOf(url.pathname) }, body: Buffer.from(file) });
+        return;
+      }
+      if (!url.pathname.startsWith(base)) {
+        // The browser's own favicon request is not the page's.
+        if (url.pathname !== "/favicon.ico") {
+          const text = `${current}: a request to ${url.pathname}${url.search} is outside ${base}, the path the site is published under `
+            + `(site.url): a script that builds this URL needs the site's path, which <meta name="pd-base-path"> names`;
+          note("error", `outside ${text}`, text, vp.name);
         }
-        for (const img of images) {
-          if (img.chosen === null || img.box === 0) continue;
-          const need = Math.round(img.box * vp.dpr);
-          const covering = img.candidates.filter(w => w >= need).sort((a, b) => a - b)[0];
-          const written = img.src.replace(/\?v=[0-9a-f]+$/, "");
-          // Named by its site path.
-          const src = base !== "/" && written.startsWith(base) ? `/${written.slice(base.length)}` : written;
-          // An image with variants is named by its asset (/_pd/images/images/harbour.<key>.<width>.webp → images/harbour).
-          const asset = /^\/_pd\/images\/(.+)\.[0-9a-f]{10}\.\d+\.webp$/.exec(src)?.[1];
-          const what = asset ? `the image ${asset}` : `<img src="${src}">`;
-          const box = `is laid out ${Math.round(img.box)} px wide (${need} px at ${vp.dpr}x)`;
-          if (covering !== undefined && img.chosen > covering) {
-            note("image", `image ${path} ${src} large`, `${path}: ${what} ${box} but takes the ${img.chosen}w variant `
-              + `where ${covering}w would do: its sizes, "${img.sizes}", says it is wider than it is`, vp.name);
-          } else if (img.chosen < need && img.candidates.some(w => w > img.chosen!)) {
-            note("image", `image ${path} ${src} small`, `${path}: ${what} ${box} but takes the ${img.chosen}w variant, `
-              + `which is too small: its sizes, "${img.sizes}", says it is narrower than it is`, vp.name);
+        await route.fulfill({ status: 404, body: Buffer.from("") });
+        return;
+      }
+      const res = await o.get(`/${url.pathname.slice(base.length)}${url.search}`);
+      const headers: Record<string, string> = {};
+      const type = res.headers.get("content-type");
+      if (type) headers["content-type"] = type;
+      await route.fulfill({ status: res.status, headers, body: Buffer.from(await res.arrayBuffer()) });
+    });
+    const page = await context.newPage();
+    let searched = false;
+    for (const path of o.pages) {
+      current = path;
+      await page.goto(`${origin}${base}${path.slice(1)}`, { waitUntil: "load" });
+      await page.addScriptTag({ content: axe });
+      const runAxe = async (state: string) => {
+        const violations = await page.evaluate(async (rules: string[]) => {
+          const r = await (window as unknown as { axe: { run(c: unknown, o: unknown): Promise<{ violations: unknown[] }> } }).axe
+            .run(document, { runOnly: { type: "rule", values: rules }, resultTypes: ["violations"], iframes: false });
+          return r.violations;
+        }, pageRuleTiers.browser) as AxeViolation[];
+        for (const v of violations) {
+          const where = v.nodes.map(n => n.target.map(String).join(" ")).join(", ");
+          const text = `${path}${state}: ${v.id} (${v.impact ?? "minor"}): ${v.help}, on ${where} (${v.helpUrl})`;
+          note(severityOf(v.impact, v.tags) === "error" ? "error" : "a11y", `a11y ${text}`, text, vp.name);
+        }
+      };
+      await runAxe("");
+      // Each image with variants, in view (a lazy one loads), then its chosen candidate against its box.
+      const images = await page.evaluate(async () => {
+        const seen: ImageSeen[] = [];
+        for (const img of Array.from(document.querySelectorAll<HTMLImageElement>("img[srcset]"))) {
+          img.scrollIntoView({ block: "center", inline: "center" });
+          if (!img.complete || img.naturalWidth === 0) {
+            await new Promise<void>(resolve => {
+              const done = () => resolve();
+              img.addEventListener("load", done, { once: true });
+              img.addEventListener("error", done, { once: true });
+              setTimeout(done, 5000);
+            });
           }
+          const candidates = img.srcset.split(",").map(c => c.trim().split(/\s+/)).map(([u, d]) => ({ url: new URL(u!, location.href).href, w: parseInt(d ?? "", 10) }));
+          const chosen = candidates.find(c => c.url === img.currentSrc);
+          seen.push({ src: img.getAttribute("src") ?? "", sizes: img.sizes, box: img.getBoundingClientRect().width,
+            chosen: chosen && !Number.isNaN(chosen.w) ? chosen.w : null, candidates: candidates.map(c => c.w).filter(w => !Number.isNaN(w)) });
+        }
+        return seen;
+      }, undefined) as ImageSeen[];
+      // The search field, used (its images are read already): a word that finds a page, submitted, must load a result.
+      if (o.search && !searched && await page.evaluate((field: string) => document.querySelector(field) !== null, FIELD)) {
+        searched = true;
+        const before = fragments;
+        await page.fill(FIELD, o.search.word);
+        await page.press(FIELD, "Enter");
+        for (let waited = 0; fragments === before && waited < 5000; waited += 100) await page.waitForTimeout(100);
+        if (fragments === before) {
+          const text = `${path}: searching for "${o.search.word}" in its search field (${FIELD}) showed no result within 5 s, `
+            + `though the index has a page with it: the search component loads ${SEARCH_PATH}pagefind.js under the site's path `
+            + `(<meta name="pd-base-path">) and shows each result's data()`;
+          note("error", text, text, vp.name);
+        } else {
+          await page.addScriptTag({ content: axe });
+          await runAxe(` (showing the results for "${o.search.word}")`);
         }
       }
-      await context.close();
+      for (const img of images) {
+        if (img.chosen === null || img.box === 0) continue;
+        const need = Math.round(img.box * vp.dpr);
+        const covering = img.candidates.filter(w => w >= need).sort((a, b) => a - b)[0];
+        const written = img.src.replace(/\?v=[0-9a-f]+$/, "");
+        // Named by its site path.
+        const src = base !== "/" && written.startsWith(base) ? `/${written.slice(base.length)}` : written;
+        // An image with variants is named by its asset (/_pd/images/images/harbour.<key>.<width>.webp → images/harbour).
+        const asset = /^\/_pd\/images\/(.+)\.[0-9a-f]{10}\.\d+\.webp$/.exec(src)?.[1];
+        const what = asset ? `the image ${asset}` : `<img src="${src}">`;
+        const box = `is laid out ${Math.round(img.box)} px wide (${need} px at ${vp.dpr}x)`;
+        if (covering !== undefined && img.chosen > covering) {
+          note("image", `image ${path} ${src} large`, `${path}: ${what} ${box} but takes the ${img.chosen}w variant `
+            + `where ${covering}w would do: its sizes, "${img.sizes}", says it is wider than it is`, vp.name);
+        } else if (img.chosen < need && img.candidates.some(w => w > img.chosen!)) {
+          note("image", `image ${path} ${src} small`, `${path}: ${what} ${box} but takes the ${img.chosen}w variant, `
+            + `which is too small: its sizes, "${img.sizes}", says it is narrower than it is`, vp.name);
+        }
+      }
     }
-  } finally {
-    await browser.close();
+    await context.close();
   }
   const lines = (kind: string) => [...found.values()].filter(f => f.kind === kind).map(f => `${f.text} (at ${f.at.join(" and ")})`);
   return { errors: lines("error"), a11yWarnings: lines("a11y"), images: lines("image") };
