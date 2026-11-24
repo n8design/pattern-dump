@@ -43,7 +43,20 @@ describe("seoTags", () => {
     expect(tags).toContain(`<meta property="og:image" content="https://example.test/assets/share.png">`);
     expect(tags).toContain(`<meta property="og:image:width" content="1200">`);
     expect(tags).toContain(`<meta property="og:image:height" content="630">`);
+    expect(tags).toContain(`<meta name="twitter:image" content="https://example.test/assets/share.png">`);
     expect(tags.at(-1)).toBe(`<meta name="twitter:card" content="summary_large_image">`);
+  });
+
+  it("names the image for X too, at the same absolute URL, under the site's path", () => {
+    const tags = seoTags({ ...base, siteUrl: "https://example.test/docs/", image: IMAGE });
+    expect(tags).toContain(`<meta property="og:image" content="https://example.test/docs/assets/share.png">`);
+    expect(tags).toContain(`<meta name="twitter:image" content="https://example.test/docs/assets/share.png">`);
+  });
+
+  it("without an image, no twitter:image and a summary card", () => {
+    const tags = seoTags(base);
+    expect(tags.some(t => t.includes("twitter:image"))).toBe(false);
+    expect(tags.at(-1)).toBe(`<meta name="twitter:card" content="summary">`);
   });
 
   it("leaves out what the page doesn't have: description, site title", () => {
@@ -161,6 +174,7 @@ describe("assemblePage — the head", () => {
     const head = headOf(page.html);
     expect(head).toContain(`<meta name="description" content="The start.">\n<link rel="canonical" href="https://example.test/">`);
     expect(head).toContain(`<meta property="og:image" content="https://example.test/assets/share.png">`);
+    expect(head).toContain(`<meta name="twitter:image" content="https://example.test/assets/share.png">`);
     expect(head).toMatch(/<meta name="twitter:card" content="summary_large_image">\n<script type="application\/ld\+json">[^\n]*<\/script>\n<link rel="icon" href="\/assets\/images\/favicon.png">\n<meta name="theme-color" content="#1e3c78">\n<link rel="stylesheet" href="\/_pd\/x.css">/);
   });
 
