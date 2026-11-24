@@ -247,6 +247,12 @@ export interface StorefrontConfig {
   /** The image a page shows in link previews when it names none of its own: a raster image in the assets
    *  (PNG, JPEG, GIF or WebP), such as `/assets/images/share.png`. */
   image?: string;
+  /**
+   * Social images: each page without an `image` of its own gets a link-preview image rendered from this component of
+   * the style guide, such as `{ component: "components/social-image" }`, at 1200 x 630 with the page's title. A folder
+   * or page picks one of its variants with `socialImage`, or turns it off with `socialImage: false`. Off when absent.
+   */
+  socialImages?: { component: string };
   /** This site's image encoding, over the project's `images`. */
   images?: ImageSettings;
   /**

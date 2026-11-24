@@ -874,6 +874,7 @@ async function routeRequest(
         lang: cfg.storefront.lang, siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
         ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
+        ...(cfg.storefront.socialImages ? { socialComponent: cfg.storefront.socialImages.component } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
         ...(ctx.symbols ? { symbols: () => ctx.symbols!.index() } : {}),
         themes: { names: themesDir ? [...state.themeCss.keys()] : [], switch: cfg.themeSwitch },

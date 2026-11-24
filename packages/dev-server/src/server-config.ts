@@ -89,6 +89,8 @@ export interface ResolvedConfig {
     readonly workbenchUrl: string | undefined;
     /** storefront.image: the link-preview image of every page that names none (a /assets/… path). */
     readonly image: string | undefined;
+    /** storefront.socialImages.component: the component social images are rendered from; undefined when off. */
+    readonly socialImages: { readonly component: string } | undefined;
     /** storefront.url: the site's address, with one trailing slash; undefined when it is not set. */
     readonly url: string | undefined;
     /** The path the site is published under: storefront.url's path, "/" at a host's root or with no url. pd dev
@@ -251,6 +253,7 @@ export function resolveServerConfig(
       site: config.storefront.site,
       workbenchUrl: config.storefront.workbenchUrl,
       image: config.storefront.image,
+      socialImages: config.storefront.socialImages,
       url: config.storefront.url,
       basePath: storefrontBasePath(config.storefront),
       lang: config.storefront.lang ?? "en",

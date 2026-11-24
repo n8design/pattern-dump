@@ -11,7 +11,7 @@ type Rule =
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
   | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "inset" | "plain-object" | "hbs-file"
-  | "quality" | "effort" | "categories" | "tags" | "term-pages" | "skip-checks";
+  | "quality" | "effort" | "categories" | "tags" | "term-pages" | "skip-checks" | "component-id";
 type Shape = Readonly<Record<string, Rule>>;
 
 /** How responsive image variants are encoded: for the project, and overridden per site. */
@@ -68,7 +68,7 @@ const SHAPE: Shape = {
       pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", globals: "plain-object",
       url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES, head: "hbs-file",
       categories: "categories", tags: "tags", tagPages: "term-pages", categoryPages: "term-pages", search: "boolean",
-      llms: "boolean",
+      llms: "boolean", socialImages: { keys: { component: "component-id" }, required: ["component"] },
       checks: { keys: { classes: { values: ["warning", "error", "off"] }, allowClasses: "strings", allowProperties: "strings" } },
     },
     required: ["pagesDir", "outDir"],
@@ -213,6 +213,14 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
   if (rule === "color-token") {
     // A colour token of the document base layer; that the base layer declares it is checked when a symbol uses it.
     if (typeof value !== "string" || !/^--color-[A-Za-z0-9_-]+$/.test(value)) fail(`a colour token's name, such as "--color-text"`);
+    return;
+  }
+  if (rule === "component-id") {
+    // A component's id, as the workbench names it: folders and its name, no variant; that it exists is checked when
+    // the site's pages are checked.
+    if (typeof value !== "string" || !/^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/.test(value) || /(?:^|\/)\.\.?(?:\/|$)/.test(value)) {
+      fail(`a component's id, such as "components/social-image"`);
+    }
     return;
   }
   if (rule === "asset-path") {
