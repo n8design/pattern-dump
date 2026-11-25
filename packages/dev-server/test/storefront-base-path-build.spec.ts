@@ -94,7 +94,8 @@ describe("pd build — a storefront under a path", () => {
     const llms = underPath.get("llms.txt")!;
     expect(llms).toContain("- [About](https://bench.example.test/sub/about/): What the bench is for.\n");
     const links = [...llms.matchAll(/\]\(([^)]+)\)/g)].map(m => m[1]!);
-    expect(links.length).toBe(6);
+    // Six pages and the two feeds.
+    expect(links.length).toBe(8);
     for (const l of links) expect(l, l).toMatch(/^https:\/\/bench\.example\.test\/sub\/[a-z]/);
     // The same text as at the root, but for the path.
     expect(llms).toBe(atRoot.get("llms.txt")!.replaceAll("https://bench.example.test/", "https://bench.example.test/sub/"));

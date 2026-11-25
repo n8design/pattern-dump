@@ -840,7 +840,7 @@ async function routeRequest(
         // pd build stops on a feed's problem, as on a page's; pd dev shows it at the feed's address.
         if (feeds && feeds.problems.length && !ctx.live) { json(res, 500, { error: feeds.problems.join("\n") } satisfies ApiError); return; }
         for (const note of feeds?.notes ?? []) ctx.onStorefrontNote?.(note);
-        json(res, 200, { pages: model.pages, nav: model.nav, ...(feeds ? { feeds: feeds.feeds.map(f => f.address) } : {}) } satisfies StorefrontPagesResponse);
+        json(res, 200, { pages: model.pages, nav: model.nav, ...(feeds ? { feeds: feeds.feeds.map(f => ({ address: f.address, title: f.feed.title, format: f.format, collection: f.collection?.folder ?? null })) } : {}) } satisfies StorefrontPagesResponse);
         return;
       }
       if (feedSettings && pathname.endsWith(".xml") && pathname !== PD_ROUTES.sitemap) {

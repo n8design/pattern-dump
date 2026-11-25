@@ -263,6 +263,12 @@ describe("pd build — the storefront root", () => {
         + "listing limits it to three lines.",
       `- [Plain on purpose](${at("/articles/plain/")}): Why the bench's skin is a wireframe.`,
       "",
+      // The bench's feeds (site.feeds), the site's first.
+      "## Feeds",
+      "",
+      `- [Storefront bench](${at("/feed.xml")}): Atom`,
+      `- [Articles](${at("/articles/feed.xml")}): Atom`,
+      "",
     ].join("\n"));
     expect(llms).not.toMatch(/\/tags\/|\/categories\//);
   });

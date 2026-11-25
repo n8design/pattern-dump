@@ -713,7 +713,8 @@ async function buildOnce(
       const model = pageModel!;
       if (storefront.llms) {
         const siteTitle = typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined;
-        const llms = llmsTxt(model, { title: siteTitle, siteUrl: storefront.url });
+        const feeds = ((await (await sfGet!(PD_ROUTES.pages)).json()) as StorefrontPagesResponse).feeds ?? [];
+        const llms = llmsTxt(model, { title: siteTitle, siteUrl: storefront.url, feeds });
         const bytes = Buffer.from(llms.text, "utf8");
         await writeFile(join(sfOut, "llms.txt"), bytes);
         counts.files++;
@@ -722,7 +723,7 @@ async function buildOnce(
       }
       const listed = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
       const stubs = new Set(listed.pages.flatMap(p => p.redirectFrom ?? []));
-      const feeds = new Set(listed.feeds ?? []);
+      const feeds = new Set((listed.feeds ?? []).map(f => f.address));
       const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !isPageImageUrl(u.split("?")[0]!) && !sfFiles.includes(u) && !stubs.has(u) && !feeds.has(u)).length;
       if (feeds.size) report.feeds = { files: feeds.size };
       report.storefront = { outDir: storefront.outDir, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };

@@ -1,6 +1,11 @@
 // The storefront's files for crawlers (site-files.ts): sitemap.xml and robots.txt, as text.
 import { describe, expect, it } from "vitest";
-import { sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "../src/storefront/site-files.js";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { readPages } from "../src/storefront/pages.js";
+import { llmsTxt, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "../src/storefront/site-files.js";
+import { save } from "../../../test-support/save.js";
 
 describe("sitemapXml", () => {
   it("lists each page once, in the order given, with lastmod only where it is known", () => {
@@ -56,5 +61,41 @@ describe("storefrontRobotsTxt", () => {
   it("has no workbench line for a workbench on its own host, and none to add when the site is kept out", () => {
     expect(storefrontRobotsTxt({ siteUrl: undefined, index: true, workbenchPath: undefined })).toBe("User-agent: *\nDisallow: /preview/\n");
     expect(storefrontRobotsTxt({ siteUrl: undefined, index: false, workbenchPath: "/workbench/" })).toBe("User-agent: *\nDisallow: /\n");
+  });
+});
+
+describe("llmsTxt: the feeds", () => {
+  const FEEDS = [
+    { address: "/articles/feed.xml", title: "Articles", format: "atom" as const, collection: "/articles/" },
+    { address: "/articles/rss.xml", title: "Articles", format: "rss" as const, collection: "/articles/" },
+    { address: "/feed.xml", title: "Bench [site]", format: "atom" as const, collection: null },
+  ];
+  async function model() {
+    const root = await mkdtemp(join(tmpdir(), "pd-llms-feeds-"));
+    try {
+      for (const [rel, text] of Object.entries({
+        "index.md": "---\ntitle: Home\n---\n\nThe home.\n",
+        "articles/index.md": "---\ntitle: Articles\nsort: date\n---\n\nAll of them.\n",
+        "articles/one.md": "---\ntitle: One\ndate: 2026-11-01\n---\n\nThe first.\n",
+      })) { await mkdir(dirname(join(root, rel)), { recursive: true }); await save(join(root, rel), text); }
+      return await readPages(root, { drafts: "leave-out", scheduled: "leave-out", today: "2026-11-25" });
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
+
+  it("lists them after the collections, the site's first, each by its title and format", async () => {
+    const { text } = llmsTxt(await model(), { title: "Bench", siteUrl: "https://example.test/", feeds: FEEDS });
+    expect(text.slice(text.indexOf("## Articles"))).toBe([
+      "## Articles", "", "- [Articles](https://example.test/articles/): All of them.", "- [One](https://example.test/articles/one/): The first.", "",
+      "## Feeds", "",
+      "- [Bench \\[site\\]](https://example.test/feed.xml): Atom",
+      "- [Articles](https://example.test/articles/feed.xml): Atom",
+      "- [Articles](https://example.test/articles/rss.xml): RSS",
+      "",
+    ].join("\n"));
+  });
+
+  it("has no Feeds section without feeds", async () => {
+    expect(llmsTxt(await model(), { title: "Bench", siteUrl: "https://example.test/" }).text).not.toContain("## Feeds");
+    expect(llmsTxt(await model(), { title: "Bench", siteUrl: "https://example.test/", feeds: [] }).text).not.toContain("## Feeds");
   });
 });

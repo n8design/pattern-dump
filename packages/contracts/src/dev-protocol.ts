@@ -862,10 +862,14 @@ export interface StorefrontNavItem {
 export interface StorefrontPagesResponse {
   pages: StorefrontPage[];
   nav: StorefrontNavItem[];
-  /** The site's feeds, by their address (/feed.xml, /articles/feed.xml), when it has any: what pd build crawls for
-   *  them. Absent without site.feeds, site.url, or with index: false. */
-  feeds?: string[];
+  /** The site's feeds, when it has any: what pd build crawls for them, and what llms.txt lists. Absent without
+   *  site.feeds, site.url, or with index: false. */
+  feeds?: StorefrontFeed[];
 }
+
+/** A feed of the site's: its address (a site path: /feed.xml, /articles/feed.xml), its title, its format, and the
+ *  route of the collection it is the feed of (null for the site's feed). */
+export interface StorefrontFeed { address: string; title: string; format: "atom" | "rss"; collection: string | null }
 
 /** The body of every JSON error response. */
 export interface ApiError {
