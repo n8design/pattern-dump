@@ -17,6 +17,7 @@ import { entriesOf, type Entry } from "./collections.js";
 import type { DatesMode, GitDates } from "./git-dates.js";
 import { readFeed } from "./listing-keys.js";
 import { routeFor, type PageModel } from "./pages.js";
+import { claimsOf, collisionOf, describeClaim } from "./site-output.js";
 import { escapeXml } from "./xml.js";
 
 /** A feed's author (Atom's person construct: a name, and a page about them). */
@@ -166,10 +167,6 @@ export interface SiteFeedSettings {
  *  for a collection's, its folder and the routes of its pages, which link to it. */
 export interface SiteFeed { address: string; format: FeedFormat; feed: Feed; collection?: { folder: string; routes: readonly string[] } }
 
-/** The site's own files at its root and the folders it writes, which no feed's address can be. */
-const SITE_FILES = new Set(["/sitemap.xml", "/robots.txt", "/llms.txt", "/404.html"]);
-const SITE_FOLDERS = ["/_pd/", "/assets/", "/preview/", "/_pagefind/"];
-
 const formatsOf = (format: SiteFeedSettings["format"]): FeedFormat[] => format === "both" ? ["atom", "rss"] : [format];
 
 /** Each format's file name for a feed: what the config or index.md names, else feed.xml (and rss.xml beside an Atom
@@ -277,8 +274,9 @@ export async function feedsOf(model: PageModel, s: SiteFeedSettings, o: {
     }, filesOf(s.format, own), "/");
   }
 
-  // Each address once, and none another file of the site's: a page or an old route under it, or a root file.
-  const routes = [...model.pages.map(p => p.route), ...model.pages.flatMap(p => p.redirectFrom ?? [])];
+  // Each address once, and none another file of the site's (site-output.ts): a page or an old route under it, a root
+  // file, or a folder Pattern Dump writes.
+  const claims = claimsOf(model);
   const seen = new Map<string, string>();
   for (const { address, feed } of feeds) {
     const other = seen.get(address);
@@ -287,10 +285,8 @@ export async function feedsOf(model: PageModel, s: SiteFeedSettings, o: {
       continue;
     }
     seen.set(address, feed.source);
-    const clash = SITE_FILES.has(address) ? `the site's ${address.slice(1)}`
-      : SITE_FOLDERS.some(f => address.startsWith(f)) ? `in ${address.split("/")[1]}/, which Pattern Dump writes`
-      : routes.find(r => r === `${address}/` || r.startsWith(`${address}/`));
-    if (clash) problems.push(`${feed.source}: its feed is ${address}, which is ${clash.startsWith("/") ? `the page ${clash}` : clash}: give the feed another file name`);
+    const clash = collisionOf(claims, address);
+    if (clash) problems.push(`${feed.source}: its feed is ${address}, which is ${describeClaim(clash)}: give the feed another file name`);
   }
   return { feeds, problems: [...new Set(problems)], notes };
 }
