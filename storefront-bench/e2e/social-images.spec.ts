@@ -2,99 +2,23 @@
 // gets a PNG card of 1200 x 630 that its head names and the build writes; the same input gives the same bytes; a card
 // already in the cache isn't rendered again, a stale committed one is; a card whose title doesn't fit, whose size isn't
 // a card's, or whose text fails contrast stops the build. Playwright here is the repository's, as a project's own would
-// be. The project is made here: its card component and pages are written by this spec, and it loads no font file.
+// be. The project is social-fixture.ts's.
 import { test, expect, chromium } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { crc32, deflateSync } from "node:zlib";
-import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { buildStaticSite } from "@pattern-dump/dev-server";
 import { save } from "../../test-support/save.js";
+import { CARD_CSS, config, fm, pngSize, project as projectIn } from "./social-fixture.js";
 
 test.setTimeout(180_000);
 
 let tmp = "";
 test.beforeAll(async () => { tmp = await mkdtemp(join(tmpdir(), "pd-social-render-")); });
 test.afterAll(async () => { if (tmp) await rm(tmp, { recursive: true, force: true }); });
+const project = (files: Record<string, string | Buffer | null> = {}) => projectIn(tmp, files);
 
-/** A PNG of one grey, made here: the site's image. */
-function greyPng(width: number, height: number): Buffer {
-  const chunk = (type: string, data: Buffer) => {
-    const typed = Buffer.concat([Buffer.from(type, "ascii"), data]);
-    const out = Buffer.alloc(8 + data.length + 4);
-    out.writeUInt32BE(data.length, 0);
-    typed.copy(out, 4);
-    out.writeUInt32BE(crc32(typed), 8 + data.length);
-    return out;
-  };
-  const header = Buffer.alloc(13);
-  header.writeUInt32BE(width, 0);
-  header.writeUInt32BE(height, 4);
-  header.set([8, 0, 0, 0, 0], 8);
-  const rows = Buffer.concat(Array.from({ length: height }, () => Buffer.concat([Buffer.from([0]), Buffer.alloc(width, 128)])));
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header), chunk("IDAT", deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
-}
-/** A PNG's size, read from its header. */
-const pngSize = (b: Buffer) => ({ width: b.readUInt32BE(16), height: b.readUInt32BE(20) });
-
-const json = (v: unknown) => JSON.stringify(v);
-const fm = (lines: string[], body = "Text.") => `---\n${lines.join("\n")}\n---\n\n${body}\n`;
-const CARD_CSS = `.card {
-  box-sizing: border-box;
-  inline-size: 1200px;
-  block-size: 630px;
-  padding: 60px;
-  background: #102a43;
-  color: #fff;
-  font: 64px/1.2 system-ui, sans-serif;
-}
-
-.card h1 {
-  margin: 0;
-  font-size: 1em;
-  max-block-size: 2.4em;
-  overflow: hidden;
-}
-
-.card p {
-  margin: 0;
-  font-size: 32px;
-}
-
-.card--pale {
-  background: #fff;
-  color: #ccc;
-}
-`;
-const FILES: Record<string, string | Buffer> = {
-  "src/patterns/layouts/page/page.hbs": `<header><p>Site</p></header><main><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n`,
-  "src/patterns/layouts/page/page.schema.json": json({ type: "object", required: ["title"], properties: { title: { type: "string" } } }),
-  "src/patterns/components/social-image/social-image.hbs": `<div class="card"><p>{{section}}</p><h1>{{title}}</h1></div>\n`,
-  "src/patterns/components/social-image/social-image.schema.json": json({ properties: { title: { type: "string" }, section: { type: "string" } } }),
-  "src/patterns/components/social-image/social-image~pale.hbs": `<div class="card card--pale"><h1>{{title}}</h1></div>\n`,
-  "src/styles/components/social-image.scss": CARD_CSS,
-  "assets/share.png": greyPng(240, 126),
-  "pages/index.md": fm(["title: Home"]),
-  "pages/guide/index.md": fm(["title: Guide"]),
-  "pages/guide/install.md": fm(["title: Install"]),
-  "pages/about.md": fm(["title: About", "image: /assets/share.png"]),
-};
-
-const config = validateConfig(defineConfig({
-  sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./.out/wb", build: { workbench: false },
-  styles: { strategy: "parallel", dir: "./src/styles" }, assets: { strategy: "central", dir: "./assets" },
-  site: { pagesDir: "./pages", outDir: "./.out/site", workbenchUrl: "https://wb.test/", url: "https://example.test/",
-    image: "/assets/share.png", socialImages: { component: "components/social-image" } },
-} as never), "test");
-
-let n = 0;
-async function project(files: Record<string, string | Buffer | null> = {}): Promise<string> {
-  const root = join(tmp, `p${n++}`);
-  for (const [rel, text] of Object.entries({ ...FILES, ...files })) if (text !== null) await save(join(root, rel), text);
-  return root;
-}
 /** Launches, counted. */
 function counted() {
   const count = { launched: 0 };

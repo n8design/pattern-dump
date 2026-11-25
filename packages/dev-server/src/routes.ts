@@ -94,7 +94,8 @@ const pagesCaches = new WeakMap<RouteContext, PagesCache>();
 /** The website's pages as this server serves them: pd dev shows drafts and scheduled pages; pd build leaves them out,
  *  as if their files weren't there. */
 async function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>, discoveryMap?: DiscoveryMap): ReturnType<typeof readPages> {
-  const { key, read } = await sitePagesRead(sf, { live: ctx.live, today: ctx.today ?? todayOf(ctx.now()), ...(discoveryMap ? { discoveryMap } : {}) });
+  const { key, read } = await sitePagesRead(sf, { live: ctx.live, today: ctx.today ?? todayOf(ctx.now()), ...(discoveryMap ? { discoveryMap } : {}),
+    ...(ctx.scheduled ? { scheduled: ctx.scheduled } : {}) });
   // Not read again for every request (pages-cache.ts): once in pd build, and in pd dev until the folder changes.
   let cache = pagesCaches.get(ctx);
   if (!cache) { cache = createPagesCache(sf.pagesDir, ctx.pagesOnce === true); pagesCaches.set(ctx, cache); }
@@ -164,6 +165,8 @@ export function mcpHandlerFor(ctx: RouteContext): McpHandler {
 
 export interface RouteContext {
   readonly cfg: ResolvedConfig;
+  /** pd social only: scheduled pages are shown, drafts still left out (DevServerOptions.scheduled). */
+  readonly scheduled?: "show";
   /** Each site page's card, by route, as its head last worked it out (social-images.ts): DevServer.socialCards. */
   readonly socialCards: Map<string, SocialCard>;
   /** Pattern Dump's version, as the MCP server names itself (DevServerOptions.version). */
