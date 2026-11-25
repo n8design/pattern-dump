@@ -108,7 +108,11 @@ export async function checkSocialComponent(component: string, discoveryMap: Disc
 
 /** A card as a page's head worked it out: its page (as messages name it), the variant, its hash, its document as the
  *  site serves it (stamped; site paths), and where its bytes are, when they are anywhere yet. */
-export interface SocialCard { route: string; page: string; variant: string; hash: string; document: string; file?: string }
+export interface SocialCard {
+  route: string; page: string; variant: string; hash: string; document: string; file?: string;
+  /** What the card is rendered with (cardValues): the overflow check looks for each field's text. */
+  values?: Record<string, unknown>;
+}
 
 /** The size of every card, in CSS pixels at 1x. */
 export const CARD = { width: 1200, height: 630 } as const;

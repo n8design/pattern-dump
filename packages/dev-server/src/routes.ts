@@ -884,7 +884,7 @@ async function routeRequest(
         ...(cfg.storefront.socialImages ? {
           socialComponent: cfg.storefront.socialImages.component,
           // The card's hash, over its document stamped as this host serves it; its URL when its bytes are there.
-          socialCard: async (cardRoute: string, document: string, about: { page: string; variant: string }) => {
+          socialCard: async (cardRoute: string, document: string, about: { page: string; variant: string; values: Record<string, unknown> }) => {
             const stamped = await stampHtml(document, hashOfFor(req, ctx), cfg.storefront!.basePath);
             const hash = cardHash(stamped, ctx.version);
             const file = await cardFile(cardRoute, hash, cardDirs(cfg)!);
