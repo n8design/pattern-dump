@@ -27,6 +27,14 @@
 - **A date with a time, or written email style, names the day to write.** The day is the one written, in the value's
   own offset. Hugo's `lastmod`, `publishDate` and `expiryDate` say what they are here.
 - **The starter writes `lang: "en"` in its config.** It decides how the site writes dates, so it is where people look.
+- **A site can have feeds, Atom or RSS.** With `site.feeds`, each folder with `sort: date` gets one, and the site one
+  across them. See [Feeds](docs/guide/storefront.md#feeds).
+- **A feed can keep the address it has.** `path` names its file, such as `index.xml`, since feed readers don't follow
+  a page's redirect.
+- **Every page links its feeds in its head.** A skin's head partial may no longer write a feed link.
+- **A feed entry's id stays the same when its page moves.** It is the page's first `redirectFrom`, so list the
+  original first.
+- **`llms.txt` lists the site's feeds.**
 
 ## 0.9.0 (2026-11-23)
 
