@@ -52,6 +52,7 @@ import { compiledScript, ScriptMissing } from "./scripts.js";
 import { contentHash } from "./content-hash.js";
 import { serveImageVariant } from "./image-route.js";
 import { cardDirs, serveSocialImage } from "./social-route.js";
+import type { DevCardRenderer } from "./social-dev.js";
 import { cardFile, cardHash, type SocialCard } from "./storefront/social-images.js";
 import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
 import { layoutIndex } from "./storefront/layout-index.js";
@@ -165,6 +166,8 @@ export function mcpHandlerFor(ctx: RouteContext): McpHandler {
 
 export interface RouteContext {
   readonly cfg: ResolvedConfig;
+  /** pd dev only: renders a social image on request (social-dev.ts). */
+  readonly cardRenderer?: DevCardRenderer;
   /** pd social only: scheduled pages are shown, drafts still left out (DevServerOptions.scheduled). */
   readonly scheduled?: "show";
   /** Each site page's card, by route, as its head last worked it out (social-images.ts): DevServer.socialCards. */
@@ -501,7 +504,7 @@ async function routeRequest(
     }
 
     // --- A site page's social image (social-route.ts) ---
-    if (pathname.startsWith(PD_ROUTE_PREFIX.social)) return await serveSocialImage(pathname, res, cfg);
+    if (pathname.startsWith(PD_ROUTE_PREFIX.social)) return await serveSocialImage(pathname, res, cfg, ctx);
 
     // --- Responsive image variants (image-route.ts) ---
     if (pathname.startsWith(PD_ROUTE_PREFIX.images)) {
@@ -892,7 +895,13 @@ async function routeRequest(
             const hash = cardHash(stamped, ctx.version);
             const file = await cardFile(cardRoute, hash, cardDirs(cfg)!);
             ctx.socialCards.set(cardRoute, { route: cardRoute, ...about, hash, document: stamped, ...(file !== undefined ? { file } : {}) });
-            return file !== undefined ? socialImageUrl(cardRoute, hash) : undefined;
+            if (file !== undefined) return { path: socialImageUrl(cardRoute, hash) };
+            // pd dev: a card it can render is named now and rendered when it is asked for (social-route.ts); one it
+            // can't is the page's warning, as pd build's report says it (D1).
+            if (!ctx.cardRenderer) return {};
+            const why = await ctx.cardRenderer.unavailable();
+            return why === undefined ? { path: socialImageUrl(cardRoute, hash) }
+              : { note: `warning: ${about.page}: no social image: its card is missing or stale and ${why}` };
           },
         } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),

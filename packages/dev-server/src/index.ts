@@ -75,6 +75,8 @@ export { loadProjectPagefind, PAGEFIND_INSTALL } from "./storefront/search.js";
 export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 export type { SocialCard } from "./storefront/social-images.js";
 export { renderSocialImages, type SocialImagesOptions, type SocialImagesReport } from "./social-command.js";
+// What a loadPlaywright passed in throws for "not installed": a page then takes the site image (D1), never a stop.
+export { BrowserUnavailableError } from "./storefront/browser-checks.js";
 // Folder overview gallery — public leaves under a group node.
 // Component detail. Widest fan-out in the package — nothing may import it back.
 // Shared timing gate — one flag, so the startup-build and per-save halves cannot drift apart.
@@ -101,6 +103,8 @@ import { watchedRoots } from "./watch-roots.js";
 import { startWatching, type WatchHandle } from "./watch.js";
 import { createGitDates } from "./storefront/git-dates.js";
 import type { SocialCard } from "./storefront/social-images.js";
+import { createDevCardRenderer } from "./social-dev.js";
+import type { PlaywrightModule } from "./storefront/browser-checks.js";
 import { readPages } from "./storefront/pages.js";
 import { projectPagefindEntry, type SearchRecord } from "./storefront/search.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
@@ -152,6 +156,9 @@ export interface DevServerOptions {
    *  build so a build that runs past midnight holds back the same pages throughout. Without it, each request takes the
    *  clock's day. */
   today?: string;
+  /** `pd dev` only: where social images get Playwright from, to be rendered on request (social-dev.ts). Default: the
+   *  project's own (loadProjectPlaywright). */
+  loadPlaywright?: (root: string) => Promise<PlaywrightModule>;
   /** `pd social` only: "show" serves the site's scheduled pages as if their day had come; drafts stay left out. */
   scheduled?: "show";
   /** `pd build` only: the storefront's pages folder is read once and that reading serves every request, since the
@@ -417,6 +424,8 @@ export async function startDevServer(
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
     ...(opts.onStorefrontNote ? { onStorefrontNote: opts.onStorefrontNote } : {}),
     ...(opts.onSearchRecord ? { onSearchRecord: opts.onSearchRecord } : {}),
+    // pd dev renders a site's social images on request (social-dev.ts); pd build renders them before its crawl.
+    ...(live && cfg.storefront?.socialImages ? { cardRenderer: createDevCardRenderer(cfg, () => httpPort, opts.loadPlaywright) } : {}),
   };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 
@@ -485,6 +494,7 @@ export async function startDevServer(
     async close() {
       await watcher?.close();
       await hotreloader.close();
+      await routeCtx.cardRenderer?.close();
       await new Promise<void>((res, rej) =>
         httpServer.close((err) => (err ? rej(err) : res()))
       );

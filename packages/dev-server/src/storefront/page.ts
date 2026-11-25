@@ -96,8 +96,10 @@ export interface PageAssembly {
   /** site.socialImages.component: the component social images are rendered from (social-images.ts). */
   socialComponent?: string;
   /** A card's URL path (/_pd/social/…) from its document (social-images.ts cardDocument), when its bytes are there to
-   *  serve; undefined when they aren't, and the page then takes the site's image. Without it, no page gets a card. */
-  socialCard?: (route: string, document: string, about: { page: string; variant: string; values: Record<string, unknown> }) => Promise<string | undefined>;
+   *  serve (or pd dev will render them when asked); without a path the page takes the site's image, and `note` says
+   *  why. Without it, no page gets a card. */
+  socialCard?: (route: string, document: string, about: { page: string; variant: string; values: Record<string, unknown> }) =>
+    Promise<{ path?: string; note?: string }>;
   /** storefront.head: the site's own head file, by its absolute path and as the config names it. */
   siteHead?: { path: string; name: string };
   /** The path the site is published under ("/project/"), put in front of its references on the way out
@@ -902,7 +904,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     }
     const card = await a.socialCard(route, cardDocument({ lang: a.lang ?? "en", head: await a.head(variantId, body, []), body }),
       { page: page.path, variant: variantId, values });
-    if (card !== undefined) socialImage = { path: card, format: "png", width: CARD.width, height: CARD.height };
+    if (card.path !== undefined) socialImage = { path: card.path, format: "png", width: CARD.width, height: CARD.height };
+    if (card.note !== undefined) notes.push(card.note);
   }
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} · ${siteTitle}` : title)}</title>`,
