@@ -175,6 +175,13 @@ export function buildReportLines(report: StaticBuildReport, workbenchUrl: string
   }
   if (report.llms) lines.push(`[pd build] llms.txt: ${report.llms.pages} page${report.llms.pages === 1 ? "" : "s"}`);
   if (report.feeds) lines.push(`[pd build] feeds: ${report.feeds.files} file${report.feeds.files === 1 ? "" : "s"}`);
+  if (report.mounts) {
+    const size = (bytes: number) => bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    const files = (n: number) => `${n} file${n === 1 ? "" : "s"}`;
+    const all = report.mounts.reduce((t, m) => ({ files: t.files + m.files, bytes: t.bytes + m.bytes }), { files: 0, bytes: 0 });
+    lines.push(`[pd build] mounts: ${files(all.files)} (${size(all.bytes)}), copied as they are: `
+      + report.mounts.map(m => `${m.to} ${files(m.files)} (${size(m.bytes)})`).join(", "));
+  }
   if (report.search) {
     lines.push(`[pd build] search: ${report.search.pages} pages indexed → ${report.search.files} files in _pd/search/ (${(report.search.bytes / 1024).toFixed(0)} KB)`);
   }

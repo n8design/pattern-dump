@@ -10,7 +10,8 @@
 //     is included — its <link>/<script>/url() references are root-relative too.
 //   - the shell: one shell page per route, carrying the static ShellRuntime instead of a port.
 
-import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import { statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { createImageCache } from "@pattern-dump/build";
@@ -37,6 +38,7 @@ import { CARD_CHROMIUM_ARGS, renderCards } from "./storefront/social-render.js";
 import { PageCheckError, runPagesA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { claimsOf, unclaimed } from "./storefront/site-output.js";
+import { readMounts } from "./storefront/mounts.js";
 import { checkClasses } from "./storefront/class-check.js";
 import { checkProperties } from "./storefront/property-check.js";
 import { withNoindex } from "./storefront/base-path.js";
@@ -114,6 +116,9 @@ export interface StaticBuildReport {
   llms?: { pages: number };
   /** The site's feeds (site.feeds): how many files. Absent when it has none. */
   feeds?: { files: number };
+  /** The site's mounts (site.mounts), in the config's order: each one's route, and the files and bytes copied from
+   *  it. Absent without mounts. */
+  mounts?: { to: string; files: number; bytes: number }[];
   /** The site's social images (social-images.ts): the pages with a card, and where each card came from (rendered by
    *  this build, the cache, the committed folder). `missing`: one line per page whose card is missing or stale and
    *  couldn't be rendered (no Playwright, or no Chromium); each such page takes the site's image, `siteImage` says
@@ -216,6 +221,8 @@ async function buildOnce(
     ...(storefront?.head ? [{ kind: "the site's head file", path: storefront.head }] : []),
     // The cards pd social committed: read for a page whose card has their hash (social-images.ts).
     ...(storefront?.socialImages ? [{ kind: "the social images folder", path: socialDir(storefront.pagesDir) }] : []),
+    // A mount's folder (site.mounts): copied, never read for content, but a file saved during the build stops it all the same.
+    ...(storefront?.mounts ?? []).map(m => ({ kind: `the mounted folder ${m.name} (site.mounts)`, path: m.from })),
   ];
   /** Refuses an output root that is, holds, or sits inside anything the build reads. */
   const clearOfInputs = (name: string, out: string): void => {
@@ -387,7 +394,11 @@ async function buildOnce(
     // the sitemap when the site has an address and is indexed.
     const sfFiles: string[] = storefront ? [...(sfBase === "/" ? [PD_ROUTES.robots] : []), PD_ROUTES.notFound,
       ...(storefront.url !== undefined && storefront.index ? [PD_ROUTES.sitemap] : [])] : [];
-    const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles, sfBase) : null;
+    // The mounts' files (mounts.ts): output, not input to the checks, so the crawl doesn't ask for them and the link check
+    // counts them as written. The server stops the crawl on a mount's problem, before anything is read here.
+    const mountFiles = storefront?.mounts.length ? (await readMounts(storefront.mounts, project)).files : [];
+    const mountedPaths = new Set(mountFiles.map(f => f.path));
+    const sfCrawl = sfGet ? await crawlStorefront(sfGet, sfFiles, sfBase, mountedPaths) : null;
     if (sfCrawl && sfCrawl.problems.length) {
       throw new Error(`pd build: the site has problems, so nothing was written:\n${sfCrawl.problems.map(p => `  - ${p}`).join("\n")}`);
     }
@@ -428,7 +439,7 @@ async function buildOnce(
       }
       const links = checkLinks({
         // The crawl records a stamped reference with its ?v=; what is written, and what a link names, is the path.
-        built: new Set(sfCrawl.urls.map(u => u.split("?")[0]!)), documents: sfCrawl.documents, pages,
+        built: new Set([...sfCrawl.urls.map(u => u.split("?")[0]!), ...mountedPaths]), documents: sfCrawl.documents, pages,
         ...(storefront.url !== undefined ? { siteUrl: storefront.url.endsWith("/") ? storefront.url : `${storefront.url}/` } : {}),
         basePath: sfBase,
         workbench: { url: wbUrl, routes, variants },
@@ -735,6 +746,21 @@ async function buildOnce(
         counts.files++;
         counts.bytes += bytes.byteLength;
         report.llms = { pages: llms.pages };
+      }
+      // The mounts, last and byte for byte: a clone where the file system has them, else a copy. Their places were
+      // checked against every file above (mounts.ts), so none is written over and none writes over one.
+      if (mountFiles.length) {
+        const byMount = new Map<string, { to: string; files: number; bytes: number }>();
+        for (const f of mountFiles) {
+          const to = join(sfOut, ...f.path.split("/").filter(Boolean));
+          await mkdir(dirname(to), { recursive: true });
+          await copyFile(f.file, to, fsConstants.COPYFILE_FICLONE | fsConstants.COPYFILE_EXCL);
+          const m = byMount.get(f.mount.to) ?? { to: f.mount.to, files: 0, bytes: 0 };
+          m.files++;
+          m.bytes += (await stat(to)).size;
+          byMount.set(f.mount.to, m);
+        }
+        report.mounts = storefront.mounts.map(m => byMount.get(m.to) ?? { to: m.to, files: 0, bytes: 0 });
       }
       const listed = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
       const stubs = new Set(listed.pages.flatMap(p => p.redirectFrom ?? []));
