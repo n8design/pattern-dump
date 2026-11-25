@@ -97,7 +97,7 @@ export interface PageAssembly {
   socialComponent?: string;
   /** A card's URL path (/_pd/social/…) from its document (social-images.ts cardDocument), when its bytes are there to
    *  serve; undefined when they aren't, and the page then takes the site's image. Without it, no page gets a card. */
-  socialCard?: (route: string, document: string, about: { page: string; variant: string }) => Promise<string | undefined>;
+  socialCard?: (route: string, document: string, about: { page: string; variant: string; values: Record<string, unknown> }) => Promise<string | undefined>;
   /** storefront.head: the site's own head file, by its absolute path and as the config names it. */
   siteHead?: { path: string; name: string };
   /** The path the site is published under ("/project/"), put in front of its references on the way out
@@ -901,7 +901,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       return fail([`${page.path}: the social image (${variantId}) doesn't render: ${renderError(e)}`]);
     }
     const card = await a.socialCard(route, cardDocument({ lang: a.lang ?? "en", head: await a.head(variantId, body, []), body }),
-      { page: page.path, variant: variantId });
+      { page: page.path, variant: variantId, values });
     if (card !== undefined) socialImage = { path: card, format: "png", width: CARD.width, height: CARD.height };
   }
   const head = [

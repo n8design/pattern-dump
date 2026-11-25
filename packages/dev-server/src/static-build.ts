@@ -32,7 +32,8 @@ import { isPageImageUrl } from "./storefront/page-images.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
-import { launchChromium, loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule, type PwBrowser } from "./storefront/browser-checks.js";
+import { BrowserUnavailableError, launchChromium, loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule, type PwBrowser } from "./storefront/browser-checks.js";
+import { CARD_CHROMIUM_ARGS, renderCards } from "./storefront/social-render.js";
 import { PageCheckError, runPagesA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { checkClasses } from "./storefront/class-check.js";
@@ -110,6 +111,9 @@ export interface StaticBuildReport {
   classes?: { severity: "warning" | "error"; warnings: string[] };
   /** llms.txt, at the site's root: how many pages it lists. Absent when none is written (storefront.llms). */
   llms?: { pages: number };
+  /** The site's social images (social-images.ts): the pages with a card, and where each card came from (rendered by
+   *  this build, the cache, the committed folder). Absent without site.socialImages. */
+  socialImages?: { pages: number; rendered: number; cached: number; committed: number };
   /** `--browser`: one line per image whose chosen variant doesn't fit the box it is laid out in. */
   images?: { warnings: string[] };
   /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
@@ -272,7 +276,12 @@ async function buildOnce(
   }
 
   // --browser: the project's Playwright, loaded before anything is built, so a missing one stops the build at once.
-  const playwright = opts.browser && storefront ? await (opts.loadPlaywright ?? loadProjectPlaywright)(project) : undefined;
+  const loadPlaywright = opts.loadPlaywright ?? loadProjectPlaywright;
+  const playwright = opts.browser && storefront ? await loadPlaywright(project) : undefined;
+  // Social images are rendered with it too, and without --browser when the project has it: none is no stop then.
+  const cardPlaywright = playwright ?? (storefront?.socialImages
+    ? await loadPlaywright(project).catch((e: unknown) => { if (e instanceof BrowserUnavailableError) return undefined; throw e; })
+    : undefined);
   // Search: the project's Pagefind, also before anything is built, so a missing one the site asks for stops at once.
   const pagefind = storefront ? await searchPagefind(storefront.search, project, opts.loadPagefind) : undefined;
   /** What each page gives the index, by route, as the crawl serves it. */
@@ -324,6 +333,38 @@ async function buildOnce(
     // A site published under a path is asked for under it, as a browser asks: everything is checked as it is served.
     const sfBase = storefront?.basePath ?? "/";
     const sfGet = storefront ? hostTransport(server.port, storefront.host, sfBase) : null;
+
+    // Social images, before the crawl (social-images.ts, social-render.ts): each page's head asked for once, so the
+    // server works out its card; the ones whose bytes are nowhere yet rendered in Chromium into the cache. The crawl's
+    // heads then name each card, and the crawl writes it. A card with a problem stops the build here.
+    let socialSummary: StaticBuildReport["socialImages"];
+    if (storefront?.socialImages && sfGet) {
+      const listed = await sfGet(PD_ROUTES.pages);
+      if (listed.status === 200) {
+        for (const p of (await listed.json() as StorefrontPagesResponse).pages) await sfGet(p.route);
+      }
+      const cards = server.socialCards();
+      const cacheDir = socialCacheDir(cfg.cwd);
+      const missing = cards.filter(c => c.file === undefined);
+      let rendered = 0;
+      if (missing.length && cardPlaywright) {
+        // A Chromium that won't start is a stop only with --browser, which needs it anyway.
+        browser ??= await launchChromium(cardPlaywright, opts.browser ? "pd build --browser" : "pd build", CARD_CHROMIUM_ARGS)
+          .catch((e: unknown) => { if (opts.browser || !(e instanceof BrowserUnavailableError)) throw e; return undefined; });
+      }
+      if (missing.length && browser) {
+        const made = await renderCards(missing, { browser, get: sfGet });
+        if (made.problems.length) {
+          throw new Error(`pd build: the site's social images have problems, so nothing was written:\n${made.problems.map(p => `  - ${p}`).join("\n")}`);
+        }
+        const cache = createImageCache(cacheDir, "png");
+        for (const [hash, png] of made.images) await cache.write(hash, png);
+        rendered = missing.filter(c => made.images.has(c.hash)).length;
+        log(`… social images: ${made.images.size} rendered in Chromium`);
+      }
+      const inCache = cards.filter(c => c.file?.startsWith(cacheDir)).length;
+      socialSummary = { pages: cards.length, rendered, cached: inCache, committed: cards.filter(c => c.file !== undefined).length - inCache };
+    }
     // The crawler files: robots.txt at a host's root (a site under a path has none: crawlers would never read it);
     // the sitemap when the site has an address and is indexed.
     const sfFiles: string[] = storefront ? [...(sfBase === "/" ? [PD_ROUTES.robots] : []), PD_ROUTES.notFound,
@@ -449,7 +490,7 @@ async function buildOnce(
       let imageWarnings: string[] | undefined;
       const browserWarnings: string[] = [];
       if (playwright) {
-        browser ??= await launchChromium(playwright);
+        browser ??= await launchChromium(playwright, "pd build --browser", storefront.socialImages ? CARD_CHROMIUM_ARGS : undefined);
         const checked = await runBrowserChecks({ pages, get: sfGet, browser, basePath: sfBase, ...(searchFiles ? { search: { files: searchFiles, word: searchWord([...searchRecords.values()]) } } : {}) });
         if (checked.errors.length) {
           throw new Error(`pd build: the site has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
@@ -684,6 +725,7 @@ async function buildOnce(
       if (classSummary) report.classes = classSummary;
       if (a11ySummary) report.accessibility = a11ySummary;
       if (imageSummary) report.images = imageSummary;
+      if (socialSummary) report.socialImages = socialSummary;
       const { drafts, scheduled } = model;
       if (drafts.length) report.drafts = drafts;
       if (model.draftsByDefaults.length) {
