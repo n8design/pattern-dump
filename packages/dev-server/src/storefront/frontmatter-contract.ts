@@ -34,6 +34,13 @@ import { CHILD_DEFAULTS } from "../frontmatter.js";
 import { designFiles } from "./design-files.js";
 import { readSocialImage, socialVariants, type SocialChoice } from "./social-images.js";
 
+/** Hugo's date keys, which a page brought over from Hugo still has: what each is in Pattern Dump. */
+const HUGO_KEYS: Readonly<Record<string, string>> = {
+  lastmod: `Hugo's lastmod is "updated" here (updated: YYYY-MM-DD, set for a real change)`,
+  publishDate: `Hugo's publishDate is "date" here (date: YYYY-MM-DD; a date after today keeps the page out of pd build until then)`,
+  expiryDate: `Hugo's expiryDate has no equivalent: a page stays until it is removed, or set draft: true`,
+};
+
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
 export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view", "toc", "socialImage"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
@@ -290,9 +297,10 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
     }
     const prop = Object.hasOwn(declared, key) ? declared[key] : undefined;
     if (!prop) {
-      if (!hasSchema) { at(key, `"${key}" is not declared by ${named}, which has no schema`); continue; }
+      const hugo = Object.hasOwn(HUGO_KEYS, key) ? `: ${HUGO_KEYS[key]}` : undefined;
+      if (!hasSchema) { at(key, `"${key}" is not declared by ${named}, which has no schema${hugo ?? ""}`); continue; }
       const near = suggest(key, [...Object.keys(declared), ...RESERVED_KEYS, ...forQueries]);
-      at(key, `"${key}" is not declared by ${named}${near ? `: did you mean "${near}"?` : ""}`);
+      at(key, `"${key}" is not declared by ${named}${hugo ?? (near ? `: did you mean "${near}"?` : "")}`);
       continue;
     }
     const r = checkDeclared(prop, value, "frontmatter");

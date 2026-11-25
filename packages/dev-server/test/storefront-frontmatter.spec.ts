@@ -268,12 +268,46 @@ describe("checkPageFrontmatter — the listing keys: date, tags, draft, sort", (
   });
 
   it("refuses a date that is not a real calendar date written YYYY-MM-DD", async () => {
-    for (const bad of ["2026-13-01", "2026-02-30", "2026-2-3", "14.11.2026", "2026-11-14T10:00", "[2026-11-14]"]) {
+    for (const bad of ["2026-13-01", "2026-02-30", "2026-2-3", "14.11.2026", "2026-02-30T10:00:00Z", "[2026-11-14]"]) {
       const shown = bad.startsWith("[") ? "[2026-11-14]" : `"${bad}"`;
       expect((await check(`---\ntitle: T\ndate: ${bad}\n---\n`)).problems, bad)
         .toEqual([P(3, `date ${shown} is not a date: write it YYYY-MM-DD, such as "2026-11-14"`)]);
     }
     expect((await check("---\ntitle: T\ndate: 2028-02-29\n---\n")).problems).toEqual([]);
+  });
+
+  it("names the day to write for a date-time or an email-style date, as written in its own offset", async () => {
+    const cases: Array<[string, string]> = [
+      // West of UTC: the instant is 14 November in UTC, the day as written is the 13th.
+      ["2026-11-13T23:30:00-08:00", `date "2026-11-13T23:30:00-08:00" has a time: a page's date is a day, so write the day only, as written: date: 2026-11-13`],
+      ["Thu, 13 Nov 2026 23:30:00 -0800", `date "Thu, 13 Nov 2026 23:30:00 -0800" is an email-style date: write the day only, YYYY-MM-DD: date: 2026-11-13`],
+      // East of UTC: the instant is 13 November in UTC, the day as written is the 14th.
+      ["2026-11-14T00:30:00+13:00", `date "2026-11-14T00:30:00+13:00" has a time: a page's date is a day, so write the day only, as written: date: 2026-11-14`],
+      ["Sat, 14 Nov 2026 00:30:00 +1300", `date "Sat, 14 Nov 2026 00:30:00 +1300" is an email-style date: write the day only, YYYY-MM-DD: date: 2026-11-14`],
+      ["2026-11-13T23:30:00Z", `date "2026-11-13T23:30:00Z" has a time: a page's date is a day, so write the day only, as written: date: 2026-11-13`],
+      ["\"2026-11-13T23:30:00-08:00\"", `date "2026-11-13T23:30:00-08:00" has a time: a page's date is a day, so write the day only, as written: date: 2026-11-13`],
+      ["2026-11-14T10:00", `date "2026-11-14T10:00" has a time: a page's date is a day, so write the day only, as written: date: 2026-11-14`],
+      ["5 Nov 2026", `date "5 Nov 2026" is an email-style date: write the day only, YYYY-MM-DD: date: 2026-11-05`],
+      ["2026-11-13 # the launch", `date "2026-11-13 # the launch": a "#" starts no comment in frontmatter, so "# the launch" is part of the value: remove it, and write the day only: date: 2026-11-13`],
+    ];
+    for (const [value, message] of cases) {
+      expect((await check(`---\ntitle: T\ndate: ${value}\n---\n`)).problems, value).toEqual([P(3, message)]);
+    }
+    // A quoted date-time with a comment after it: the frontmatter's own problem (the quote isn't closed), then the date's.
+    const commented = (await check("---\ntitle: T\ndate: '2026-11-13T23:30:00-08:00' ## must be today or earlier\n---\n")).problems;
+    expect(commented.at(-1)).toEqual(P(3, `date "'2026-11-13T23:30:00-08:00' ## must be today or earlier": a "#" starts no comment in frontmatter, `
+      + `so "## must be today or earlier" is part of the value: remove it, and write the day only: date: 2026-11-13`));
+    // updated reads the same.
+    expect((await check("---\ntitle: T\nupdated: Fri, 20 Nov 2026 08:00:00 +0100\n---\n")).problems).toEqual([
+      P(3, `updated "Fri, 20 Nov 2026 08:00:00 +0100" is an email-style date: write the day only, YYYY-MM-DD: updated: 2026-11-20`)]);
+  });
+
+  it("says what Hugo's date keys are here", async () => {
+    expect((await check("---\ntitle: T\nlastmod: 2026-11-20\npublishDate: 2026-11-01\nexpiryDate: 2027-01-01\n---\n")).problems).toEqual([
+      P(3, `"lastmod" is not declared by layout "page": Hugo's lastmod is "updated" here (updated: YYYY-MM-DD, set for a real change)`),
+      P(4, `"publishDate" is not declared by layout "page": Hugo's publishDate is "date" here (date: YYYY-MM-DD; a date after today keeps the page out of pd build until then)`),
+      P(5, `"expiryDate" is not declared by layout "page": Hugo's expiryDate has no equivalent: a page stays until it is removed, or set draft: true`),
+    ]);
   });
 
   it("refuses a tag that can't be a URL segment, and a tag listed twice", async () => {

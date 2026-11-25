@@ -25,15 +25,60 @@ const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TAG = /^[a-z0-9-]+$/;
 const show = (v: FrontmatterValue): string => Array.isArray(v) ? `[${v.join(", ")}]` : `"${v}"`;
 
-/** `key`: the key the value is under, for the message (`date`, `updated`). */
+/** A real calendar day, written YYYY-MM-DD. */
+function isDay(v: string): boolean {
+  const m = DATE.exec(v);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const t = new Date(0);
+  t.setUTCFullYear(y, mo - 1, d);
+  return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d;
+}
+
+/** An ISO date-time (a time after the day, with an offset, `Z` or neither): its day as written, YYYY-MM-DD. */
+const DATE_TIME = /^(\d{4}-\d{2}-\d{2})[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}(?::?\d{2})?)?$/i;
+/** An email-style date (RFC 822, as feeds and Hugo write it): `Thu, 13 Nov 2026 23:30:00 -0800`. */
+const EMAIL_DATE = /^(?:[A-Za-z]{3},\s*)?(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})(?:\s+\d{2}:\d{2}(?::\d{2})?(?:\s*(?:[+-]\d{4}|[A-Za-z]{1,5}))?)?$/;
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** The day a date-time or an email-style date is written for, in its own offset (never the UTC day); undefined for
+ *  any other form, and for a day that doesn't exist. */
+function dayAsWritten(v: string): { day: string; form: "time" | "email" } | undefined {
+  const iso = DATE_TIME.exec(v);
+  if (iso) return isDay(iso[1]!) ? { day: iso[1]!, form: "time" } : undefined;
+  const email = EMAIL_DATE.exec(v);
+  if (!email) return undefined;
+  const month = MONTHS.indexOf(email[2]!.toLowerCase());
+  if (month < 0) return undefined;
+  const day = `${email[3]}-${String(month + 1).padStart(2, "0")}-${email[1]!.padStart(2, "0")}`;
+  return isDay(day) ? { day, form: "email" } : undefined;
+}
+
+/**
+ * `key`: the key the value is under, for the message (`date`, `updated`). Only `YYYY-MM-DD` is a date. For a form
+ * that names a day (a date-time, an email-style date), the message names that day as written, in the value's own
+ * offset: `2026-11-13T23:30:00-08:00` is 13 November, although it is 14 November in UTC.
+ */
 export function readDate(v: FrontmatterValue, key = "date"): Read<string> {
-  const m = typeof v === "string" ? DATE.exec(v) : null;
-  if (m) {
-    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-    const t = new Date(Date.UTC(y, mo - 1, d));
-    if (t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d) return { ok: true, value: v as string };
+  if (typeof v === "string" && isDay(v)) return { ok: true, value: v };
+  const generic = `${key} ${show(v)} is not a date: write it YYYY-MM-DD, such as "2026-11-14"`;
+  if (typeof v !== "string") return { ok: false, message: generic };
+  // A "#" after the value: frontmatter has no comments, so it is part of the value.
+  const hash = /\s+#/.exec(v);
+  if (hash) {
+    const before = v.slice(0, hash.index).trim().replace(/^(["'])(.*)\1$/, "$2").replace(/^["']/, "");
+    const named = isDay(before) ? { day: before } : dayAsWritten(before);
+    return { ok: false, message: `${key} ${show(v)}: a "#" starts no comment in frontmatter, so "${v.slice(hash.index).trim()}" is part `
+      + `of the value: remove it${named ? `, and write the day only: ${key}: ${named.day}` : ""}` };
   }
-  return { ok: false, message: `${key} ${show(v)} is not a date: write it YYYY-MM-DD, such as "2026-11-14"` };
+  const named = dayAsWritten(v);
+  if (named?.form === "time") {
+    return { ok: false, message: `${key} ${show(v)} has a time: a page's ${key} is a day, so write the day only, as written: ${key}: ${named.day}` };
+  }
+  if (named?.form === "email") {
+    return { ok: false, message: `${key} ${show(v)} is an email-style date: write the day only, YYYY-MM-DD: ${key}: ${named.day}` };
+  }
+  return { ok: false, message: generic };
 }
 
 /** `updated: YYYY-MM-DD`: a date, and not before the page's own `date` (`published`, when it has a valid one). */
