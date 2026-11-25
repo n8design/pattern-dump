@@ -39,6 +39,8 @@
   byte for byte, so no workflow copies them in. See [Mounts](docs/guide/storefront.md#mounts).
 - **A mounted file in the place of one the site writes stops the build.** The message names both files, and nothing is
   written. A missing folder or a link out of the folder stops it too.
+- **`pd dev` serves a site's mounts as they are on disk.** A rebuild of the other tool shows on the next reload. A
+  missing folder is one warning, and its route works once the folder is built.
 
 ## 0.9.0 (2026-11-23)
 

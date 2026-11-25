@@ -26,7 +26,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** The Playwright suites: the folder that holds `e2e/` and `playwright.config.ts`. */
-const PLAYWRIGHT = ["apps/dev-ui", "storefront-bench", "package-bench", "skins/experimental"];
+const PLAYWRIGHT = ["apps/dev-ui", "storefront-bench", "package-bench", "mounts-bench", "skins/experimental"];
 
 /**
  * Changes that are not specs but that every spec of a kind stands on. A changed file that matches `when`
@@ -43,11 +43,20 @@ export const DEPENDENTS = [
       /^storefront-bench\/e2e\/hmr\.spec\.ts$/,
     ],
   },
+  {
+    // The mounts bench: the site and the folders the mounts specs build and serve copies of.
+    when: [/^mounts-bench\/(?!e2e\/)/],
+    specs: [
+      /^packages\/dev-server\/test\/site-mounts-[^/]*\.spec\.ts$/,
+      /^packages\/dev-server\/test\/static-build-paths\.spec\.ts$/,
+      /^mounts-bench\/e2e\/[^/]*\.spec\.ts$/,
+    ],
+  },
 ];
 
 const SPEC = /\.(spec|test)\.ts$/;
 /** A workspace's folder (the root package.json's workspaces). */
-const WORKSPACE = /^((?:packages|apps|skins)\/[^/]+|package-bench|storefront-bench|test-bench)\//;
+const WORKSPACE = /^((?:packages|apps|skins)\/[^/]+|package-bench|storefront-bench|mounts-bench|test-bench)\//;
 
 /**
  * Where a spec runs: Playwright in its suite (its `e2e/` folder); vitest in its workspace, wherever the

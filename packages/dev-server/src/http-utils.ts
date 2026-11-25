@@ -33,6 +33,14 @@ export function mimeType(ext: string): string {
     ".otf":   "font/otf",
     ".mp4":   "video/mp4",
     ".webm":  "video/webm",
+    // What another tool's output (site.mounts) and a site's root files carry.
+    ".mjs":   "application/javascript",
+    ".map":   "application/json",
+    ".xml":   "application/xml",
+    ".txt":   "text/plain",
+    ".webmanifest": "application/manifest+json",
+    ".pdf":   "application/pdf",
+    ".avif":  "image/avif",
   };
   return map[ext.toLowerCase()] ?? "application/octet-stream";
 }

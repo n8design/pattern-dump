@@ -77,8 +77,8 @@ import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { isPageImageUrl, pageImageFile } from "./storefront/page-images.js";
 import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
-import { mountProblems, readMounts, sitemapRoutes } from "./storefront/mounts.js";
-import { claimsOf } from "./storefront/site-output.js";
+import { mountedFile, mountProblems, readMounts, sitemapRoutes } from "./storefront/mounts.js";
+import { claimsOf, collisionOf, describeClaim } from "./storefront/site-output.js";
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import type { SearchRecord } from "./storefront/search.js";
@@ -260,6 +260,9 @@ export async function handleRequest(
   }
   if (cfg.storefront && host === cfg.storefront.host) {
     if (!underBasePath(req, res, cfg.storefront.basePath)) return;
+    // A mount's file (site.mounts) leaves as it is on disk: answered here, before the stamping and the base path
+    // reach the response, so pd dev serves it byte for byte, as pd build copies it.
+    if (cfg.storefront.mounts.length && await answerMount(req, res, ctx)) return;
     return stampedResponse(req, res, ctx);
   }
   return routeRequest(req, res, ctx);
@@ -285,6 +288,68 @@ function underBasePath(req: IncomingMessage, res: ServerResponse, base: string):
     return false;
   }
   req.url = PD_ROUTES.notFound;
+  return true;
+}
+
+/** The site's address for this request, and its feeds (feeds.ts), like the sitemap: with the site's address, for a
+ *  site in search engines. In pd dev the address is the one the browser is on (under the site's path), so every link
+ *  a page shows works there; in pd build it is the configured one. */
+function siteFeedsOf(req: IncomingMessage, ctx: RouteContext, model: Awaited<ReturnType<typeof readStorefrontPages>>) {
+  const storefront = ctx.cfg.storefront!;
+  const siteUrl = storefront.url === undefined ? undefined
+    : ctx.live ? `http://${req.headers.host ?? storefront.host}${storefront.basePath}` : storefront.url;
+  const feedSettings = siteUrl !== undefined && storefront.index ? storefront.feeds : undefined;
+  const siteFeeds = () => cachedFeedsOf(model, feedSettings!, {
+    siteUrl: siteUrl!, siteTitle: typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined,
+    lang: storefront.lang, dates: ctx.dates, mode: ctx.live ? "dev" : "build",
+  });
+  return { siteUrl, feedSettings, siteFeeds };
+}
+
+/** The collisions pd dev has warned about, once each per server: "<path> <what>". */
+const mountWarnings = new WeakMap<RouteContext, Set<string>>();
+
+/**
+ * A request on the site's host for a mount's file (mounts.ts): the file, with its content type, read from disk on
+ * every request. A folder's address without its "/" forwards to it. A file in the place of one the site writes is
+ * left to the site (pd build stops on it): PD's file is served, with one warning naming both. True when answered.
+ */
+async function answerMount(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): Promise<boolean> {
+  const sf = ctx.cfg.storefront!;
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+  const raw = new URL(req.url ?? "/", "http://x").pathname;
+  const path = decodePath(raw);
+  if (path === null) return false;
+  const found = await mountedFile(sf.mounts, path);
+  if (found === null) return false;
+  const warnOnce = (line: string): void => {
+    let seen = mountWarnings.get(ctx);
+    if (!seen) mountWarnings.set(ctx, seen = new Set());
+    if (seen.has(line)) return;
+    seen.add(line);
+    console.warn(`[dev-server] ${line}`);
+  };
+  if (found.kind === "folder") {
+    res.writeHead(302, { Location: `${sf.basePath}${found.location.slice(1)}` });
+    res.end();
+    return true;
+  }
+  // The site's own files win in pd dev, as nothing may take their place in pd build.
+  const model = await readStorefrontPages(ctx, sf, (await currentDiscovery(ctx.state, ctx.cfg.patternRoots)).discoveryMap);
+  const sitePath = `${found.mount.to}${found.rel}`;
+  const { feedSettings, siteFeeds } = siteFeedsOf(req, ctx, model);
+  const feeds = feedSettings ? (await siteFeeds()).feeds.map(f => ({ address: f.address, source: f.feed.source })) : [];
+  const clash = collisionOf(claimsOf(model, feeds), sitePath);
+  if (clash) {
+    warnOnce(`site.mounts: ${found.mount.name}/${found.rel} would be published at ${sitePath}, which is ${describeClaim(clash)}: `
+      + `pd dev serves the site's, and pd build stops on it; remove the file from the mount, or publish the mount at another route`);
+    return false;
+  }
+  for (const other of found.also) {
+    warnOnce(`site.mounts: ${other} would be published at ${sitePath}, which clashes with ${found.mount.name}/${found.rel}: `
+      + `pd dev serves the first mount's, and pd build stops on it; remove the file from one of the mounts`);
+  }
+  await serveFile(res, found.file, mimeType(extname(found.file)));
   return true;
 }
 
@@ -326,15 +391,20 @@ function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
       // came in on, which is gone once its client hangs up (a page live reload replaces), and would refuse the
       // server its own request. The Host header is the outer request's, read as it arrived.
       const self = { url: path, method: "GET", headers: { host: req.headers.host } } as unknown as IncomingMessage;
+      // The route first, and its references stamped only when it is a file: a missing file is the 404 page, which
+      // may link that same file (a favicon not there yet), and stamping it would wait on this very lookup.
+      const found = holdResponse();
       const held = holdResponse();
-      const lookup = stampedResponse(self, held.res, ctx).then(() => {
-        const status = held.status();
+      const lookup = routeRequest(self, found.res, ctx).then(async () => {
+        if (found.status() === 200) await sendStamped(self, found, held.res, ctx);
+        const status = found.status() === 200 ? held.status() : found.status();
         if (status === 200) return contentHash(held.body());
         // Only "no such file" is remembered for the generation. Any other failure (a script that doesn't
         // compile, a file that can't be read) is reported and asked again by the next page.
         if (status !== 404) {
           if (hashes.get(path) === lookup) hashes.delete(path);
-          console.error(`[site] ${path} could not be stamped: ${status} ${held.body().toString("utf8").split("\n")[0]!.slice(0, 160)}`);
+          const said = found.status() === 200 ? held.body() : found.body();
+          console.error(`[site] ${path} could not be stamped: ${status} ${said.toString("utf8").split("\n")[0]!.slice(0, 160)}`);
         }
         return undefined;
       });
@@ -348,6 +418,11 @@ function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
 async function stampedResponse(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): Promise<void> {
   const held = holdResponse();
   await routeRequest(req, held.res, ctx);
+  await sendStamped(req, held, res, ctx);
+}
+
+/** A held response sent on `res`, its references stamped and the base path in front of them (HTML and CSS). */
+async function sendStamped(req: IncomingMessage, held: HeldResponse, res: ServerResponse, ctx: RouteContext): Promise<void> {
   const type = String(held.headers["content-type"] ?? "");
   let body: Buffer | string = held.body();
   // Stamps first, by site path; then the site's base path in front of every root-relative reference.
@@ -828,14 +903,7 @@ async function routeRequest(
       const model = await readStorefrontPages(ctx, cfg.storefront, discoveryMap);
       // With storefront.url set, pages carry absolute URLs: the configured address in a build, and in
       // pd dev the address the browser is on (under the site's path), so every link it shows works there.
-      const siteUrl = cfg.storefront.url === undefined ? undefined
-        : ctx.live ? `http://${req.headers.host ?? cfg.storefront.host}${cfg.storefront.basePath}` : cfg.storefront.url;
-      // The feeds (feeds.ts), like the sitemap: with the site's address, for a site in search engines.
-      const feedSettings = siteUrl !== undefined && storefront.index ? storefront.feeds : undefined;
-      const siteFeeds = () => cachedFeedsOf(model, feedSettings!, {
-        siteUrl: siteUrl!, siteTitle: typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined,
-        lang: storefront.lang, dates: ctx.dates, mode: ctx.live ? "dev" : "build",
-      });
+      const { siteUrl, feedSettings, siteFeeds } = siteFeedsOf(req, ctx, model);
       if (pathname === PD_ROUTES.pages) {
         if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
         const feeds = feedSettings ? await siteFeeds() : undefined;
@@ -922,6 +990,7 @@ async function routeRequest(
         image: (path, as) => checkPageImage(path, assetRoots, assetRootNames,
           { written: as?.written, beside: as?.beside, pagesDir: storefront.pagesDir }),
         ...(siteUrl !== undefined ? { siteUrl } : {}),
+        ...(ctx.live && storefront.mounts.length ? { mounted: new Set((await readMounts(storefront.mounts, cwd)).files.map(f => f.path)) } : {}),
         lang: cfg.storefront.lang, dateFormat: dateFormatter(cfg.storefront.lang, cfg.storefront.dates),
         ...(feedSettings && target !== PD_ROUTES.notFound ? { feeds: feedLinksFor(target, (await siteFeeds()).feeds, siteUrl!,
           typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined) } : {}),

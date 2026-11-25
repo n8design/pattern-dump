@@ -1707,7 +1707,8 @@ site/
 ### Mounts
 
 A site can publish folders of finished files that another tool built, each at a route of its own. `pd build` then
-writes the whole deployment, and no workflow needs a step that copies them in. htwoo.io, for example, publishes its
+writes the whole deployment, no workflow needs a step that copies them in, and `pd dev` serves them beside the
+pages. htwoo.io, for example, publishes its
 Pattern Lab build at `/htwoo-core/` and its Storybook build at `/htwoo-react/` beside its pages, and needs a favicon,
 a web manifest and a font provider's stylesheet at its root:
 
@@ -1725,6 +1726,8 @@ export default defineConfig({
 
 `from` is a folder, relative to the project's root like every path in the config; it may be outside the project.
 `to` is the route it is published at, starting and ending with `/`; `/` puts the folder's files at the site's root.
+A workbench on the site's own host (`site.workbenchUrl` is a path) keeps its path: a mount there, or under it, is a
+config problem.
 Under a path ([Publishing under a path](#publishing-under-a-path)) a mount lands under it, as the pages do:
 `/htwoo-core/` is served at `/htwoo/htwoo-core/`. `pd build` prints one line with the files and size of each mount.
 
@@ -1751,6 +1754,13 @@ Links are published as files
   link that points outside the mount, or nowhere, stops the build. Nothing in the output is a link, since some static
   hosts refuse them.
 
+**In `pd dev`** a mount's files are served at their routes, byte for byte as `pd build` copies them, and read
+from disk on every request: rebuild the other tool and reload the page. Mounts aren't watched, so nothing reloads
+by itself. A folder's address without its `/` forwards to it, as a static host does. A missing folder is one warning
+when `pd dev` starts, and its addresses are the 404 page until the folder is there; the next request after the other
+tool builds it serves it, without a restart. A mounted file in the place of the site's own is a warning, once:
+`pd dev` serves the site's file, and `pd build` stops on it.
+
 With `sitemap: true`, every `.html` file of a mount is in the site's sitemap, after the site's own pages, an
 `index.html` by its folder's URL. Left out, none is: another tool's sitemap stays its own. A page of the site can
 link to a mounted file like any other, and the link check counts it as written.
@@ -1768,6 +1778,15 @@ A missing folder
 
 A link out of the mount
 : `site.mounts: <file> is a link to <target>, outside <folder>: a mount publishes files, and a link is published as the file it points to, inside the mount; copy the file in, or remove the link`
+
+A mount at the workbench's path
+: `"site.mounts[0].to": "/htwoo-core/" is the workbench's path, site.workbenchUrl "/htwoo-core/": publish the mount at another route, or give the workbench another address`
+
+A missing folder, in `pd dev`
+: `site.mounts: ../docs/htwoo-core, published at /htwoo-core/, doesn't exist: its addresses are the 404 page until it does; build it, and the next request serves it (pd build stops without it)`
+
+A file in the place of one the site writes, in `pd dev`
+: `site.mounts: <file> would be published at <path>, which is the page /about/: pd dev serves the site's, and pd build stops on it; remove the file from the mount, or publish the mount at another route`
 
 ### Publishing under a path
 

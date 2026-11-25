@@ -115,6 +115,9 @@ jobs:
       - name: Run package bench E2E tests
         run: npm run e2e:package-bench
 
+      - name: Run mounts bench E2E tests
+        run: npm run e2e:mounts
+
       - name: Upload Playwright traces and videos on failure
         if: failure()
         uses: actions/upload-artifact@v7
@@ -126,6 +129,7 @@ jobs:
             storefront-bench/test-results/
             skins/experimental/test-results/
             package-bench/test-results/
+            mounts-bench/test-results/
           retention-days: 7
 
   # Every spec a pull request adds or changes (and the watcher specs, when the harness or the dev-server
@@ -216,4 +220,5 @@ jobs:
             storefront-bench/test-results/
             skins/experimental/test-results/
             package-bench/test-results/
+            mounts-bench/test-results/
           retention-days: 7

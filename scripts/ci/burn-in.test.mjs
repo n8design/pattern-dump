@@ -81,6 +81,16 @@ for (const changed of ["packages/dev-server/test/watch-harness.ts", "test-suppor
   });
 }
 
+test("a change to the mounts bench burns in the mounts specs and its suite, and not for its own specs", () => {
+  const all = ["mounts-bench/tool/index.html", "mounts-bench/e2e/mounts.spec.ts", "packages/dev-server/test/site-mounts-dev.spec.ts",
+    "packages/dev-server/test/site-mounts-build.spec.ts", "packages/dev-server/test/static-build-paths.spec.ts", "packages/dev-server/test/lazy.spec.ts"];
+  assert.deepEqual(planBurnIn(["mounts-bench/tool/index.html"], all), [
+    { runner: "playwright", cwd: "mounts-bench", files: ["e2e/mounts.spec.ts"] },
+    { runner: "vitest", cwd: "packages/dev-server", files: ["test/site-mounts-build.spec.ts", "test/site-mounts-dev.spec.ts", "test/static-build-paths.spec.ts"] },
+  ]);
+  assert.deepEqual(planBurnIn(["mounts-bench/e2e/mounts.spec.ts"], all), [{ runner: "playwright", cwd: "mounts-bench", files: ["e2e/mounts.spec.ts"] }]);
+});
+
 test("a spec both changed and named by a rule is listed once", () => {
   const jobs = planBurnIn(["packages/dev-server/src/watch.ts", "packages/dev-server/test/reload.spec.ts"], ALL);
   assert.equal(jobs.find(j => j.runner === "vitest").files.filter(f => f === "test/reload.spec.ts").length, 1);
