@@ -97,8 +97,9 @@ function dataFile(store: SourceStore, path: string, display: (absPath: string) =
 }
 
 /**
- * An image as an <img>: with its variants (the slot's widths the image has as displayed, at least its own width when
- * every slot width is wider; `src` the largest), or a single file at its size. Shared by `{{pd-image}}` and the
+ * An image as an <img>: with its variants (the slot's widths the image has as displayed, and its own width when a slot
+ * width is wider, so the srcset reaches the original and nothing is upscaled; `src` the largest), or a single file at
+ * its size. Shared by `{{pd-image}}` and the
  * storefront's prose images, so both write the same markup. With `dark`, a <picture> whose
  * `(prefers-color-scheme: dark)` <source> is that image, in the same widths, at its own size; the <img> is the light one.
  */
@@ -127,8 +128,10 @@ function candidates(
 ): { src: string; srcset?: string; width: number; height: number } {
   if (source.kind === "single") return { src: source.url, width: source.width, height: source.height };
   const esc = Handlebars.escapeExpression;
+  // The slot's widths up to the image's own; then its own width, when a wider slot width would have shown more of it
+  // (a 602 px image in a slot of 480 and 960 gets 480 and 602, never a smaller variant as its largest).
   const widths = o.widths.filter(w => w <= source.width);
-  if (widths.length === 0) widths.push(source.width);
+  if (!widths.includes(source.width) && (widths.length === 0 || o.widths.some(w => w > source.width))) widths.push(source.width);
   const urls = widths.map(w => source.variantUrl(w, o.settings));
   const top = widths[widths.length - 1]!;
   return { src: urls[urls.length - 1]!, srcset: urls.map((u, i) => `${esc(u)} ${widths[i]}w`).join(", "),

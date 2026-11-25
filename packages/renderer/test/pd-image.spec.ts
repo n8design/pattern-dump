@@ -13,6 +13,8 @@ import { save } from "../../../test-support/save.js";
 const SLOT = { widths: [480, 960, 1440], sizes: "(max-width: 40rem) 100vw, 40rem" };
 const lookup: ImageLookup = src => {
   if (src === "/assets/images/harbour.jpg") return { kind: "variants", width: 1000, height: 500, variantUrl: (w, s) => `/v/${s ?? "project"}/harbour-${w}.webp` };
+  if (src === "/assets/images/narrow.jpg") return { kind: "variants", width: 602, height: 301, variantUrl: (w, s) => `/v/${s ?? "project"}/narrow-${w}.webp` };
+  if (src === "/assets/images/narrow-dark.jpg") return { kind: "variants", width: 602, height: 301, variantUrl: (w, s) => `/v/${s ?? "project"}/narrow-dark-${w}.webp` };
   if (src === "/assets/images/logo.svg") return { kind: "single", url: src, width: 64, height: 32 };
   if (src === "/assets/images/broken.jpg") return { kind: "unavailable", reason: "Pattern Dump could not load sharp (test)" };
   return undefined;
@@ -27,6 +29,9 @@ const files: Record<string, string> = {
   "atoms/pic/pic~logo.json": JSON.stringify({ image: "/assets/images/logo.svg", alt: "" }),
   "atoms/pic/pic~broken.json": JSON.stringify({ image: "/assets/images/broken.jpg", alt: "x" }),
   "atoms/pic/pic~noalt.json": JSON.stringify({ alt: null }),
+  "atoms/narrow/narrow.hbs": `{{pd-image image alt="Narrow"}}`,
+  "atoms/narrow/narrow.schema.json": JSON.stringify({ properties: { image: { type: "string", "x-pd-image": { widths: [480, 960], sizes: "100vw" } } } }),
+  "atoms/narrow/narrow.json": JSON.stringify({ image: "/assets/images/narrow.jpg" }),
   "atoms/hero/hero.hbs": `{{pd-image image alt=alt loading="eager"}}`,
   "atoms/hero/hero.schema.json": JSON.stringify({ properties: { image: { type: "string", "x-pd-image": { widths: [320, 2000], sizes: "100vw" } }, alt: { type: "string" } } }),
   "atoms/hero/hero.json": JSON.stringify({ image: "/assets/images/harbour.jpg", alt: "Hero" }),
@@ -50,26 +55,34 @@ afterAll(async () => { if (root) await rm(root, { recursive: true, force: true }
 const v = (s: string, w: number) => `/v/${s}/harbour-${w}.webp`;
 
 describe("{{pd-image}}", () => {
-  it("writes the image as an <img> with its slot's variants, as wide as the image is, sized and lazy", async () => {
+  it("writes the image as an <img> with its slot's variants up to its own width, sized and lazy", async () => {
+    // 1000 px wide, in a slot of 480, 960 and 1440: 1440 would upscale, so the image's own width ends the srcset.
     expect((await render({ component: "atoms/pic" })).html.trim()).toBe(
-      `<img src="${v("project", 960)}" srcset="${v("project", 480)} 480w, ${v("project", 960)} 960w" sizes="(max-width: 40rem) 100vw, 40rem" `
-      + `width="960" height="480" alt="A harbour" loading="lazy" decoding="async">`);
+      `<img src="${v("project", 1000)}" srcset="${v("project", 480)} 480w, ${v("project", 960)} 960w, ${v("project", 1000)} 1000w" `
+      + `sizes="(max-width: 40rem) 100vw, 40rem" width="1000" height="500" alt="A harbour" loading="lazy" decoding="async">`);
+  });
+
+  it("reaches an image's own width between two slot widths, and nothing wider", async () => {
+    // A 602 px image in a slot of 480 and 960 used to show at 480.
+    expect((await render({ component: "atoms/narrow" })).html.trim()).toBe(
+      `<img src="/v/project/narrow-602.webp" srcset="/v/project/narrow-480.webp 480w, /v/project/narrow-602.webp 602w" sizes="100vw" `
+      + `width="602" height="301" alt="Narrow" loading="lazy" decoding="async">`);
   });
 
   it("keys the variants with the site's settings when the render says so", async () => {
-    expect((await render({ component: "atoms/pic", images: "site" })).html).toContain(`src="${v("site", 960)}"`);
+    expect((await render({ component: "atoms/pic", images: "site" })).html).toContain(`src="${v("site", 1000)}"`);
   });
 
   it("passes the settings into a nested component, and resolves a field inside {{#each}}", async () => {
     const html = (await render({ component: "molecules/gallery", images: "site" })).html.trim();
     expect(html).toBe(
       `<img src="${v("site", 480)}" srcset="${v("site", 480)} 480w" sizes="50vw" width="480" height="240" alt="First" loading="lazy" decoding="async">|`
-      + `<img src="${v("site", 960)}" srcset="${v("site", 480)} 480w, ${v("site", 960)} 960w" sizes="(max-width: 40rem) 100vw, 40rem" width="960" height="480" alt="Nested" loading="lazy" decoding="async">`);
+      + `<img src="${v("site", 1000)}" srcset="${v("site", 480)} 480w, ${v("site", 960)} 960w, ${v("site", 1000)} 1000w" sizes="(max-width: 40rem) 100vw, 40rem" width="1000" height="500" alt="Nested" loading="lazy" decoding="async">`);
   });
 
-  it("uses the image's own width when every slot width beyond the smallest is wider, and loads eager when asked", async () => {
+  it("ends with the image's own width when the next slot width is wider, and loads eager when asked", async () => {
     expect((await render({ component: "atoms/hero" })).html.trim()).toBe(
-      `<img src="${v("project", 320)}" srcset="${v("project", 320)} 320w" sizes="100vw" width="320" height="160" alt="Hero" loading="eager" decoding="async">`);
+      `<img src="${v("project", 1000)}" srcset="${v("project", 320)} 320w, ${v("project", 1000)} 1000w" sizes="100vw" width="1000" height="500" alt="Hero" loading="eager" decoding="async">`);
   });
 
   it("writes an SVG as one file at its size, and alt=\"\" for a decorative image", async () => {
@@ -116,3 +129,4 @@ describe("{{pd-image}} problems, found from the schema before rendering", () => 
     }
   });
 });
+
