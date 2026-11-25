@@ -111,6 +111,8 @@ export interface StaticBuildReport {
   classes?: { severity: "warning" | "error"; warnings: string[] };
   /** llms.txt, at the site's root: how many pages it lists. Absent when none is written (storefront.llms). */
   llms?: { pages: number };
+  /** The site's feeds (site.feeds): how many files. Absent when it has none. */
+  feeds?: { files: number };
   /** The site's social images (social-images.ts): the pages with a card, and where each card came from (rendered by
    *  this build, the cache, the committed folder). `missing`: one line per page whose card is missing or stale and
    *  couldn't be rendered (no Playwright, or no Chromium); each such page takes the site's image, `siteImage` says
@@ -711,15 +713,19 @@ async function buildOnce(
       const model = pageModel!;
       if (storefront.llms) {
         const siteTitle = typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined;
-        const llms = llmsTxt(model, { title: siteTitle, siteUrl: storefront.url });
+        const feeds = ((await (await sfGet!(PD_ROUTES.pages)).json()) as StorefrontPagesResponse).feeds ?? [];
+        const llms = llmsTxt(model, { title: siteTitle, siteUrl: storefront.url, feeds });
         const bytes = Buffer.from(llms.text, "utf8");
         await writeFile(join(sfOut, "llms.txt"), bytes);
         counts.files++;
         counts.bytes += bytes.byteLength;
         report.llms = { pages: llms.pages };
       }
-      const stubs = new Set((await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse).pages.flatMap(p => p.redirectFrom ?? []));
-      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !isPageImageUrl(u.split("?")[0]!) && !sfFiles.includes(u) && !stubs.has(u)).length;
+      const listed = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
+      const stubs = new Set(listed.pages.flatMap(p => p.redirectFrom ?? []));
+      const feeds = new Set((listed.feeds ?? []).map(f => f.address));
+      const pages = sfCrawl.urls.filter(u => !/^\/(?:_pd|assets|preview)\//.test(u) && !isPageImageUrl(u.split("?")[0]!) && !sfFiles.includes(u) && !stubs.has(u) && !feeds.has(u)).length;
+      if (feeds.size) report.feeds = { files: feeds.size };
       report.storefront = { outDir: storefront.outDir, basePath: sfBase, pages, files: counts.files, bytes: counts.bytes };
       if (sfBase !== "/") {
         // What the site's robots.txt would have said, for the host's own, if its owner can add to it.
@@ -733,7 +739,9 @@ async function buildOnce(
       }
       if (storefront.url === undefined) {
         report.notes.push("site.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, "
-          + "and there is no sitemap: set site.url to the site's address, such as \"https://example.com/\"");
+          + `and there is no sitemap${storefront.feeds ? " and no feed" : ""}: set site.url to the site's address, such as "https://example.com/"`);
+      } else if (storefront.feeds && !storefront.index) {
+        report.notes.push("site.feeds is set, and the site has index: false, so it has no feeds: a site kept out of search engines has none");
       }
       report.notes.push(...storefrontNotes, ...externalNotes);
       if (linkSummary) report.links = linkSummary;

@@ -107,6 +107,8 @@ describe("pd build — the storefront root", () => {
       "_pd/themes/dark.css",
       "_pd/themes/light.css",
       "about/index.html",
+      // The articles' feed (articles/index.md has sort: date), and the site's below.
+      "articles/feed.xml",
       "articles/harbour/index.html",
       "articles/index.html",
       "articles/plain/index.html",
@@ -122,6 +124,7 @@ describe("pd build — the storefront root", () => {
       "categories/ds/index.html",
       "categories/guides/index.html",
       "categories/index.html",
+      "feed.xml",
       "guides/index.html",
       "guides/setup/index.html",
       "index.html",
@@ -140,7 +143,7 @@ describe("pd build — the storefront root", () => {
       "tags/layout/index.html",
       "tags/pictures/index.html",
     ]);
-    expect(report.storefront).toEqual({ outDir: join(root, ".out", "site"), basePath: "/", pages: 14, files: 57, bytes: expect.any(Number) });
+    expect(report.storefront).toEqual({ outDir: join(root, ".out", "site"), basePath: "/", pages: 14, files: 59, bytes: expect.any(Number) });
     // llms.txt lists six pages: every page of the folder but the home page, whose title and description head it.
     expect(report.llms).toEqual({ pages: 6 });
   });
@@ -259,6 +262,12 @@ describe("pd build — the storefront root", () => {
         + "paragraph instead: the text of the page as it starts, without its markup, never shortened in the data. The card in the "
         + "listing limits it to three lines.",
       `- [Plain on purpose](${at("/articles/plain/")}): Why the bench's skin is a wireframe.`,
+      "",
+      // The bench's feeds (site.feeds), the site's first.
+      "## Feeds",
+      "",
+      `- [Storefront bench](${at("/feed.xml")}): Atom`,
+      `- [Articles](${at("/articles/feed.xml")}): Atom`,
       "",
     ].join("\n"));
     expect(llms).not.toMatch(/\/tags\/|\/categories\//);

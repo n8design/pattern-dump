@@ -42,6 +42,7 @@ import { checkPageDeclaration, FILLED, pageValue, positionOf, RETIRED, type Deri
 import { checkDeclaredQueries, declaredQueries, resolveQuery, type ResolvedQuery } from "./query.js";
 import { collidingHeadings, idsBesides } from "./anchors.js";
 import { dateFormatter, type DateFormat } from "./date-text.js";
+import type { FeedLink } from "./feeds.js";
 import type { GitDates } from "./git-dates.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
@@ -112,6 +113,8 @@ export interface PageAssembly {
   siteUrl?: string;
   /** <html lang>. Default: "en". */
   lang?: string;
+  /** The feeds the page links to in its head (feeds.ts feedLinksFor); none without. */
+  feeds?: readonly FeedLink[];
   /** How dates are written for readers (`page.dateText` and the others; date-text.ts): site.lang in the style of
    *  site.dates. Default: `lang`'s in the long style. */
   dateFormat?: DateFormat;
@@ -284,6 +287,8 @@ export function seoTags(p: {
   /** The page is an article (articleOf): og:type article, with its date, its first category as article:section (Open
    *  Graph has one) and one article:tag per tag, each by its label. */
   article?: PageArticle | undefined;
+  /** The feeds the page links to (feeds.ts feedLinksFor), each as a link rel="alternate". */
+  feeds?: readonly FeedLink[];
 }): string[] {
   const tags: string[] = [];
   if (!p.index) tags.push(`<meta name="robots" content="noindex">`);
@@ -297,6 +302,7 @@ export function seoTags(p: {
     `<meta property="og:title" content="${escapeAttr(p.title)}">`,
     ...(p.description ? [`<meta property="og:description" content="${escapeAttr(p.description)}">`] : []),
     `<meta property="og:url" content="${escapeAttr(url)}">`,
+    ...(p.feeds ?? []).map(f => `<link rel="alternate" type="${f.type}" title="${escapeAttr(f.title)}" href="${escapeAttr(f.href)}">`),
   );
   if (p.article) {
     tags.push(`<meta property="article:published_time" content="${escapeAttr(p.article.published)}">`,
@@ -925,7 +931,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     ...seoTags({
       route, title, description, siteTitle, siteUrl: isNotFound ? undefined : a.siteUrl,
       image: socialImage ?? (imageCheck?.ok ? imageCheck.image : undefined),
-      index: !isNotFound && a.siteIndex !== false && checked.build.index !== false, article,
+      index: !isNotFound && a.siteIndex !== false && checked.build.index !== false, article, feeds: isNotFound ? [] : a.feeds ?? [],
     }),
     ...(a.siteUrl !== undefined && !isNotFound
       ? [jsonLdScript({ siteUrl: a.siteUrl, siteTitle, route, title, description, breadcrumbs: positionOf(route, model).breadcrumbs, modified, published, article,

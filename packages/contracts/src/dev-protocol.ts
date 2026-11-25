@@ -862,7 +862,14 @@ export interface StorefrontNavItem {
 export interface StorefrontPagesResponse {
   pages: StorefrontPage[];
   nav: StorefrontNavItem[];
+  /** The site's feeds, when it has any: what pd build crawls for them, and what llms.txt lists. Absent without
+   *  site.feeds, site.url, or with index: false. */
+  feeds?: StorefrontFeed[];
 }
+
+/** A feed of the site's: its address (a site path: /feed.xml, /articles/feed.xml), its title, its format, and the
+ *  route of the collection it is the feed of (null for the site's feed). */
+export interface StorefrontFeed { address: string; title: string; format: "atom" | "rss"; collection: string | null }
 
 /** The body of every JSON error response. */
 export interface ApiError {
@@ -934,6 +941,10 @@ export type ShellRuntime =
       audit?: boolean;
     };
 
+/** A feed's file name unless the config or its folder's index.md names another: the site's at the root, a
+ *  collection's in its folder (`/articles/feed.xml`). A feed in both formats has the RSS one at `rss.xml`. */
+export const FEED_FILES = { atom: "feed.xml", rss: "rss.xml" } as const;
+
 /** "/pd", "pd/", "pd" → "/pd/"; "" and "/" → "/". */
 export function normalizeBasePath(basePath: string | undefined): string {
   const trimmed = (basePath ?? "").trim().replace(/^\/+|\/+$/g, "");
@@ -967,6 +978,9 @@ export function staticPathFor(liveUrl: string): string {
   if (/\/[^/]+\.(?:png|jpe?g|gif|webp|svg)$/.test(path)) return path.slice(1);
   // The root files a static host reads by name, written under that name, never as a folder.
   if (path === PD_ROUTES.sitemap || path === PD_ROUTES.robots || path === PD_ROUTES.notFound) return path.slice(1);
+  // A feed (/feed.xml, /articles/feed.xml, or the name a feed is given): a file under its own name. A route never
+  // ends in one.
+  if (/\/[^/]+\.xml$/.test(path)) return path.slice(1);
   // Anything else is a shell route: one index.html per route, so deep links load without rewrites.
   const route = path.replace(/^\/+|\/+$/g, "");
   return route ? `${route}/index.html` : "index.html";

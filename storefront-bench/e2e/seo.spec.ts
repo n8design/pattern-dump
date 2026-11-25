@@ -44,6 +44,7 @@ for (const [route, title, [image, width, height]] of PAGES) {
         .map(m => [m.getAttribute("property") ?? m.getAttribute("name"), m.getAttribute("content")])),
       lang: document.documentElement.lang,
       tags: [...document.querySelectorAll(`meta[property="article:tag"]`)].map(m => m.getAttribute("content")),
+      feeds: [...document.querySelectorAll<HTMLLinkElement>("link[rel=alternate]")].map(l => [l.type, l.title, l.href]),
     }));
     const url = new URL(route.slice(1), site).href;
     expect(head.canonical).toBe(url);
@@ -55,6 +56,11 @@ for (const [route, title, [image, width, height]] of PAGES) {
     expect(head.tags).toEqual(article ?? []);
     expect(head.meta["article:section"]).toBe(article ? SECTIONS[route]?.[0] : undefined);
     expect(head.meta["og:site_name"]).toBe("Storefront bench");
+    // The site's feed on every page; the articles' on the articles and their listing.
+    expect(head.feeds).toEqual([
+      ["application/atom+xml", "Storefront bench", new URL("feed.xml", site).href],
+      ...(route.startsWith("/articles/") ? [["application/atom+xml", "Articles · Storefront bench", new URL("articles/feed.xml", site).href]] : []),
+    ]);
     expect([head.meta["og:image:width"], head.meta["og:image:height"]]).toEqual([width, height]);
     expect(head.meta["twitter:card"]).toBe("summary_large_image");
     // The image is served where the site serves it: at the same path on the server under test. Its URL is
@@ -94,6 +100,18 @@ for (const [route, title, [image, width, height]] of PAGES) {
     if (trail.length) expect(trail.at(-1)!.item).toBe(url);
   });
 }
+
+test("the feeds are served at the addresses the pages link to, with the site's address in every id", async ({ request }, info) => {
+  const site = isDev(info) ? `${DEV}/` : SITE_URL;
+  for (const [path, titles] of [["/feed.xml", ["A harbour of cable cars", "Plain on purpose"]], ["/articles/feed.xml", ["A harbour of cable cars", "Plain on purpose"]]] as const) {
+    const res = await request.get(path);
+    expect(res.status(), path).toBe(200);
+    const xml = await res.text();
+    expect(xml, path).toMatch(/^<\?xml version="1.0" encoding="utf-8"\?>\n<feed xmlns="http:\/\/www.w3.org\/2005\/Atom">/);
+    expect([...xml.matchAll(/<entry>\s*<id>([^<]+)<\/id>\s*<title type="text">([^<]+)/g)].map(m => [m[1], m[2]]), path).toEqual([
+      [new URL("articles/harbour/", site).href, titles[0]], [new URL("articles/plain/", site).href, titles[1]]]);
+  }
+});
 
 test("robots.txt keeps crawlers out of the previews and names the sitemap; the sitemap lists every page, dated by the page", async ({ request }, info) => {
   const site = isDev(info) ? `${DEV}/` : SITE_URL;

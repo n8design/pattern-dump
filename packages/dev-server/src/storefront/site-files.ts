@@ -2,7 +2,9 @@
 // an address (storefront.url). Both are text built from the page model on every request, never stored. And
 // llms.txt, for language models, which only pd build writes.
 
+import type { StorefrontFeed } from "@pattern-dump/contracts";
 import type { PageModel } from "./pages.js";
+import { escapeXml } from "./xml.js";
 
 /** A page in the sitemap: its absolute URL, and its last change when the page says. */
 export interface SitemapEntry { url: string; lastmod: string | null }
@@ -23,9 +25,6 @@ export function sitemapEntries(model: PageModel, siteUrl: string): SitemapEntry[
   });
 }
 
-const escapeXml = (s: string): string =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-
 /** sitemap.xml (sitemaps.org 0.9): one <url> per entry, in the order given; <lastmod> only where known. */
 export function sitemapXml(entries: readonly SitemapEntry[]): string {
   const urls = entries.map(e => `<url><loc>${escapeXml(e.url)}</loc>${e.lastmod ? `<lastmod>${escapeXml(e.lastmod)}</lastmod>` : ""}</url>`);
@@ -39,9 +38,11 @@ export function sitemapXml(entries: readonly SitemapEntry[]): string {
  * headed by its title and led by it), in nav order. Each page is `- [title](url): teaser`, its description else its
  * first paragraph; no `: ` part when it has neither. The same pages as the sitemap: no draft, no scheduled page, no
  * page with `index: false`; a section with none left is not written. Tag and category pages are left out: they have
- * no content of their own, and their pages are listed. `siteUrl`: absolute URLs; without it, the route.
+ * no content of their own, and their pages are listed. Then `## Feeds`, the site's feed first, each by its title and
+ * format (`feeds`, as the pages response lists them; none without the site's address). `siteUrl`: absolute URLs;
+ * without it, the route.
  */
-export function llmsTxt(model: PageModel, o: { title: string | undefined; siteUrl: string | undefined }): { text: string; pages: number } {
+export function llmsTxt(model: PageModel, o: { title: string | undefined; siteUrl: string | undefined; feeds?: readonly StorefrontFeed[] }): { text: string; pages: number } {
   const titles = new Map(model.pages.map(p => [p.route, p.title]));
   const listed = (route: string): boolean => {
     const file = model.files.get(route), entry = model.entries.get(route);
@@ -68,6 +69,11 @@ export function llmsTxt(model: PageModel, o: { title: string | undefined; siteUr
     if (!routes.length) continue;
     pages += routes.length;
     out.push(`## ${oneLine(s.heading)}`, "", ...routes.map(line), "");
+  }
+  // The feeds, the site's first: each by its title and format, at its absolute address.
+  const feeds = [...(o.feeds ?? [])].sort((a, b) => (a.collection === null ? 0 : 1) - (b.collection === null ? 0 : 1));
+  if (feeds.length && o.siteUrl !== undefined) {
+    out.push("## Feeds", "", ...feeds.map(f => `- [${linkText(f.title)}](${href(f.address)}): ${f.format === "atom" ? "Atom" : "RSS"}`), "");
   }
   return { text: out.join("\n"), pages };
 }

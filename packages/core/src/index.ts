@@ -174,6 +174,7 @@ export function buildReportLines(report: StaticBuildReport, workbenchUrl: string
     for (const w of report.classes.warnings) lines.push(`[pd build]   warning: ${w}`);
   }
   if (report.llms) lines.push(`[pd build] llms.txt: ${report.llms.pages} page${report.llms.pages === 1 ? "" : "s"}`);
+  if (report.feeds) lines.push(`[pd build] feeds: ${report.feeds.files} file${report.feeds.files === 1 ? "" : "s"}`);
   if (report.search) {
     lines.push(`[pd build] search: ${report.search.pages} pages indexed → ${report.search.files} files in _pd/search/ (${(report.search.bytes / 1024).toFixed(0)} KB)`);
   }

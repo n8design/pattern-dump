@@ -77,7 +77,7 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
     try { error = (JSON.parse(body) as { error?: string }).error ?? body; } catch { /* not JSON */ }
     return { urls: [], problems: error.split("\n").filter(Boolean), documents: new Map(), stylesheets: new Map() };
   }
-  const { pages } = await list.json() as StorefrontPagesResponse;
+  const { pages, feeds } = await list.json() as StorefrontPagesResponse;
 
   const urls: string[] = [];
   const documents = new Map<string, string>();
@@ -89,6 +89,8 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
   // Each old route a page lists: the page that forwards from it.
   for (const p of pages) for (const old of p.redirectFrom ?? []) add(old);
   for (const f of files) add(f);
+  // The site's feeds (feeds.ts), which no page links to by path.
+  for (const f of feeds ?? []) add(f.address);
 
   while (queue.length) {
     const url = queue.shift()!;

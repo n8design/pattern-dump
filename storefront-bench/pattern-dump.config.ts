@@ -23,6 +23,8 @@ export default defineConfig({
     workbenchUrl: "https://workbench.example.test/",
     // The site's own address: canonical URLs, Open Graph, JSON-LD and the sitemap are built from it.
     url: "https://bench.example.test/",
+    // Feeds: the articles' (articles/index.md has sort: date) and the site's, as Atom, linked from each page's head.
+    feeds: { author: { name: "The storefront bench" } },
     // The categories a page can name (`categories:` in its frontmatter), independent of its folder.
     categories: {
       "design-systems": { label: "Design systems", description: "How a design system is built and kept", aliases: ["ds"] },

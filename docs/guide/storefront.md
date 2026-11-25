@@ -289,13 +289,14 @@ lede: Three folders make a site.
 | `categories` | One category or a list, each declared in `site.categories` (or an old key of one), none twice: `categories: [guides]`. See [Categories](#categories) |
 | `draft` | `true` shows the page in `pd dev` and leaves it out of `pd build`. See [Drafts](#drafts) |
 | `sort` | On a folder's `index.md` only: `date` lists the folder's pages newest first; `order`, the default, in the folder's order |
+| `feed` | On a folder's `index.md` only: `false` turns the folder's feed off; `limit`, `path`, or `atom` and `rss`, indented under `feed:`, set its own. See [Feeds](#feeds) |
 | `view` | On a folder's `index.md` only: the view its listing is shown in, `views/<name>` in the skin. See [Listing views](#listing-views) |
 | `toc` | `true` shows the table of contents in its region; `false` keeps it out, whatever the layout says. See [The table of contents](#the-table-of-contents) |
 | `socialImage` | The variant of the social image component the page's social image is rendered from, such as `guide`; `false` for none, so the page takes `site.image`. Without it, the component itself. See [Social images](#social-images) |
 | any other key | Must be declared by the layout's schema |
 
 `layout`, `childLayout`, `order`, `image`, `index`, `redirectFrom`, `date`, `updated`, `tags`, `categories`, `draft`,
-`sort`, `view`, `toc` and `socialImage` belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
+`sort`, `view`, `toc`, `socialImage` and `feed` belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
 them (a layout shows them through `page.date`, `page.updated`, `page.tags` and `page.categories`). `nav: true` or
 `false` belongs to the build as well; the layout still gets `nav`, the navigation, and may declare it.
 
@@ -440,7 +441,8 @@ link-preview tags ([below](#search-engines-and-link-previews)) and the styleshee
 Dump can't know (an icon, a theme colour, a font preload) with a `partials/head` component. It is rendered with
 `site`, placed after Pattern Dump's tags and before the stylesheets, and may hold only `<meta>`, `<link>`,
 `<script>`, `<style>` and `<noscript>`. It must not write what Pattern Dump writes: `<title>`, a canonical
-link, `description`, `robots`, `og:*`, `twitter:*` or JSON-LD, nor `<base>`. Any of those, any other element,
+link, `description`, `robots`, `og:*`, `twitter:*`, a feed's link (`rel="alternate"` with a feed's type) or
+JSON-LD, nor `<base>`. Any of those, any other element,
 or text, is a problem for every page. Its workbench preview is empty, since everything in it belongs in a
 head.
 
@@ -1418,7 +1420,8 @@ its title, led by it and listing that folder's own pages), in the order of the p
 the same pages as the sitemap (no draft, no scheduled page, none with `index: false`); tag and category pages are left
 out, since their pages are listed. URLs are absolute with `site.url`, else paths from the site's root. `pd
 build` writes it to the site's root (under a path, at `<path>llms.txt`); `pd dev` has none. On unless the site has
-`index: false`; `site.llms: false` turns it off.
+`index: false`; `site.llms: false` turns it off. A site with [feeds](#feeds) ends it with a `## Feeds` section, the
+site's feed first, each a line `- [title](url): Atom` or `: RSS`.
 
 **`robots.txt`.** Both output roots get one. The site's keeps crawlers out of `/preview/` (the live
 examples: component demos, not pages) and names the sitemap. The workbench's keeps them out of its
@@ -1433,6 +1436,68 @@ previews only; the workbench itself stays searchable. A workbench on the site's 
   writes it to its own root, so copy its rule into the `robots.txt` that host serves at `/` (the build says
   so); its previews also carry a robots `noindex` tag then. On the site's host there is nothing to copy.
 - A site published under a path has no `robots.txt` at all ([below](#publishing-under-a-path)).
+
+### Feeds
+
+A feed lets a reader follow a collection in a feed reader. With `site.feeds`, each folder whose `index.md` has
+`sort: date` gets one of its newest pages, at `<folder>/feed.xml`, and the site gets one across them, at `/feed.xml`.
+Each entry is a page's title, its link, its date, its `updated` (else its date) and its summary: the page's
+description, else its first paragraph. A draft, a scheduled page and a page with `index: false` are in none, and
+a folder with no dated page yet has no feed (a note says so). Like the sitemap, feeds need `site.url`, and a site
+with `index: false` has none.
+
+```ts
+export default defineConfig({
+  site: {
+    url: "https://example.com/",
+    feeds: {
+      author: { name: "The team" },
+    },
+  },
+});
+```
+
+`site.feeds` takes `true`, or an object with these keys:
+
+- `format`: `"atom"` (Atom 1.0, the default), `"rss"` (RSS 2.0), or `"both"`
+- `limit`: the newest pages each feed lists, default 20
+- `collections`: only these folders' feeds, such as `["articles"]`, each with `sort: date`
+- `site`: `false` leaves out the site's feed
+- `path`: the site feed's file name (below)
+- `author`: `{ name, uri }`. An Atom feed needs a name, so `site.feeds: true` alone is a config problem until
+  `author` is set or the format is RSS. In RSS, the name is each item's `dc:creator`.
+
+An RSS feed also needs a description: its folder's `index.md` gives it (its description, else its first paragraph),
+and the home page gives the site feed's.
+
+A folder's `index.md` sets its own feed. `feed: false` turns it off; indented under `feed:`, `limit` is its own
+limit and `path` its file name:
+
+```yaml
+feed:
+  limit: 50
+  path: index.xml
+```
+
+**A feed's file name.** A feed is at `feed.xml` unless `path` names another file: `site.feeds.path` for the site's,
+`path` under `feed:` for a folder's. A feed in both formats needs a name for each: `{ atom, rss }` in the config,
+and `atom` and `rss` under `feed:`, by default `feed.xml` and `rss.xml`. This keeps a feed at the address it already
+has, such as the `/index.xml` another tool wrote: feed readers don't follow the redirect a page's `redirectFrom`
+writes. A name another feed, an old route or a file of the site's has (`sitemap.xml`, `robots.txt`, `llms.txt`,
+`404.html`) stops the build.
+
+**Head links.** Every page links the site's feed in its head, and a collection's own page and its pages link the
+collection's too, each as `<link rel="alternate">` with the feed's type and a title such as
+"Articles · Example". A skin's `partials/head` may not write a feed link of its own.
+
+**An entry's id.** A feed reader knows an entry by its id, so the id never changes: it is the page's oldest route,
+absolute. That is its first `redirectFrom`, else its route, so list a moved page's old routes with the original
+first. Where git has the history, the build notes a page that git first saw at another route than its id's.
+Changing `site.url` changes every id, and a reader then shows every entry again. In RSS the id is the item's `guid`,
+marked as no permalink, and its `link` is the page's address now.
+
+`pd dev` serves each feed at the address the browser is on, as it does the sitemap: the same document as `pd build`
+writes but for the site's address. A feed's problem is a 500 at its address there, and stops `pd build`.
 
 ### Social images
 
@@ -1630,6 +1695,7 @@ site/
   setup/index.html  start/index.html                pages that forward from old routes
   robots.txt  sitemap.xml                           for crawlers (the sitemap with site.url)
   llms.txt                                          the site for language models
+  feed.xml  articles/feed.xml                       the feeds, with site.feeds
   preview/components/callout/index.html            the previews the pages show
   _pd/  assets/                                    what pages and previews reference
   .nojekyll
