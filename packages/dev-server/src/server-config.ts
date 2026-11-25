@@ -136,6 +136,9 @@ export interface ResolvedConfig {
   /** 'stylesheet' links ONLY the active theme (correct for bare-`:root` theme sets like hTWOo's,
    *  which collide when all are linked); 'attribute' (default) links all and toggles [data-theme]. */
   readonly themeSwitch: ThemeSwitch;
+  /** themes.order: the picker's order (themes.ts orderThemeNames); empty without it. */
+  readonly themeOrder: readonly string[];
+
   /** Swatch properties for the PROJECT's themes (config.themes.swatch.slots). */
   readonly swatchSlots: string[];
   /** Swatch properties for a pattern package's themes, which the project config does not describe. */
@@ -310,6 +313,7 @@ export function resolveServerConfig(
     overviewsEnabled:    config.overviews !== false,
     documentBaseEnabled,
     themeSwitch,
+    themeOrder:          config.themes?.order ?? [],
     swatchSlots:         config.themes?.swatch?.slots ?? DEFAULT_SWATCH_SLOTS,
     packageSwatchSlots:  DEFAULT_SWATCH_SLOTS,
   };

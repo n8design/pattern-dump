@@ -56,13 +56,13 @@ import { fileURLToPath } from "node:url";
 // The composition graph (uses/usedBy) + its registry type, which css-closure, flattening
 // surfacing and export planning all pass around.
 // Theme discovery + swatch-token extraction.
-import { discoverThemeFiles, extractThemeTokens } from "./themes.js";
+import { discoverThemeFiles, extractThemeTokens, unknownThemeNames } from "./themes.js";
 // Read-only queries over the discovery index — no site reconstructs a component file path.
 import { baseComponentIds } from "./discovery-index.js";
 // Project helper/data loaders — one bad file is isolated and logged, never fatal.
 import { loadHelperRegistrars, loadGlobalData } from "./project-loaders.js";
 // Set-level findings surfaced as generated side artifacts (collisions, flattening).
-import { surfaceAssetRoots, surfaceCollisions, surfaceDefaultTheme, surfaceDocumentBase, surfaceFlattening } from "./surfacing.js";
+import { surfaceAssetRoots, surfaceCollisions, surfaceDefaultTheme, surfaceDocumentBase, surfaceFlattening, surfaceThemeNotes } from "./surfacing.js";
 // Headless `pd audit`. Re-exported: packages/core imports it.
 export { runDiagnosticsAudit } from "./audit.js";
 // The project graph and its answers, for pd graph, pd describe and pd affected (packages/core).
@@ -341,7 +341,7 @@ export async function startDevServer(
 
   // Pre-compile all known themes.
   if (cfg.themeDirs.length) {
-    for (const { name, dir } of await discoverThemeFiles(cfg.themeDirs)) {
+    for (const { name, dir } of await discoverThemeFiles(cfg.themeDirs, cfg.themeOrder)) {
       try {
         const css = await compileSassFile(join(dir, `${name}.theme.scss`));
         state.themeCss.set(name, css);
@@ -355,6 +355,7 @@ export async function startDevServer(
     }
   }
   surfaceDefaultTheme(cfg.defaultTheme, [...state.themeCss.keys()]);
+  surfaceThemeNotes(unknownThemeNames(cfg.themeOrder, state.themeCss.keys()));
 
 
 

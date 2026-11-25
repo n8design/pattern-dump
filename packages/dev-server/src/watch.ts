@@ -38,7 +38,7 @@ import {
 import { buildAllStyleData, patchClassOwnerIndex } from "./style-index.js";
 import { rootMatchers, watchedRoots, within, type WatchedRoots } from "./watch-roots.js";
 import { auditInputs, auditWithHash, componentContentHash } from "./diagnostics.js";
-import { extractThemeTokens } from "./themes.js";
+import { extractThemeTokens, reorderThemes } from "./themes.js";
 import { surfaceCollisions, surfaceFlattening } from "./surfacing.js";
 import { verboseTiming } from "./timing.js";
 import { sameHostWorkbenchPath, type PatternDumpConfig } from "@pattern-dump/config";
@@ -1120,17 +1120,7 @@ on("change", async (filePath) => {
   const themesDir = themeDirOf(filePath);
   if (ext === ".scss" || isPlainStylesheet(filePath)) {
     if (themesDir && ext === ".scss") {
-      // Theme SCSS changed → recompile theme, push content-swap so iframe picks up new link.
-      const themeName = basename(filePath, ".theme.scss");
-      try {
-        const css = await compileSassFile(filePath);
-        state.themeCss.set(themeName, css);
-        state.themeTokens.set(themeName, await extractThemeTokens(themeName, css, swatchSlots, themesDir));
-        hmr.push({ type: "content-swap", componentId: state.lastComponentId });
-        console.log(`[dev-server] Theme CSS updated: ${themeName}`);
-      } catch (e) {
-        hmr.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
-      }
+      await handleTheme(filePath, themesDir, "updated");
     } else {
       await handleComponentScss(filePath);
       // TRIPWIRE — diagnostics graph does NOT re-audit on an SCSS edit, ON PURPOSE. Every engine in
@@ -1292,7 +1282,10 @@ on("add", async (filePath) => {
   if (await handleReloadable(filePath, "add")) return;
   const ext = extname(filePath);
   const patternRoot = patternRootOf(filePath);
-  if ((ext === ".scss" && !themeDirOf(filePath)) || isPlainStylesheet(filePath)) {
+  const addedTheme = themeDirOf(filePath);
+  if (addedTheme && filePath.endsWith(".theme.scss")) {
+    await handleTheme(filePath, addedTheme, "added");
+  } else if ((ext === ".scss" && !addedTheme) || isPlainStylesheet(filePath)) {
     await handleComponentScss(filePath);
   } else if (ext === ".hbs" && patternRoot) {
     await rebuildAndSignalTree(`Pattern added: ${relative(patternRoot, filePath)}`);
@@ -1302,6 +1295,23 @@ on("add", async (filePath) => {
     await handleComponentJson(filePath, "add");
   }
 });
+
+// A theme saved or added: compiled, and in its place in the picker's order (themes.ts), then a content-swap so the
+// preview picks up the new link.
+async function handleTheme(filePath: string, themesDir: string, what: "updated" | "added"): Promise<void> {
+  const themeName = basename(filePath, ".theme.scss");
+  try {
+    const css = await compileSassFile(filePath);
+    state.themeCss.set(themeName, css);
+    state.themeTokens.set(themeName, await extractThemeTokens(themeName, css, swatchSlots, themesDir));
+    reorderThemes(state.themeCss, cfg.themeOrder);
+    reorderThemes(state.themeTokens, cfg.themeOrder);
+    hmr.push({ type: "content-swap", componentId: state.lastComponentId });
+    console.log(`[dev-server] Theme ${what}: ${themeName}`);
+  } catch (e) {
+    hmr.push({ type: "error", scope: "build", message: `SCSS error: ${String(e)}` });
+  }
+}
 
 // A component's file removed — rebuild discovery and signal nav rebuild.
 on("unlink", async (filePath) => {
@@ -1315,6 +1325,7 @@ on("unlink", async (filePath) => {
     const themeName = basename(filePath, ".theme.scss");
     state.themeCss.delete(themeName);
     state.themeTokens.delete(themeName);
+    // Removing keeps the order of the rest; the new state is still one ordered source.
     hmr.push({ type: "content-swap", componentId: state.lastComponentId });
     console.log(`[dev-server] Theme removed: ${themeName}`);
   } else if (extname(filePath) === ".scss" || isPlainStylesheet(filePath)) {

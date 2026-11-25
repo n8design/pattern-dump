@@ -11,9 +11,37 @@ import { join } from "node:path";
 import type { ThemeSummary } from "@pattern-dump/contracts";
 import { scopedDeclarations } from "./css-tokens.js";
 
-/** Every `*.theme.scss` across the theme folders, with the folder it lives in. A name already found
- *  in an earlier folder (the project's) hides a later one (a package's). */
-export async function discoverThemeFiles(themesDirs: string | string[]): Promise<Array<{ name: string; dir: string }>> {
+/**
+ * Theme names in the picker's order (themes.order): the names `order` lists first, in its order, then every other
+ * name sorted (by localeCompare, numbers by value: "teal2" before "teal10"). A listed name no theme has is left out
+ * (unknownThemeNames reports it). Without `order`, every name sorted. The order never depends on how the file
+ * system lists a folder.
+ */
+export function orderThemeNames(names: Iterable<string>, order: readonly string[] = []): string[] {
+  const all = [...new Set(names)];
+  const present = new Set(all);
+  const listed = [...new Set(order)].filter(n => present.has(n));
+  const rest = all.filter(n => !listed.includes(n)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return [...listed, ...rest];
+}
+
+/** The names `order` lists that no theme has, in its order. */
+export const unknownThemeNames = (order: readonly string[], names: Iterable<string>): string[] => {
+  const present = new Set(names);
+  return [...new Set(order)].filter(n => !present.has(n));
+};
+
+/** A map's entries again in the picker's order, in place: the theme state (themeCss, themeTokens) is one ordered
+ *  source, so a theme added or removed in pd dev takes its place instead of going last. */
+export function reorderThemes<V>(map: Map<string, V>, order: readonly string[] = []): void {
+  const entries = new Map(map);
+  map.clear();
+  for (const name of orderThemeNames(entries.keys(), order)) map.set(name, entries.get(name)!);
+}
+
+/** Every `*.theme.scss` across the theme folders, with the folder it lives in, in the picker's order (`order`). A
+ *  name already found in an earlier folder (the project's) hides a later one (a package's). */
+export async function discoverThemeFiles(themesDirs: string | string[], order: readonly string[] = []): Promise<Array<{ name: string; dir: string }>> {
   const found = new Map<string, string>();
   for (const dir of Array.isArray(themesDirs) ? themesDirs : [themesDirs]) {
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
@@ -23,11 +51,11 @@ export async function discoverThemeFiles(themesDirs: string | string[]): Promise
       if (!found.has(name)) found.set(name, dir);
     }
   }
-  return [...found].map(([name, dir]) => ({ name, dir }));
+  return orderThemeNames(found.keys(), order).map(name => ({ name, dir: found.get(name)! }));
 }
 
-export async function discoverThemes(themesDirs: string | string[]): Promise<ThemeSummary[]> {
-  return (await discoverThemeFiles(themesDirs)).map(({ name }) => ({ name }));
+export async function discoverThemes(themesDirs: string | string[], order: readonly string[] = []): Promise<ThemeSummary[]> {
+  return (await discoverThemeFiles(themesDirs, order)).map(({ name }) => ({ name }));
 }
 
 export async function extractThemeTokens(

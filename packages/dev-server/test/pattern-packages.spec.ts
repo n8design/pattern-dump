@@ -133,10 +133,10 @@ describe("pattern packages alongside the project", () => {
 
   it("serves the peer's base layer, the package theme, its scripts and assets", async () => {
     expect(await (await get("/_pd/base.css")).text()).toContain("margin: 0");
-    // Themes from BOTH sources; the project's own `light` hides the package's; stylesheet switching,
-    // because the package's bare :root sets would collide if linked together.
+    // Themes from BOTH sources, sorted by name (no themes.order); the project's own `light` hides the package's.
+    // Stylesheet switching, because the package's bare :root sets would collide if linked together.
     const themes = await (await get("/api/themes")).json() as Array<{ name: string }>;
-    expect(themes.map(t => t.name)).toEqual(["light", "dark"]);
+    expect(themes.map(t => t.name)).toEqual(["dark", "light"]);
     expect(await (await get("/_pd/themes/light.css")).text()).toContain("#fff");
     expect(await (await get("/_pd/themes/dark.css")).text()).toContain("#111");
     const config = await (await get("/api/config")).json() as { themeSwitch: string; defaultTheme: string };
