@@ -178,12 +178,13 @@ export function surfaceAssetRoots(assetRoots: readonly string[], cwd: string): v
 
 /** Warn when the configured default theme is none of the themes found in the project's or the
  *  packages' theme folders: previews would otherwise carry a data-theme nothing styles. */
-/** The theme notes at start: each name themes.order lists that no theme has (the rest of the order still holds).
- *  Warnings, never errors. */
-export function surfaceThemeNotes(unknownOrder: readonly string[]): void {
+/** The theme notes at start: each name themes.order lists that no theme has (the rest of the order still holds), and
+ *  each pattern package whose theme switch the project's setting overrides. Warnings, never errors. */
+export function surfaceThemeNotes(unknownOrder: readonly string[], switchNotes: readonly string[]): void {
   for (const name of unknownOrder) {
     console.warn(`[dev-server] themes.order names "${name}", and no theme has that name: it is left out of the order`);
   }
+  for (const note of switchNotes) console.warn(`[dev-server] ${note}`);
 }
 
 export function surfaceDefaultTheme(defaultTheme: string | undefined, themeNames: readonly string[]): void {

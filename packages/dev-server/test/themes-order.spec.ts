@@ -1,5 +1,6 @@
-// The theme picker's order (themes.ts, themes.order): it never depends on how a file system lists a folder, and a
-// theme added or removed in pd dev takes its place in the one ordered list /api/themes serves.
+// The theme picker's order (themes.ts, themes.order) and where the theme switch comes from (server-config.ts): the
+// order never depends on how a file system lists a folder, the project's switch wins over a package's, and a theme
+// added or removed in pd dev takes its place in the one ordered list /api/themes serves.
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { request } from "node:http";
@@ -8,6 +9,8 @@ import { dirname, join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import type { ThemeSummary } from "@pattern-dump/contracts";
 import { orderThemeNames, reorderThemes, unknownThemeNames } from "../src/themes.js";
+import { resolveServerConfig } from "../src/server-config.js";
+import type { ResolvedPackage } from "../src/packages.js";
 import { surfaceThemeNotes } from "../src/surfacing.js";
 import { save } from "../../../test-support/save.js";
 
@@ -51,7 +54,7 @@ describe("orderThemeNames", () => {
 
   it("an unknown name is a warning at start, not an error", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    surfaceThemeNotes(["teams.hc"]);
+    surfaceThemeNotes(["teams.hc"], []);
     expect(warn.mock.calls.map(c => c[0])).toEqual([`[dev-server] themes.order names "teams.hc", and no theme has that name: it is left out of the order`]);
     warn.mockRestore();
   });
@@ -84,6 +87,29 @@ describe("discoverThemeFiles", () => {
       expect(shuffled.find(t => t.name === "blue")!.dir).toBe(join(root, "themes"));
       expect((await discoverThemeFiles(dirs, CTS)).map(t => t.name)).toEqual(["teal", "red", "gray", "blue", "teams.light"]);
     } finally { shuffle.on = false; }
+  });
+});
+
+describe("the theme switch", () => {
+  const config = defineConfig({ sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist", styles: { strategy: "parallel", dir: "./src/styles" } });
+  const pkg = (name: string, value?: "attribute" | "stylesheet"): ResolvedPackage => ({
+    name, version: "1.0.0", dir: `/nm/${name}`, exclude: [], direct: true, styles: true,
+    manifest: { themes: { dir: "themes", ...(value ? { switch: value } : {}) } },
+  });
+
+  it("the project's setting wins over a package's, with a note naming both", () => {
+    const cfg = resolveServerConfig({ ...config, themes: { default: "teal", switch: "attribute" } }, "/project", {}, [pkg("@acme/ds", "stylesheet"), pkg("@acme/b")]);
+    expect(cfg.themeSwitch).toBe("attribute");
+    expect(cfg.themeSwitchNotes).toEqual([`themes.switch is "attribute", and the pattern package @acme/ds asks for "stylesheet": the project's setting is used`]);
+  });
+
+  it("without the project's: stylesheet as soon as a package asks for it, else attribute; no note", () => {
+    const sheet = resolveServerConfig({ ...config, themes: { default: "teal" } }, "/project", {}, [pkg("@acme/a", "attribute"), pkg("@acme/ds", "stylesheet")]);
+    expect([sheet.themeSwitch, sheet.themeSwitchNotes]).toEqual(["stylesheet", []]);
+    const attr = resolveServerConfig({ ...config, themes: { default: "teal" } }, "/project", {}, [pkg("@acme/a")]);
+    expect([attr.themeSwitch, attr.themeSwitchNotes]).toEqual(["attribute", []]);
+    const same = resolveServerConfig({ ...config, themes: { default: "teal", switch: "stylesheet" } }, "/project", {}, [pkg("@acme/ds", "stylesheet")]);
+    expect(same.themeSwitchNotes).toEqual([]);
   });
 });
 

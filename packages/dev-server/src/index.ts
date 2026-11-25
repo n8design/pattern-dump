@@ -355,7 +355,7 @@ export async function startDevServer(
     }
   }
   surfaceDefaultTheme(cfg.defaultTheme, [...state.themeCss.keys()]);
-  surfaceThemeNotes(unknownThemeNames(cfg.themeOrder, state.themeCss.keys()));
+  surfaceThemeNotes(unknownThemeNames(cfg.themeOrder, state.themeCss.keys()), cfg.themeSwitchNotes);
 
 
 
