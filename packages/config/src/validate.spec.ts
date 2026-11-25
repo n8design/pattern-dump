@@ -5,7 +5,7 @@ import { defineConfig } from "./index.js";
 const valid = {
   sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist",
   styles: { strategy: "parallel", dir: "./src/styles", entry: "styles.scss" },
-  themes: { dir: "./themes", default: "light", switch: "attribute", swatch: { slots: ["--a"] } },
+  themes: { dir: "./themes", default: "light", switch: "attribute", order: ["teal", "red"], swatch: { slots: ["--a"] } },
   assets: { strategy: "central", dir: ["./assets/images", "./assets/css"], css: ["css/fonts.css"] },
   scriptsDir: "./src/scripts", globalScripts: ["nav", "https://cdn.example/x.js"],
   dataDir: "./src/data", helpers: "./src/helpers", documentBase: ["base"], overviews: false,
@@ -131,6 +131,13 @@ describe("configProblems", () => {
       `"assets.dir" must be a string or a list of strings`,
       `"overviews" must be true or false`,
     ]);
+  });
+
+  it("themes.order: a list of theme names (whether each names a theme is a warning at start)", () => {
+    expect(configProblems({ ...valid, themes: { default: "blue", order: [] } })).toEqual([]);
+    expect(configProblems({ ...valid, themes: { default: "blue", order: ["teal", "teams.light"] } })).toEqual([]);
+    expect(configProblems({ ...valid, themes: { default: "blue", order: "teal" } })).toEqual([`"themes.order" must be a list of strings`]);
+    expect(configProblems({ ...valid, themes: { default: "blue", ordr: ["teal"] } })).toEqual([`unknown key "themes.ordr": did you mean "themes.order"?`]);
   });
 
   it("accepts themes with only a default, for a theme a package provides", () => {
