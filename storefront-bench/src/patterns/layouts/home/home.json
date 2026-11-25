@@ -37,6 +37,7 @@
           "title": "A harbour of cable cars",
           "description": "The bench's one photograph.",
           "date": "2026-11-01",
+          "dateText": "November 1, 2026",
           "image": null,
           "tags": [
             {
@@ -53,6 +54,7 @@
           "title": "Plain on purpose",
           "description": "Why the bench's skin is a wireframe.",
           "date": "2026-10-02",
+          "dateText": "October 2, 2026",
           "image": null,
           "tags": [],
           "draft": false

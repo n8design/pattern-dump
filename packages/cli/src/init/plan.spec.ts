@@ -343,6 +343,7 @@ describe("planInit — the shipped templates", () => {
         const config = r.plan.writes.find(w => w.path === "pattern-dump.config.ts")!.content;
         expect(config).toContain(`packages: ["@acme/styleguide"]`);
         expect(config).toContain(`build: { workbench: false }`);
+        expect(config).toContain(`    lang: "en",\n`);
         expect(r.plan.writes.some(w => w.path.startsWith("src/") || w.path.startsWith("themes/"))).toBe(false);
       });
     }
@@ -356,6 +357,7 @@ describe("planInit — the shipped templates", () => {
         expect(r.plan.packageJson.content).not.toMatch(/__PD_/);
         const config = r.plan.writes.find(w => w.path === "pattern-dump.config.ts")!.content;
         expect(config.includes(`workbenchUrl: "/workbench/"`)).toBe(storefront);
+        expect(config.includes(`    lang: "en",\n`)).toBe(storefront);
         expect(r.plan.writes.some(w => w.path === ".github/workflows/pages.yml")).toBe(storefront);
       });
     }

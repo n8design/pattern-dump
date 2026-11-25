@@ -179,7 +179,8 @@ describe("the starter project's patternDump field", () => {
 describe("the starter project with a website (--with-site, no examples)", () => {
   it("has a config that validates: a same-host workbench at /workbench/, built for that path", async () => {
     const config = await loadConfig(siteDir);
-    expect(config.storefront).toMatchObject({ pagesDir: "./pages", outDir: "./site", workbenchUrl: "/workbench/",
+    // lang written out, though it is the default: it decides how dates are written, so it is where people look.
+    expect(config.storefront).toMatchObject({ pagesDir: "./pages", outDir: "./site", workbenchUrl: "/workbench/", lang: "en",
       site: { title: "Starter Check", footer: "Made with Pattern Dump." } });
     expect(config.build?.basePath).toBe("/workbench/");
   });
@@ -227,12 +228,14 @@ describe("the starter project with a website (--with-site, no examples)", () => 
       const articles = await onHost(server.port, "live.localhost", "/articles/");
       expect(articles.status).toBe(200);
       // Shown through the list view its index.md names: one listing card per page, and the view's and card's styles.
-      expect(articles.body).toMatch(/<ul class="view-list" role="list">\s*<li>\s*<article class="listing-card">\s*<h2 class="listing-card-title"><a href="\/articles\/related\/">Related articles<\/a><\/h2>\s*<p class="listing-card-date"><time datetime="2026-11-15">/);
-      expect(articles.body).toContain(`<a href="/articles/hello/">Hello, articles</a></h2>\n  <p class="listing-card-date"><time datetime="2026-11-14">`);
+      expect(articles.body).toMatch(/<ul class="view-list" role="list">\s*<li>\s*<article class="listing-card">\s*<h2 class="listing-card-title"><a href="\/articles\/related\/">Related articles<\/a><\/h2>\s*<p class="listing-card-date"><time datetime="2026-11-15">November 15, 2026<\/time><\/p>/);
+      expect(articles.body).toContain(`<a href="/articles/hello/">Hello, articles</a></h2>\n  <p class="listing-card-date"><time datetime="2026-11-14">November 14, 2026</time></p>`);
       expect(articles.body).toContain(`href="${componentCssUrl("views/list").replace(/\.css$/, "")}`);
       expect(articles.body).toContain(`href="${componentCssUrl("components/listing-card").replace(/\.css$/, "")}`);
       const hello = await onHost(server.port, "live.localhost", "/articles/hello/");
       expect(hello.status).toBe(200);
+      // Its date as text for readers, the day in the machine-readable datetime.
+      expect(hello.body).toContain(`<div class="page-meta"><time datetime="2026-11-14">November 14, 2026</time>`);
       // Each tag by its label, linked to its tag page.
       expect(hello.body).toContain(`<ul class="page-tags" aria-label="Tags"><li><a href="/tags/getting-started/">getting-started</a></li><li><a href="/tags/notes/">notes</a></li></ul>`);
       // The tag and category pages, and their indexes, through the starter's plain layouts.

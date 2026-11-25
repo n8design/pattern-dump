@@ -39,7 +39,9 @@
       "title": "Sample next page"
     },
     "created": "2026-01-10T10:00:00+01:00",
+    "createdText": "January 10, 2026",
     "updated": "2026-03-20",
+    "updatedText": "March 20, 2026",
     "categories": [
       {
         "key": "sample",

@@ -11,7 +11,8 @@ test("an article lists the related pages of its folder through the view (the lay
   await expect(page.locator(".related h2")).toHaveText("Related");
   await expect(related(page)).toHaveText(["Plain on purpose"]);
   await expect(related(page)).toHaveAttribute("href", "/articles/plain/");
-  await expect(page.locator(".related .compact-card time")).toHaveText("2026-10-02");
+  await expect(page.locator(".related .compact-card time")).toHaveText("October 2, 2026");
+  await expect(page.locator(".related .compact-card time")).toHaveAttribute("datetime", "2026-10-02");
 });
 
 test("a page's own options: a hand-picked page first, then the pages in its category with any of its tags", async ({ page }) => {

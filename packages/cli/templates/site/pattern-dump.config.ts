@@ -18,6 +18,9 @@ export default defineConfig({
     // Where the style guide's own workbench is published: a page's examples link to their component there. A full
     // address for a workbench on a host of its own, or a path when it is published on this site's host.
     workbenchUrl: __PD_WORKBENCH_URL_JSON__,
+    // The language of every page (<html lang>), which also decides how dates are written: "en" writes
+    // "November 1, 2026", "en-GB" "1 November 2026", "de-AT" "1. November 2026". site.dates sets the style.
+    lang: "en",
     // The site's address, once you know it: canonical URLs, link previews and the sitemap are built from it.
     // url: "https://www.example.com/",
 __PD_SEARCH_NOTE__

@@ -7,8 +7,8 @@
   "page": {
     "next": { "route": "/about/", "title": "About" },
     "latest": {
-      "entries": [{ "route": "/articles/second/", "title": "A second article", "date": "2026-11-15" }],
-      "listing": "<ul class=\"view-list\" role=\"list\"><li><article class=\"listing-card\"><h2 class=\"listing-card-title\"><a href=\"/articles/second/\">A second article</a></h2><p class=\"listing-card-date\"><time datetime=\"2026-11-15\">2026-11-15</time></p><p class=\"listing-card-teaser\">Its teaser: the page's description, or its first paragraph.</p></article></li></ul>"
+      "entries": [{ "route": "/articles/second/", "title": "A second article", "date": "2026-11-15", "dateText": "November 15, 2026" }],
+      "listing": "<ul class=\"view-list\" role=\"list\"><li><article class=\"listing-card\"><h2 class=\"listing-card-title\"><a href=\"/articles/second/\">A second article</a></h2><p class=\"listing-card-date\"><time datetime=\"2026-11-15\">November 15, 2026</time></p><p class=\"listing-card-teaser\">Its teaser: the page's description, or its first paragraph.</p></article></li></ul>"
     }
   }
 }

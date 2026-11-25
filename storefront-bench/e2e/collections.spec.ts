@@ -16,7 +16,9 @@ test("the listing shows the folder's pages newest first, each card linking to it
   await page.goto("/articles/");
   await expect(page.locator(".card-title a")).toHaveText(["A harbour of cable cars", "Plain on purpose"]);
   expect(await page.locator(".card-title a").evaluateAll(as => as.map(a => a.getAttribute("href")))).toEqual(["/articles/harbour/", "/articles/plain/"]);
-  await expect(page.locator(".card-date time")).toHaveText(["2026-11-01", "2026-10-02"]);
+  // Each date as text for readers (the bench sets no lang: "en", the long style), the day in datetime.
+  await expect(page.locator(".card-date time")).toHaveText(["November 1, 2026", "October 2, 2026"]);
+  expect(await page.locator(".card-date time").evaluateAll(ts => ts.map(t => t.getAttribute("datetime")))).toEqual(["2026-11-01", "2026-10-02"]);
   await expect(page.locator(".card-teaser").nth(1)).toHaveText("Why the bench's skin is a wireframe.");
   // The harbour card's image, with its variants for an 8rem box.
   await expect(page.locator(".card img")).toHaveCount(1);

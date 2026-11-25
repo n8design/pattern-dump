@@ -1,6 +1,6 @@
 {
   "entries": [
-    { "route": "/articles/harbour/", "title": "A harbour of cable cars", "date": "2026-11-01" },
-    { "route": "/articles/plain/", "title": "Plain on purpose", "date": "2026-10-02" }
+    { "route": "/articles/harbour/", "title": "A harbour of cable cars", "date": "2026-11-01", "dateText": "November 1, 2026" },
+    { "route": "/articles/plain/", "title": "Plain on purpose", "date": "2026-10-02", "dateText": "October 2, 2026" }
   ]
 }

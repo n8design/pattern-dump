@@ -119,12 +119,26 @@
           ],
           "description": "When the page was first committed (the author date, ISO 8601); null when git has no history for it"
         },
+        "createdText": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The day of created, as the site writes it for readers (site.lang, site.dates)"
+        },
         "updated": {
           "type": [
             "string",
             "null"
           ],
           "description": "The page's own updated date (YYYY-MM-DD), set by its author for a real change; null without one"
+        },
+        "updatedText": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "updated, as the site writes it for readers"
         },
         "categories": {
           "type": "array",

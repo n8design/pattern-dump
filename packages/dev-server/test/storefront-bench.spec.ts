@@ -66,12 +66,12 @@ const SKIN: Array<[id: string, title: string, description: string, layout: strin
     ["Good to know", "A callout sets a short note apart"]],
   // The view the layouts' queries show related pages in (page.related), and its card.
   ["views/compact", "Compact", "A list of pages as titles and dates, each a compact card.", "centered",
-    ["A harbour of cable cars", "2026-11-01", "Plain on purpose"]],
+    ["A harbour of cable cars", "November 1, 2026", "Plain on purpose"]],
   // The table of contents (toc.ts), in the doc layout's sidebar region.
   ["components/toc", "Table of contents", "The page's table of contents, in the doc layout's sidebar region.", "centered",
     ["Pages", "Layouts", "Live examples"]],
   ["components/compact-card", "Compact card", "One page in the compact view, its title as a link and its date.", "centered",
-    ["A harbour of cable cars", "2026-11-01"]],
+    ["A harbour of cable cars", "November 1, 2026"]],
 ];
 /** The components pages place with values (pd- tags): the guides page's slider and its slides, the about page's icon
  *  label (the bench's symbol set). */
@@ -108,7 +108,7 @@ describe("storefront bench in the workbench", () => {
     const p = await preview("components/card~article");
     expect(p.status).toBe(200);
     expect(p.text).toContain("A harbour of cable cars");
-    expect(p.text).toContain("2026-11-01");
+    expect(p.text).toContain("November 1, 2026");
   });
 
   it("renders the callout's warning variant from its own data", async () => {

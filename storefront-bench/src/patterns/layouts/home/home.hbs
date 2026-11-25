@@ -8,7 +8,7 @@
     <h2 id="home-latest-title">Latest articles</h2>
     <ul>
       {{#each page.latest.entries}}
-      <li><a href="{{route}}">{{title}}</a>{{#if date}} <time datetime="{{date}}">{{date}}</time>{{/if}}</li>
+      <li><a href="{{route}}">{{title}}</a>{{#if date}} <time datetime="{{date}}">{{dateText}}</time>{{/if}}</li>
       {{/each}}
     </ul>
   </section>
