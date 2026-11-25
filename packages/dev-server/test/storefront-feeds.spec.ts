@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
-import { feedsOf, type SiteFeedSettings } from "../src/storefront/feeds.js";
+import { feedLinksFor, feedsOf, type SiteFeedSettings } from "../src/storefront/feeds.js";
 import { readPages } from "../src/storefront/pages.js";
 import { buildStaticSite } from "../src/static-build.js";
 import { startDevServer } from "../src/index.js";
@@ -260,6 +260,52 @@ describe("pd dev serves them", () => {
       expect(res.status).toBe(500);
       expect(res.body).toBe("site.feeds: its feed is /feed.xml, which is index.md's feed too: give one of them another file name, or turn one off");
       expect((await get(server.port, "/articles/")).status).toBe(200);
+    } finally { await server.close(); }
+  });
+});
+
+describe("which feeds a page links to", () => {
+  it("the site feed on every page; a collection's on its own page and its pages, titled with the site's", async () => {
+    const { feeds: all } = await feeds({}, { format: "both" });
+    const links = (route: string) => feedLinksFor(route, all, SITE, "Bench").map(l => `${l.type} ${l.title} ${l.href}`);
+    const site = ["application/atom+xml Bench https://example.test/feed.xml", "application/rss+xml Bench https://example.test/rss.xml"];
+    expect(links("/guides/setup/")).toEqual(site);
+    const articles = ["application/atom+xml Articles · Bench https://example.test/articles/feed.xml",
+      "application/rss+xml Articles · Bench https://example.test/articles/rss.xml"];
+    expect(links("/articles/")).toEqual([...site, ...articles]);
+    expect(links("/articles/mid/")).toEqual([...site, ...articles]);
+    expect(links("/notes/one/")).toEqual([...site, "application/atom+xml Notes · Bench https://example.test/notes/feed.xml",
+      "application/rss+xml Notes · Bench https://example.test/notes/rss.xml"]);
+    // Without a site title, a collection's feed is titled with its own.
+    expect(feedLinksFor("/articles/", all, SITE, undefined).map(l => l.title)).toEqual(["Bench", "Bench", "Articles", "Articles"]);
+  });
+
+  it("pd dev writes them in the head of a page; the 404 page has none", async () => {
+    const root = await project({
+      "src/patterns/layouts/page/page.hbs": "<header><p>Site</p></header><main><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n",
+      "src/patterns/layouts/page/page.schema.json": json({ properties: { title: { type: "string" }, description: { type: "string" } } }),
+      "src/styles/x.scss": "",
+    });
+    const config = validateConfig(defineConfig({
+      sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist", styles: { strategy: "parallel", dir: "./src/styles" },
+      site: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "https://wb.test/", url: SITE, feeds: { author: { name: "The bench" } } },
+    } as never), "test");
+    const server = await startDevServer(config, root, { port: 0, wsPort: 0, live: false, today: "2026-11-25" });
+    const head = (path: string) => new Promise<string>((resolve, reject) => {
+      request({ host: "127.0.0.1", port: server.port, path, headers: { host: `live.localhost:${server.port}` } }, res => {
+        let body = "";
+        res.setEncoding("utf8").on("data", (c: string) => { body += c; });
+        res.on("end", () => resolve(/<head>[\s\S]*<\/head>/.exec(body)?.[0] ?? ""));
+      }).on("error", reject).end();
+    });
+    try {
+      const alternates = (h: string) => [...h.matchAll(/<link rel="alternate"[^>]*>/g)].map(m => m[0]);
+      expect(alternates(await head("/articles/mid/"))).toEqual([
+        `<link rel="alternate" type="application/atom+xml" title="Home" href="https://example.test/feed.xml">`,
+        `<link rel="alternate" type="application/atom+xml" title="Articles" href="https://example.test/articles/feed.xml">`,
+      ]);
+      expect(alternates(await head("/guides/"))).toEqual([`<link rel="alternate" type="application/atom+xml" title="Home" href="https://example.test/feed.xml">`]);
+      expect(alternates(await head("/no-such-page/"))).toEqual([]);
     } finally { await server.close(); }
   });
 });

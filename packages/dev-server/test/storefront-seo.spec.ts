@@ -34,6 +34,20 @@ describe("seoTags", () => {
     ]);
   });
 
+  it("links each feed the page has, after og:url, its title escaped; none without the site's address", () => {
+    const feeds = [
+      { href: "https://example.test/feed.xml", type: "application/atom+xml", title: "Bench" },
+      { href: "https://example.test/guides/rss.xml", type: "application/rss+xml", title: `Guides & "notes" · Bench` },
+    ];
+    const tags = seoTags({ ...base, feeds });
+    expect(tags.slice(5, 8)).toEqual([
+      `<meta property="og:url" content="https://example.test/guides/setup/">`,
+      `<link rel="alternate" type="application/atom+xml" title="Bench" href="https://example.test/feed.xml">`,
+      `<link rel="alternate" type="application/rss+xml" title="Guides &amp; &quot;notes&quot; · Bench" href="https://example.test/guides/rss.xml">`,
+    ]);
+    expect(seoTags({ ...base, siteUrl: undefined, feeds })).toEqual([]);
+  });
+
   it("gives the home page the site's address itself", () => {
     expect(seoTags({ ...base, route: "/" })[0]).toBe(`<link rel="canonical" href="https://example.test/">`);
   });

@@ -162,8 +162,9 @@ export interface SiteFeedSettings {
   author?: FeedPerson | undefined;
 }
 
-/** A feed the site has: its address (a site path, such as /articles/feed.xml), its format and its document's feed. */
-export interface SiteFeed { address: string; format: FeedFormat; feed: Feed }
+/** A feed the site has: its address (a site path, such as /articles/feed.xml), its format and its document's feed;
+ *  for a collection's, its folder and the routes of its pages, which link to it. */
+export interface SiteFeed { address: string; format: FeedFormat; feed: Feed; collection?: { folder: string; routes: readonly string[] } }
 
 /** The site's own files at its root and the folders it writes, which no feed's address can be. */
 const SITE_FILES = new Set(["/sitemap.xml", "/robots.txt", "/llms.txt", "/404.html"]);
@@ -204,10 +205,10 @@ export async function feedsOf(model: PageModel, s: SiteFeedSettings, o: {
   });
   const newest = (a: Entry, b: Entry) => a.date === b.date ? (a.route < b.route ? -1 : 1) : a.date! < b.date! ? 1 : -1;
   const feeds: SiteFeed[] = [];
-  const add = (feed: Feed, files: Partial<Record<FeedFormat, string>>, dir: string): void => {
+  const add = (feed: Feed, files: Partial<Record<FeedFormat, string>>, dir: string, collection?: SiteFeed["collection"]): void => {
     for (const format of formatsOf(s.format)) {
       problems.push(...checkFeed(feed, format));
-      feeds.push({ address: `${dir}${files[format]!}`, format, feed });
+      feeds.push({ address: `${dir}${files[format]!}`, format, feed, ...(collection ? { collection } : {}) });
     }
   };
   const updatedOf = (entries: readonly FeedEntry[]) => entries.reduce((max, e) => e.updated > max ? e.updated : max, entries[0]!.updated);
@@ -246,7 +247,7 @@ export async function feedsOf(model: PageModel, s: SiteFeedSettings, o: {
     add({
       source: file.path, id: abs(folder), title: page?.title ?? named(folder), subtitle: model.entries.get(folder)?.description ?? null,
       home: abs(folder), updated: updatedOf(entries), author: s.author, language: o.lang, entries,
-    }, filesOf(s.format, settings), folder);
+    }, filesOf(s.format, settings), folder, { folder, routes: listing.children });
   }
 
   if (s.site && all.size) {
@@ -275,4 +276,31 @@ export async function feedsOf(model: PageModel, s: SiteFeedSettings, o: {
     if (clash) problems.push(`${feed.source}: its feed is ${address}, which is ${clash.startsWith("/") ? `the page ${clash}` : clash}: give the feed another file name`);
   }
   return { feeds, problems: [...new Set(problems)], notes };
+}
+
+/** A link to a feed in a page's head: its absolute URL, media type and title. */
+export interface FeedLink { href: string; type: string; title: string }
+
+/**
+ * The feeds a page links to in its head: the site's feed on every page, and a collection's feed on the collection's
+ * own page and on each of its pages. `siteTitle` ends each collection feed's title ("Articles · Bench").
+ */
+export function feedLinksFor(route: string, feeds: readonly SiteFeed[], siteUrl: string, siteTitle: string | undefined): FeedLink[] {
+  const link = (f: SiteFeed): FeedLink => ({ href: new URL(f.address.slice(1), siteUrl).href, type: FEED_TYPES[f.format],
+    title: f.collection && siteTitle ? `${f.feed.title} · ${siteTitle}` : f.feed.title });
+  return [
+    ...feeds.filter(f => !f.collection).map(link),
+    ...feeds.filter(f => f.collection && (f.collection.folder === route || f.collection.routes.includes(route))).map(link),
+  ];
+}
+
+/** feedsOf, once per page model and site address: every page of a render asks for its links. */
+const cached = new WeakMap<PageModel, Map<string, ReturnType<typeof feedsOf>>>();
+export function cachedFeedsOf(...args: Parameters<typeof feedsOf>): ReturnType<typeof feedsOf> {
+  const [model, , o] = args;
+  let bySite = cached.get(model);
+  if (!bySite) { bySite = new Map(); cached.set(model, bySite); }
+  let got = bySite.get(o.siteUrl);
+  if (!got) { got = feedsOf(...args); bySite.set(o.siteUrl, got); }
+  return got;
 }

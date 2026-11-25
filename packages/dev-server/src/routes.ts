@@ -18,7 +18,7 @@ import type { SymbolService } from "./symbol-service.js";
 import { standaloneSvg } from "./symbols.js";
 import { baseTokens } from "./css-tokens.js";
 import { dateFormatter } from "./storefront/date-text.js";
-import { atomXml, FEED_TYPES, feedsOf, rssXml } from "./storefront/feeds.js";
+import { atomXml, cachedFeedsOf, FEED_TYPES, feedLinksFor, rssXml } from "./storefront/feeds.js";
 import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
@@ -830,7 +830,7 @@ async function routeRequest(
         : ctx.live ? `http://${req.headers.host ?? cfg.storefront.host}${cfg.storefront.basePath}` : cfg.storefront.url;
       // The feeds (feeds.ts), like the sitemap: with the site's address, for a site in search engines.
       const feedSettings = siteUrl !== undefined && storefront.index ? storefront.feeds : undefined;
-      const siteFeeds = () => feedsOf(model, feedSettings!, {
+      const siteFeeds = () => cachedFeedsOf(model, feedSettings!, {
         siteUrl: siteUrl!, siteTitle: typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined,
         lang: storefront.lang, dates: ctx.dates, mode: ctx.live ? "dev" : "build",
       });
@@ -911,6 +911,8 @@ async function routeRequest(
           { written: as?.written, beside: as?.beside, pagesDir: storefront.pagesDir }),
         ...(siteUrl !== undefined ? { siteUrl } : {}),
         lang: cfg.storefront.lang, dateFormat: dateFormatter(cfg.storefront.lang, cfg.storefront.dates),
+        ...(feedSettings && target !== PD_ROUTES.notFound ? { feeds: feedLinksFor(target, (await siteFeeds()).feeds, siteUrl!,
+          typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined) } : {}),
         siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
         ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),

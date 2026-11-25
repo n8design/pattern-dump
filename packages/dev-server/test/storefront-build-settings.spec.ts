@@ -65,7 +65,8 @@ describe("pd build — the storefront's settings", () => {
     const report = await buildStaticSite(validateConfig({ ...benchConfig, site: rest }, "test"), root,
       { outDir: join(root, "..", "wb-nosite"), pdVersion: "x", now: NOW });
     const note = `site.url is not set, so pages have no canonical URL, og:url, og:image or JSON-LD, `
-      + `and there is no sitemap: set site.url to the site's address, such as "https://example.com/"`;
+      // The bench has feeds (site.feeds), which need the address too.
+      + `and there is no sitemap and no feed: set site.url to the site's address, such as "https://example.com/"`;
     expect(report.notes.filter(n => n === note)).toHaveLength(1);
     const pages = await tree(join(root, ".out", "site"));
     for (const [file, { bytes }] of pages) {

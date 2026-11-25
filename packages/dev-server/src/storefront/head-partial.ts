@@ -16,7 +16,14 @@ function attr(attrs: string, name: string): string | undefined {
 
 /** What Pattern Dump writes itself: the tag as a problem names it, or undefined when the element is the skin's to add. */
 function writtenByPatternDump(tag: string, attrs: string): string | undefined {
-  if (tag === "link" && (attr(attrs, "rel") ?? "").split(/\s+/).includes("canonical")) return `<link rel="canonical">`;
+  const rels = (attr(attrs, "rel") ?? "").split(/\s+/);
+  if (tag === "link" && rels.includes("canonical")) return `<link rel="canonical">`;
+  // A feed's link (an alternate with a feed's type): Pattern Dump links each feed the page has. Any other alternate,
+  // such as a page in another language (hreflang), is the skin's.
+  const type = attr(attrs, "type");
+  if (tag === "link" && rels.includes("alternate") && (type === "application/atom+xml" || type === "application/rss+xml")) {
+    return `<link rel="alternate" type="${type}">`;
+  }
   if (tag === "meta") {
     const name = attr(attrs, "name"), property = attr(attrs, "property");
     if (name === "description" || name === "robots") return `<meta name="${name}">`;

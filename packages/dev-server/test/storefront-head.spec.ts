@@ -32,6 +32,10 @@ describe("checkHeadMarkup", () => {
     expect(checkHeadMarkup(`<meta name="twitter:card" content="x">`)).toEqual([own(`<meta name="twitter:card">`)]);
     expect(checkHeadMarkup(`<script type="application/ld+json">{}</script>`)).toEqual([own(`<script type="application/ld+json">`)]);
     expect(checkHeadMarkup(`<base href="/x/">`)).toEqual([`partials/head: <base> would change every link on the page; a head partial must not write it`]);
+    // A feed's link: Pattern Dump links each feed the site has. Another alternate (a page in another language) is the skin's.
+    expect(checkHeadMarkup(`<link rel="alternate" type="application/atom+xml" href="/feed.xml">`)).toEqual([own(`<link rel="alternate" type="application/atom+xml">`)]);
+    expect(checkHeadMarkup(`<link type='application/rss+xml' rel="alternate" href="/rss.xml">`)).toEqual([own(`<link rel="alternate" type="application/rss+xml">`)]);
+    expect(checkHeadMarkup(`<link rel="alternate" hreflang="de" href="https://example.test/de/">`)).toEqual([]);
   });
 
   it("names an element or text that doesn't belong in a head", () => {
