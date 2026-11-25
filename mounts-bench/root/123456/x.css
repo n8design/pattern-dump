@@ -1,0 +1,2 @@
+/* A font provider's CSS, at the path its redirect expects. */
+@font-face { font-family: "Bench"; src: local("Arial"); }

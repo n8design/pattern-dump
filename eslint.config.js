@@ -21,6 +21,8 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "test-bench/**",
+      // Stand-ins for another tool's finished files, published as they are (site.mounts): not this repository's code.
+      "mounts-bench/{tool,other,root}/**",
       "**/*.generated.*",
     ],
   },
