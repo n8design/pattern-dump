@@ -16,10 +16,10 @@ import type { PageModel } from "./pages.js";
 
 /** One place in the site's output that Pattern Dump writes. A file's `path` is the file's (/guide/index.html); a
  *  folder's ends with "/" and covers everything under it. A page or a forward also has its `route`, a feed its
- *  `source` (the config or the index.md that asks for it). */
+ *  `source` (the config or the index.md that asks for it), a mounted file (mounts.ts) its folder and path in it. */
 export type Claim =
   | { kind: "page" | "forward"; path: string; route: string }
-  | { kind: "feed"; path: string; source: string }
+  | { kind: "feed" | "mount"; path: string; source: string }
   | { kind: "image" | "file"; path: string }
   | { kind: "folder"; path: string };
 
@@ -63,6 +63,7 @@ export function describeClaim(c: Claim): string {
   switch (c.kind) {
     case "page": case "forward": return `the page ${c.route}`;
     case "feed": return `${c.source}'s feed`;
+    case "mount": return `${c.source}, a mounted file`;
     case "image": return `the image ${c.path}`;
     case "file": return `the site's ${c.path.slice(1)}`;
     case "folder": return `in ${c.path.slice(1, -1)}/, which Pattern Dump writes`;
