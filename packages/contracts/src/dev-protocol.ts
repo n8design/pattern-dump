@@ -862,6 +862,9 @@ export interface StorefrontNavItem {
 export interface StorefrontPagesResponse {
   pages: StorefrontPage[];
   nav: StorefrontNavItem[];
+  /** The site's feeds, by their address (/feed.xml, /articles/feed.xml), when it has any: what pd build crawls for
+   *  them. Absent without site.feeds, site.url, or with index: false. */
+  feeds?: string[];
 }
 
 /** The body of every JSON error response. */

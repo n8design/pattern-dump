@@ -10,7 +10,7 @@
 
 import { basename, join, resolve } from "node:path";
 import type { ImageEncoding } from "@pattern-dump/build";
-import { storefrontBasePath, type PatternDumpConfig, type StorefrontCategory, StorefrontTermPages } from "@pattern-dump/config";
+import { storefrontBasePath, type FeedPath, type PatternDumpConfig, type SiteFeeds, type StorefrontCategory, StorefrontTermPages } from "@pattern-dump/config";
 import { PD_HOSTS, type ThemeSwitch } from "@pattern-dump/contracts";
 import type { PatternRoot } from "@pattern-dump/discovery";
 import type { ResolvedPackage } from "./packages.js";
@@ -122,6 +122,8 @@ export interface ResolvedConfig {
     readonly checks: { readonly classes: "warning" | "error" | "off"; readonly allowClasses: readonly string[]; readonly allowProperties: readonly string[] };
     /** storefront.search as the config writes it (search.ts reads it). */
     readonly search: boolean | undefined;
+    /** storefront.feeds with its defaults; undefined when feeds are off. */
+    readonly feeds: FeedConfig | undefined;
   } | null;
 
   readonly overviewsEnabled: boolean;
@@ -151,6 +153,25 @@ export function shadowedAssetRoots(assetRoots: readonly string[]): { root: strin
     else if (by !== root) shadowed.push({ root, by });
   }
   return shadowed;
+}
+
+/** site.feeds, with its defaults (Atom, 20 pages, every dated collection, the site feed at feed.xml). */
+export interface FeedConfig {
+  readonly format: "atom" | "rss" | "both";
+  readonly limit: number;
+  /** Only these folders' feeds, by path ("articles"); undefined: every folder with sort: date. */
+  readonly collections: readonly string[] | undefined;
+  readonly site: boolean;
+  /** The site feed's file name, or one per format for a feed in both. */
+  readonly path: FeedPath | undefined;
+  readonly author: { readonly name: string; readonly uri?: string } | undefined;
+}
+
+function feedConfig(feeds: boolean | SiteFeeds | undefined): FeedConfig | undefined {
+  if (feeds === undefined || feeds === false) return undefined;
+  const o = feeds === true ? {} : feeds;
+  return { format: o.format ?? "atom", limit: o.limit ?? 20, collections: o.collections, site: o.site !== false,
+    path: o.path, author: o.author };
 }
 
 const DEFAULT_SWATCH_SLOTS = ["--bodyBackground", "--themePrimary", "--accent"];
@@ -271,6 +292,7 @@ export function resolveServerConfig(
       categoryPages: config.storefront.categoryPages,
       search: config.storefront.search,
       llms: config.storefront.index !== false && config.storefront.llms !== false,
+      feeds: feedConfig(config.storefront.feeds),
       checks: {
         classes: config.storefront.checks?.classes ?? "warning",
         allowClasses: config.storefront.checks?.allowClasses ?? [],

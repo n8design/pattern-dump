@@ -18,6 +18,7 @@ import type { SymbolService } from "./symbol-service.js";
 import { standaloneSvg } from "./symbols.js";
 import { baseTokens } from "./css-tokens.js";
 import { dateFormatter } from "./storefront/date-text.js";
+import { atomXml, FEED_TYPES, feedsOf, rssXml } from "./storefront/feeds.js";
 import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
@@ -823,15 +824,39 @@ async function routeRequest(
       const discovery = await currentDiscovery(state, patternRoots);
       const discoveryMap = discovery.discoveryMap;
       const model = await readStorefrontPages(ctx, cfg.storefront, discoveryMap);
-      if (pathname === PD_ROUTES.pages) {
-        if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
-        json(res, 200, { pages: model.pages, nav: model.nav } satisfies StorefrontPagesResponse);
-        return;
-      }
       // With storefront.url set, pages carry absolute URLs: the configured address in a build, and in
       // pd dev the address the browser is on (under the site's path), so every link it shows works there.
       const siteUrl = cfg.storefront.url === undefined ? undefined
         : ctx.live ? `http://${req.headers.host ?? cfg.storefront.host}${cfg.storefront.basePath}` : cfg.storefront.url;
+      // The feeds (feeds.ts), like the sitemap: with the site's address, for a site in search engines.
+      const feedSettings = siteUrl !== undefined && storefront.index ? storefront.feeds : undefined;
+      const siteFeeds = () => feedsOf(model, feedSettings!, {
+        siteUrl: siteUrl!, siteTitle: typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined,
+        lang: storefront.lang, dates: ctx.dates, mode: ctx.live ? "dev" : "build",
+      });
+      if (pathname === PD_ROUTES.pages) {
+        if (model.problems.length) { json(res, 500, { error: model.problems.join("\n") } satisfies ApiError); return; }
+        const feeds = feedSettings ? await siteFeeds() : undefined;
+        // pd build stops on a feed's problem, as on a page's; pd dev shows it at the feed's address.
+        if (feeds && feeds.problems.length && !ctx.live) { json(res, 500, { error: feeds.problems.join("\n") } satisfies ApiError); return; }
+        for (const note of feeds?.notes ?? []) ctx.onStorefrontNote?.(note);
+        json(res, 200, { pages: model.pages, nav: model.nav, ...(feeds ? { feeds: feeds.feeds.map(f => f.address) } : {}) } satisfies StorefrontPagesResponse);
+        return;
+      }
+      if (feedSettings && pathname.endsWith(".xml") && pathname !== PD_ROUTES.sitemap) {
+        const feeds = await siteFeeds();
+        const found = feeds.feeds.find(f => f.address === pathname);
+        if (found) {
+          if (model.problems.length || feeds.problems.length) {
+            res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+            res.end([...model.problems, ...feeds.problems].join("\n"));
+            return;
+          }
+          res.writeHead(200, { "Content-Type": `${FEED_TYPES[found.format]}; charset=utf-8` });
+          res.end((found.format === "atom" ? atomXml : rssXml)(found.feed, new URL(pathname.slice(1), siteUrl).href));
+          return;
+        }
+      }
       // Crawlers read robots.txt only at a host's root, so a site under a path has none (pd build says what to add
       // to the host's own): it is the 404 page there, like any address with no page.
       if (pathname === PD_ROUTES.robots && cfg.storefront.basePath === "/") {
