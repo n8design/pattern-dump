@@ -46,7 +46,7 @@ test("a page without an image gets a card of 1200 x 630, its head names it and t
   expect(card.bytes.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   expect(pngSize(card.bytes)).toEqual({ width: 1200, height: 630 });
   expect(await ogImage(root, "/about/")).toMatch(/^https:\/\/example\.test\/assets\/share\.png\?v=/);
-  expect(report.socialImages).toEqual({ pages: 3, rendered: 3, cached: 0, committed: 0 });
+  expect(report.socialImages).toEqual({ pages: 3, rendered: 3, cached: 0, committed: 0, missing: [], siteImage: true });
   expect((await readdir(cacheOf(root))).sort()).toHaveLength(3);
 });
 
@@ -57,7 +57,7 @@ test("the same input builds the same bytes twice; a second build renders nothing
   const cached = join(cacheOf(root), `${first.hash}.png`);
   const before = (await stat(cached)).mtimeMs;
   const again = await build(root);
-  expect(again.socialImages).toEqual({ pages: 3, rendered: 0, cached: 3, committed: 0 });
+  expect(again.socialImages).toEqual({ pages: 3, rendered: 0, cached: 3, committed: 0, missing: [], siteImage: true });
   expect((await stat(cached)).mtimeMs).toBe(before);
   // From an empty cache, rendered again: the same bytes.
   await rm(cacheOf(root), { recursive: true, force: true });
@@ -75,7 +75,7 @@ test("a committed card at its hash is used, not rendered; a stale one is rendere
   await save(join(root, "social", "guide", "install", `card.${hash}.png`), bytes);
   await save(join(root, "social", "guide", `card.0123456789.png`), bytes);
   const report = await build(root);
-  expect(report.socialImages).toEqual({ pages: 3, rendered: 2, cached: 0, committed: 1 });
+  expect(report.socialImages).toEqual({ pages: 3, rendered: 2, cached: 0, committed: 1, missing: [], siteImage: true });
   expect(existsSync(join(cacheOf(root), `${hash}.png`))).toBe(false);
   const guide = await builtCard(root, "/guide/");
   expect(guide.hash).not.toBe("0123456789");

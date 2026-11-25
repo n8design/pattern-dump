@@ -2,7 +2,7 @@
 // Orchestration: load config, start dev server, run the diagnostics audit.
 import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite, ensureScratchDir, renderSocialImages } from "@pattern-dump/dev-server";
 import { readProjectGraph, graphJson, describeOf, affectedOf } from "@pattern-dump/dev-server";
-import type { DevServerOptions, AuditFormat } from "@pattern-dump/dev-server";
+import type { DevServerOptions, AuditFormat, StaticBuildReport } from "@pattern-dump/dev-server";
 import { PD_HOSTS, PD_ROUTES, type DiagnosticsGraph, type StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { request as httpRequest } from "node:http";
 import { build as esbuild } from "esbuild";
@@ -124,64 +124,87 @@ export async function runBuild(
     pdVersion: options.pdVersion,
     log: line => console.log(`[pd build] ${line}`),
   });
+  for (const line of buildReportLines(report, config.storefront?.workbenchUrl)) console.log(line);
+}
+
+/** What `pd build` prints when it's done, one line each, in order: `workbenchUrl` is site.workbenchUrl as the config
+ *  has it. The last lines are the ones written to be seen: NO SOCIAL IMAGE, then NOT CHECKED. */
+export function buildReportLines(report: StaticBuildReport, workbenchUrl: string | undefined): string[] {
+  const lines: string[] = [];
   const mb = (report.bytes / 1024 / 1024).toFixed(1);
   if (report.workbench === false) {
-    console.log(`[pd build] workbench: not built (build.workbench: false); the pages link to it at ${config.storefront?.workbenchUrl ?? "site.workbenchUrl"}`);
+    lines.push(`[pd build] workbench: not built (build.workbench: false); the pages link to it at ${workbenchUrl ?? "site.workbenchUrl"}`);
   } else {
-    console.log(`[pd build] ${report.components} components → ${report.files} files, ${mb} MB in ${report.ms} ms`);
-    console.log(`[pd build] ${report.outDir}  (served from ${report.basePath})`);
+    lines.push(`[pd build] ${report.components} components → ${report.files} files, ${mb} MB in ${report.ms} ms`);
+    lines.push(`[pd build] ${report.outDir}  (served from ${report.basePath})`);
   }
   if (report.borrowedStyles) {
     const n = report.borrowedStyles;
-    console.log(`[pd build] styles: ${n} stylesheet${n === 1 ? "" : "s"} linked by a borrowed class (STYLE_BORROWED on the component's Diagnostics tab)`);
+    lines.push(`[pd build] styles: ${n} stylesheet${n === 1 ? "" : "s"} linked by a borrowed class (STYLE_BORROWED on the component's Diagnostics tab)`);
   }
   if (report.storefront) {
-    console.log(`[pd build] site: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from ${report.storefront.basePath})`);
+    lines.push(`[pd build] site: ${report.storefront.pages} pages → ${report.storefront.files} files in ${report.storefront.outDir}  (served from ${report.storefront.basePath})`);
   }
   if (report.links) {
-    console.log(`[pd build] links: ${report.links.references} references on ${report.links.pages} pages, none broken`
+    lines.push(`[pd build] links: ${report.links.references} references on ${report.links.pages} pages, none broken`
       + (report.links.external ? `; ${report.links.external} external, not checked (notes)` : ""));
   }
   if (report.accessibility) {
     const n = report.accessibility.warnings.length;
-    console.log(`[pd build] accessibility: ${report.accessibility.pages} pages${report.accessibility.browser ? ", in jsdom and Chromium" : ""}, no errors`
+    lines.push(`[pd build] accessibility: ${report.accessibility.pages} pages${report.accessibility.browser ? ", in jsdom and Chromium" : ""}, no errors`
       + (n ? `; ${n} rule${n === 1 ? "" : "s"} with warnings:` : ""));
-    for (const w of report.accessibility.warnings) console.log(`[pd build]   warning: ${w}`);
+    for (const w of report.accessibility.warnings) lines.push(`[pd build]   warning: ${w}`);
   }
   if (report.images) {
     const n = report.images.warnings.length;
-    console.log(`[pd build] images: ${n ? `${n} with a variant that doesn't fit:` : "every variant fits its box"}`);
-    for (const w of report.images.warnings) console.log(`[pd build]   warning: ${w}`);
+    lines.push(`[pd build] images: ${n ? `${n} with a variant that doesn't fit:` : "every variant fits its box"}`);
+    for (const w of report.images.warnings) lines.push(`[pd build]   warning: ${w}`);
+  }
+  const social = report.socialImages;
+  if (social) {
+    const from = [[social.rendered, "rendered"], [social.cached, "from the cache"], [social.committed, "committed"]]
+      .filter(([k]) => k).map(([k, what]) => `${k} ${what}`);
+    if (social.missing.length) from.push(`${social.missing.length} without one:`);
+    lines.push(`[pd build] social images: ${social.pages} page${social.pages === 1 ? "" : "s"}${from.length ? ` (${from.join(", ")})` : ""}`);
+    for (const w of social.missing) lines.push(`[pd build]   warning: ${w}`);
   }
   if (report.classes) {
     const n = report.classes.warnings.length;
-    console.log(`[pd build] classes: ${n ? `${n} outside the design system:` : "every class on the site's pages is the style guide's"}`);
-    for (const w of report.classes.warnings) console.log(`[pd build]   warning: ${w}`);
+    lines.push(`[pd build] classes: ${n ? `${n} outside the design system:` : "every class on the site's pages is the style guide's"}`);
+    for (const w of report.classes.warnings) lines.push(`[pd build]   warning: ${w}`);
   }
-  if (report.llms) console.log(`[pd build] llms.txt: ${report.llms.pages} page${report.llms.pages === 1 ? "" : "s"}`);
+  if (report.llms) lines.push(`[pd build] llms.txt: ${report.llms.pages} page${report.llms.pages === 1 ? "" : "s"}`);
   if (report.search) {
-    console.log(`[pd build] search: ${report.search.pages} pages indexed → ${report.search.files} files in _pd/search/ (${(report.search.bytes / 1024).toFixed(0)} KB)`);
+    lines.push(`[pd build] search: ${report.search.pages} pages indexed → ${report.search.files} files in _pd/search/ (${(report.search.bytes / 1024).toFixed(0)} KB)`);
   }
   if (report.drafts) {
-    console.log(`[pd build] drafts: ${report.drafts.length} left out (${report.drafts.join(", ")})`);
+    lines.push(`[pd build] drafts: ${report.drafts.length} left out (${report.drafts.join(", ")})`);
     // A folder's draft default hides every page under it: said per folder, so a forgotten line can't do it silently.
     for (const d of report.draftsByDefaults ?? []) {
-      console.log(`[pd build]   ${d.pages} page${d.pages === 1 ? " is a draft" : "s are drafts"} via the childDefaults of ${d.from}`);
+      lines.push(`[pd build]   ${d.pages} page${d.pages === 1 ? " is a draft" : "s are drafts"} via the childDefaults of ${d.from}`);
     }
   }
   if (report.scheduled) {
-    console.log(`[pd build] scheduled: ${report.scheduled.length} held back (${report.scheduled.map(s => `${s.path} until ${s.until}`).join(", ")})`);
+    lines.push(`[pd build] scheduled: ${report.scheduled.length} held back (${report.scheduled.map(s => `${s.path} until ${s.until}`).join(", ")})`);
   }
-  for (const w of report.warnings) console.log(`[pd build]   not built: ${w}`);
-  for (const n of report.notes) console.log(`[pd build]   note: ${n}`);
+  for (const w of report.warnings) lines.push(`[pd build]   not built: ${w}`);
+  for (const n of report.notes) lines.push(`[pd build]   note: ${n}`);
+  // Next to last, written to be seen: the pages that went out with the site's image, or none, for want of a card.
+  if (social?.missing.length) {
+    const n = social.missing.length;
+    const pages = `${n} page${n === 1 ? "" : "s"}`;
+    lines.push(`[pd build] NO SOCIAL IMAGE: ${pages} ${social.siteImage ? `use${n === 1 ? "s" : ""} the site image instead` : `ha${n === 1 ? "s" : "ve"} no link-preview image`}`
+      + ` (run pd social, or install Playwright)`);
+  }
   // Last, so it is the line a reader sees: what this build did not check.
   if (report.skippedChecks) {
     const what: Record<string, string> = {
       a11y: "the accessibility of the site's pages (a11y)",
       html: "the components' markup against HTML's content model (html)",
     };
-    console.log(`[pd build] NOT CHECKED: ${report.skippedChecks.map(c => what[c] ?? c).join(", ")}, as asked (--skip-checks or build.skipChecks)`);
+    lines.push(`[pd build] NOT CHECKED: ${report.skippedChecks.map(c => what[c] ?? c).join(", ")}, as asked (--skip-checks or build.skipChecks)`);
   }
+  return lines;
 }
 
 /**
