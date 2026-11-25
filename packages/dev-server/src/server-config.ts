@@ -14,6 +14,7 @@ import { storefrontBasePath, type PatternDumpConfig, type StorefrontCategory, St
 import { PD_HOSTS, type ThemeSwitch } from "@pattern-dump/contracts";
 import type { PatternRoot } from "@pattern-dump/discovery";
 import type { ResolvedPackage } from "./packages.js";
+import { DEFAULT_DATES } from "./storefront/date-text.js";
 
 /** One SCSS tree to attribute and bucket: the project's `styles.dir`, or a package's. */
 export interface StyleRoot {
@@ -98,6 +99,8 @@ export interface ResolvedConfig {
     readonly basePath: string;
     /** storefront.lang, for <html lang>: "en" unless set. */
     readonly lang: string;
+    /** storefront.dates: how dates are written for readers, in the style of `lang`; { dateStyle: "long" } unless set. */
+    readonly dates: Intl.DateTimeFormatOptions;
     /** How the site's image variants are encoded: the project's `images`, with `storefront.images` over it. */
     readonly images: ImageEncoding;
     /** storefront.index: false keeps the whole site out of search engines. */
@@ -257,6 +260,7 @@ export function resolveServerConfig(
       url: config.storefront.url,
       basePath: storefrontBasePath(config.storefront),
       lang: config.storefront.lang ?? "en",
+      dates: config.storefront.dates ?? DEFAULT_DATES,
       index: config.storefront.index !== false,
       images: { ...images, ...config.storefront.images },
       head: config.storefront.head !== undefined ? resolve(cwd, config.storefront.head) : undefined,

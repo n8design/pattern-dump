@@ -4,14 +4,14 @@
 // undefined" from whichever reader touches the key first.
 
 import { relative, resolve, sep } from "node:path";
-import { SKIPPABLE_CHECKS, type PatternDumpConfig, type PatternDumpConfigInput } from "./index.js";
+import { DATE_OPTIONS, SKIPPABLE_CHECKS, type PatternDumpConfig, type PatternDumpConfigInput } from "./index.js";
 
 type Rule =
   | "string" | "strings" | "string-or-strings" | "boolean"
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
   | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "inset" | "plain-object" | "hbs-file"
-  | "quality" | "effort" | "categories" | "tags" | "term-pages" | "skip-checks" | "component-id";
+  | "quality" | "effort" | "date-format" | "categories" | "tags" | "term-pages" | "skip-checks" | "component-id";
 type Shape = Readonly<Record<string, Rule>>;
 
 /** How responsive image variants are encoded: for the project, and overridden per site. */
@@ -66,7 +66,7 @@ const SHAPE: Shape = {
   site: {
     keys: {
       pagesDir: "string", outDir: "string", host: "host", workbenchUrl: "workbench-url", globals: "plain-object",
-      url: "site-url", lang: "lang", index: "boolean", image: "asset-path", images: IMAGES, head: "hbs-file",
+      url: "site-url", lang: "lang", dates: "date-format", index: "boolean", image: "asset-path", images: IMAGES, head: "hbs-file",
       categories: "categories", tags: "tags", tagPages: "term-pages", categoryPages: "term-pages", search: "boolean",
       llms: "boolean", socialImages: { keys: { component: "component-id" }, required: ["component"] },
       checks: { keys: { classes: { values: ["warning", "error", "off"] }, allowClasses: "strings", allowProperties: "strings" } },
@@ -203,6 +203,29 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     }
     return;
   }
+  if (rule === "date-format") {
+    // Options of Intl.DateTimeFormat for a day. A time or a time zone is refused by name (a page's date is a day,
+    // written as the day it is), and so is dateStyle with a part; Intl itself refuses a value it doesn't take.
+    if (!isObject(value)) { fail(`an object of Intl.DateTimeFormat options for a day, such as { dateStyle: "long" }`); return; }
+    const before = problems.length;
+    const timeKeys = Object.keys(value).filter(k => TIME_OPTIONS.includes(k));
+    for (const k of timeKeys) {
+      problems.push(`"${at}.${k}": a page's date is a day, so site.dates takes no ${k === "timeZone" ? "time zone (the day is written as it is, wherever the site is built)" : "time"}: leave it out`);
+    }
+    for (const k of Object.keys(value).filter(k => !timeKeys.includes(k) && !(DATE_OPTIONS as readonly string[]).includes(k))) {
+      const near = suggest(k, [...DATE_OPTIONS]);
+      problems.push(`unknown key "${at}.${k}": site.dates takes ${DATE_OPTIONS.join(", ")}${near ? `: did you mean "${at}.${near}"?` : ""}`);
+    }
+    const parts = ["weekday", "era", "year", "month", "day"].filter(k => Object.hasOwn(value, k));
+    if (value.dateStyle !== undefined && parts.length) {
+      problems.push(`"${at}": dateStyle is a whole style, so it can't be set with ${parts.join(", ")}: use dateStyle alone, or the parts alone, such as { day: "numeric", month: "long", year: "numeric" }`);
+    }
+    if (problems.length > before) return;
+    try { new Intl.DateTimeFormat(undefined, value as Intl.DateTimeFormatOptions); } catch (e) {
+      problems.push(`"${at}": ${e instanceof Error ? e.message : String(e)}`);
+    }
+    return;
+  }
   if (rule === "hbs-file") {
     // A template file of the project's, relative to its root; that it exists is checked when a page is built.
     if (typeof value !== "string" || !/\.hbs$/.test(value) || /^(?:\/|[a-zA-Z]:)/.test(value)) {
@@ -278,6 +301,10 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
   if (!isObject(value)) { fail("an object"); return; }
   checkObject(value, rule.keys, rule.required ?? [], `${at}.`, problems);
 }
+
+/** Options of Intl.DateTimeFormat that write a time or pick a time zone: site.dates refuses them by name. */
+const TIME_OPTIONS: readonly string[] = ["timeZone", "timeStyle", "hour", "minute", "second", "dayPeriod",
+  "fractionalSecondDigits", "hour12", "hourCycle", "timeZoneName"];
 
 /** A category's or tag's key, and each old key of one: a URL segment (each gets a page of its own). */
 const SEGMENT = /^[a-z0-9-]+$/;
