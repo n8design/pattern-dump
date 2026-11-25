@@ -35,6 +35,10 @@
 - **A feed entry's id stays the same when its page moves.** It is the page's first `redirectFrom`, so list the
   original first.
 - **`llms.txt` lists the site's feeds.**
+- **A site can publish another tool's finished files at a route.** `site.mounts` copies each folder into the site
+  byte for byte, so no workflow copies them in. See [Mounts](docs/guide/storefront.md#mounts).
+- **A mounted file in the place of one the site writes stops the build.** The message names both files, and nothing is
+  written. A missing folder or a link out of the folder stops it too.
 
 ## 0.9.0 (2026-11-23)
 

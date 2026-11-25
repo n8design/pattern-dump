@@ -1698,10 +1698,76 @@ site/
   feed.xml  articles/feed.xml                       the feeds, with site.feeds
   preview/components/callout/index.html            the previews the pages show
   _pd/  assets/                                    what pages and previews reference
+  htwoo-core/                                      a mount, with site.mounts
   .nojekyll
 ```
 
 `site.workbenchUrl` is required to build, since built pages link to the workbench at its own address.
+
+### Mounts
+
+A site can publish folders of finished files that another tool built, each at a route of its own. `pd build` then
+writes the whole deployment, and no workflow needs a step that copies them in. htwoo.io, for example, publishes its
+Pattern Lab build at `/htwoo-core/` and its Storybook build at `/htwoo-react/` beside its pages, and needs a favicon,
+a web manifest and a font provider's stylesheet at its root:
+
+```ts
+export default defineConfig({
+  site: {
+    mounts: [
+      { from: "../docs/htwoo-core", to: "/htwoo-core/" },
+      { from: "../docs/htwoo-react", to: "/htwoo-react/" },
+      { from: "./root", to: "/" },
+    ],
+  },
+});
+```
+
+`from` is a folder, relative to the project's root like every path in the config; it may be outside the project.
+`to` is the route it is published at, starting and ending with `/`; `/` puts the folder's files at the site's root.
+Under a path ([Publishing under a path](#publishing-under-a-path)) a mount lands under it, as the pages do:
+`/htwoo-core/` is served at `/htwoo/htwoo-core/`. `pd build` prints one line with the files and size of each mount.
+
+Four rules hold for every mount:
+
+Byte for byte
+: Each file is copied as it is: no link or path in it is rewritten, it gets no hash in its name, and no check reads
+  it. What the other tool built is its own, base path included: a page of it that links `/style.css` needs that file
+  at the host's root.
+
+Collisions stop the build
+: A mounted file can't take the place of a file the site writes: a page, an old route a page forwards from
+  (`redirectFrom`), a feed, `sitemap.xml`, `robots.txt`, `llms.txt`, `404.html`, or anything under `/_pd/`,
+  `/assets/` or `/preview/`. Nor can it take another mount's file. The build stops and names both files, and nothing
+  is written. A file also collides where a folder of the same name is: a mounted `about` against the page `/about/`.
+
+A missing folder stops the build
+: Pattern Dump never builds the other tool. A mounted folder is usually build output that isn't checked in, so the
+  other tool's build runs first, ordered by the task runner, such as a script that runs both or an Nx target with
+  `dependsOn`. A folder that isn't there stops the build rather than publish a site with a hole in it.
+
+Links are published as files
+: A symbolic link inside a mount is published as the file or folder it points to, when that is inside the mount. A
+  link that points outside the mount, or nowhere, stops the build. Nothing in the output is a link, since some static
+  hosts refuse them.
+
+With `sitemap: true`, every `.html` file of a mount is in the site's sitemap, after the site's own pages, an
+`index.html` by its folder's URL. Left out, none is: another tool's sitemap stays its own. A page of the site can
+link to a mounted file like any other, and the link check counts it as written.
+
+The messages, with `<file>` the mounted file as the config names its folder and `<path>` where it would be published:
+
+A file in the place of one the site writes
+: `site.mounts: <file> would be published at <path>, which is the page /about/: remove the file from the mount, or publish the mount at another route`
+
+Two mounts publish one file
+: `site.mounts: <file> would be published at <path>, which clashes with <other file>, published at <path>: remove the file from the mount, or publish the mount at another route`
+
+A missing folder
+: `site.mounts: ../docs/htwoo-core, published at /htwoo-core/, doesn't exist: build it before the site (the other tool's build runs first), or remove the mount`
+
+A link out of the mount
+: `site.mounts: <file> is a link to <target>, outside <folder>: a mount publishes files, and a link is published as the file it points to, inside the mount; copy the file in, or remove the link`
 
 ### Publishing under a path
 
