@@ -328,6 +328,25 @@ export interface StorefrontConfig {
    * with `feed: false`, or sets its `limit` and `path` under `feed:`.
    */
   feeds?: boolean | SiteFeeds;
+  /**
+   * Folders of another tool's finished files (a Pattern Lab or Storybook build, favicons, a font provider's CSS),
+   * each published at a route of the site, unchanged: `pd build` copies them byte for byte into the site's output,
+   * after its own files, and checks none of them, and `pd dev` serves them from disk. A mounted file that would take
+   * the place of a file the site writes, or of another mount's, stops the build. So does a missing folder, which pd
+   * build never makes: the other tool's build runs first.
+   */
+  mounts?: SiteMount[];
+}
+
+/** A folder published at a route of the site (site.mounts). */
+export interface SiteMount {
+  /** The folder, relative to the project's root like every path in the config, such as "../docs/htwoo-core". */
+  from: string;
+  /** The route it is published at, before the site's path: starts and ends with "/", such as "/htwoo-core/"; "/"
+   *  publishes the folder's files at the site's root. */
+  to: string;
+  /** `true`: every .html file of the folder is in the sitemap, an index.html by its folder's URL. Default: false. */
+  sitemap?: boolean;
 }
 
 /** A feed's file name: one for a feed in one format, one per format for a feed in both (default feed.xml, and

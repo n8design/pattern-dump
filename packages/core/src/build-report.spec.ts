@@ -41,3 +41,17 @@ describe("pd build's report: social images", () => {
     expect(site.at(-1)).toBe("[pd build] NO SOCIAL IMAGE: 1 page uses the site image instead (run pd social, or install Playwright)");
   });
 });
+
+describe("pd build's report: mounts", () => {
+  it("one line: the files and size of all mounts, then each mount's, in the config's order", () => {
+    const lines = buildReportLines({ ...base, mounts: [
+      { to: "/htwoo-core/", files: 550, bytes: 17.4 * 1024 * 1024 }, { to: "/", files: 1, bytes: 3 * 1024 },
+    ] }, undefined);
+    expect(lines.filter(l => l.includes("mounts"))).toEqual([
+      "[pd build] mounts: 551 files (17.4 MB), copied as they are: /htwoo-core/ 550 files (17.4 MB), / 1 file (3 KB)"]);
+  });
+
+  it("no line without mounts", () => {
+    expect(buildReportLines(base, undefined).some(l => l.includes("mounts"))).toBe(false);
+  });
+});

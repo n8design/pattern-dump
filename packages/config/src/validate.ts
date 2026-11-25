@@ -11,7 +11,7 @@ type Rule =
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
   | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "inset" | "plain-object" | "hbs-file"
-  | "quality" | "effort" | "date-format" | "count" | "feed-path" | "feeds" | "categories" | "tags" | "term-pages" | "skip-checks" | "component-id";
+  | "quality" | "effort" | "date-format" | "count" | "feed-path" | "feeds" | "categories" | "tags" | "term-pages" | "skip-checks" | "component-id" | "mounts";
 type Shape = Readonly<Record<string, Rule>>;
 
 /** How responsive image variants are encoded: for the project, and overridden per site. */
@@ -70,7 +70,7 @@ const SHAPE: Shape = {
       categories: "categories", tags: "tags", tagPages: "term-pages", categoryPages: "term-pages", search: "boolean",
       llms: "boolean", socialImages: { keys: { component: "component-id" }, required: ["component"] },
       checks: { keys: { classes: { values: ["warning", "error", "off"] }, allowClasses: "strings", allowProperties: "strings" } },
-      feeds: "feeds",
+      feeds: "feeds", mounts: "mounts",
     },
     required: ["pagesDir", "outDir"],
   },
@@ -237,6 +237,21 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     if (typeof value !== "number" || !Number.isInteger(value) || value < 1) fail("a whole number of 1 or more, such as 20");
     return;
   }
+  if (rule === "mounts") {
+    if (!Array.isArray(value)) { fail(`a list of { from, to }, such as [{ from: "../docs/tool", to: "/tool/" }]`); return; }
+    value.forEach((m, i) => {
+      const here = `${at}[${i}]`;
+      if (!isObject(m)) { problems.push(`"${here}" must be { from, to }, such as { from: "../docs/tool", to: "/tool/" }`); return; }
+      checkObject(m, MOUNT, ["from", "to"], `${here}.`, problems);
+      if (typeof m.from === "string" && (m.from.trim() === "" || /^(?:\/|[a-zA-Z]:|~)/.test(m.from))) {
+        problems.push(`"${here}.from" must be a folder relative to the project's root, such as "../docs/tool"`);
+      }
+      if (typeof m.to === "string" && !MOUNT_ROUTE.test(m.to)) {
+        problems.push(`"${here}.to" must be a route that starts and ends with "/", such as "/tool/", or "/" for the site's root`);
+      }
+    });
+    return;
+  }
   if (rule === "feed-path") {
     const file = (v: unknown) => typeof v === "string" && FEED_FILE.test(v);
     const ok = file(value) || (isObject(value) && Object.keys(value).every(k => k === "atom" || k === "rss") && file(value.atom) && file(value.rss));
@@ -325,6 +340,11 @@ const TIME_OPTIONS: readonly string[] = ["timeZone", "timeStyle", "hour", "minut
 
 /** A feed's file name: one path segment, ending in .xml, not hidden. */
 const FEED_FILE = /^[A-Za-z0-9_-][A-Za-z0-9._-]*\.xml$/;
+/** One of site.mounts. */
+const MOUNT: Shape = { from: "string", to: "string", sitemap: "boolean" };
+/** A mount's route: "/", or plain segments, each followed by "/", none of them "." or "..". */
+const MOUNT_ROUTE = /^\/(?:(?!\.{1,2}\/)[A-Za-z0-9._~-]+\/)*$/;
+
 /** site.feeds as an object. */
 const FEEDS: Shape = {
   format: { values: ["atom", "rss", "both"] }, content: { values: ["summary"], unsupported: ["full"] }, limit: "count",
@@ -399,6 +419,17 @@ function checkRelations(raw: Record<string, unknown>, problems: string[]): void 
     problems.push(`"site.globals.workbenchUrl": templates get site.workbenchUrl from Pattern Dump (site.workbenchUrl, or pd dev's own workbench): remove this global and use site.workbenchUrl`);
   }
   checkFeeds(sf.feeds, problems);
+  // Two mounts at one route: their files are checked against each other when the site is built, but one route is
+  // one folder.
+  if (Array.isArray(sf.mounts)) {
+    const at = new Map<string, number>();
+    sf.mounts.forEach((m, i) => {
+      if (!isObject(m) || typeof m.to !== "string") return;
+      const first = at.get(m.to);
+      if (first === undefined) at.set(m.to, i);
+      else problems.push(`"site.mounts[${i}].to": "${m.to}" is site.mounts[${first}]'s route too: publish each folder at a route of its own`);
+    });
+  }
   // Tag pages and category pages each under a path of their own (when both are on).
   const pathOf = (v: unknown, fallback: string): string | undefined =>
     v === false ? undefined : isObject(v) && typeof v.path === "string" ? v.path : fallback;

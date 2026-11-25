@@ -124,6 +124,9 @@ export interface ResolvedConfig {
     readonly search: boolean | undefined;
     /** storefront.feeds with its defaults; undefined when feeds are off. */
     readonly feeds: FeedConfig | undefined;
+    /** storefront.mounts (mounts.ts): each folder resolved against the root, as the config names it, its route, and
+     *  whether its pages are in the sitemap. Empty without mounts. */
+    readonly mounts: readonly SiteMountConfig[];
   } | null;
 
   readonly overviewsEnabled: boolean;
@@ -154,6 +157,9 @@ export function shadowedAssetRoots(assetRoots: readonly string[]): { root: strin
   }
   return shadowed;
 }
+
+/** One of site.mounts, resolved: `from` against the root, `name` as the config writes it (for messages). */
+export interface SiteMountConfig { readonly name: string; readonly from: string; readonly to: string; readonly sitemap: boolean }
 
 /** site.feeds, with its defaults (Atom, 20 pages, every dated collection, the site feed at feed.xml). */
 export interface FeedConfig {
@@ -293,6 +299,7 @@ export function resolveServerConfig(
       search: config.storefront.search,
       llms: config.storefront.index !== false && config.storefront.llms !== false,
       feeds: feedConfig(config.storefront.feeds),
+      mounts: (config.storefront.mounts ?? []).map(m => ({ name: m.from, from: resolve(cwd, m.from), to: m.to, sitemap: m.sitemap === true })),
       checks: {
         classes: config.storefront.checks?.classes ?? "warning",
         allowClasses: config.storefront.checks?.allowClasses ?? [],

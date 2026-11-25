@@ -66,8 +66,9 @@ export interface StorefrontCrawl {
 
 /** `files`: the root files to write besides the pages and what they reference (robots.txt, sitemap.xml). `get`
  *  asks for site paths; `basePath`: the path the site is published under, which every reference it finds carries.
- *  URLs and documents are by site path. */
-export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>, files: readonly string[] = [], basePath = "/"): Promise<StorefrontCrawl> {
+ *  `mounted`: the site paths of the mounts' files, which are never asked for. URLs and documents are by site path. */
+export async function crawlStorefront(get: (liveUrl: string) => Promise<Response>, files: readonly string[] = [], basePath = "/",
+  mounted: ReadonlySet<string> = new Set()): Promise<StorefrontCrawl> {
   const problems: string[] = [];
   const siteProblems = new Set<string>();
   const list = await get(PD_ROUTES.pages);
@@ -84,7 +85,9 @@ export async function crawlStorefront(get: (liveUrl: string) => Promise<Response
   const stylesheets = new Map<string, string>();
   const seen = new Set<string>();
   const queue: string[] = [];
-  const add = (url: string): void => { if (!seen.has(url)) { seen.add(url); queue.push(url); } };
+  // A mounted file (mounts.ts) is copied as it is, never asked for: a page may reference one like any file.
+  const isMounted = (url: string): boolean => mounted.size > 0 && mounted.has(decodeURIComponentSafe(url.split(/[?#]/)[0]!));
+  const add = (url: string): void => { if (!seen.has(url) && !isMounted(url)) { seen.add(url); queue.push(url); } };
   for (const p of pages) add(p.route);
   // Each old route a page lists: the page that forwards from it.
   for (const p of pages) for (const old of p.redirectFrom ?? []) add(old);

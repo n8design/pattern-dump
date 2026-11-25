@@ -124,6 +124,9 @@ export function checkLinks(site: LinkSite): LinkCheck {
   const builtAs = (path: string): string | undefined => {
     if (site.built.has(path)) return path;
     if (!path.endsWith("/") && site.built.has(`${path}/`)) return `${path}/`;
+    // A folder of a mount's files: a static host serves its index.html.
+    if (path.endsWith("/") && site.built.has(`${path}index.html`)) return `${path}index.html`;
+    if (!path.endsWith("/") && site.built.has(`${path}/index.html`)) return `${path}/index.html`;
     if (path.endsWith("/index.html")) {
       const folder = path.slice(0, -"index.html".length);
       if (site.built.has(folder)) return folder;

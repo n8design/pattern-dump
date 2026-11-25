@@ -77,6 +77,8 @@ import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { isPageImageUrl, pageImageFile } from "./storefront/page-images.js";
 import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
+import { mountProblems, readMounts, sitemapRoutes } from "./storefront/mounts.js";
+import { claimsOf } from "./storefront/site-output.js";
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import type { SearchRecord } from "./storefront/search.js";
@@ -839,6 +841,13 @@ async function routeRequest(
         const feeds = feedSettings ? await siteFeeds() : undefined;
         // pd build stops on a feed's problem, as on a page's; pd dev shows it at the feed's address.
         if (feeds && feeds.problems.length && !ctx.live) { json(res, 500, { error: feeds.problems.join("\n") } satisfies ApiError); return; }
+        // pd build stops on a mount's problem too: a missing folder, a link out of it, a file in another's place
+        // (mounts.ts), checked against every file the site writes (site-output.ts).
+        if (!ctx.live && storefront.mounts.length) {
+          const claims = claimsOf(model, (feeds?.feeds ?? []).map(f => ({ address: f.address, source: f.feed.source })));
+          const mounted = await mountProblems(storefront.mounts, cfg.cwd, claims);
+          if (mounted.problems.length) { json(res, 500, { error: mounted.problems.join("\n") } satisfies ApiError); return; }
+        }
         for (const note of feeds?.notes ?? []) ctx.onStorefrontNote?.(note);
         json(res, 200, { pages: model.pages, nav: model.nav, ...(feeds ? { feeds: feeds.feeds.map(f => ({ address: f.address, title: f.feed.title, format: f.format, collection: f.collection?.folder ?? null })) } : {}) } satisfies StorefrontPagesResponse);
         return;
@@ -868,7 +877,10 @@ async function routeRequest(
       if (pathname === PD_ROUTES.sitemap && siteUrl !== undefined && cfg.storefront.index) {
         if (model.problems.length) { res.writeHead(500, { "Content-Type": "text/plain" }); res.end(model.problems.join("\n")); return; }
         res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
-        res.end(sitemapXml(sitemapEntries(model, siteUrl)));
+        // With sitemap: true, a mount's pages after the site's own (mounts.ts), without a date: the other tool's files say none.
+        const mounted = storefront.mounts.some(m => m.sitemap) ? sitemapRoutes((await readMounts(storefront.mounts, cfg.cwd)).files) : [];
+        res.end(sitemapXml([...sitemapEntries(model, siteUrl),
+          ...mounted.sort().map(route => ({ url: new URL(route.slice(1), siteUrl).href, lastmod: null }))]));
         return;
       }
       // An image beside the pages (page-images.ts): the file, at its path in the pages folder. A route has no extension,
