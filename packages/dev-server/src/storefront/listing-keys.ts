@@ -177,6 +177,60 @@ export function readView(v: FrontmatterValue, path: string): Read<string> {
 }
 
 /** `path`: the page's path in the pages folder; only a folder's index.md (the root's included) sorts. */
+/** A folder's own feed settings (`feed:` on its index.md): off, or its limit and its file name. `path` names a
+ *  feed in one format; `atom` and `rss` each format's file, for a feed in both. */
+export interface FeedSettings { limit?: number; path?: string; atom?: string; rss?: string }
+
+const FEED_FILE = /^[A-Za-z0-9_-][A-Za-z0-9._-]*\.xml$/;
+const FEED_KEYS = ["limit", "path", "atom", "rss", "content"] as const;
+
+/**
+ * `feed` on a folder's index.md: `feed: false` turns the folder's feed off, `feed: true` leaves it on; keys indented
+ * under `feed:` set its `limit`, its file name (`path`, or `atom` and `rss` for a feed in both formats), and its
+ * `content`. Which format the site writes is checked where the feeds are made.
+ */
+export function readFeed(v: FrontmatterValue | undefined, map: Readonly<Record<string, FrontmatterValue>> | undefined, path: string): Read<false | FeedSettings> {
+  if (!isFolderIndex(path)) {
+    return { ok: false, message: `feed sets a folder's feed, so it belongs on the folder's index.md, not on a page` };
+  }
+  if (map === undefined) {
+    if (v === "false") return { ok: true, value: false };
+    if (v === "true") return { ok: true, value: {} };
+    return { ok: false, message: `feed must be true or false, or have its settings indented under it (limit, path)` };
+  }
+  const out: FeedSettings = {};
+  for (const [key, value] of Object.entries(map)) {
+    if (!(FEED_KEYS as readonly string[]).includes(key)) {
+      const near = suggest(key, [...FEED_KEYS]);
+      return { ok: false, message: `feed.${key} is not a feed setting: it takes ${FEED_KEYS.filter(k => k !== "content").join(", ")}${near ? `: did you mean "${near}"?` : ""}` };
+    }
+    if (key === "content") {
+      if (value === "summary") continue;
+      return { ok: false, message: value === "full" ? `feed.content "full" is not supported yet: use "summary", or leave it out`
+        : `feed.content must be "summary"` };
+    }
+    if (key === "limit") {
+      if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return { ok: false, message: `feed.limit must be a whole number of 1 or more, such as 20` };
+      out.limit = Number(value);
+      continue;
+    }
+    if (typeof value !== "string" || !FEED_FILE.test(value)) {
+      return { ok: false, message: `feed.${key} must be a file name ending in .xml, such as "index.xml"` };
+    }
+    out[key as "path" | "atom" | "rss"] = value;
+  }
+  if (out.path !== undefined && (out.atom !== undefined || out.rss !== undefined)) {
+    return { ok: false, message: `feed.path names a feed in one format, feed.atom and feed.rss one in both: give one or the other` };
+  }
+  if ((out.atom === undefined) !== (out.rss === undefined)) {
+    return { ok: false, message: `feed.atom and feed.rss name a feed in both formats, so give both, or feed.path for one` };
+  }
+  if (out.atom !== undefined && out.atom === out.rss) {
+    return { ok: false, message: `feed.atom and feed.rss are both "${out.atom}": give each a name of its own` };
+  }
+  return { ok: true, value: out };
+}
+
 export function readSort(v: FrontmatterValue, path: string): Read<SortBy> {
   if (!isFolderIndex(path)) {
     return { ok: false, message: `sort orders a folder's pages, so it belongs on the folder's index.md, not on a page` };

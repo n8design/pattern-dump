@@ -25,7 +25,7 @@ import { checkDeclared, readSchema, type PropertySchema } from "./declared-value
 import { DEFAULT_LAYOUT, imageBase, type PageFile } from "./pages.js";
 import { isRelativePath, resolvePageImage } from "./page-images.js";
 import type { FrontmatterValue } from "../frontmatter.js";
-import { readChildLayout, readDate, readDraft, readSort, readTerms, readUpdated, readView, type Read, type SortBy } from "./listing-keys.js";
+import { readChildLayout, readDate, readDraft, readFeed, readSort, readTerms, readUpdated, readView, type FeedSettings, type Read, type SortBy } from "./listing-keys.js";
 import { categoryIndex, termIndex, TERM_WORDS, type CategoryIndex, type TermIndex, type TermKind } from "./categories.js";
 import { declaredQueries } from "./query.js";
 import { checkChildDefaults, NOT_DEFAULTABLE, originOf, placeOf } from "./folder-defaults.js";
@@ -42,7 +42,7 @@ const HUGO_KEYS: Readonly<Record<string, string>> = {
 };
 
 /** Keys the build owns: they are read by the storefront, never passed to the layout. */
-export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view", "toc", "socialImage"] as const;
+export const RESERVED_KEYS = ["layout", "childLayout", "order", "redirectFrom", "index", "image", "date", "updated", "tags", "categories", "draft", "sort", "view", "toc", "socialImage", "feed"] as const;
 /** Keys the storefront fills for every page: a page cannot set them. */
 export const ASSEMBLY_KEYS = ["body", "nav", "site", "page"] as const;
 
@@ -83,6 +83,8 @@ export interface BuildKeys {
   view?: string;
   /** The variant of the social image component its social image is rendered from; false for none. */
   socialImage?: string | false;
+  /** On a folder's index.md: its feed off (false), or its own settings. */
+  feed?: false | FeedSettings;
 }
 
 /** An old route: root-relative, slash-wrapped, plain segments only (no query, fragment, "." or ".."). */
@@ -95,7 +97,9 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
   /** The file a relative `image` is resolved against: the page, or the index.md whose childDefaults gave it. */
   imageFrom: string = path,
   /** The social image component and its variants, which `socialImage` names one of; undefined when the site has none. */
-  social?: SocialChoice): BuildKeys {
+  social?: SocialChoice,
+  /** The keys with others indented under them (`feed:`). */
+  maps: Readonly<Record<string, Readonly<Record<string, FrontmatterValue>>>> = {}): BuildKeys {
   const out: BuildKeys = {};
   const redirect = values["redirectFrom"];
   if (redirect !== undefined) {
@@ -150,6 +154,11 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
   take("draft", v("draft") === undefined ? undefined : readDraft(v("draft")!));
   take("sort", v("sort") === undefined ? undefined : readSort(v("sort")!, path));
   take("view", v("view") === undefined ? undefined : readView(v("view")!, path));
+  if (v("feed") !== undefined || maps["feed"] !== undefined) {
+    const r = readFeed(v("feed"), maps["feed"], path);
+    if (r.ok) out.feed = r.value;
+    else at("feed", r.message);
+  }
   if (v("socialImage") !== undefined) {
     const r = readSocialImage(v("socialImage")!, social);
     if (r.ok) out.socialImage = r.value;
@@ -202,7 +211,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
   };
   const social: SocialChoice | undefined = socialComponent !== undefined
     ? { component: socialComponent, variants: socialVariants(socialComponent, discoveryMap) } : undefined;
-  const buildKeys = () => checkBuildKeys(values, page.path, at, { categories, tags }, renamed, imageBase(page), social);
+  const buildKeys = () => checkBuildKeys(values, page.path, at, { categories, tags }, renamed, imageBase(page), social, page.frontmatter.maps);
 
   // ---- layout: its own, else its folder's childLayout (pages.ts), else the default ----
   const index = await layoutIndex(discoveryMap);
@@ -310,7 +319,7 @@ export async function checkPageFrontmatter(page: PageFile, discoveryMap: Discove
 
   // ---- keys with options under them: only a query of the layout takes them ----
   for (const key of Object.keys(page.frontmatter.maps ?? {})) {
-    if (forQueries.includes(key)) continue;
+    if (forQueries.includes(key) || key === "feed") continue;
     const known = Object.hasOwn(declared, key) || (RESERVED_KEYS as readonly string[]).includes(key) || (ASSEMBLY_KEYS as readonly string[]).includes(key);
     if (known) { at(key, `"${key}" has keys indented under it, which only a query of the layout takes: write its value on the line`); continue; }
     const near = suggest(key, [...Object.keys(declared), ...RESERVED_KEYS, ...forQueries]);

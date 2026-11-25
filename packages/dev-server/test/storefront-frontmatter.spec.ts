@@ -330,6 +330,32 @@ describe("checkPageFrontmatter — the listing keys: date, tags, draft, sort", (
       .toEqual([P(3, "sort orders a folder's pages, so it belongs on the folder's index.md, not on a page")]);
   });
 
+  it("takes feed on a folder's index.md: false, true, or its settings indented under it; refuses it on a page", async () => {
+    const at = (md: string, path = "articles/index.md") => checkPageFrontmatter(pageFile(md, path), map);
+    expect((await at("---\ntitle: T\nfeed: false\n---\n")).build).toEqual({ feed: false });
+    expect((await at("---\ntitle: T\nfeed: true\n---\n")).build).toEqual({ feed: {} });
+    const set = await at("---\ntitle: T\nfeed:\n  limit: 50\n  path: index.xml\n  content: summary\n---\n");
+    expect(set.problems).toEqual([]);
+    expect(set.build).toEqual({ feed: { limit: 50, path: "index.xml" } });
+    expect((await at("---\ntitle: T\nfeed:\n  atom: feed.xml\n  rss: index.xml\n---\n")).build).toEqual({ feed: { atom: "feed.xml", rss: "index.xml" } });
+    const bad: Array<[string, string]> = [
+      ["feed: maybe\n", "feed must be true or false, or have its settings indented under it (limit, path)"],
+      ["feed:\n  limit: 0\n", "feed.limit must be a whole number of 1 or more, such as 20"],
+      ["feed:\n  path: feed\n", `feed.path must be a file name ending in .xml, such as "index.xml"`],
+      ["feed:\n  path: ../feed.xml\n", `feed.path must be a file name ending in .xml, such as "index.xml"`],
+      ["feed:\n  limt: 5\n", `feed.limt is not a feed setting: it takes limit, path, atom, rss: did you mean "limit"?`],
+      ["feed:\n  content: full\n", `feed.content "full" is not supported yet: use "summary", or leave it out`],
+      ["feed:\n  path: a.xml\n  rss: b.xml\n", "feed.path names a feed in one format, feed.atom and feed.rss one in both: give one or the other"],
+      ["feed:\n  rss: b.xml\n", "feed.atom and feed.rss name a feed in both formats, so give both, or feed.path for one"],
+      ["feed:\n  atom: b.xml\n  rss: b.xml\n", `feed.atom and feed.rss are both "b.xml": give each a name of its own`],
+    ];
+    for (const [lines, message] of bad) {
+      expect((await at(`---\ntitle: T\n${lines}---\n`)).problems, lines).toEqual([{ file: "articles/index.md", line: 3, message }]);
+    }
+    expect((await check("---\ntitle: T\nfeed: false\n---\n")).problems)
+      .toEqual([P(3, "feed sets a folder's feed, so it belongs on the folder's index.md, not on a page")]);
+  });
+
   it("refuses a layout that declares one of them", async () => {
     const r = await check("---\nlayout: listing\ntitle: T\n---\n");
     expect(r.problems).toEqual(["date", "tags", "draft", "sort"].map(k =>

@@ -229,6 +229,40 @@ describe("configProblems — storefront", () => {
     }
   });
 
+  it("takes feeds: true, false, or its settings; an Atom feed needs an author", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    const author = { name: "The team" };
+    for (const ok of [false, { author }, { format: "rss" }, { format: "both", author, path: { atom: "feed.xml", rss: "index.xml" } },
+      { format: "rss", path: "index.xml" }, { author: { name: "T", uri: "https://example.com/about/" }, limit: 50, collections: ["articles"], site: false, content: "summary" }]) {
+      expect(storefront({ ...base, feeds: ok }), JSON.stringify(ok)).toEqual([]);
+    }
+    const needsAuthor = `"site.feeds.author.name": an Atom feed needs an author: set site.feeds.author to { name: "<who writes the site>" }, or format: "rss"`;
+    expect(storefront({ ...base, feeds: true })).toEqual([needsAuthor]);
+    expect(storefront({ ...base, feeds: { format: "both" } })).toEqual([needsAuthor]);
+    expect(storefront({ ...base, feeds: { author: { name: " " } } })).toEqual([needsAuthor]);
+    expect(storefront({ ...base, feeds: { author, content: "full" } })).toEqual([`"site.feeds.content": "full" is not supported yet: use "summary", or leave it out`]);
+    expect(storefront({ ...base, feeds: { author, limit: 0 } })).toEqual([`"site.feeds.limit" must be a whole number of 1 or more, such as 20`]);
+    expect(storefront({ ...base, feeds: { author, format: "json" } })).toEqual([`"site.feeds.format" must be "atom" or "rss" or "both"`]);
+    expect(storefront({ ...base, feeds: { authr: author } })).toEqual([`unknown key "site.feeds.authr": did you mean "site.feeds.author"?`]);
+    expect(storefront({ ...base, feeds: "atom" })).toEqual([`"site.feeds" must be true, false, or an object of the feeds' settings, such as { author: { name: "The team" } }`]);
+    expect(storefront({ ...base, feeds: { author: { name: "T", uri: "/about/" } } })).toEqual([`"site.feeds.author.uri" must be an absolute http(s) URL, such as "https://example.com/about/"`]);
+  });
+
+  it("takes a feed's path: a file name for one format, { atom, rss } for both, never another root file's", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    const feeds = (f: Record<string, unknown>) => storefront({ ...base, feeds: { author: { name: "T" }, ...f } });
+    const shape = `"site.feeds.path" must be a file name ending in .xml, such as "index.xml", or { atom, rss } for a feed in both formats, such as { atom: "feed.xml", rss: "index.xml" }`;
+    for (const bad of ["feed", "a/feed.xml", ".feed.xml", "", { atom: "feed.xml" }, { atom: "a.xml", rss: "b.xml", json: "c.xml" }, 3]) {
+      expect(feeds({ path: bad }), JSON.stringify(bad)).toEqual([shape]);
+    }
+    expect(feeds({ format: "both", path: "index.xml" })).toEqual([
+      `"site.feeds.path": the feed is written in both formats, so it needs a file name for each: { atom: "feed.xml", rss: "index.xml" }`]);
+    expect(feeds({ path: { atom: "a.xml", rss: "b.xml" } })).toEqual([
+      `"site.feeds.path": { atom, rss } is for a feed in both formats; with format "atom", give one file name, such as "a.xml"`]);
+    expect(feeds({ format: "both", path: { atom: "a.xml", rss: "a.xml" } })).toEqual([`"site.feeds.path": the Atom and the RSS feed are both "a.xml": give each a name of its own`]);
+    expect(feeds({ path: "sitemap.xml" })).toEqual([`"site.feeds.path": "sitemap.xml" is the site's sitemap: give the feed another name`]);
+  });
+
   it("takes the options of a day for dates", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     for (const ok of [{ dateStyle: "long" }, { dateStyle: "medium" }, { day: "numeric", month: "short", year: "numeric" },

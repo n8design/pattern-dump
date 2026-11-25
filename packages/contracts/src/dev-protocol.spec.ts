@@ -14,7 +14,7 @@ import { describe, it, expect } from "vitest";
 import {
   previewUrl, renderedSourceUrl, dataSourceUrl, overviewUrl,
   componentUrl, componentCssUrl, themeCssUrl, scriptUrl, imageUrl, parseImageUrl, socialImageUrl, parseSocialImageUrl, PD_ROUTES, PD_ROUTE_PREFIX, PD_HOSTS,
-  staticPathFor, normalizeBasePath,
+  staticPathFor, normalizeBasePath, FEED_FILES,
   buildAuditRollup, AUDIT_SCOPE, PD_PROTOCOL_VERSION,
   type DiagnosticsGraph, type HmrMessage,
   type DiagnosticComponentNode, type DiagnosticOccurrence,
@@ -398,6 +398,18 @@ describe("staticPathFor — every builder's URL maps to one file", () => {
     expect(staticPathFor(PD_ROUTES.sitemap)).toBe("sitemap.xml");
     expect(staticPathFor(PD_ROUTES.robots)).toBe("robots.txt");
     expect(staticPathFor(PD_ROUTES.notFound)).toBe("404.html");
+  });
+
+  it("writes a feed under its own name, at the root or in its folder, whatever it is called", () => {
+    expect(FEED_FILES).toEqual({ atom: "feed.xml", rss: "rss.xml" });
+    expect(staticPathFor("/feed.xml")).toBe("feed.xml");
+    expect(staticPathFor("/articles/feed.xml")).toBe("articles/feed.xml");
+    expect(staticPathFor("/blog/news/rss.xml")).toBe("blog/news/rss.xml");
+    // A feed kept at the address another tool gave it.
+    expect(staticPathFor("/index.xml")).toBe("index.xml");
+    expect(staticPathFor("/blog/index.xml")).toBe("blog/index.xml");
+    // A page route is still a folder.
+    expect(staticPathFor("/articles/feed/")).toBe("articles/feed/index.html");
   });
 
   it("maps shell routes to one index.html each", () => {

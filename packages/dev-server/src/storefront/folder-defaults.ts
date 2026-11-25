@@ -29,7 +29,7 @@ import type { PageFile } from "./pages.js";
 
 /** Keys a folder can't set for its pages: one page's own (`title`, `order`, `redirectFrom`, `date`, `updated`), a
  *  folder index's own (`sort`, `view`, `childLayout`, `childDefaults`), and what the storefront fills itself. */
-export const NOT_DEFAULTABLE = ["title", "order", "redirectFrom", "date", "updated", "sort", "view", "childLayout", CHILD_DEFAULTS,
+export const NOT_DEFAULTABLE = ["title", "order", "redirectFrom", "date", "updated", "sort", "view", "feed", "childLayout", CHILD_DEFAULTS,
   "body", "site", "page"] as const;
 const notDefaultable = new Set<string>(NOT_DEFAULTABLE);
 

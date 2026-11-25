@@ -11,7 +11,7 @@ type Rule =
   | { values: readonly string[]; unsupported?: readonly string[] }
   | { keys: Shape; required?: readonly string[] }
   | "packages" | "logo" | "workbench-url" | "site-url" | "lang" | "asset-path" | "color-token" | "host" | "inset" | "plain-object" | "hbs-file"
-  | "quality" | "effort" | "date-format" | "categories" | "tags" | "term-pages" | "skip-checks" | "component-id";
+  | "quality" | "effort" | "date-format" | "count" | "feed-path" | "feeds" | "categories" | "tags" | "term-pages" | "skip-checks" | "component-id";
 type Shape = Readonly<Record<string, Rule>>;
 
 /** How responsive image variants are encoded: for the project, and overridden per site. */
@@ -70,6 +70,7 @@ const SHAPE: Shape = {
       categories: "categories", tags: "tags", tagPages: "term-pages", categoryPages: "term-pages", search: "boolean",
       llms: "boolean", socialImages: { keys: { component: "component-id" }, required: ["component"] },
       checks: { keys: { classes: { values: ["warning", "error", "off"] }, allowClasses: "strings", allowProperties: "strings" } },
+      feeds: "feeds",
     },
     required: ["pagesDir", "outDir"],
   },
@@ -226,6 +227,22 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
     }
     return;
   }
+  if (rule === "feeds") {
+    if (typeof value === "boolean") return;
+    if (!isObject(value)) { fail(`true, false, or an object of the feeds' settings, such as { author: { name: "The team" } }`); return; }
+    checkObject(value, FEEDS, [], `${at}.`, problems);
+    return;
+  }
+  if (rule === "count") {
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 1) fail("a whole number of 1 or more, such as 20");
+    return;
+  }
+  if (rule === "feed-path") {
+    const file = (v: unknown) => typeof v === "string" && FEED_FILE.test(v);
+    const ok = file(value) || (isObject(value) && Object.keys(value).every(k => k === "atom" || k === "rss") && file(value.atom) && file(value.rss));
+    if (!ok) fail(`a file name ending in .xml, such as "index.xml", or { atom, rss } for a feed in both formats, such as { atom: "feed.xml", rss: "index.xml" }`);
+    return;
+  }
   if (rule === "hbs-file") {
     // A template file of the project's, relative to its root; that it exists is checked when a page is built.
     if (typeof value !== "string" || !/\.hbs$/.test(value) || /^(?:\/|[a-zA-Z]:)/.test(value)) {
@@ -306,6 +323,14 @@ function checkValue(value: unknown, rule: Rule, at: string, problems: string[]):
 const TIME_OPTIONS: readonly string[] = ["timeZone", "timeStyle", "hour", "minute", "second", "dayPeriod",
   "fractionalSecondDigits", "hour12", "hourCycle", "timeZoneName"];
 
+/** A feed's file name: one path segment, ending in .xml, not hidden. */
+const FEED_FILE = /^[A-Za-z0-9_-][A-Za-z0-9._-]*\.xml$/;
+/** site.feeds as an object. */
+const FEEDS: Shape = {
+  format: { values: ["atom", "rss", "both"] }, content: { values: ["summary"], unsupported: ["full"] }, limit: "count",
+  collections: "strings", site: "boolean", path: "feed-path", author: { keys: { name: "string", uri: "string" }, required: ["name"] },
+};
+
 /** A category's or tag's key, and each old key of one: a URL segment (each gets a page of its own). */
 const SEGMENT = /^[a-z0-9-]+$/;
 const TERM: Shape = { label: "string", description: "string", aliases: "strings" };
@@ -373,6 +398,7 @@ function checkRelations(raw: Record<string, unknown>, problems: string[]): void 
   if (isObject(sf.globals) && Object.hasOwn(sf.globals, "workbenchUrl")) {
     problems.push(`"site.globals.workbenchUrl": templates get site.workbenchUrl from Pattern Dump (site.workbenchUrl, or pd dev's own workbench): remove this global and use site.workbenchUrl`);
   }
+  checkFeeds(sf.feeds, problems);
   // Tag pages and category pages each under a path of their own (when both are on).
   const pathOf = (v: unknown, fallback: string): string | undefined =>
     v === false ? undefined : isObject(v) && typeof v.path === "string" ? v.path : fallback;
@@ -405,6 +431,34 @@ function checkRelations(raw: Record<string, unknown>, problems: string[]): void 
       else if (inside(pa, pb)) problems.push(`${label(a, va)} is inside ${label(b, vb)}: each needs a folder of its own, outside the other`);
       else if (inside(pb, pa)) problems.push(`${label(b, vb)} is inside ${label(a, va)}: each needs a folder of its own, outside the other`);
     }
+  }
+}
+
+/** site.feeds across its keys: an Atom feed's author, a path for each format, and no name another file has. */
+function checkFeeds(feeds: unknown, problems: string[]): void {
+  if (feeds === undefined || feeds === false) return;
+  const o = isObject(feeds) ? feeds : {};
+  const format = typeof o.format === "string" ? o.format : "atom";
+  const author = isObject(o.author) ? o.author : undefined;
+  if (format !== "rss" && (author === undefined || typeof author.name !== "string" || !author.name.trim())) {
+    problems.push(`"site.feeds.author.name": an Atom feed needs an author: set site.feeds.author to { name: "<who writes the site>" }, or format: "rss"`);
+  }
+  if (author && typeof author.uri === "string") {
+    let ok = false;
+    try { ok = /^https?:$/.test(new URL(author.uri).protocol); } catch { ok = false; }
+    if (!ok) problems.push(`"site.feeds.author.uri" must be an absolute http(s) URL, such as "https://example.com/about/"`);
+  }
+  const path = o.path;
+  if (typeof path === "string" && format === "both") {
+    problems.push(`"site.feeds.path": the feed is written in both formats, so it needs a file name for each: { atom: "feed.xml", rss: "${path}" }`);
+  } else if (isObject(path) && format !== "both") {
+    problems.push(`"site.feeds.path": { atom, rss } is for a feed in both formats; with format "${format}", give one file name, such as "${String(path[format] ?? "feed.xml")}"`);
+  } else if (isObject(path) && path.atom === path.rss && typeof path.atom === "string") {
+    problems.push(`"site.feeds.path": the Atom and the RSS feed are both "${path.atom}": give each a name of its own`);
+  }
+  // The site's own files at its root, which a feed there can't be.
+  for (const name of [typeof path === "string" ? path : undefined, ...(isObject(path) ? [path.atom, path.rss] : [])]) {
+    if (name === "sitemap.xml") problems.push(`"site.feeds.path": "sitemap.xml" is the site's sitemap: give the feed another name`);
   }
 }
 

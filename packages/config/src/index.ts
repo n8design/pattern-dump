@@ -321,6 +321,36 @@ export interface StorefrontConfig {
   llms?: boolean;
   /** pd build's checks of the site against its style guide. */
   checks?: SiteChecks;
+  /**
+   * Feeds: each folder whose index.md has `sort: date` gets one of its newest pages, and the site one across them,
+   * at `<folder>/feed.xml` and `/feed.xml`. Needs `url`, as the sitemap does; none with `index: false`. Left out:
+   * off. `true`: on, with the defaults. An object: on, with its settings. A folder's index.md turns its own feed off
+   * with `feed: false`, or sets its `limit` and `path` under `feed:`.
+   */
+  feeds?: boolean | SiteFeeds;
+}
+
+/** A feed's file name: one for a feed in one format, one per format for a feed in both (default feed.xml, and
+ *  rss.xml for the RSS one beside an Atom one). */
+export type FeedPath = string | { atom: string; rss: string };
+
+/** site.feeds as an object. */
+export interface SiteFeeds {
+  /** Atom 1.0 (the default), RSS 2.0, or both. */
+  format?: "atom" | "rss" | "both";
+  /** What an entry carries: the page's summary (its description, else its first paragraph). */
+  content?: "summary";
+  /** The newest pages each feed lists. Default: 20. */
+  limit?: number;
+  /** Only these folders' feeds (their paths, such as "articles"), each with `sort: date` on its index.md. Default:
+   *  every such folder. */
+  collections?: string[];
+  /** The site's feed, across the collections' feeds. Default: true. */
+  site?: boolean;
+  /** The site feed's file name, at the site's root: such as "index.xml" for a feed that is there already. */
+  path?: FeedPath;
+  /** Who writes the site. An Atom feed needs a name; RSS gives it as each item's dc:creator. */
+  author?: { name: string; uri?: string };
 }
 
 /** site.checks: what pd build checks the site's classes and custom properties against. */
