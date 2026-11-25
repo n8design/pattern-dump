@@ -36,6 +36,7 @@ import { BrowserUnavailableError, launchChromium, loadProjectPlaywright, runBrow
 import { CARD_CHROMIUM_ARGS, renderCards } from "./storefront/social-render.js";
 import { PageCheckError, runPagesA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
+import { claimsOf, unclaimed } from "./storefront/site-output.js";
 import { checkClasses } from "./storefront/class-check.js";
 import { checkProperties } from "./storefront/property-check.js";
 import { withNoindex } from "./storefront/base-path.js";
@@ -679,6 +680,21 @@ async function buildOnce(
     // ---- 7. The storefront, into its own root, through its own writer ----
     if (storefront && sfStage && sfGet && sfCrawl) {
       const sfOut = sfStage;
+      // Every file this step writes is one the site's list of claims has (site-output.ts), which is what another
+      // tool's files are checked against. A file it doesn't have is a kind of output missing from that list.
+      const written = [
+        ...sfCrawl.urls.map(u => `/${staticPathFor(u)}`), ...[...symbolFiles.keys()].map(u => `/${staticPathFor(u)}`), "/.nojekyll",
+        ...[...searchFiles?.keys() ?? []].map(path => `${SEARCH_PATH}${path}`), ...(storefront.llms ? ["/llms.txt"] : []),
+      ];
+      // The pages as the server listed them, which the crawl followed (tag and category pages too), and the images
+      // beside them.
+      const served = (await (await sfGet(PD_ROUTES.pages)).json()) as StorefrontPagesResponse;
+      const listedFeeds = served.feeds ?? [];
+      const strays = unclaimed(claimsOf({ pages: served.pages, images: pageModel!.images }, listedFeeds), written);
+      if (strays.length) {
+        throw new Error(`pd build: Pattern Dump was about to write files that its list of the site's files doesn't have, `
+          + `so nothing was written. This is a fault in Pattern Dump, not in the project:\n${strays.map(f => `  - ${f}`).join("\n")}`);
+      }
       await rm(sfOut, { recursive: true, force: true });
       await mkdir(sfOut, { recursive: true });
       const counts = { files: 0, bytes: 0, warnings: [] as string[] };
@@ -713,8 +729,7 @@ async function buildOnce(
       const model = pageModel!;
       if (storefront.llms) {
         const siteTitle = typeof storefront.site?.["title"] === "string" ? storefront.site["title"] : undefined;
-        const feeds = ((await (await sfGet!(PD_ROUTES.pages)).json()) as StorefrontPagesResponse).feeds ?? [];
-        const llms = llmsTxt(model, { title: siteTitle, siteUrl: storefront.url, feeds });
+        const llms = llmsTxt(model, { title: siteTitle, siteUrl: storefront.url, feeds: listedFeeds });
         const bytes = Buffer.from(llms.text, "utf8");
         await writeFile(join(sfOut, "llms.txt"), bytes);
         counts.files++;
