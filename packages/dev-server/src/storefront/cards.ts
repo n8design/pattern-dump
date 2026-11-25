@@ -65,7 +65,9 @@ export async function readCard(id: string, owner: string, role: string, discover
 const HINTS: Readonly<Record<string, string>> = {
   image: "image: /assets/images/<name>.jpg, a raster image in the assets",
   date: "date: YYYY-MM-DD",
+  dateText: "date: YYYY-MM-DD, which it is written from",
   updated: "updated: YYYY-MM-DD",
+  updatedText: "updated: YYYY-MM-DD, which it is written from",
   description: "description: one sentence, or a first paragraph in its body",
   tags: "tags: [a-tag]",
   categories: "categories: [a-category], declared in site.categories",

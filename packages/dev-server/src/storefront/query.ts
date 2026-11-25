@@ -24,6 +24,7 @@ import { suggest } from "@pattern-dump/config";
 import { QUERY_OPTIONS } from "@pattern-dump/renderer";
 import type { DiscoveryMap } from "@pattern-dump/contracts";
 import type { FrontmatterReading, FrontmatterValue } from "../frontmatter.js";
+import type { DateFormat } from "./date-text.js";
 import type { DatesMode, GitDates } from "./git-dates.js";
 import type { PageFile, PageModel } from "./pages.js";
 import { placeOf } from "./folder-defaults.js";
@@ -114,6 +115,8 @@ export interface QueryContext {
   discoveryMap: DiscoveryMap;
   dates?: GitDates | undefined;
   mode: DatesMode;
+  /** How the site writes dates for readers (date-text.ts): an entry's dateText and updatedText. */
+  dateFormat?: DateFormat | undefined;
   /** The page's own terms' keys, for `same` and relevance, when it has no entry of its own (a tag or category page:
    *  its term). Default: its entry's. */
   own?: { tags: string[]; categories: string[] };
@@ -321,7 +324,7 @@ export async function resolveQuery(q: DeclaredQuery, ctx: QueryContext): Promise
 
   const entries: Entry[] = [];
   const take = async (r: string): Promise<Entry | undefined> => {
-    const got = await entryOf(r, model, { dates: ctx.dates, mode: ctx.mode });
+    const got = await entryOf(r, model, { dates: ctx.dates, mode: ctx.mode, dateFormat: ctx.dateFormat });
     problems.push(...got.problems);
     return got.entry;
   };

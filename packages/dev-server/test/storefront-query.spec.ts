@@ -59,7 +59,7 @@ const site = (a = "", extra: Record<string, string> = {}): Record<string, string
   ...extra,
 });
 
-async function assemble(route: string, pages: Record<string, string>, o: { skin?: Record<string, string>; build?: boolean } = {}) {
+async function assemble(route: string, pages: Record<string, string>, o: { skin?: Record<string, string>; build?: boolean; extra?: Partial<PageAssembly> } = {}) {
   const root = await mkdtemp(join(tmpdir(), "pd-query-"));
   roots.push(root);
   for (const [rel, body] of Object.entries(o.skin ?? SKIN)) await save(join(root, "patterns", ...rel.split("/")), body);
@@ -75,7 +75,7 @@ async function assemble(route: string, pages: Record<string, string>, o: { skin?
     site: undefined, workbenchUrl: "https://wb.example/", shown: p => p,
     head: async (_layout, _html, placed) => { heads.push([...placed]); return ""; },
     image: async () => ({ ok: false, message: "no images here" }), render,
-    ...(o.build ? {} : { live: { wsPort: 1, generation: "" } }),
+    ...(o.build ? {} : { live: { wsPort: 1, generation: "" } }), ...o.extra,
   } as PageAssembly);
   const titles = /R\[([^\]]*)\]/.exec(page.html)?.[1]?.split(";").filter(Boolean) ?? null;
   const listing = /L\[([\s\S]*?)\]<\/main>/.exec(page.html)?.[1] ?? null;
@@ -95,6 +95,12 @@ describe("a query's pages", () => {
   it("sorts by date, newest first, or oldest first with order: asc", async () => {
     expect((await assemble("/articles/a/", site("related:\n  sort: date\n"))).titles).toEqual(["Bravo", "Charlie", "Delta"]);
     expect((await assemble("/articles/a/", site("related:\n  sort: date\n  order: asc\n"))).titles).toEqual(["Delta", "Charlie", "Bravo"]);
+  });
+
+  it("gives each page its date as text, in the site's language", async () => {
+    const skin = { ...SKIN, "layouts/article/article.hbs": `<main><h1>{{title}}</h1>R[{{#each page.related.entries}}{{title}} {{dateText}};{{/each}}]L[]</main>` };
+    expect((await assemble("/articles/a/", site("related:\n  sort: date\n"), { skin, extra: { lang: "en-GB" } })).titles)
+      .toEqual(["Bravo 2 November 2026", "Charlie 1 November 2026", "Delta 1 October 2026"]);
   });
 
   it("sorts by title, A to Z, or Z to A with order: desc", async () => {
