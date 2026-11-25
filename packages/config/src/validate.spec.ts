@@ -263,6 +263,26 @@ describe("configProblems — storefront", () => {
     expect(feeds({ path: "sitemap.xml" })).toEqual([`"site.feeds.path": "sitemap.xml" is the site's sitemap: give the feed another name`]);
   });
 
+  it("takes mounts: folders relative to the root, each at a route of its own", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    const mounts = (m: unknown) => storefront({ ...base, mounts: m });
+    expect(mounts([{ from: "../docs/htwoo-core", to: "/htwoo-core/" }, { from: "./root", to: "/", sitemap: true },
+      { from: "tools/a", to: "/a/b.c/" }])).toEqual([]);
+    expect(mounts({ from: "./x", to: "/x/" })).toEqual([`"site.mounts" must be a list of { from, to }, such as [{ from: "../docs/tool", to: "/tool/" }]`]);
+    expect(mounts(["./x"])).toEqual([`"site.mounts[0]" must be { from, to }, such as { from: "../docs/tool", to: "/tool/" }`]);
+    expect(mounts([{ from: "./x" }])).toEqual([`missing required "site.mounts[0].to"`]);
+    expect(mounts([{ form: "./x", to: "/x/" }])).toEqual([`missing required "site.mounts[0].from" (found "site.mounts[0].form": did you mean "site.mounts[0].from"?)`]);
+    expect(mounts([{ from: "./x", to: "/x/", sitemap: "yes" }])).toEqual([`"site.mounts[0].sitemap" must be true or false`]);
+    const fromRule = `"site.mounts[0].from" must be a folder relative to the project's root, such as "../docs/tool"`;
+    for (const bad of ["/abs/tool", "C:/tool", "~/tool", " "]) expect(mounts([{ from: bad, to: "/x/" }]), bad).toEqual([fromRule]);
+    const toRule = `"site.mounts[0].to" must be a route that starts and ends with "/", such as "/tool/", or "/" for the site's root`;
+    for (const bad of ["tool/", "/tool", "", "//", "/a//b/", "/../", "/a/./", "/a b/", "https://x.test/"]) {
+      expect(mounts([{ from: "./x", to: bad }]), bad).toEqual([toRule]);
+    }
+    expect(mounts([{ from: "./a", to: "/x/" }, { from: "./b", to: "/y/" }, { from: "./c", to: "/x/" }])).toEqual([
+      `"site.mounts[2].to": "/x/" is site.mounts[0]'s route too: publish each folder at a route of its own`]);
+  });
+
   it("takes the options of a day for dates", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     for (const ok of [{ dateStyle: "long" }, { dateStyle: "medium" }, { day: "numeric", month: "short", year: "numeric" },
