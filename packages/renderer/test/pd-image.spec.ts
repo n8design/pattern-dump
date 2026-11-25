@@ -32,6 +32,11 @@ const files: Record<string, string> = {
   "atoms/narrow/narrow.hbs": `{{pd-image image alt="Narrow"}}`,
   "atoms/narrow/narrow.schema.json": JSON.stringify({ properties: { image: { type: "string", "x-pd-image": { widths: [480, 960], sizes: "100vw" } } } }),
   "atoms/narrow/narrow.json": JSON.stringify({ image: "/assets/images/narrow.jpg" }),
+  "atoms/classy/classy.hbs": `{{pd-image image alt="Classy" class=cls}}`,
+  "atoms/classy/classy.schema.json": JSON.stringify({ properties: { image: { type: "string", "x-pd-image": { widths: [480], sizes: "100vw" } }, cls: { type: "string" } } }),
+  "atoms/classy/classy.json": JSON.stringify({ image: "/assets/images/narrow.jpg", cls: "card-image wide" }),
+  "atoms/classy/classy~quote.json": JSON.stringify({ cls: `a" onload="x` }),
+  "atoms/classy/classy~empty.json": JSON.stringify({ cls: "" }),
   "atoms/hero/hero.hbs": `{{pd-image image alt=alt loading="eager"}}`,
   "atoms/hero/hero.schema.json": JSON.stringify({ properties: { image: { type: "string", "x-pd-image": { widths: [320, 2000], sizes: "100vw" } }, alt: { type: "string" } } }),
   "atoms/hero/hero.json": JSON.stringify({ image: "/assets/images/harbour.jpg", alt: "Hero" }),
@@ -67,6 +72,12 @@ describe("{{pd-image}}", () => {
     expect((await render({ component: "atoms/narrow" })).html.trim()).toBe(
       `<img src="/v/project/narrow-602.webp" srcset="/v/project/narrow-480.webp 480w, /v/project/narrow-602.webp 602w" sizes="100vw" `
       + `width="602" height="301" alt="Narrow" loading="lazy" decoding="async">`);
+  });
+
+  it("writes class on the <img>, escaped; an empty one is left out", async () => {
+    expect((await render({ component: "atoms/classy" })).html).toContain(`alt="Classy" class="card-image wide" loading="lazy"`);
+    expect((await render({ component: "atoms/classy", variant: "quote" })).html).toContain(`class="a&quot; onload&#x3D;&quot;x"`);
+    expect((await render({ component: "atoms/classy", variant: "empty" })).html).not.toContain("class=");
   });
 
   it("keys the variants with the site's settings when the render says so", async () => {
@@ -130,3 +141,14 @@ describe("{{pd-image}} problems, found from the schema before rendering", () => 
   });
 });
 
+describe("imageTag", () => {
+  it("writes class on the <img> inside a dark <picture>, and the dark source reaches its own width too", async () => {
+    const { imageTag } = await import("../src/index");
+    const light = lookup("/assets/images/narrow.jpg")!, dark = lookup("/assets/images/narrow-dark.jpg")!;
+    if (light.kind === "unavailable" || dark.kind === "unavailable") throw new Error("fixture");
+    const html = imageTag(light, { widths: [480, 960], sizes: "100vw", alt: "Both", eager: false, dark, className: "prose-image" });
+    expect(html).toBe(`<picture><source media="(prefers-color-scheme: dark)" srcset="/v/project/narrow-dark-480.webp 480w, /v/project/narrow-dark-602.webp 602w" `
+      + `sizes="100vw" width="602" height="301"><img src="/v/project/narrow-602.webp" srcset="/v/project/narrow-480.webp 480w, /v/project/narrow-602.webp 602w" `
+      + `sizes="100vw" width="602" height="301" alt="Both" class="prose-image" loading="lazy" decoding="async"></picture>`);
+  });
+});

@@ -99,18 +99,18 @@ function dataFile(store: SourceStore, path: string, display: (absPath: string) =
 /**
  * An image as an <img>: with its variants (the slot's widths the image has as displayed, and its own width when a slot
  * width is wider, so the srcset reaches the original and nothing is upscaled; `src` the largest), or a single file at
- * its size. Shared by `{{pd-image}}` and the
+ * its size. `className` is written on the <img>, escaped like every attribute. Shared by `{{pd-image}}` and the
  * storefront's prose images, so both write the same markup. With `dark`, a <picture> whose
  * `(prefers-color-scheme: dark)` <source> is that image, in the same widths, at its own size; the <img> is the light one.
  */
 export function imageTag(
   source: Exclude<ImageSource, { kind: "unavailable" }>,
   o: { widths: readonly number[]; sizes: string; alt: string; title?: string; eager: boolean; settings?: "site";
-    dark?: Exclude<ImageSource, { kind: "unavailable" }> },
+    dark?: Exclude<ImageSource, { kind: "unavailable" }>; className?: string },
 ): string {
   const esc = Handlebars.escapeExpression;
-  const rest = `alt="${esc(o.alt)}"${o.title !== undefined ? ` title="${esc(o.title)}"` : ""} `
-    + `loading="${o.eager ? "eager" : "lazy"}" decoding="async"`;
+  const rest = `alt="${esc(o.alt)}"${o.title !== undefined ? ` title="${esc(o.title)}"` : ""}`
+    + `${o.className ? ` class="${esc(o.className)}"` : ""} loading="${o.eager ? "eager" : "lazy"}" decoding="async"`;
   const light = candidates(source, o);
   const img = light.srcset === undefined
     ? `<img src="${esc(light.src)}" width="${light.width}" height="${light.height}" ${rest}>`
@@ -138,7 +138,8 @@ function candidates(
     width: top, height: Math.round(top * source.height / source.width) };
 }
 
-/** `{{pd-image field alt=… [loading="eager"]}}`: an image in its slot (image-slots.ts) as an <img> with its variants. */
+/** `{{pd-image field alt=… [class="…"] [loading="eager"]}}`: an image in its slot (image-slots.ts) as an <img> with its
+ *  variants, the class on the <img>. */
 function registerImageHelper(env: ReturnType<typeof Handlebars.create>, images: ImageLookup | undefined): void {
   env.registerHelper("pd-image", function (value: unknown, options: { hash?: Record<string, unknown>; data?: { pdImages?: "site" } }) {
     const raw = options.hash?.[SLOT_KEY];
@@ -156,9 +157,11 @@ function registerImageHelper(env: ReturnType<typeof Handlebars.create>, images: 
     if (!source) throw new Error(`{{pd-image}}: "${value}" is not an image in the assets`);
     if (source.kind === "unavailable") throw new Error(source.reason);
     const settings = options.data?.pdImages;
+    const className = options.hash?.["class"];
     return new env.SafeString(imageTag(source, {
       widths: slot.widths, sizes: slot.sizes, alt: String(alt), eager: options.hash?.["loading"] === "eager",
       ...(settings ? { settings } : {}),
+      ...(className !== undefined && className !== null && String(className) !== "" ? { className: String(className) } : {}),
     }));
   });
 }
