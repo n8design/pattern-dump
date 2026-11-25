@@ -391,15 +391,20 @@ function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
       // came in on, which is gone once its client hangs up (a page live reload replaces), and would refuse the
       // server its own request. The Host header is the outer request's, read as it arrived.
       const self = { url: path, method: "GET", headers: { host: req.headers.host } } as unknown as IncomingMessage;
+      // The route first, and its references stamped only when it is a file: a missing file is the 404 page, which
+      // may link that same file (a favicon not there yet), and stamping it would wait on this very lookup.
+      const found = holdResponse();
       const held = holdResponse();
-      const lookup = stampedResponse(self, held.res, ctx).then(() => {
-        const status = held.status();
+      const lookup = routeRequest(self, found.res, ctx).then(async () => {
+        if (found.status() === 200) await sendStamped(self, found, held.res, ctx);
+        const status = found.status() === 200 ? held.status() : found.status();
         if (status === 200) return contentHash(held.body());
         // Only "no such file" is remembered for the generation. Any other failure (a script that doesn't
         // compile, a file that can't be read) is reported and asked again by the next page.
         if (status !== 404) {
           if (hashes.get(path) === lookup) hashes.delete(path);
-          console.error(`[site] ${path} could not be stamped: ${status} ${held.body().toString("utf8").split("\n")[0]!.slice(0, 160)}`);
+          const said = found.status() === 200 ? held.body() : found.body();
+          console.error(`[site] ${path} could not be stamped: ${status} ${said.toString("utf8").split("\n")[0]!.slice(0, 160)}`);
         }
         return undefined;
       });
@@ -413,6 +418,11 @@ function hashOfFor(req: IncomingMessage, ctx: RouteContext): HashOf {
 async function stampedResponse(req: IncomingMessage, res: ServerResponse, ctx: RouteContext): Promise<void> {
   const held = holdResponse();
   await routeRequest(req, held.res, ctx);
+  await sendStamped(req, held, res, ctx);
+}
+
+/** A held response sent on `res`, its references stamped and the base path in front of them (HTML and CSS). */
+async function sendStamped(req: IncomingMessage, held: HeldResponse, res: ServerResponse, ctx: RouteContext): Promise<void> {
   const type = String(held.headers["content-type"] ?? "");
   let body: Buffer | string = held.body();
   // Stamps first, by site path; then the site's base path in front of every root-relative reference.
