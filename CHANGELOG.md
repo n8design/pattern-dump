@@ -43,6 +43,7 @@
   missing folder is one warning, and its route works once the folder is built.
 - **`themes.order` sets the theme picker's order.** The themes it names come first, the rest sorted by name. See
   [Order](docs/guide/themes.md#order).
+- **`{{pd-image}}` takes a `class`.** It is written on the `<img>`, also inside a `<picture>` with a dark version.
 
 ### Fixed
 
@@ -53,6 +54,8 @@
 - **A preview's `data-theme` names the theme in effect with stylesheet switching too.** It stayed on the default.
 - **A preview opened with another theme picked shows it from its first paint.**
 - **The project's `themes.switch` wins over a pattern package's.** `pd dev` says so when the two differ.
+- **An image narrower than a slot's next width shows at its own width.** A 602 px image in a slot of 480 and 960
+  showed at 480. It gets a 602 variant now, and never one wider than it is.
 
 
 ## 0.9.0 (2026-11-23)
