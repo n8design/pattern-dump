@@ -41,6 +41,19 @@
   written. A missing folder or a link out of the folder stops it too.
 - **`pd dev` serves a site's mounts as they are on disk.** A rebuild of the other tool shows on the next reload. A
   missing folder is one warning, and its route works once the folder is built.
+- **`themes.order` sets the theme picker's order.** The themes it names come first, the rest sorted by name. See
+  [Order](docs/guide/themes.md#order).
+
+### Fixed
+
+- **The theme picker lists themes in the same order on every machine.** They followed the file system's listing,
+  sorted on macOS and not on Linux; they are sorted by name now.
+- **A stylesheet theme switch no longer flickers.** The new sheet loads beside the current one, so the preview is
+  never without a theme, and a switch never reloads it.
+- **A preview's `data-theme` names the theme in effect with stylesheet switching too.** It stayed on the default.
+- **A preview opened with another theme picked shows it from its first paint.**
+- **The project's `themes.switch` wins over a pattern package's.** `pd dev` says so when the two differ.
+
 
 ## 0.9.0 (2026-11-23)
 

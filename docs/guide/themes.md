@@ -55,8 +55,27 @@ themes: {
 ```
 
 - **`default`** is the theme a preview starts with, and the one baked into a static build.
+- **`order`** is the picker's order (below).
 - **`swatch.slots`** lists the properties shown as small colour swatches next to each of your own themes (those in
   `themes.dir`) in the picker. A pattern package's themes show `--bodyBackground`, `--themePrimary` and `--accent`.
+
+## Order
+
+The picker lists the themes sorted by name, wherever their files are: your own and your pattern packages' themes in
+one list, the same on every machine. `themes.order` puts the themes you name first, in that order, and the rest
+follow, sorted by name:
+
+```ts
+themes: {
+  dir: "./themes",
+  default: "teal",
+  order: ["teal", "red", "purple", "orange", "green", "gray", "darkyellow", "darkblue", "blue", "teams.light", "teams.hc", "teams.dark"],
+},
+```
+
+Names are sorted with numbers by their value, so `teal2` comes before `teal10`. A name in `order` that no theme has is
+left out, and `pd dev` warns about it when it starts: `themes.order names "<name>", and no theme has that name: it is
+left out of the order`. A theme you add while `pd dev` runs takes its place in the order.
 
 ## Switching
 
@@ -66,12 +85,21 @@ themes: {
   `data-theme="<name>"` on the preview's `<body>`. Use it when each theme is scoped to
   `[data-theme="<name>"]`, as above.
 - **`stylesheet`**: only the active theme's stylesheet is linked, and the picker swaps it. Use it when
-  themes set their properties on `:root` and would override each other if all were linked.
+  themes set their properties on `:root` and would override each other if all were linked. The new theme's
+  stylesheet loads beside the current one, which goes once the new one has loaded, so the preview is never without
+  a theme. A stylesheet that fails to load leaves the current theme in place, and the Console says which theme
+  failed. `data-theme` on the `<body>` names the theme in effect in this mode too.
+
+Switching never reloads the preview: only values change, so its scroll position, an open dialog and anything typed
+into a form stay as they are. A preview you open while a theme other than `default` is picked comes with that theme
+from its first paint.
 
 Theme stylesheets come after the base layer and before the component CSS in every preview; see
 [what a preview contains](authoring.md#what-a-preview-contains).
 
-When pattern packages are used and any of them needs `stylesheet`, it applies to all themes.
+Your own `themes.switch` wins over a pattern package's. Without one, `stylesheet` applies to all themes as soon as a
+package needs it. When yours and a package's differ, `pd dev` says so when it starts: `themes.switch is "attribute",
+and the pattern package <name> asks for "stylesheet": the project's setting is used`.
 
 ## Swatch values from JSON
 

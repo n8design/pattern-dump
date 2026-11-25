@@ -103,7 +103,8 @@ documentBase: ["00-base", "03-organisms/hero"],
 |---|---|---|
 | `themes.dir` | string | Optional. Folder of your own `<name>.theme.scss` files. Leave it out to use only the themes your pattern packages provide |
 | `themes.default` | string | The theme previews start with: one of yours or a package's. `pd dev` warns when it matches no theme |
-| `themes.switch` | `"attribute"` (default) or `"stylesheet"` | How themes switch; see [themes.md](themes.md#switching) |
+| `themes.switch` | `"attribute"` (default) or `"stylesheet"` | How themes switch, over a pattern package's setting; see [themes.md](themes.md#switching) |
+| `themes.order` | list of strings | The theme picker's order: these themes first, the rest sorted by name; see [themes.md](themes.md#order) |
 | `themes.swatch.slots` | string[] | Custom properties shown as colour swatches for your own themes in the theme picker (a package's themes show the default ones). Default: `["--bodyBackground", "--themePrimary", "--accent"]` |
 
 ### assets
