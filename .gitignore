@@ -28,3 +28,6 @@ apps/dev-ui/test-results/
 
 # Scaffolds written by packages/cli/src/init/starter.spec.ts (removed after each run)
 packages/cli/.test-scaffold-*/
+
+# A golden build's extraction of test-bench (scripts/golden/build.mjs), removed when it ends
+.golden-tb/
