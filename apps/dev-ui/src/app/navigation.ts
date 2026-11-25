@@ -94,8 +94,12 @@ export async function applyComponent(detail: ComponentDetail, variant?: string, 
   claim("detail", detail.id, generation);
   const key = `${detail.id}~${(variant && isKnownVariant) ? variant : ""}`;
   const wanted = (): boolean => session.current?.id === detail.id;
-  if (variant && isKnownVariant) {
-    await loadDocument("preview", key, previewUrl(detail.id, variant, store.local.theme || undefined),
+  // The detail's document is built with the default theme. With another theme in effect, the preview is fetched with
+  // it baked in, as a variant's is, so the frame never first paints the default and then switches.
+  const theme = store.local.theme || undefined;
+  const otherTheme = theme !== undefined && theme !== session.serverDefaultTheme;
+  if ((variant && isKnownVariant) || otherTheme) {
+    await loadDocument("preview", key, previewUrl(detail.id, variant && isKnownVariant ? variant : undefined, theme),
       doc => { swapWithTransition(() => { dom.iframe.srcdoc = doc; }); }, wanted);
   } else {
     claim("preview", key, generation);
