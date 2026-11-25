@@ -429,6 +429,23 @@ function checkRelations(raw: Record<string, unknown>, problems: string[]): void 
       if (first === undefined) at.set(m.to, i);
       else problems.push(`"site.mounts[${i}].to": "${m.to}" is site.mounts[${first}]'s route too: publish each folder at a route of its own`);
     });
+    // The workbench on the site's own host has its path: a mount there, or under it, would publish another
+    // folder where the site's links expect the workbench.
+    let wb: string | undefined;
+    try {
+      wb = sameHostWorkbenchPath({
+        ...(typeof sf.workbenchUrl === "string" ? { workbenchUrl: sf.workbenchUrl } : {}),
+        ...(typeof sf.url === "string" ? { url: sf.url } : {}),
+      });
+    } catch { wb = undefined; }
+    if (wb !== undefined) {
+      const path = wb.endsWith("/") ? wb : `${wb}/`;
+      sf.mounts.forEach((m, i) => {
+        if (!isObject(m) || typeof m.to !== "string" || !m.to.startsWith(path)) return;
+        problems.push(`"site.mounts[${i}].to": "${m.to}" is ${m.to === path ? "" : "inside "}the workbench's path, site.workbenchUrl "${String(sf.workbenchUrl)}": `
+          + `publish the mount at another route, or give the workbench another address`);
+      });
+    }
   }
   // Tag pages and category pages each under a path of their own (when both are on).
   const pathOf = (v: unknown, fallback: string): string | undefined =>

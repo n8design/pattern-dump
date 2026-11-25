@@ -1726,6 +1726,8 @@ export default defineConfig({
 
 `from` is a folder, relative to the project's root like every path in the config; it may be outside the project.
 `to` is the route it is published at, starting and ending with `/`; `/` puts the folder's files at the site's root.
+A workbench on the site's own host (`site.workbenchUrl` is a path) keeps its path: a mount there, or under it, is a
+config problem.
 Under a path ([Publishing under a path](#publishing-under-a-path)) a mount lands under it, as the pages do:
 `/htwoo-core/` is served at `/htwoo/htwoo-core/`. `pd build` prints one line with the files and size of each mount.
 
@@ -1776,6 +1778,9 @@ A missing folder
 
 A link out of the mount
 : `site.mounts: <file> is a link to <target>, outside <folder>: a mount publishes files, and a link is published as the file it points to, inside the mount; copy the file in, or remove the link`
+
+A mount at the workbench's path
+: `"site.mounts[0].to": "/htwoo-core/" is the workbench's path, site.workbenchUrl "/htwoo-core/": publish the mount at another route, or give the workbench another address`
 
 A missing folder, in `pd dev`
 : `site.mounts: ../docs/htwoo-core, published at /htwoo-core/, doesn't exist: its addresses are the 404 page until it does; build it, and the next request serves it (pd build stops without it)`

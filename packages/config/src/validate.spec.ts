@@ -283,6 +283,22 @@ describe("configProblems — storefront", () => {
       `"site.mounts[2].to": "/x/" is site.mounts[0]'s route too: publish each folder at a route of its own`]);
   });
 
+  it("refuses a mount at the workbench's path on the site's own host, or under it", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    const tail = `publish the mount at another route, or give the workbench another address`;
+    expect(storefront({ ...base, workbenchUrl: "/htwoo-core/", mounts: [{ from: "../docs/htwoo-core", to: "/htwoo-core/" }, { from: "./root", to: "/" }] }))
+      .toEqual([`"site.mounts[0].to": "/htwoo-core/" is the workbench's path, site.workbenchUrl "/htwoo-core/": ${tail}`]);
+    expect(storefront({ ...base, workbenchUrl: "/docs", mounts: [{ from: "./x", to: "/docs/old/" }] }))
+      .toEqual([`"site.mounts[0].to": "/docs/old/" is inside the workbench's path, site.workbenchUrl "/docs": ${tail}`]);
+    // An absolute address on the site's own origin is the same host.
+    expect(storefront({ ...base, url: "https://example.com/", workbenchUrl: "https://example.com/wb/", mounts: [{ from: "./x", to: "/wb/" }] }))
+      .toEqual([`"site.mounts[0].to": "/wb/" is the workbench's path, site.workbenchUrl "https://example.com/wb/": ${tail}`]);
+    // A workbench on a host of its own, or at another path, leaves the mount alone.
+    for (const workbenchUrl of ["https://wb.example.com/htwoo-core/", "/workbench/"]) {
+      expect(storefront({ ...base, workbenchUrl, mounts: [{ from: "./x", to: "/htwoo-core/" }] }), workbenchUrl).toEqual([]);
+    }
+  });
+
   it("takes the options of a day for dates", () => {
     const base = { pagesDir: "./pages", outDir: "./www" };
     for (const ok of [{ dateStyle: "long" }, { dateStyle: "medium" }, { day: "numeric", month: "short", year: "numeric" },
