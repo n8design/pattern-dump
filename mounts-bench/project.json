@@ -1,0 +1,24 @@
+{
+  "name": "mounts-bench",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "targets": {
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run e2e",
+        "cwd": "mounts-bench"
+      },
+      "dependsOn": [
+        {
+          "projects": [
+            "cli",
+            "dev-ui"
+          ],
+          "target": "build"
+        }
+      ],
+      "cache": false
+    }
+  }
+}

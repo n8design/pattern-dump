@@ -1,0 +1,14 @@
+{
+  "name": "mounts-bench",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "A small site and three folders of another tool's files beside it, published with site.mounts.",
+  "devDependencies": {
+    "@pattern-dump/cli": "*"
+  },
+  "scripts": {
+    "dev": "cd site && node ../../packages/cli/dist/index.js dev",
+    "e2e": "playwright test --config e2e/playwright.config.ts"
+  }
+}

@@ -13,6 +13,7 @@ const CONFIGS = [
   "storefront-bench/e2e/playwright.config.ts",
   "skins/experimental/e2e/playwright.config.ts",
   "package-bench/e2e/playwright.config.ts",
+  "mounts-bench/e2e/playwright.config.ts",
 ];
 
 /** The spec files Playwright lists for `config`, relative to the repository. */

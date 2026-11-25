@@ -35,6 +35,7 @@
     "test-bench",
     "storefront-bench",
     "package-bench",
+    "mounts-bench",
     "skins/*"
   ],
   "scripts": {
@@ -54,7 +55,8 @@
     "affected": "nx affected -t build test lint typecheck",
     "dev": "npm run dev --workspace test-bench",
     "prepare": "husky",
-    "e2e:skin-experimental": "nx run skin-experimental:e2e"
+    "e2e:skin-experimental": "nx run skin-experimental:e2e",
+    "e2e:mounts": "nx run mounts-bench:e2e"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.3",
