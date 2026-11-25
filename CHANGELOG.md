@@ -19,6 +19,14 @@
 - **Pages with a link-preview image get `twitter:image` too.** It names the same image as `og:image`.
 - **A badly named image in the pages folder fails with the name to use.** `Guest_Access.PNG` is reported with
   `guest-access.png`, since the name becomes part of the URL.
+- **Layouts and cards get each date as text for readers.** `page.dateText`, an entry's `dateText` and the others are
+  written in `site.lang`. See [Dates as text](docs/guide/storefront.md#dates-as-text).
+- **`site.dates` sets the style of those dates.** It takes the options of `Intl.DateTimeFormat` for a day; the default
+  is the long style, "November 1, 2026" in `en`.
+- **A social image gets its date as text too.** Only a card that shows `dateText` renders again.
+- **A date with a time, or written email style, names the day to write.** The day is the one written, in the value's
+  own offset. Hugo's `lastmod`, `publishDate` and `expiryDate` say what they are here.
+- **The starter writes `lang: "en"` in its config.** It decides how the site writes dates, so it is where people look.
 
 ## 0.9.0 (2026-11-23)
 

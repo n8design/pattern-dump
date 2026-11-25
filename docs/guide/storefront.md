@@ -555,9 +555,12 @@ keys below, at any depth.
 | `breadcrumbs` | Home, then each folder above the page by its `index.md`, as `{ route, title }`; empty on the home page. They reach pages the one-level nav does not list |
 | `prev`, `next` | The pages before and after this one in the nav, read entry by entry with each folder's pages after it, across sections; `null` at either end and for a page the nav does not list, such as one with `nav: false`. A page with `nav: false` is no one's `prev` or `next` |
 | `created` | The page's first commit, from git: the author date, ISO 8601. A renamed page keeps the date it was first added |
+| `createdText` | The day of `created` as the site writes it for readers, else `null` (see [Dates as text](#dates-as-text)) |
 | `updated` | The page's `updated`, `YYYY-MM-DD`, else `null`. Never git's last commit, see [Dates](#dates) |
+| `updatedText` | `updated` as the site writes it for readers, else `null` |
 | `children` | On a folder's `index.md`: the folder's pages, an entry each, sorted as its `sort` says (see [Collections](#collections)); `[]` on any other page |
 | `date` | The page's `date`, else the day git first saw it (`YYYY-MM-DD`), else `null` |
+| `dateText` | `date` as the site writes it for readers, else `null` |
 | `tags` | The page's tags, in its order, each `{ key, label, description, route }` (see [Tags](#tags)), else `[]` |
 | `categories` | The page's categories, in its order, each `{ key, label, description, route }` (`description` `null` when the config gives none, `route` the category's page or `null`), else `[]` |
 | `term` | On a tag or category page: the tag or category, `{ key, label, description, route, count }` (see [Tag and category pages](#tag-and-category-pages)), else `null` |
@@ -597,6 +600,41 @@ it: a new commit is seen on restart. Two limits:
   (`fetch-depth: 0` with `actions/checkout`). `pd dev` notes it.
 - **A page moved into the pages folder from outside it** counts as created at the move: the history read
   is limited to the pages folder, so that move reads as an add.
+
+A date is a day, written `YYYY-MM-DD`. A date with a time, a date written email style (as feeds and Hugo write
+them) and a value with a `#` after it are each a problem that names the day to write. That day is the one written,
+in the value's own offset: `2026-11-13T23:30:00-08:00` is 13 November, though it is 14 November in UTC. A `#`
+starts no comment in frontmatter, so it is part of the value. Hugo's `lastmod` is `updated` here, its `publishDate`
+is `date`, and its `expiryDate` has no equivalent: a page that still has one is told so.
+
+#### Dates as text
+
+Each date has a second key with the same date written for readers: `page.dateText`, `page.createdText` and
+`page.updatedText` on a page, `dateText` and `updatedText` on an entry, and `dateText` on a social image. Each is
+`null` where its date is. Write the text in a `time` element, with the date in its `datetime`:
+
+```hbs
+{{#if page.date}}<time datetime="{{page.date}}">{{page.dateText}}</time>{{/if}}
+```
+
+`site.lang` decides the language and `site.dates` the style: options of `Intl.DateTimeFormat` for a day, by
+default `{ dateStyle: "long" }`. With `lang: "en"`, the default, that is "November 1, 2026"; `en-GB` writes
+"1 November 2026" and `de-AT` "1. November 2026". The text of `page.created` is the author's day, the first ten
+characters of the git date.
+
+```ts
+export default defineConfig({
+  site: {
+    lang: "en-GB",
+    dates: { day: "numeric", month: "short", year: "numeric" },
+  },
+});
+```
+
+The day is written as it is, wherever the site is built: Pattern Dump formats it in UTC, so a build west of UTC
+doesn't write the day before. A time or a time zone in `site.dates` is a config problem, and so is `dateStyle`
+with a part such as `day`. `pd dev` takes a change to `site.dates` or `site.lang` on restart, as it does every
+config key but `site.globals`.
 
 ### Regions
 
@@ -712,7 +750,9 @@ has the same fixed shape:
 | `route`, `title` | The page's route and title |
 | `description` | The page's `description`; without one, the first paragraph of its body as plain text (links keep their text, markup and images are left out, a paragraph that is only an image or a placed component is skipped), or `null` |
 | `date` | The page's `date`, else the day git first saw it, else `null` |
+| `dateText` | `date` as the site writes it for readers, or `null` (see [Dates as text](#dates-as-text)) |
 | `updated` | The page's `updated`, or `null` |
+| `updatedText` | `updated` as the site writes it for readers, or `null` |
 | `image` | The page's `image`, a path in the assets, or `null` |
 | `tags` | The page's tags, each `{ key, label, description, route }`, or `[]` |
 | `categories` | The page's categories, each `{ key, label, description, route }`, or `[]` |
@@ -1419,6 +1459,7 @@ It is rendered in the layers a page of the site has, without a theme. Without `s
 | `description` | The page's description, if any |
 | `section` | The title of the page's top-level folder (its `index.md`); none for a top-level page |
 | `date` | The page's date, if any |
+| `dateText` | The page's date as the site writes it for readers (see [Dates as text](#dates-as-text)), if any |
 | `site` | `site.globals` |
 
 A variant's data (`social-image~guide.json`) reaches it too, under those fields: the fields always win.
