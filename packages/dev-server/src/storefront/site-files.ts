@@ -3,6 +3,7 @@
 // llms.txt, for language models, which only pd build writes.
 
 import type { PageModel } from "./pages.js";
+import { escapeXml } from "./xml.js";
 
 /** A page in the sitemap: its absolute URL, and its last change when the page says. */
 export interface SitemapEntry { url: string; lastmod: string | null }
@@ -22,9 +23,6 @@ export function sitemapEntries(model: PageModel, siteUrl: string): SitemapEntry[
     return [{ url: new URL(p.route.slice(1), siteUrl).href, lastmod: e?.updated ?? e?.date ?? null }];
   });
 }
-
-const escapeXml = (s: string): string =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
 /** sitemap.xml (sitemaps.org 0.9): one <url> per entry, in the order given; <lastmod> only where known. */
 export function sitemapXml(entries: readonly SitemapEntry[]): string {
