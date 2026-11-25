@@ -5,8 +5,9 @@
 //
 //   - The checkout (--repo, default: the current directory's repository) must be AT <commit> and clean, so the dist
 //     this script builds is that commit's code. Its node_modules is used as it is.
-//   - Pattern Dump's own packages are rebuilt first (nx run-many -t build, with the Nx daemon off: a daemon started
-//     for a fresh worktree can hang with no output), so a stale dist can't leak in.
+//   - Pattern Dump's own packages are rebuilt first (nx run-many -t build), past Nx's cache, so neither a stale dist
+//     nor a cached one built with other dependencies can stand in for this commit's. With the Nx daemon off: a daemon
+//     started for a fresh worktree can hang with no output.
 //   - test-bench is taken from `git archive <commit> test-bench` into <checkout>/.golden-tb, which must be absent or
 //     empty, and every extracted file's mtime is pinned, so `?v=<mtime>` cache-busters don't depend on the checkout.
 //   - Pattern packages inside test-bench (pd-fixture-ui) are linked from the archived copy into its own node_modules,
@@ -53,7 +54,7 @@ const dirty = git("status", "--porcelain");
 if (dirty) fail(`the working tree of ${repo} is not clean:\n${dirty}`);
 
 // ---- 2. Pattern Dump's own code at that commit ----
-execFileSync("npx", ["nx", "run-many", "-t", "build"], { cwd: repo, stdio: "ignore", env: { ...process.env, NX_DAEMON: "false" } });
+execFileSync("npx", ["nx", "run-many", "-t", "build", "--skip-nx-cache"], { cwd: repo, stdio: "ignore", env: { ...process.env, NX_DAEMON: "false" } });
 
 // ---- 3. test-bench at that commit, with pinned mtimes ----
 // The folder is the same for every build of every commit (<checkout>/.golden-tb), and empty before extraction, so
