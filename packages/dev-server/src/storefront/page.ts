@@ -902,7 +902,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (a.socialComponent !== undefined && a.socialCard && !isNotFound && a.siteUrl !== undefined
     && checked.build.image === undefined && checked.build.socialImage !== false) {
     const variantId = checked.build.socialImage ? `${a.socialComponent}~${checked.build.socialImage}` : a.socialComponent;
-    const values = cardValues({ title, description, section: sectionOf(route, model), date: checked.build.date, site: site.values },
+    const values = cardValues({ title, description, section: sectionOf(route, model), date: checked.build.date,
+      dateText: checked.build.date === undefined ? undefined : dateFormat(checked.build.date), site: site.values },
       await variantData(variantId, a.discoveryMap));
     const missing = await missingFields(a.socialComponent, values, a.discoveryMap);
     if (missing.length) return fail(missing.map(f => missingFieldMessage(page.path, f, variantId, a.socialComponent!)));
