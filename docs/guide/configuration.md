@@ -190,6 +190,7 @@ in [storefront.md](storefront.md).
 | `site.lang` | string | `en` | The language of every page, for `<html lang>`: a language tag such as `de-AT` |
 | `site.index` | boolean | `true` | `false` keeps the whole site out of search engines, for a staging site: every page `noindex`, `robots.txt` disallows everything, no sitemap |
 | `site.image` | string | (none) | The link-preview image of every page that names none: a PNG, JPEG, GIF or WebP file in the assets, such as `/assets/images/share.png` |
+| `site.socialImages` | object | (none) | `{ component: "components/social-image" }`: each page without an `image` of its own gets a link-preview image rendered from that component, at 1200 x 630 with the page's title. Off when absent ([storefront.md](storefront.md#social-images)) |
 | `site.images` | object | (none) | The site's own `quality` and `effort` for its images, over `images` (above) |
 | `site.categories` | object | (none) | The categories a page's `categories:` may name, by key (lowercase letters, digits and hyphens): `{ guides: { label: "Guides", description: "…", aliases: ["how-to"] } }`. `label` is required; `aliases` are old keys kept after a rename. Independent of the folders, so a page changes category without changing its URL ([storefront.md](storefront.md#categories)) |
 | `site.tags` | object | (none) | The tags a page's `tags:` may name, declared as categories are: `{ css: { label: "CSS", aliases: ["styles"] } }`. Without it any tag works, labelled with its key ([storefront.md](storefront.md#tags)) |

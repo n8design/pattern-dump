@@ -291,10 +291,11 @@ lede: Three folders make a site.
 | `sort` | On a folder's `index.md` only: `date` lists the folder's pages newest first; `order`, the default, in the folder's order |
 | `view` | On a folder's `index.md` only: the view its listing is shown in, `views/<name>` in the skin. See [Listing views](#listing-views) |
 | `toc` | `true` shows the table of contents in its region; `false` keeps it out, whatever the layout says. See [The table of contents](#the-table-of-contents) |
+| `socialImage` | The variant of the social image component the page's social image is rendered from, such as `guide`; `false` for none, so the page takes `site.image`. Without it, the component itself. See [Social images](#social-images) |
 | any other key | Must be declared by the layout's schema |
 
 `layout`, `childLayout`, `order`, `image`, `index`, `redirectFrom`, `date`, `updated`, `tags`, `categories`, `draft`,
-`sort`, `view` and `toc` belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
+`sort`, `view`, `toc` and `socialImage` belong to the build: they never reach the layout as keys of their own, and a layout's schema may not declare any of
 them (a layout shows them through `page.date`, `page.updated`, `page.tags` and `page.categories`). `nav: true` or
 `false` belongs to the build as well; the layout still gets `nav`, the navigation, and may declare it.
 
@@ -383,7 +384,7 @@ options for its `related` query, without writing them.
   services/web.md (from the childDefaults of services/index.md, line 9): limit "two" is not a number of pages: a whole number from 1, such as 3
   ```
 
-  The values that can be checked without a page (`tags`, `categories`, `draft`, `index`, `toc`, `image`, `layout`)
+  The values that can be checked without a page (`tags`, `categories`, `draft`, `index`, `toc`, `image`, `socialImage`, `layout`)
   are also checked on the `index.md`, so a folder with no pages yet is checked too.
 - **`draft: true` as a default** keeps every page under the folder out of `pd build`. So that a forgotten line can't
   hide a section without a word, the build says so per folder:
@@ -1357,8 +1358,9 @@ and `pd build` writes `sitemap.xml`. Without it, those are left out and `pd buil
 the same tags carry the address the browser is on. Every page has `<html lang>` from `site.lang`
 (default `en`).
 
-**Images.** A page's image is its `image`, else `site.image`. Link previews show raster images only, so
-an image must be a PNG, JPEG, GIF or WebP file in the assets.
+**Images.** A page's image is its `image`, else its social image when the site has them
+([below](#social-images)), else `site.image`. Link previews show raster images only, so an image must be a PNG,
+JPEG, GIF or WebP file in the assets.
 
 **Keeping pages out.** `index: false` on a page gives it `noindex` and leaves it out of the sitemap.
 `site.index: false` does that for the whole site, for a staging site: `robots.txt` then disallows
@@ -1391,6 +1393,115 @@ previews only; the workbench itself stays searchable. A workbench on the site's 
   writes it to its own root, so copy its rule into the `robots.txt` that host serves at `/` (the build says
   so); its previews also carry a robots `noindex` tag then. On the site's host there is nothing to copy.
 - A site published under a path has no `robots.txt` at all ([below](#publishing-under-a-path)).
+
+### Social images
+
+A page without an `image` of its own gets a link-preview image rendered from a component of your style guide, in the
+site's design, with the page's title on it. Name the component in the config:
+
+```ts
+export default defineConfig({
+  site: {
+    socialImages: { component: "components/social-image" },
+  },
+});
+```
+
+The component is an ordinary one: it shows in the workbench with its own sample data, has a schema, and is checked
+like any other. Its own CSS sets its size, 1200 x 630, and its colour scheme (`color-scheme: dark` for a dark card).
+It is rendered in the layers a page of the site has, without a theme. Without `site.socialImages`, nothing changes.
+
+**What it gets.** The same fields on every page, of which its schema declares the ones it uses:
+
+| Field | Value |
+|---|---|
+| `title` | The page's title |
+| `description` | The page's description, if any |
+| `section` | The title of the page's top-level folder (its `index.md`); none for a top-level page |
+| `date` | The page's date, if any |
+| `site` | `site.globals` |
+
+A variant's data (`social-image~guide.json`) reaches it too, under those fields: the fields always win.
+
+**Choosing the design.** The component's variants are the designs. `socialImage` picks one, on a page or for a
+folder's pages in its `childDefaults` (nearest folder wins); `socialImage: false` turns it off, and the page takes
+`site.image`. Frontmatter reads `false` as text, so no variant can be called `false`. Without `socialImage`, the
+component itself. A page with an `image` of its own (or from `childDefaults`), the 404 page, and every page of a site
+without `site.url` get none. Tag and category pages get the component itself.
+
+**Where it goes.** A social image is a PNG of 1200 x 630 at `/_pd/social/<route>/card.<hash>.png` (the home page's at
+`/_pd/social/card.<hash>.png`). The page's head names it in `og:image` (with its width and height) and
+`twitter:image`. The hash covers what decides the picture: the component's markup as rendered with the page's fields,
+its stylesheets and the fonts and images they load, Pattern Dump's version and how it is rendered. Any change to those
+makes a new one; nothing else does.
+
+**How it is made.** `pd build` renders the social images it needs in Chromium, with the project's own Playwright
+(`npm install --save-dev playwright`), before it writes anything, and keeps them in
+`node_modules/.cache/pattern-dump/social/`: an unchanged page is not rendered again. `pd dev` renders one when it is
+first asked for. Text is drawn a little differently on macOS and Linux, so the same page can give different bytes on
+two machines; it keeps the same address.
+
+**Committed social images.** A host without Chromium, such as Cloudflare Pages, can't render them. Run `pd social`
+and commit what it writes: every social image the site needs, scheduled pages included and drafts never, in `social/`
+beside the pages folder, at `social/<route>/card.<hash>.png`. `pd build` uses a committed one when its hash matches
+and renders only what is missing or stale. `pd social` removes the files no page uses any more, and writes nothing when
+one social image has a problem.
+
+**Checks.** Each social image is checked when it is rendered, and a problem stops the build: its size must be 1200 x
+630, no field's text may overflow its box or the image, and its text is checked with axe's colour contrast rule
+(reported once per variant, with its pages).
+
+**Without Playwright.** A build that can't render a missing or stale social image doesn't stop: the page takes
+`site.image` (or none, with a `summary` card), each page is named in the report, and the report's last lines say how
+many pages went out without one.
+
+The messages, as Pattern Dump writes them (`<page>` is the page's file in the pages folder, such as
+`guide/install.md`; `<component>` the configured component):
+
+The component doesn't exist
+: `site.socialImages.component is "<component>", and there is no such component` (with `: did you mean "<id>"?` for a near one)
+
+It has no schema
+: `site.socialImages.component: <component> has no schema: a social image component declares the fields it uses in <name>.schema.json, beside its template`
+
+Its schema declares a field it doesn't get
+: `<component> declares "<field>", which a social image doesn't get: it gets title, description, section, date and site, and what a variant's data gives`
+
+A variant's data can't be read
+: `the data of <component>~<variant> cannot be read: <error>`
+
+`socialImage` isn't a variant name or `false`
+: `socialImage must be a variant of <component>, such as "<variant>", or false`
+
+`socialImage` names no variant
+: `socialImage "<value>" is not a variant of <component>: its variants are "<a>", "<b>"`, or `: it has no variants`
+
+`socialImage` without `site.socialImages`
+: `socialImage is set, but site.socialImages is not, so there is no social image component: set site.socialImages.component, or remove socialImage`
+
+A field the component requires and the page lacks
+: `<page>: the social image needs "<field>", which <variant> requires (<name>.schema.json): give the page a <field>, or set socialImage: false`
+
+The component doesn't render
+: `<page>: the social image (<variant>) doesn't render: <error>`
+
+Its text overflows
+: `<page>: the social image cuts its <field> off: shorten it, or let the component take more lines`
+
+Its size isn't 1200 x 630
+: `<variant>: the social image is <w> x <h>, and a card is 1200 x 630: set its size in its own CSS`
+
+Its text fails contrast
+: `<variant>: the social image fails color-contrast (<impact>): <help>, on <element> (<url>), on <n> pages: <page>, <page>`
+
+No Playwright to render it
+: `<page>: no social image: its card is missing or stale and Playwright isn't installed: run pd social, or install Playwright`
+
+Chromium doesn't start
+: `<page>: no social image: its card is missing or stale and Chromium didn't start (<reason>): run pd social, or npx playwright install chromium`
+
+The report's line for those pages
+: `[pd build] NO SOCIAL IMAGE: <n> pages use the site image instead (run pd social, or install Playwright)`, or `<n> pages have no link-preview image` without `site.image`
 
 ### The 404 page
 

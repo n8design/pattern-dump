@@ -155,6 +155,24 @@ Full guide: [static-build.md](static-build.md).
 
 ---
 
+## `pd social`
+
+Renders the site's social images into the project, to be committed: `social/` beside the pages folder, at
+`social/<route>/card.<hash>.png`. A build on a host without Chromium then uses them. It writes every social image the
+site needs, scheduled pages included and drafts never, removes the ones no page uses any more, and writes nothing when
+one has a problem. Needs `site.socialImages` and the project's own Playwright
+([storefront.md](storefront.md#social-images)).
+
+| Option | Description |
+|---|---|
+| `--root <path>` | A specific project root (default: the current folder) |
+| `--config <path>` | Use a config file outside the root |
+
+What it prints: `[pd social] <n> social images in social/: <n> rendered, <n> from the cache, <n> already there`, and
+`; <n> old ones removed` when it removed any.
+
+---
+
 ## `pd export`
 
 Finds families of near-duplicate components (copies that differ only in a modifier class on their root
