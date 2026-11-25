@@ -20,6 +20,13 @@
         "null"
       ]
     },
+    "dateText": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The page's date as the site writes it for readers (site.lang, site.dates)"
+    },
     "image": {
       "type": [
         "string",

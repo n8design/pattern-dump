@@ -4,6 +4,7 @@
       "route": "/articles/second/",
       "title": "A second article",
       "date": "2026-11-14",
+      "dateText": "November 14, 2026",
       "description": "Its teaser: the page's description, or its first paragraph.",
       "tags": [
         {
@@ -18,6 +19,7 @@
       "route": "/articles/first/",
       "title": "A first article",
       "date": "2026-11-01",
+      "dateText": "November 1, 2026",
       "description": "Listed below the newer one.",
       "tags": []
     }

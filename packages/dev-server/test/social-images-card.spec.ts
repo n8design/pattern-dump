@@ -66,11 +66,11 @@ const FILES: Record<string, string> = {
   "pages/off.md": fm(["title: Off", "socialImage: false"]),
 };
 
-const configFor = (url = "https://example.test/", globals: Record<string, unknown> = { title: "Bench" }) => validateConfig(defineConfig({
+const configFor = (url = "https://example.test/", globals: Record<string, unknown> = { title: "Bench" }, more: Record<string, unknown> = {}) => validateConfig(defineConfig({
   sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist", helpers: "./src/helpers",
   styles: { strategy: "parallel", dir: "./src/styles" }, assets: { strategy: "central", dir: "./assets" },
   site: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "https://wb.test/", url, image: "/assets/share.png",
-    globals, socialImages: { component: "components/social-image" } },
+    globals, socialImages: { component: "components/social-image" }, ...more },
 } as never), "test");
 
 let n = 0;
@@ -142,6 +142,42 @@ describe("which pages get a card", () => {
       expect(res.status).toBe(500);
       expect(res.body.toString("utf8")).toContain(
         `guide/index.md: the social image needs "description", which components/social-image requires (social-image.schema.json): give the page a description, or set socialImage: false`);
+    });
+  });
+});
+
+describe("the card's date as text", () => {
+  /** The component writes the date as text, and declares it. */
+  const SHOWS_TEXT = {
+    "src/patterns/components/social-image/social-image.hbs": `<div class="card"><h1>{{title}}</h1><time datetime="{{date}}">{{dateText}}</time></div>`,
+    "src/patterns/components/social-image/social-image.schema.json": json({ properties: {
+      title: { type: "string" }, date: { type: "string" }, dateText: { type: "string" } } }),
+  };
+  const cardAt = (root: string, route: string, config = configFor()) =>
+    withServer(root, async s => { await get(s, route); return s.socialCards().find(c => c.route === route); }, { config });
+
+  it("a component that declares dateText gets it, in the site's language and style, and its document shows it", async () => {
+    const root = await project(SHOWS_TEXT);
+    const card = (await cardAt(root, "/guide/install/"))!;
+    expect(card.values).toMatchObject({ date: "2026-11-01", dateText: "November 1, 2026" });
+    expect(card.document).toContain(`<time datetime="2026-11-01">November 1, 2026</time>`);
+    const gb = (await cardAt(root, "/guide/install/", configFor(undefined, undefined, { lang: "en-GB" })))!;
+    expect(gb.values?.["dateText"]).toBe("1 November 2026");
+    const short = (await cardAt(root, "/guide/install/", configFor(undefined, undefined, { lang: "en-GB", dates: { day: "numeric", month: "short", year: "numeric" } })))!;
+    expect(short.values?.["dateText"]).toBe("1 Nov 2026");
+    // Another text is another picture.
+    expect(new Set([card.hash, gb.hash, short.hash]).size).toBe(3);
+  });
+
+  it("a page without a date has none, and a component that requires it names the date to give", async () => {
+    const root = await project({ ...SHOWS_TEXT, "src/patterns/components/social-image/social-image.schema.json": json({
+      required: ["dateText"], properties: { title: { type: "string" }, date: { type: "string" }, dateText: { type: "string" } } }) });
+    await withServer(root, async s => {
+      expect((await get(s, "/guide/install/")).status).toBe(200);
+      const res = await get(s, "/guide/");
+      expect(res.status).toBe(500);
+      expect(res.body.toString("utf8")).toContain(
+        `guide/index.md: the social image needs "dateText", which components/social-image requires (social-image.schema.json): give the page a date, or set socialImage: false`);
     });
   });
 });

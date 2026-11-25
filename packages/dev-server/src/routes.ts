@@ -17,6 +17,7 @@
 import type { SymbolService } from "./symbol-service.js";
 import { standaloneSvg } from "./symbols.js";
 import { baseTokens } from "./css-tokens.js";
+import { dateFormatter } from "./storefront/date-text.js";
 import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
@@ -884,7 +885,8 @@ async function routeRequest(
         image: (path, as) => checkPageImage(path, assetRoots, assetRootNames,
           { written: as?.written, beside: as?.beside, pagesDir: storefront.pagesDir }),
         ...(siteUrl !== undefined ? { siteUrl } : {}),
-        lang: cfg.storefront.lang, siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
+        lang: cfg.storefront.lang, dateFormat: dateFormatter(cfg.storefront.lang, cfg.storefront.dates),
+        siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
         ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
         ...(cfg.storefront.socialImages ? {

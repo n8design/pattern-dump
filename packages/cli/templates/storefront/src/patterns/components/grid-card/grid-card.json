@@ -2,5 +2,6 @@
   "route": "/articles/hello/",
   "title": "Hello, articles",
   "image": "/assets/icon.svg",
-  "date": "2026-11-14"
+  "date": "2026-11-14",
+  "dateText": "November 14, 2026"
 }

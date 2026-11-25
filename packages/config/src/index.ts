@@ -205,6 +205,13 @@ export interface ImageSettings {
   effort?: number;
 }
 
+/** site.dates: the options of `Intl.DateTimeFormat` that write a day (DATE_OPTIONS). */
+export type SiteDates = Pick<Intl.DateTimeFormatOptions, (typeof DATE_OPTIONS)[number]>;
+
+/** The options of `Intl.DateTimeFormat` site.dates takes: those of a day. A time, its parts and a time zone are
+ *  not among them (a page's date is a day). */
+export const DATE_OPTIONS = ["dateStyle", "weekday", "era", "year", "month", "day", "calendar", "numberingSystem"] as const;
+
 /**
  * @deprecated Use SiteConfig. Removed in 1.0. The shape of `storefront`, the old name of `site`: the values every page
  * shares are its `site`, where SiteConfig has `globals`.
@@ -239,6 +246,13 @@ export interface StorefrontConfig {
   url?: string;
   /** The language of every page, as `<html lang>` takes it (a BCP 47 tag such as `de-AT`). Default: `en`. */
   lang?: string;
+  /**
+   * How a page's dates are written for its readers (`page.dateText`, an entry's `dateText` and the others), in the
+   * style of `lang`: options of `Intl.DateTimeFormat` for a day, such as `{ day: "numeric", month: "short", year:
+   * "numeric" }`. Default: `{ dateStyle: "long" }`, which is "November 1, 2026" in `en` and "1 November 2026" in
+   * `en-GB`. A date is a day, so no time and no time zone: the day is written as it is, wherever the site is built.
+   */
+  dates?: SiteDates;
   /**
    * `false` keeps the whole site out of search engines (a staging site): every page gets `noindex`,
    * `robots.txt` disallows everything, and there is no sitemap. Default: `true`.

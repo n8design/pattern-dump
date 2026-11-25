@@ -6,6 +6,9 @@
     // The workbench is published on the website's own host, under /workbench/ (and built for that path,
     // build.basePath below).
     workbenchUrl: "/workbench/",
+    // The language of every page (<html lang>), which also decides how dates are written: "en" writes
+    // "November 1, 2026", "en-GB" "1 November 2026", "de-AT" "1. November 2026". site.dates sets the style.
+    lang: "en",
     // The site's address, once you know it: canonical URLs, link previews and the sitemap are built from it.
     // url: "https://www.example.com/",
     // Or a subfolder, such as a GitHub project page: the site is then served under the path, in `npm run dev` too,

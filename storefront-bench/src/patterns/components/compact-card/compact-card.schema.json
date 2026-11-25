@@ -7,6 +7,7 @@
   "properties": {
     "route": { "type": "string", "description": "The page's URL" },
     "title": { "type": "string", "description": "The page's title, as the link" },
-    "date": { "type": ["string", "null"], "description": "The page's date, YYYY-MM-DD" }
+    "date": { "type": ["string", "null"], "description": "The page's date, YYYY-MM-DD" },
+    "dateText": { "type": ["string", "null"], "description": "The page's date as the site writes it for readers (site.lang, site.dates)" }
   }
 }

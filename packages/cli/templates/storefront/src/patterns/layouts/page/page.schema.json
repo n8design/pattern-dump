@@ -14,6 +14,7 @@
       "properties": {
         "next": { "description": "The page after this one in the navigation" },
         "date": { "description": "The page's date, from its frontmatter, for an article" },
+        "dateText": { "description": "The same date as the site writes it for readers (site.lang, site.dates)" },
         "tags": { "description": "The page's tags, from its frontmatter" }
       }
     }

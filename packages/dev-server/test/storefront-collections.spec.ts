@@ -15,6 +15,7 @@ import { buildDiscoveryMap } from "@pattern-dump/discovery";
 import { createRenderer } from "@pattern-dump/renderer";
 import { buildCompositionRegistry } from "../src/composition.js";
 import { assemblePage, type PageAssembly } from "../src/storefront/page.js";
+import { dateFormatter } from "../src/storefront/date-text.js";
 
 const roots: string[] = [];
 afterAll(async () => { await Promise.all(roots.map(r => rm(r, { recursive: true, force: true }))); });
@@ -127,7 +128,7 @@ describe("entriesOf", () => {
     expect(r.problems).toEqual([]);
     expect(r.entries.map(e => [e.route, e.date])).toEqual([
       ["/articles/b/", "2026-11-02"], ["/articles/d/", "2026-10-15"], ["/articles/a/", "2026-10-01"], ["/articles/c/", "2026-10-01"]]);
-    expect(r.entries[0]).toEqual({ route: "/articles/b/", title: "B", description: "Body of B.", date: "2026-11-02", updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false });
+    expect(r.entries[0]).toEqual({ route: "/articles/b/", title: "B", description: "Body of B.", date: "2026-11-02", dateText: "November 2, 2026", updated: null, updatedText: null, image: null, tags: [], categories: [], draft: false, scheduled: false });
   });
 
   it("keeps the folder's order without sort: date", async () => {
@@ -195,8 +196,8 @@ describe("assemblePage: page.children, page.date, page.tags, and datePublished",
     const { page: p, data } = await assemble("/articles/", site, ["children"]);
     expect(p.problems).toEqual([]);
     expect(data).toEqual({ children: [
-      { route: "/articles/new/", title: "New", description: "Newest", date: "2026-11-02", updated: null, image: null, tags: [], categories: [], draft: false, scheduled: false },
-      { route: "/articles/old/", title: "Old", description: "The old one.", date: "2026-01-05", updated: null, image: null, tags: [{ key: "css", label: "css", description: null, route: null }], categories: [], draft: false, scheduled: false },
+      { route: "/articles/new/", title: "New", description: "Newest", date: "2026-11-02", dateText: "November 2, 2026", updated: null, updatedText: null, image: null, tags: [], categories: [], draft: false, scheduled: false },
+      { route: "/articles/old/", title: "Old", description: "The old one.", date: "2026-01-05", dateText: "January 5, 2026", updated: null, updatedText: null, image: null, tags: [{ key: "css", label: "css", description: null, route: null }], categories: [], draft: false, scheduled: false },
     ] });
     expect(p.html).toContain("<li>New: Newest</li><li>Old: The old one.</li>");
   });
@@ -209,6 +210,43 @@ describe("assemblePage: page.children, page.date, page.tags, and datePublished",
     expect((await assemble("/articles/old/", site, ["date", "tags"])).data).toEqual({ date: "2026-01-05", tags: [{ key: "css", label: "css", description: null, route: null }] });
     const fromGit = await assemble("/", site, ["date", "tags"], { dates: fakeDates({ "index.md": "2025-12-24T08:00:00+01:00" }) });
     expect(fromGit.data).toEqual({ date: "2025-12-24", tags: [] });
+  });
+
+  it("a page gets its dates as text for readers, in the site's language and style, null without a date", async () => {
+    const files = { ...site, "articles/later.md": page("Later", "date: 2026-11-02\nupdated: 2026-11-20\n") };
+    const keys = ["date", "dateText", "updated", "updatedText", "created", "createdText"];
+    // Git's created is a date-time in the author's zone: its text is the author's day, not the machine's.
+    const dates = fakeDates({ "articles/later.md": "2026-11-01T23:30:00-08:00" });
+    expect((await assemble("/articles/later/", files, keys, { dates })).data).toEqual({
+      date: "2026-11-02", dateText: "November 2, 2026", updated: "2026-11-20", updatedText: "November 20, 2026",
+      created: "2026-11-01T23:30:00-08:00", createdText: "November 1, 2026",
+    });
+    expect((await assemble("/articles/later/", files, keys, { dates, lang: "de-AT" })).data).toMatchObject({
+      dateText: "2. November 2026", updatedText: "20. November 2026", createdText: "1. November 2026",
+    });
+    const style = dateFormatter("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    expect((await assemble("/articles/later/", files, keys, { dates, lang: "en-GB", dateFormat: style })).data).toMatchObject({
+      dateText: "2 Nov 2026", updatedText: "20 Nov 2026", createdText: "1 Nov 2026",
+    });
+    // Each text key alone is enough: page.dateText without page.date.
+    expect((await assemble("/articles/later/", files, ["dateText", "createdText"], { dates })).data).toEqual({
+      dateText: "November 2, 2026", createdText: "November 1, 2026",
+    });
+    // No date of its own, nothing from git: null, as the ISO key is.
+    expect((await assemble("/", files, keys)).data).toEqual({
+      date: null, dateText: null, updated: null, updatedText: null, created: null, createdText: null,
+    });
+  });
+
+  it("an entry gets its dates as text, a git-dated one too, in the site's style", async () => {
+    const files = { ...site, "articles/later.md": page("Later", "updated: 2026-11-20\n") };
+    const dates = fakeDates({ "articles/later.md": "2026-11-14T00:30:00+13:00" });
+    const { data } = await assemble("/articles/", files, ["children"], { dates, lang: "en-GB" });
+    expect((data?.["children"] as Array<{ route: string; dateText: unknown; updatedText: unknown }>).map(e => [e.route, e.dateText, e.updatedText])).toEqual([
+      ["/articles/later/", "14 November 2026", "20 November 2026"],
+      ["/articles/new/", "2 November 2026", null],
+      ["/articles/old/", "5 January 2026", null],
+    ]);
   });
 
   it("datePublished is the page's date, else git's first commit of it", async () => {

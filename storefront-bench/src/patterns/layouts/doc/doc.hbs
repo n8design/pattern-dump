@@ -30,8 +30,8 @@
   {{/if}}
   {{#if page.created}}
   <p class="doc-dates">
-    Created <time class="doc-created" datetime="{{page.created}}">{{page.created}}</time>{{#if page.updated}},
-    updated <time class="doc-updated" datetime="{{page.updated}}">{{page.updated}}</time>{{/if}}
+    Created <time class="doc-created" datetime="{{page.created}}">{{page.createdText}}</time>{{#if page.updated}},
+    updated <time class="doc-updated" datetime="{{page.updated}}">{{page.updatedText}}</time>{{/if}}
   </p>
   {{/if}}
   <nav class="doc-pager" aria-label="Previous and next">

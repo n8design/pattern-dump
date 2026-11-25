@@ -192,6 +192,6 @@ describe("the social image component, checked with the site's pages", () => {
       site: { type: "object" }, tone: { type: "string" }, author: { type: "string" },
     } }) });
     expect(await assembledProblems(root, "/about/")).toEqual([
-      `components/social-image declares "author", which a social image doesn't get: it gets title, description, section, date and site, and what a variant's data gives`]);
+      `components/social-image declares "author", which a social image doesn't get: it gets title, description, section, date, dateText and site, and what a variant's data gives`]);
   });
 });

@@ -41,7 +41,8 @@ import { resolveNavigations } from "./navigations.js";
 import { checkPageDeclaration, FILLED, pageValue, positionOf, RETIRED, type DerivedPage, type PageHeading } from "./derived.js";
 import { checkDeclaredQueries, declaredQueries, resolveQuery, type ResolvedQuery } from "./query.js";
 import { collidingHeadings, idsBesides } from "./anchors.js";
-import type { GitDates, PageDates } from "./git-dates.js";
+import { dateFormatter, type DateFormat } from "./date-text.js";
+import type { GitDates } from "./git-dates.js";
 import type { CompositionRegistry } from "../composition.js";
 import { readFile } from "node:fs/promises";
 import type { PageImage, PageImageCheck } from "./page-image.js";
@@ -111,6 +112,9 @@ export interface PageAssembly {
   siteUrl?: string;
   /** <html lang>. Default: "en". */
   lang?: string;
+  /** How dates are written for readers (`page.dateText` and the others; date-text.ts): site.lang in the style of
+   *  site.dates. Default: `lang`'s in the long style. */
+  dateFormat?: DateFormat;
   /** storefront.index: false gives every page noindex. Default: true. */
   siteIndex?: boolean;
   /** The image index, ready for this render: a page's images from the assets are written with their variants
@@ -609,18 +613,20 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   // runs for a site that needs neither. Only a layout that shows dates is stopped by an unreliable one (a
   // shallow clone in pd build) or noted about a missing one: the JSON-LD just leaves the date out.
   const notes: string[] = [];
-  let dates: Partial<Pick<PageDates, "created">> = {};
+  let dates: Partial<Pick<DerivedPage, "created" | "createdText">> = {};
   // dateModified: the page's own updated; git's last commit counts a typo fix as a change, so it is never used.
   const modified: string | null = checked.build.updated ?? null;
   // datePublished: the page's own date, else the day git first saw it.
   let published: string | null = checked.build.date ?? null;
   const mode = a.live ? "dev" : "build";
   const declares = (k: string) => pageDeclaration.declared?.includes(k) ?? false;
-  const showsDates = declares("created");
+  const dateFormat = a.dateFormat ?? dateFormatter(a.lang ?? "en");
+  const asText = (d: string | null | undefined): string | null => d === null || d === undefined ? null : dateFormat(d);
+  const showsDates = declares("created") || declares("createdText");
   if (a.dates && !isNotFound && (showsDates || a.siteUrl !== undefined)) {
     const dated = await a.dates.of(page.path, mode);
     if (showsDates) {
-      dates = { created: dated.dates.created };
+      dates = { created: dated.dates.created, createdText: asText(dated.dates.created) };
       notes.push(...dated.notes);
       problems.push(...dated.problems);
     }
@@ -628,12 +634,12 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     else published ??= dated.dates.created;
   }
   // A listing's entries, and the page's own date and tags (collections.ts), for a layout that shows them.
-  const listing: { children?: Entry[]; date?: string | null; updated?: string | null; tags?: Term[]; categories?: Category[]; listing?: string | null;
+  const listing: { children?: Entry[]; date?: string | null; dateText?: string | null; updated?: string | null; updatedText?: string | null; tags?: Term[]; categories?: Category[]; listing?: string | null;
     term?: GeneratedPage["term"] | null; terms?: GeneratedPage["terms"] | null } = {};
   // The layout's card for them (x-pd-card on page.children): every page of the listing is checked against it.
   const layoutCard = cardOf(layoutSchema?.properties?.["page"]?.properties?.["children"]);
   if (declares("children")) {
-    const listed = isNotFound ? { entries: [], problems: [], notes: [] } : await entriesOf(route, model, { dates: a.dates, mode });
+    const listed = isNotFound ? { entries: [], problems: [], notes: [] } : await entriesOf(route, model, { dates: a.dates, mode, dateFormat });
     listing.children = listed.entries;
     problems.push(...listed.problems);
     notes.push(...listed.notes);
@@ -656,7 +662,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     if (resolved.view) {
       let entries = listing.children;
       if (entries === undefined) {
-        const listed = await entriesOf(route, model, { dates: a.dates, mode });
+        const listed = await entriesOf(route, model, { dates: a.dates, mode, dateFormat });
         entries = listed.entries;
         problems.push(...listed.problems);
         notes.push(...listed.notes);
@@ -677,7 +683,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       for (const q of declaredQs) {
         if (isNotFound) { queries.push({ name: q.name, entries: [], problems: [], notes: [] }); continue; }
         const r = await resolveQuery(q, { route, path: page.path, frontmatter: page.frontmatter, ...(page.defaults ? { defaults: page.defaults } : {}), layoutId: checked.layoutId, model,
-          discoveryMap: a.discoveryMap, dates: a.dates, mode,
+          discoveryMap: a.discoveryMap, dates: a.dates, mode, dateFormat,
           ...(generated ? { own: {
             tags: generated.kind === "tag" && generated.term ? [generated.term.key] : [],
             categories: generated.kind === "category" && generated.term ? [generated.term.key] : [],
@@ -688,20 +694,24 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       }
     }
   }
-  if (declares("date")) {
+  if (declares("date") || declares("dateText")) {
     const dated = isNotFound ? { date: null, problems: [], notes: [] } : await dateOf(route, model, a.dates, mode);
     listing.date = dated.date;
+    listing.dateText = asText(dated.date);
     problems.push(...dated.problems);
     notes.push(...dated.notes);
   }
-  if (declares("updated")) listing.updated = checked.build.updated ?? null;
+  if (declares("updated") || declares("updatedText")) {
+    listing.updated = checked.build.updated ?? null;
+    listing.updatedText = asText(listing.updated);
+  }
   // A page's own tags and categories, with their pages' routes (the 404 page has no entry: its own, by key).
   if (declares("tags")) listing.tags = model.entries.get(route)?.tags ?? (checked.build.tags ?? []).map(k => termOf(model.tags, k));
   if (declares("categories")) listing.categories = model.entries.get(route)?.categories ?? (checked.build.categories ?? []).map(k => termOf(model.categories, k));
   if (declares("term")) listing.term = generated?.term ?? null;
   if (declares("terms")) listing.terms = generated?.terms ?? null;
   // The collections the skin lists (site.collections), on every page.
-  const collections = site.collections.length ? await resolveCollections(site.collections, model, { dates: a.dates, mode }) : undefined;
+  const collections = site.collections.length ? await resolveCollections(site.collections, model, { dates: a.dates, mode, dateFormat }) : undefined;
   if (collections) {
     problems.push(...collections.problems);
     notes.push(...collections.notes);
@@ -892,7 +902,8 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (a.socialComponent !== undefined && a.socialCard && !isNotFound && a.siteUrl !== undefined
     && checked.build.image === undefined && checked.build.socialImage !== false) {
     const variantId = checked.build.socialImage ? `${a.socialComponent}~${checked.build.socialImage}` : a.socialComponent;
-    const values = cardValues({ title, description, section: sectionOf(route, model), date: checked.build.date, site: site.values },
+    const values = cardValues({ title, description, section: sectionOf(route, model), date: checked.build.date,
+      dateText: checked.build.date === undefined ? undefined : dateFormat(checked.build.date), site: site.values },
       await variantData(variantId, a.discoveryMap));
     const missing = await missingFields(a.socialComponent, values, a.discoveryMap);
     if (missing.length) return fail(missing.map(f => missingFieldMessage(page.path, f, variantId, a.socialComponent!)));

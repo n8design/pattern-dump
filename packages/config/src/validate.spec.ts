@@ -229,6 +229,35 @@ describe("configProblems — storefront", () => {
     }
   });
 
+  it("takes the options of a day for dates", () => {
+    const base = { pagesDir: "./pages", outDir: "./www" };
+    for (const ok of [{ dateStyle: "long" }, { dateStyle: "medium" }, { day: "numeric", month: "short", year: "numeric" },
+      { weekday: "long", day: "2-digit", month: "2-digit", era: "short" }, { dateStyle: "full", calendar: "gregory", numberingSystem: "latn" }, {}]) {
+      expect(storefront({ ...base, dates: ok }), JSON.stringify(ok)).toEqual([]);
+    }
+    // A time, or a time zone, by name.
+    for (const key of ["timeZone", "timeStyle", "hour", "minute", "second", "dayPeriod", "fractionalSecondDigits", "hour12", "hourCycle", "timeZoneName"]) {
+      const problems = storefront({ ...base, dates: { dateStyle: "long", [key]: "x" } });
+      expect(problems, key).toHaveLength(1);
+      expect(problems[0], key).toMatch(new RegExp(`^"site\\.dates\\.${key}": a page's date is a day, so site\\.dates takes no time`));
+    }
+    expect(storefront({ ...base, dates: { timeZone: "Europe/Vienna" } })).toEqual([
+      `"site.dates.timeZone": a page's date is a day, so site.dates takes no time zone (the day is written as it is, wherever the site is built): leave it out`,
+    ]);
+    expect(storefront({ ...base, dates: { mnth: "long" } })).toEqual([
+      `unknown key "site.dates.mnth": site.dates takes dateStyle, weekday, era, year, month, day, calendar, numberingSystem: did you mean "site.dates.month"?`,
+    ]);
+    // A whole style with a part of one.
+    expect(storefront({ ...base, dates: { dateStyle: "long", day: "numeric", year: "numeric" } })).toEqual([
+      `"site.dates": dateStyle is a whole style, so it can't be set with year, day: use dateStyle alone, or the parts alone, such as { day: "numeric", month: "long", year: "numeric" }`,
+    ]);
+    // A value Intl doesn't take.
+    const bad = storefront({ ...base, dates: { month: "longest" } });
+    expect(bad).toHaveLength(1);
+    expect(bad[0]).toMatch(/^"site\.dates": .*longest/);
+    expect(storefront({ ...base, dates: "long" })).toEqual([`"site.dates" must be an object of Intl.DateTimeFormat options for a day, such as { dateStyle: "long" }`]);
+  });
+
   it("takes a colour token's name for assets.symbols.currentColor", () => {
     const symbols = (currentColor: unknown) => configProblems({ ...valid, assets: { symbols: { currentColor } } });
     for (const ok of ["--color-text", "--color-on_dark-2"]) expect(symbols(ok), ok).toEqual([]);

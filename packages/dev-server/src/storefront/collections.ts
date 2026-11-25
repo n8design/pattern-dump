@@ -6,13 +6,14 @@
 // A listed name the pages folder has no folder for is an empty list and a note, or an error when the skin requires it.
 //
 // An entry has Pattern Dump's fixed shape: route, title, description (the page's, else its first paragraph),
-// date, image, tags, draft. Its date is the page's `date`, else the day git first saw it (`page.created`), else
+// date, image, tags, draft; and its date and updated as text for readers (dateText, updatedText: date-text.ts). Its date is the page's `date`, else the day git first saw it (`page.created`), else
 // null. In pd build a page whose date would come from a shallow clone stops the listing, as a layout that shows
 // dates does. The folder's `sort`: "order" (the default) keeps the folder's order, "date" puts the newest first,
 // ties by route; a page with no date at all is then a problem in pd build and a note in pd dev, where it sorts
 // last.
 
 import { suggest } from "@pattern-dump/config";
+import { dateFormatter, type DateFormat } from "./date-text.js";
 import type { DatesMode, GitDates } from "./git-dates.js";
 import type { PageModel } from "./pages.js";
 import type { Category, Term } from "./categories.js";
@@ -23,7 +24,11 @@ export interface Entry {
   title: string;
   description: string | null;
   date: string | null;
+  /** `date` as the site writes it for readers (site.lang, site.dates); null without a date. */
+  dateText: string | null;
   updated: string | null;
+  /** `updated` as the site writes it for readers; null without one. */
+  updatedText: string | null;
   image: string | null;
   tags: Term[];
   categories: Category[];
@@ -38,6 +43,19 @@ export interface Listed {
   notes: string[];
 }
 
+/** How entries are made: the pages' dates from git, pd dev or pd build, and how dates are written for readers
+ *  (the site's dateFormat; `en` in the long style without one). */
+export interface EntryOptions { dates?: GitDates | undefined; mode: DatesMode; dateFormat?: DateFormat | undefined }
+
+const defaultFormat = dateFormatter("en");
+
+/** An entry from a page's fields and its date, with both dates as text. */
+function entry(route: string, title: string, fields: Omit<Entry, "route" | "title" | "date" | "dateText" | "updatedText">,
+  date: string | null, format: DateFormat = defaultFormat): Entry {
+  return { route, title, ...fields, date, dateText: date === null ? null : format(date),
+    updatedText: fields.updated === null ? null : format(fields.updated) };
+}
+
 /** The date of the page at `route`: its own, else the day git first saw it. */
 export async function dateOf(route: string, model: PageModel, dates: GitDates | undefined, mode: DatesMode)
   : Promise<{ date: string | null; problems: string[]; notes: string[] }> {
@@ -49,17 +67,17 @@ export async function dateOf(route: string, model: PageModel, dates: GitDates | 
 }
 
 /** The entry of the page at `route`, with its date (dateOf); undefined for a route that is no page. */
-export async function entryOf(route: string, model: PageModel, o: { dates?: GitDates | undefined; mode: DatesMode })
+export async function entryOf(route: string, model: PageModel, o: EntryOptions)
   : Promise<{ entry?: Entry; problems: string[]; notes: string[] }> {
   const fields = model.entries.get(route);
   if (!fields) return { problems: [], notes: [] };
   const dated = await dateOf(route, model, o.dates, o.mode);
   const title = model.pages.find(p => p.route === route)?.title ?? route;
-  return { entry: { route, title, ...fields, date: dated.date }, problems: dated.problems, notes: dated.notes };
+  return { entry: entry(route, title, fields, dated.date, o.dateFormat), problems: dated.problems, notes: dated.notes };
 }
 
 /** The entries of the folder at `folder` (a route: "/articles/"), sorted as its index.md says. */
-export async function entriesOf(folder: string, model: PageModel, o: { dates?: GitDates | undefined; mode: DatesMode }): Promise<Listed> {
+export async function entriesOf(folder: string, model: PageModel, o: EntryOptions): Promise<Listed> {
   const listing = model.folders.get(folder);
   if (!listing) return { entries: [], problems: [], notes: [] };
   const titles = new Map(model.pages.map(p => [p.route, p.title]));
@@ -72,7 +90,7 @@ export async function entriesOf(folder: string, model: PageModel, o: { dates?: G
     problems.push(...dated.problems);
     // Why a date is missing matters where the order depends on it.
     if (listing.sort === "date") notes.push(...dated.notes);
-    entries.push({ route, title: titles.get(route) ?? route, ...fields, date: dated.date });
+    entries.push(entry(route, titles.get(route) ?? route, fields, dated.date, o.dateFormat));
   }
   if (listing.sort === "date") {
     const index = model.files.get(folder)!.path;
@@ -131,7 +149,7 @@ export function checkCollections(
 }
 
 /** Every listed collection's entries, by name, for the page being rendered. */
-export async function resolveCollections(listed: readonly string[], model: PageModel, o: { dates?: GitDates | undefined; mode: DatesMode })
+export async function resolveCollections(listed: readonly string[], model: PageModel, o: EntryOptions)
   : Promise<{ collections: Record<string, Entry[]>; problems: string[]; notes: string[] }> {
   const collections: Record<string, Entry[]> = {};
   const problems: string[] = [], notes: string[] = [];

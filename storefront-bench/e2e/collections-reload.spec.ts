@@ -27,7 +27,8 @@ test("a date edit reorders the open listing, and the home page's latest", async 
   await expect(home.locator(".home-latest a")).toHaveText(["A harbour of cable cars", "Plain on purpose"]);
   await save(file("plain"), originals.get("plain")!.replace("date: 2026-10-02", "date: 2026-11-05"));
   await expect(page.locator(".card-title a")).toHaveText(["Plain on purpose", "A harbour of cable cars"], { timeout: 10_000 });
-  await expect(page.locator(".card-date time").first()).toHaveText("2026-11-05");
+  await expect(page.locator(".card-date time").first()).toHaveText("November 5, 2026");
+  await expect(page.locator(".card-date time").first()).toHaveAttribute("datetime", "2026-11-05");
   await expect(home.locator(".home-latest a")).toHaveText(["Plain on purpose", "A harbour of cable cars"], { timeout: 10_000 });
   await home.close();
 });

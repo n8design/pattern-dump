@@ -27,12 +27,18 @@ export interface DerivedPage {
   next: PageLink | null;
   /** The day git first saw the page. */
   created: string | null;
+  /** `created` as the site writes it for readers (site.lang in the style of site.dates: date-text.ts). */
+  createdText: string | null;
   /** The page's own `updated`, its last real change; null without one. Never git's last commit. */
   updated: string | null;
+  /** `updated` as the site writes it for readers. */
+  updatedText: string | null;
   /** A folder's index.md: its pages (collections.ts); [] on any other page. */
   children: Entry[];
   /** The page's date, YYYY-MM-DD: its own, else the day git first saw it. */
   date: string | null;
+  /** `date` as the site writes it for readers. */
+  dateText: string | null;
   /** The page's tags (categories.ts), in its order; [] when it has none. */
   tags: Term[];
   /** The page's categories (categories.ts), in its order; [] when it has none. */
@@ -61,7 +67,7 @@ const TERM_PAGE: Shape = { fields: { key: "value", label: "value", description: 
 /** An entry of a listing (collections.ts). */
 export const ENTRY: Shape = {
   fields: {
-    route: "value", title: "value", description: "value", date: "value", updated: "value", image: "value", tags: { items: TERM },
+    route: "value", title: "value", description: "value", date: "value", dateText: "value", updated: "value", updatedText: "value", image: "value", tags: { items: TERM },
     categories: { items: CATEGORY }, draft: "value", scheduled: "value",
   },
 };
@@ -75,9 +81,12 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
     prev: LINK,
     next: LINK,
     created: "value",
+    createdText: "value",
     updated: "value",
+    updatedText: "value",
     children: { items: ENTRY },
     date: "value",
+    dateText: "value",
     tags: { items: TERM },
     categories: { items: CATEGORY },
     term: TERM_PAGE,
@@ -88,7 +97,7 @@ export const PAGE_SHAPE: { fields: Record<keyof DerivedPage, Shape> } = {
 };
 
 /** The sub-keys of `page` Pattern Dump fills today. Each later step adds the keys it derives. */
-export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "updated", "children", "date", "tags", "categories", "term", "terms", "listing", "regions"];
+export const FILLED: readonly (keyof DerivedPage)[] = ["headings", "section", "breadcrumbs", "prev", "next", "created", "createdText", "updated", "updatedText", "children", "date", "dateText", "tags", "categories", "term", "terms", "listing", "regions"];
 
 /** Sub-keys Pattern Dump filled once and no longer does, with what to declare instead. */
 export const RETIRED: Readonly<Record<string, string>> = {

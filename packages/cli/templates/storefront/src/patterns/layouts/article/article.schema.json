@@ -13,6 +13,7 @@
       "description": "What Pattern Dump works out for the page",
       "properties": {
         "date": { "description": "The article's date, from its frontmatter" },
+        "dateText": { "description": "The same date as the site writes it for readers (site.lang, site.dates)" },
         "tags": { "description": "The article's tags, from its frontmatter" },
         "related": {
           "description": "Up to three articles of the same folder, the ones sharing most tags and categories first, in the compact view. An article changes options under related: (limit: 5, indented), or turns them off with related: false",

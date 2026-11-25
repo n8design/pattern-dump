@@ -55,7 +55,7 @@ async function assemble(route: string, patterns: Record<string, string>, pages: 
   return page;
 }
 
-const ENTRY_FIELDS = "route, title, description, date, updated, image, tags, categories, draft, scheduled";
+const ENTRY_FIELDS = "route, title, description, date, dateText, updated, updatedText, image, tags, categories, draft, scheduled";
 
 describe("x-pd-card: each page of a listing, checked against its card", () => {
   it("renders a listing whose pages have every field the card requires", async () => {
@@ -71,6 +71,18 @@ describe("x-pd-card: each page of a listing, checked against its card", () => {
       `articles/index.md: articles/two.md has no image, which the listing's card (components/card) requires: give it one (image: /assets/images/<name>.jpg, a raster image in the assets)`,
       // An empty list is no tags at all.
       `articles/index.md: articles/two.md has no tags, which the listing's card (components/card) requires: give it one (tags: [a-tag])`,
+    ]);
+  });
+
+  it("takes a card that declares dateText, and names the date a page without one needs", async () => {
+    const shows = { ...LISTING, "components/card/card.hbs": `<article><h2>{{title}}</h2><time datetime="{{date}}">{{dateText}}</time></article>`,
+      ...card({ required: ["title", "dateText"], properties: { title: { type: "string" }, date: { type: ["string", "null"] }, dateText: { type: ["string", "null"] } } }) };
+    const p = await assemble("/articles/", shows);
+    expect(p.problems).toEqual([]);
+    expect(p.html).toContain(`<li><article><h2>One</h2><time datetime="2026-11-02">November 2, 2026</time></article></li>`);
+    const undated = await assemble("/articles/", shows, { ...SITE, "articles/index.md": md("Articles", "layout: listing\n"), "articles/three.md": md("Three") });
+    expect(undated.problems).toEqual([
+      `articles/index.md: articles/three.md has no dateText, which the listing's card (components/card) requires: give it one (date: YYYY-MM-DD, which it is written from)`,
     ]);
   });
 

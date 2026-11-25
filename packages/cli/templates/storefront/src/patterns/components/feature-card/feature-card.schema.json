@@ -39,6 +39,13 @@
       ],
       "description": "The page's date, YYYY-MM-DD"
     },
+    "dateText": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The page's date as the site writes it for readers (site.lang, site.dates), such as \"November 14, 2026\""
+    },
     "description": {
       "type": [
         "string",

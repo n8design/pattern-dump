@@ -19,8 +19,8 @@ import type { Read } from "./listing-keys.js";
 import type { PageModel } from "./pages.js";
 
 /** What every social image is rendered with, whatever the page: its title, its description, the title of its
- *  top-level folder, its date, and the site's globals. */
-export const SOCIAL_FIELDS = ["title", "description", "section", "date", "site"] as const;
+ *  top-level folder, its date (YYYY-MM-DD, and as the site writes it for readers), and the site's globals. */
+export const SOCIAL_FIELDS = ["title", "description", "section", "date", "dateText", "site"] as const;
 
 /** The social image component, and the names of its variants, sorted. */
 export interface SocialChoice { component: string; variants: readonly string[] }
@@ -141,7 +141,7 @@ export async function variantData(variantId: string, discoveryMap: DiscoveryMap)
 /** What a card is rendered with: the variant's data, then the page's fields over it (a field the page lacks is left
  *  out, not null). */
 export function cardValues(fields: { title: string; description?: string | undefined; section?: string | undefined;
-  date?: string | undefined; site: Record<string, unknown> }, data: Record<string, unknown> = {}): Record<string, unknown> {
+  date?: string | undefined; dateText?: string | undefined; site: Record<string, unknown> }, data: Record<string, unknown> = {}): Record<string, unknown> {
   return { ...data, ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) };
 }
 
@@ -155,6 +155,7 @@ export async function missingFields(component: string, values: Record<string, un
 export function missingFieldMessage(page: string, field: string, variantId: string, component: string): string {
   const fix = field === "section" ? "give its top-level folder an index.md with a title"
     : field === "site" ? "set site.globals"
+    : field === "dateText" ? "give the page a date"
     : `give the page a ${field}`;
   return `${page}: the social image needs "${field}", which ${variantId} requires (${basename(component)}.schema.json): `
     + `${fix}, or set socialImage: false`;
