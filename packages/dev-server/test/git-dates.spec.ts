@@ -24,6 +24,12 @@ describe("parseLog", () => {
     expect(parseLog(LOG, PAGES).get("a.md")).toEqual({ created: "2026-01-10T10:00:00+01:00", modified: "2026-02-10T10:00:00+01:00" });
   });
 
+  it("records each page's oldest path: through two renames to its add; a copy's is its own", () => {
+    const oldest = new Map<string, string>();
+    parseLog(LOG, PAGES, oldest);
+    expect(Object.fromEntries(oldest)).toEqual({ "a.md": "pages/a.md", "d.md": "pages/b.md", "e.md": "pages/e.md" });
+  });
+
   it("follows a rename, and a rename with an edit, back to the page's add", () => {
     expect(parseLog(LOG, PAGES).get("d.md")).toEqual({ created: "2026-01-10T10:00:00+01:00", modified: "2026-04-10T10:00:00+01:00" });
   });
@@ -108,6 +114,17 @@ describe("the pass, on a repository with history", () => {
 
   it("takes the author date, not the committer date", async () => {
     expect((await of("index.md")).dates).toEqual({ created: "2026-01-10T10:00:00+01:00", modified: "2026-04-25T09:00:00+02:00" });
+  });
+
+  it("knows where each page was first committed, in the pages folder's own paths", async () => {
+    const h = await readHistory(pages, PATHS, git);
+    expect(Object.fromEntries(h.oldest)).toEqual({ "index.md": "index.md", "setup.md": "install.md", "draft.md": "draft.md",
+      // Moved in from outside the pages folder: the log is limited to it, so the move reads as the page's add.
+      "moved.md": "moved.md" });
+    const dates = createGitDates(pages, async () => PATHS, git);
+    expect(await dates.oldestOf!("setup.md")).toBe("install.md");
+    // Not committed: the history can't say.
+    expect(await dates.oldestOf!("new.md")).toBeNull();
   });
 
   it("dates a renamed page from its first add", async () => {

@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { feedLinksFor, feedsOf, type SiteFeedSettings } from "../src/storefront/feeds.js";
 import { readPages } from "../src/storefront/pages.js";
+import type { GitDates } from "../src/storefront/git-dates.js";
 import { buildStaticSite } from "../src/static-build.js";
 import { startDevServer } from "../src/index.js";
 import { request } from "node:http";
@@ -60,12 +61,19 @@ const SETTINGS: SiteFeedSettings = { format: "atom", limit: 20, site: true, auth
 const SITE = "https://example.test/";
 
 /** The feeds of a project's pages as pd build reads them (no draft, no scheduled page). */
-async function feeds(files: Record<string, string | null> = {}, s: Partial<SiteFeedSettings> = {}, mode: "build" | "dev" = "build") {
+async function feeds(files: Record<string, string | null> = {}, s: Partial<SiteFeedSettings> = {}, mode: "build" | "dev" = "build",
+  dates?: GitDates) {
   const root = await project(files);
   const leave = mode === "build" ? "leave-out" : "show";
   const model = await readPages(join(root, "pages"), { drafts: leave, scheduled: leave, today: "2026-11-25" });
-  return feedsOf(model, { ...SETTINGS, ...s }, { siteUrl: SITE, siteTitle: "Bench", lang: "en-GB", mode });
+  return feedsOf(model, { ...SETTINGS, ...s }, { siteUrl: SITE, siteTitle: "Bench", lang: "en-GB", mode, dates });
 }
+/** Git as far as the feeds ask it: where each page was first committed (`first`, by its path now). */
+const gitWith = (first: Record<string, string>): GitDates => ({
+  of: async () => ({ dates: { created: null, modified: null }, notes: [], problems: [], shallow: false }),
+  statusChanged() { /* nothing to forget */ },
+  oldestOf: async path => first[path] ?? path,
+});
 
 describe("which feeds a site has", () => {
   it("one per folder with sort: date, at <folder>/feed.xml, and the site's at /feed.xml", async () => {
@@ -126,6 +134,26 @@ describe("which feeds a site has", () => {
     expect(r.problems).toEqual([]);
     const bare = await feeds({ "pages/notes/index.md": `---\ntitle: Notes\nsort: date\n---\n` }, { format: "rss" });
     expect(bare.problems).toEqual(["notes/index.md: an RSS feed needs a description: give the folder's index.md a description"]);
+  });
+});
+
+describe("an entry's id", () => {
+  it("is the page's first redirectFrom, absolute, else its route; the link is the page's URL now", async () => {
+    const r = await feeds({ "pages/articles/mid.md": fm(["title: Mid", "date: 2026-11-10", "redirectFrom: [/articles/middle/, /mid/]"]) });
+    const mid = r.feeds[0]!.feed.entries.find(e => e.title === "Mid")!;
+    expect([mid.id, mid.url]).toEqual(["https://example.test/articles/middle/", "https://example.test/articles/mid/"]);
+    expect(r.feeds[0]!.feed.entries.find(e => e.title === "New")!.id).toBe("https://example.test/articles/new/");
+  });
+
+  it("says when git first saw a page at another route than its id's, once, and nothing when they agree", async () => {
+    const moved = fm(["title: Mid", "date: 2026-11-10", "redirectFrom: [/mid/, /articles/middle/]"]);
+    const r = await feeds({ "pages/articles/mid.md": moved }, {}, "build", gitWith({ "articles/mid.md": "articles/middle.md" }));
+    expect(r.notes).toEqual(["articles/mid.md: git first saw this page at /articles/middle/, but its feed entry's id is from /mid/: "
+      + "list /articles/middle/ first in redirectFrom (the original first), so a feed reader knows it as the same entry"]);
+    const right = fm(["title: Mid", "date: 2026-11-10", "redirectFrom: [/articles/middle/, /mid/]"]);
+    expect((await feeds({ "pages/articles/mid.md": right }, {}, "build", gitWith({ "articles/mid.md": "articles/middle.md" }))).notes).toEqual([]);
+    // A page that never moved, with no redirectFrom: nothing to say.
+    expect((await feeds({}, {}, "build", gitWith({}))).notes).toEqual([]);
   });
 });
 

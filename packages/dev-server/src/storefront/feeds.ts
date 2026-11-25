@@ -16,7 +16,7 @@ import { FEED_FILES } from "@pattern-dump/contracts";
 import { entriesOf, type Entry } from "./collections.js";
 import type { DatesMode, GitDates } from "./git-dates.js";
 import { readFeed } from "./listing-keys.js";
-import type { PageModel } from "./pages.js";
+import { routeFor, type PageModel } from "./pages.js";
 import { escapeXml } from "./xml.js";
 
 /** A feed's author (Atom's person construct: a name, and a page about them). */
@@ -200,8 +200,22 @@ export async function feedsOf(model: PageModel, s: SiteFeedSettings, o: {
     else if (listing.sort !== "date") problems.push(`site.feeds.collections names "${name}", but ${model.files.get(`/${name}/`)?.path ?? `${name}/index.md`} has no sort: date, so its pages are not in date order: add sort: date`);
   }
   const hidden = (route: string) => model.files.get(route)?.frontmatter.values["index"] === "false";
+  // An entry's id never changes (RFC 4287 4.2.6): the page's oldest route, which is its first redirectFrom, else its
+  // route. Where git knows the page's first path, a note says when that isn't the id's route.
+  const redirects = new Map(model.pages.map(p => [p.route, p.redirectFrom ?? []]));
+  const idRoute = (route: string) => redirects.get(route)?.[0] ?? route;
+  const ids = new Map<string, string>();
+  const checkId = async (route: string): Promise<void> => {
+    const file = model.files.get(route);
+    if (ids.has(route) || !file || !o.dates?.oldestOf) return;
+    ids.set(route, idRoute(route));
+    const first = await o.dates.oldestOf(file.path);
+    if (first === null || routeFor(first) === idRoute(route)) return;
+    notes.push(`${file.path}: git first saw this page at ${routeFor(first)}, but its feed entry's id is from ${idRoute(route)}: `
+      + `list ${routeFor(first)} first in redirectFrom (the original first), so a feed reader knows it as the same entry`);
+  };
   const toEntry = (e: Entry): FeedEntry => ({
-    id: abs(e.route), title: e.title, url: abs(e.route), published: e.date!, updated: e.updated ?? e.date!, summary: e.description,
+    id: abs(idRoute(e.route)), title: e.title, url: abs(e.route), published: e.date!, updated: e.updated ?? e.date!, summary: e.description,
   });
   const newest = (a: Entry, b: Entry) => a.date === b.date ? (a.route < b.route ? -1 : 1) : a.date! < b.date! ? 1 : -1;
   const feeds: SiteFeed[] = [];
@@ -241,6 +255,7 @@ export async function feedsOf(model: PageModel, s: SiteFeedSettings, o: {
     problems.push(...got.problems);
     const dated = got.entries.filter(e => e.date !== null && !e.draft && !e.scheduled && !hidden(e.route));
     for (const e of dated) all.set(e.route, e);
+    for (const e of dated.slice(0, settings.limit ?? s.limit)) await checkId(e.route);
     const entries = dated.slice(0, settings.limit ?? s.limit).map(toEntry);
     if (!entries.length) { notes.push(`${file.path}: sort: date, and no page with a date yet, so no feed`); continue; }
     const page = model.pages.find(p => p.route === folder);
@@ -251,7 +266,9 @@ export async function feedsOf(model: PageModel, s: SiteFeedSettings, o: {
   }
 
   if (s.site && all.size) {
-    const entries = [...all.values()].sort(newest).slice(0, s.limit).map(toEntry);
+    const newestAll = [...all.values()].sort(newest).slice(0, s.limit);
+    for (const e of newestAll) await checkId(e.route);
+    const entries = newestAll.map(toEntry);
     const own = typeof s.path === "string" ? { path: s.path } : s.path ?? {};
     add({
       source: "site.feeds", id: o.siteUrl, title: o.siteTitle ?? model.pages.find(p => p.route === "/")?.title ?? "",

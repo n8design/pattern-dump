@@ -46,11 +46,14 @@ export const runGit: RunGit = (cwd, args) => new Promise((resolve, reject) => {
  * each ended by \0 — and git puts a newline before the first status of a commit. A rename or copy has two
  * paths, old then new.
  */
-export function parseLog(out: string, pages: ReadonlyMap<string, string>): Map<string, PageDates> {
+export function parseLog(out: string, pages: ReadonlyMap<string, string>,
+  /** Filled with each page's oldest path, as git names it: the name of its first commit, through its renames. */
+  oldest?: Map<string, string>): Map<string, PageDates> {
   const dates = new Map<string, PageDates>();
   /** Path in the commit being read → the page it is, at that point of the history. */
   const alias = new Map(pages);
-  const seen = (page: string, date: string): void => {
+  const seen = (page: string, date: string, path: string): void => {
+    oldest?.set(page, path); // provisional, as created
     const d = dates.get(page) ?? { created: null, modified: null };
     d.modified ??= date;
     d.created = date; // provisional: an older commit of the same page overwrites it
@@ -66,7 +69,7 @@ export function parseLog(out: string, pages: ReadonlyMap<string, string>): Map<s
         i += 3;
         const page = alias.get(to);
         if (page === undefined) continue;
-        seen(page, date);
+        seen(page, date, to);
         alias.delete(to);
         // A rename carries the page's history on under its old name; a copy's history starts here.
         if (status.startsWith("R")) alias.set(from, page);
@@ -75,7 +78,7 @@ export function parseLog(out: string, pages: ReadonlyMap<string, string>): Map<s
         i += 2;
         const page = alias.get(file);
         if (page === undefined) continue;
-        seen(page, date);
+        seen(page, date, file);
         if (status === "A") alias.delete(file);
       }
     }
@@ -106,6 +109,8 @@ export interface GitHistory {
   shallow: boolean;
   /** By page path relative to the pages folder ("guides/setup.md"). */
   dates: Map<string, PageDates>;
+  /** Each page's oldest path, relative to the pages folder: where its first commit had it. */
+  oldest: Map<string, string>;
   /** Repository-relative path of a page path. */
   repoPath(path: string): string;
   /** The top level, where `status` runs. */
@@ -116,7 +121,7 @@ export interface GitHistory {
 
 /** The one log pass over `pagesDir`, for the pages at `paths` (relative to it, with forward slashes). */
 export async function readHistory(pagesDir: string, paths: string[], git: RunGit = runGit): Promise<GitHistory> {
-  const empty = (none: string): GitHistory => ({ none, shallow: false, dates: new Map(), repoPath: p => p, top: pagesDir, scope: "." });
+  const empty = (none: string): GitHistory => ({ none, shallow: false, dates: new Map(), oldest: new Map(), repoPath: p => p, top: pagesDir, scope: "." });
   let top: string;
   try { top = (await git(pagesDir, ["rev-parse", "--show-toplevel"])).trim(); } catch { return empty("the pages folder is not in a git repository"); }
   try { await git(top, ["rev-parse", "--verify", "-q", "HEAD"]); } catch { return empty("the repository has no commits"); }
@@ -125,7 +130,11 @@ export async function readHistory(pagesDir: string, paths: string[], git: RunGit
   const repoPath = (p: string): string => prefix ? `${prefix}/${p}` : p;
   const scope = prefix || ".";
   const log = await git(top, ["log", "-M", "--name-status", "-z", "--format=%x01%aI", "--", scope]);
-  return { shallow, dates: parseLog(log, new Map(paths.map(p => [repoPath(p), p]))), repoPath, top, scope };
+  const oldest = new Map<string, string>();
+  const dates = parseLog(log, new Map(paths.map(p => [repoPath(p), p])), oldest);
+  // Repository-relative, as the log names them; the pages folder's own form, as every other path here.
+  for (const [page, path] of oldest) oldest.set(page, prefix && path.startsWith(`${prefix}/`) ? path.slice(prefix.length + 1) : path);
+  return { shallow, dates, oldest, repoPath, top, scope };
 }
 
 /** Which pages git does not track, and which have changes not yet committed: the working tree now. */
@@ -169,17 +178,28 @@ export function datesOf(path: string, history: GitHistory, status: { untracked: 
  * dates (a site whose layouts use none pays nothing); the working tree's status is read again after a
  * page changes (statusChanged, from the watcher). New commits are seen on restart.
  */
-export function createGitDates(pagesDir: string, listPages: () => Promise<string[]>, git: RunGit = runGit) {
+export interface GitDates {
+  of(path: string, mode: DatesMode): Promise<DatedPage>;
+  statusChanged(): void;
+  /** Where the page at `path` was first committed (a path in the pages folder), through its renames; null when the
+   *  history can't say: a shallow clone, no repository, a page not committed. */
+  oldestOf?(path: string): Promise<string | null>;
+}
+
+export function createGitDates(pagesDir: string, listPages: () => Promise<string[]>, git: RunGit = runGit): GitDates {
   let history: Promise<GitHistory> | null = null;
   let status: Promise<{ untracked: Set<string>; changed: Set<string> }> | null = null;
+  const read = () => history ??= listPages().then(paths => readHistory(pagesDir, paths, git));
   return {
     async of(path: string, mode: DatesMode): Promise<DatedPage> {
-      history ??= listPages().then(paths => readHistory(pagesDir, paths, git));
-      const h = await history;
+      const h = await read();
       status ??= readStatus(h, git);
       return datesOf(path, h, await status, mode);
     },
     statusChanged(): void { status = null; },
+    async oldestOf(path: string): Promise<string | null> {
+      const h = await read();
+      return h.none || h.shallow ? null : h.oldest.get(path) ?? null;
+    },
   };
 }
-export type GitDates = ReturnType<typeof createGitDates>;
