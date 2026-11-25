@@ -18,6 +18,10 @@ const PD_PORT = process.env["PD_PORT"] ?? "4100";
 const STATIC_PORT = process.env["PD_STATIC_PORT"] ?? "4200";
 const STATIC_BASE = "/pd/";
 const STATIC_SITE = path.join(os.tmpdir(), "pd-e2e-static-site");
+// The theme switch with stylesheet switching: test-bench under a second config (switch: "stylesheet"), its own
+// pd dev on its own ports. It only reads test-bench.
+const THEME_PORT = process.env["PD_THEME_PORT"] ?? "4250";
+const THEME_WS_PORT = process.env["PD_THEME_WS_PORT"] ?? "4251";
 
 export default defineConfig({
   testDir: ".",
@@ -64,6 +68,11 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: "static/**" },
     {
+      name: "themes-stylesheet",
+      testMatch: "theme-switch.spec.ts",
+      use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${THEME_PORT}` },
+    },
+    {
       name: "static",
       testMatch: "static/**/*.spec.ts",
       use: { ...devices["Desktop Chrome"], baseURL: `http://127.0.0.1:${STATIC_PORT}${STATIC_BASE}` },
@@ -97,5 +106,12 @@ export default defineConfig({
     url: `http://127.0.0.1:${STATIC_PORT}${STATIC_BASE}`,
     reuseExistingServer: false,
     timeout: 120_000,
+  }, {
+    command: `node packages/cli/dist/index.js dev --root test-bench --config test-bench/pattern-dump.stylesheet.config.ts`
+      + ` --port ${THEME_PORT} --ws-port ${THEME_WS_PORT}`,
+    cwd: path.resolve(__dirname, "../../.."),
+    url: `http://localhost:${THEME_PORT}/api/version`,
+    reuseExistingServer: false,
+    timeout: 60_000,
   }],
 });
