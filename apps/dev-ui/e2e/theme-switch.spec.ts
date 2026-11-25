@@ -8,21 +8,26 @@ import { gotoComponentReady, selectTheme } from "./helpers.js";
 const frame = (page: Page) => page.frameLocator("#preview-frame");
 const stylesheetMode = (name: string) => name === "themes-stylesheet";
 
-/** Inside the preview: a marker on its window, a tall page scrolled down, an open dialog with typed input. */
+/**
+ * Inside the preview: a marker on its window, an open dialog with typed input at the top, and the page scrolled
+ * down. On a full-height preview (atoms/preview-full), whose frame keeps the Stage's height and scrolls inside
+ * itself; a content-sized frame grows to its content and has no scroll of its own to keep.
+ */
 async function furnish(page: Page): Promise<void> {
   const f = page.frame({ url: "about:srcdoc" })!;
   await f.evaluate(() => {
     (window as unknown as { __pdMarker: string }).__pdMarker = "still here";
+    const dialog = document.createElement("dialog");
+    dialog.innerHTML = `<input id="pd-typed" aria-label="Typed">`;
+    document.body.prepend(dialog);
+    dialog.show();
     const tall = document.createElement("div");
     tall.style.height = "3000px";
     document.body.append(tall);
-    const dialog = document.createElement("dialog");
-    dialog.innerHTML = `<input id="pd-typed" aria-label="Typed">`;
-    document.body.append(dialog);
-    dialog.show();
-    window.scrollTo(0, 700);
   });
   await frame(page).locator("#pd-typed").fill("typed before the switch");
+  await f.evaluate(() => window.scrollTo(0, 700));
+  await expect.poll(() => f.evaluate(() => window.scrollY)).toBe(700);
 }
 
 async function state(page: Page) {
@@ -38,11 +43,10 @@ async function state(page: Page) {
 
 test.describe("a theme switch", () => {
   test("never reloads the preview, and data-theme names the picked theme", async ({ page }, info) => {
-    await gotoComponentReady(page, "atoms/button");
+    await gotoComponentReady(page, "atoms/preview-full");
     await furnish(page);
     const before = await state(page);
-    expect(before).toMatchObject({ marker: "still here", dialogOpen: true, typed: "typed before the switch", theme: "light" });
-    expect(before.scrollY).toBeGreaterThan(0);
+    expect(before).toMatchObject({ marker: "still here", dialogOpen: true, typed: "typed before the switch", theme: "light", scrollY: 700 });
 
     await selectTheme(page, "brand-red");
     await expect.poll(async () => (await state(page)).theme).toBe("brand-red");
