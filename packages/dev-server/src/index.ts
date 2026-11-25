@@ -102,6 +102,7 @@ import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching, type WatchHandle } from "./watch.js";
 import { createGitDates } from "./storefront/git-dates.js";
+import { readMounts } from "./storefront/mounts.js";
 import type { SocialCard } from "./storefront/social-images.js";
 import { createDevCardRenderer } from "./social-dev.js";
 import type { PlaywrightModule } from "./storefront/browser-checks.js";
@@ -444,6 +445,16 @@ export async function startDevServer(
   if (live) {
     if (cfg.storefront) console.log(`[dev-server] Website:   http://${cfg.storefront.host}:${actualPort}${cfg.storefront.basePath}`);
     console.log(`[dev-server] Workbench: http://${cfg.storefront ? PD_HOSTS.workbench : "localhost"}:${actualPort}/`);
+    // A mount whose folder isn't there yet (site.mounts): said once. Its route is the 404 page until the other tool
+    // builds it; the folder is read on every request, so the next one after that serves it.
+    if (cfg.storefront?.mounts.length) {
+      const read = await readMounts(cfg.storefront.mounts, cwd);
+      for (const m of read.missing) {
+        console.warn(`[dev-server] site.mounts: ${m.name}, published at ${m.to}, doesn't exist: its addresses are the 404 page `
+          + `until it does; build it, and the next request serves it (pd build stops without it)`);
+      }
+      for (const p of read.problems) console.warn(`[dev-server] ${p}`);
+    }
     console.log(`[dev-server] MCP:       http://${cfg.mcpHost}:${actualPort}/ (or http://localhost:${actualPort}/mcp)`);
     // Search is built by pd build only: an index on every save would slow it down.
     if (cfg.storefront && cfg.storefront.search !== false && (cfg.storefront.search === true || projectPagefindEntry(cfg.cwd) !== undefined)) {

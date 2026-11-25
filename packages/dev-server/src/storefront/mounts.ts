@@ -10,6 +10,7 @@
 
 import { lstat, readdir, realpath, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
+import { containedFile } from "../contained-file.js";
 import type { SiteMountConfig } from "../server-config.js";
 import { collisionOf, describeClaim, type Claim } from "./site-output.js";
 
@@ -111,3 +112,37 @@ export async function mountProblems(mounts: readonly SiteMountConfig[], root: st
  *  URL, as a page's route is. */
 export const sitemapRoutes = (files: readonly MountedFile[]): string[] =>
   files.filter(f => f.mount.sitemap && f.path.endsWith(".html")).map(f => f.path.replace(/(^|\/)index\.html$/, "$1"));
+
+/** What a request for a site path finds in the mounts (pd dev): the file of the first mount that has it, in the
+ *  config's order, with the later mounts that have it too; or a folder of a mount that wants its "/" (a static host
+ *  forwards /tool to /tool/, so the folder's relative links resolve). Null when no mount has it. */
+export type MountedAnswer =
+  | { kind: "file"; file: string; mount: SiteMountConfig; rel: string; also: string[] }
+  | { kind: "folder"; location: string }
+  | null;
+
+/**
+ * Looks `path` (a decoded site path, the base path taken off) up in the mounts, on disk, every time: a mount
+ * rebuilt while pd dev runs shows on the next request, and a folder that is missing simply has no files.
+ * Containment is containedFile's: a file must be inside its mount's folder, links followed.
+ */
+export async function mountedFile(mounts: readonly SiteMountConfig[], path: string): Promise<MountedAnswer> {
+  let found: Extract<MountedAnswer, { kind: "file" }> | undefined;
+  for (const mount of mounts) {
+    if (!path.startsWith(mount.to)) continue;
+    const rest = path.slice(mount.to.length);
+    const rel = rest === "" || rest.endsWith("/") ? `${rest}index.html` : rest;
+    const file = await containedFile(mount.from, rel);
+    if (file === null) continue;
+    if (found) found.also.push(`${mount.name}/${rel}`);
+    else found = { kind: "file", file, mount, rel, also: [] };
+  }
+  if (found) return found;
+  if (!path.endsWith("/")) {
+    for (const mount of mounts) {
+      if (!`${path}/`.startsWith(mount.to)) continue;
+      if (await containedFile(mount.from, `${path}/index.html`.slice(mount.to.length))) return { kind: "folder", location: `${path}/` };
+    }
+  }
+  return null;
+}

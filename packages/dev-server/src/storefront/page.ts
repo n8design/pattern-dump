@@ -115,6 +115,8 @@ export interface PageAssembly {
   lang?: string;
   /** The feeds the page links to in its head (feeds.ts feedLinksFor); none without. */
   feeds?: readonly FeedLink[];
+  /** pd dev: the site paths of the mounts' files (mounts.ts), which a page's links may name like its pages. */
+  mounted?: ReadonlySet<string>;
   /** How dates are written for readers (`page.dateText` and the others; date-text.ts): site.lang in the style of
    *  site.dates. Default: `lang`'s in the long style. */
   dateFormat?: DateFormat;
@@ -992,6 +994,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
     const self = isNotFound ? PD_ROUTES.notFound : route;
     const routes = new Set<string>([...model.pages.map(p => p.route), ...model.pages.flatMap(p => p.redirectFrom ?? []), PD_ROUTES.notFound]);
     routes.add(self);
+    for (const path of a.mounted ?? []) routes.add(path);
     const links = checkLinks({ built: routes, documents: new Map([[self, html]]), pages: [self], pagesOnly: true,
       ...(a.basePath !== undefined ? { pathHint: a.basePath } : {}) });
     notes.push(...links.problems.map(p => `warning: ${page!.path}${p.slice(self.length)}`));
