@@ -136,6 +136,11 @@ export interface ResolvedConfig {
   /** 'stylesheet' links ONLY the active theme (correct for bare-`:root` theme sets like hTWOo's,
    *  which collide when all are linked); 'attribute' (default) links all and toggles [data-theme]. */
   readonly themeSwitch: ThemeSwitch;
+  /** themes.order: the picker's order (themes.ts orderThemeNames); empty without it. */
+  readonly themeOrder: readonly string[];
+  /** Where the theme switch came from, when the project's setting and a pattern package's differ: one line each, for
+   *  the terminal (surfacing.ts). Empty when they agree or only one says. */
+  readonly themeSwitchNotes: readonly string[];
   /** Swatch properties for the PROJECT's themes (config.themes.swatch.slots). */
   readonly swatchSlots: string[];
   /** Swatch properties for a pattern package's themes, which the project config does not describe. */
@@ -223,10 +228,13 @@ export function resolveServerConfig(
     ...(config.themes?.dir ? [resolve(cwd, config.themes.dir)] : []),
     ...themePackages.map(p => inPackage(p, p.manifest.themes!.dir)),
   ];
-  // 'stylesheet' as soon as any source needs it: its bare `:root` sets collide when all are linked,
-  // while [data-theme]-scoped sets work in either mode.
-  const switches = [config.themes?.switch, ...themePackages.map(p => p.manifest.themes!.switch)];
-  const themeSwitch: ThemeSwitch = switches.includes("stylesheet") ? "stylesheet" : "attribute";
+  // The project's own setting wins. Without one, 'stylesheet' as soon as a package needs it: its bare `:root` sets
+  // collide when all are linked, while [data-theme]-scoped sets work in either mode.
+  const own = config.themes?.switch;
+  const packageSwitches = themePackages.flatMap(p => p.manifest.themes!.switch ? [{ name: p.name, value: p.manifest.themes!.switch }] : []);
+  const themeSwitch: ThemeSwitch = own ?? (packageSwitches.some(p => p.value === "stylesheet") ? "stylesheet" : "attribute");
+  const themeSwitchNotes = own === undefined ? [] : packageSwitches.filter(p => p.value !== own).map(p =>
+    `themes.switch is "${own}", and the pattern package ${p.name} asks for "${p.value}": the project's setting is used`);
 
   const assetRoots = [
     ...asList(config.assets?.dir).map(d => resolve(cwd, d)),
@@ -310,6 +318,8 @@ export function resolveServerConfig(
     overviewsEnabled:    config.overviews !== false,
     documentBaseEnabled,
     themeSwitch,
+    themeOrder:          config.themes?.order ?? [],
+    themeSwitchNotes,
     swatchSlots:         config.themes?.swatch?.slots ?? DEFAULT_SWATCH_SLOTS,
     packageSwatchSlots:  DEFAULT_SWATCH_SLOTS,
   };

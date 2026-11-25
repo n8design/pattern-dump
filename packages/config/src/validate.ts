@@ -35,6 +35,7 @@ const SHAPE: Shape = {
       dir: "string",
       default: "string",
       switch: { values: ["attribute", "stylesheet"] },
+      order: "strings",
       swatch: { keys: { slots: "strings" }, required: ["slots"] },
     },
     required: ["default"],

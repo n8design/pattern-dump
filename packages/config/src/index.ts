@@ -56,8 +56,12 @@ export interface ThemesConfig {
   dir?: string;
   /** Default theme name applied via data-theme on the preview body: a project theme or a package's. */
   default: string;
-  /** Switch wiring: attribute toggle (default) or per-theme stylesheet swap. */
+  /** Switch wiring: attribute toggle (default) or per-theme stylesheet swap. The project's setting wins over a
+   *  pattern package's; without one, a package that asks for `stylesheet` gets it. */
   switch?: ThemeSwitch;
+  /** The theme picker's order: these themes first, in this order, then every other theme sorted by name. A name no
+   *  theme has is a warning, not an error. Without it, every theme is sorted by name. */
+  order?: string[];
   /** Swatch configuration for the left-rail theme picker. */
   swatch?: {
     /**

@@ -60,7 +60,6 @@ import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
 import { layoutIndex } from "./storefront/layout-index.js";
 import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.js";
 import { buildAllStyleData } from "./style-index.js";
-import { discoverThemes } from "./themes.js";
 import {
   assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, readDiagnosticsArtifact, refreshDiagnosticsGraph, styleBorrowedDiagnostics,
 } from "./diagnostics.js";
@@ -769,11 +768,10 @@ async function routeRequest(
     }
 
     if (pathname === PD_ROUTES.themes) {
-      const themes = cfg.themeDirs.length ? await discoverThemes(cfg.themeDirs) : [];
-      const enriched: ThemeSummary[] = themes.map(t => ({
-        ...t,
-        tokens: state.themeTokens.get(t.name),
-      }));
+      // The themes as the server holds them, in the picker's order (themes.ts): the same list every preview links.
+      const enriched: ThemeSummary[] = cfg.themeDirs.length
+        ? [...state.themeCss.keys()].map(name => ({ name, tokens: state.themeTokens.get(name) }))
+        : [];
       json(res, 200, enriched satisfies ThemeSummary[]);
       return;
     }

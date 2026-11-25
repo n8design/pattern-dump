@@ -146,19 +146,50 @@ export function applyTheme(theme: string): void {
  *  attribute switch, when the theme's stylesheet has loaded for a stylesheet switch. The Stage follows it. */
 export const THEME_APPLIED = "pd-theme-applied";
 
+/** Sent on a preview frame when a theme's stylesheet fails to load (a stylesheet switch): `detail` names the theme. The
+ *  theme in effect stays as it was. The app writes it to the Console (a rail module doesn't import the dock). */
+export const THEME_FAILED = "pd-theme-failed";
+
+/**
+ * Puts `theme` in effect in a preview frame, without reloading it: its scroll, an open dialog and typed input stay.
+ *
+ * - attribute switch: every theme is linked; `data-theme` on the body selects one.
+ * - stylesheet switch: only the active theme's sheet is linked. The new sheet goes in beside the current one, and
+ *   the current one leaves only once the new one has loaded, so no frame is ever without a theme. On an error the
+ *   current one stays. `data-theme` names the theme in effect here too.
+ */
 export function applyThemeToIframe(f: HTMLIFrameElement, theme: string): void {
   const doc = f.contentDocument;
   const body = doc?.body;
   if (!doc || !body) return;
   if (session.themeSwitch === "stylesheet") {
-    // Swap the active theme's <link> href — only one theme is linked, so bare-:root sets don't
-    // collide. The paint changes because the linked stylesheet changes, not an attribute.
-    const link = doc.querySelector<HTMLLinkElement>("link[data-pd-theme]");
-    if (link && theme) {
-      link.addEventListener("load", () => f.dispatchEvent(new Event(THEME_APPLIED)), { once: true });
-      link.setAttribute("href", resourceUrl(themeCssUrl(theme)));
-      link.setAttribute("data-pd-theme", theme);
+    const current = doc.querySelector<HTMLLinkElement>("link[data-pd-theme]");
+    if (!current || !theme) return;
+    // A switch still loading is overtaken: only the last theme asked for goes in.
+    for (const pending of doc.querySelectorAll<HTMLLinkElement>("link[data-pd-theme-next]")) pending.remove();
+    if (current.getAttribute("data-pd-theme") === theme) {
+      body.setAttribute("data-theme", theme);
+      f.dispatchEvent(new Event(THEME_APPLIED));
+      return;
     }
+    const next = doc.createElement("link");
+    next.rel = "stylesheet";
+    next.setAttribute("data-pd-theme-next", theme);
+    next.addEventListener("load", () => {
+      if (!next.isConnected) return;
+      current.remove();
+      next.removeAttribute("data-pd-theme-next");
+      next.setAttribute("data-pd-theme", theme);
+      body.setAttribute("data-theme", theme);
+      f.dispatchEvent(new Event(THEME_APPLIED));
+    }, { once: true });
+    next.addEventListener("error", () => {
+      if (!next.isConnected) return;
+      next.remove();
+      f.dispatchEvent(new CustomEvent(THEME_FAILED, { detail: theme }));
+    }, { once: true });
+    next.href = resourceUrl(themeCssUrl(theme));
+    current.after(next);
     return;
   }
   if (theme) body.setAttribute("data-theme", theme);

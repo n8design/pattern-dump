@@ -26,7 +26,7 @@ import { copyDockSource, renderConsole, switchDockTab, switchSourceFacet } from 
 import { svgIcon } from "../icons/index.js";
 import { clearAuditError } from "../inspector/audit.js";
 import { renderPanel } from "../inspector/panel.js";
-import { applyThemeToIframe } from "../rail/theme.js";
+import { applyThemeToIframe, THEME_FAILED } from "../rail/theme.js";
 import { applyPackageFilter, filterTree } from "../rail/tree.js";
 import { currentVpParam } from "../stage/viewport.js";
 import { withLayoutParam } from "../stage/layout-toggle.js";
@@ -123,6 +123,10 @@ export function mount(): void {
   dom.iframe.addEventListener("load", () => {
     const theme = store.local.theme;
     if (theme) applyThemeToIframe(dom.iframe, theme);
+  });
+  // A theme whose stylesheet doesn't load: the preview keeps the theme it had, and the Console says which failed.
+  dom.iframe.addEventListener(THEME_FAILED, (e) => {
+    renderConsole(`The theme "${String((e as CustomEvent).detail)}" could not be loaded: its stylesheet answered with an error, so the preview keeps its theme`, "error");
   });
 
   dom.sidebarTree.addEventListener("click", (e) => {
