@@ -112,8 +112,10 @@ export interface StaticBuildReport {
   /** llms.txt, at the site's root: how many pages it lists. Absent when none is written (storefront.llms). */
   llms?: { pages: number };
   /** The site's social images (social-images.ts): the pages with a card, and where each card came from (rendered by
-   *  this build, the cache, the committed folder). Absent without site.socialImages. */
-  socialImages?: { pages: number; rendered: number; cached: number; committed: number };
+   *  this build, the cache, the committed folder). `missing`: one line per page whose card is missing or stale and
+   *  couldn't be rendered (no Playwright, or no Chromium); each such page takes the site's image, `siteImage` says
+   *  whether there is one. Absent without site.socialImages. */
+  socialImages?: { pages: number; rendered: number; cached: number; committed: number; missing: string[]; siteImage: boolean };
   /** `--browser`: one line per image whose chosen variant doesn't fit the box it is laid out in. */
   images?: { warnings: string[] };
   /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
@@ -282,6 +284,8 @@ async function buildOnce(
   const cardPlaywright = playwright ?? (storefront?.socialImages
     ? await loadPlaywright(project).catch((e: unknown) => { if (e instanceof BrowserUnavailableError) return undefined; throw e; })
     : undefined);
+  /** Why a card can't be rendered, in the words of the warning for each page that lacks one. */
+  let noRender = "Playwright isn't installed: run pd social, or install Playwright";
   // Search: the project's Pagefind, also before anything is built, so a missing one the site asks for stops at once.
   const pagefind = storefront ? await searchPagefind(storefront.search, project, opts.loadPagefind) : undefined;
   /** What each page gives the index, by route, as the crawl serves it. */
@@ -350,7 +354,13 @@ async function buildOnce(
       if (missing.length && cardPlaywright) {
         // A Chromium that won't start is a stop only with --browser, which needs it anyway.
         browser ??= await launchChromium(cardPlaywright, opts.browser ? "pd build --browser" : "pd build", CARD_CHROMIUM_ARGS)
-          .catch((e: unknown) => { if (opts.browser || !(e instanceof BrowserUnavailableError)) throw e; return undefined; });
+          .catch(async (e: unknown) => {
+            if (opts.browser || !(e instanceof BrowserUnavailableError)) throw e;
+            // Its first line, as launchChromium names it: "pd build couldn't start Chromium (<reason>): ...".
+            const reason = /couldn't start Chromium \((.*)\): /.exec(e.message)?.[1] ?? e.message;
+            noRender = `Chromium didn't start (${reason}): run pd social, or npx playwright install chromium`;
+            return undefined;
+          });
       }
       if (missing.length && browser) {
         const made = await renderCards(missing, { browser, get: sfGet });
@@ -363,7 +373,12 @@ async function buildOnce(
         log(`… social images: ${made.images.size} rendered in Chromium`);
       }
       const inCache = cards.filter(c => c.file?.startsWith(cacheDir)).length;
-      socialSummary = { pages: cards.length, rendered, cached: inCache, committed: cards.filter(c => c.file !== undefined).length - inCache };
+      // D1: a card that is nowhere and couldn't be rendered. The build goes on; the page's head takes the site's image
+      // (it names a card only when its bytes are there), and the build says so, page by page.
+      // With a browser every missing card was rendered (or the build stopped); without one, each is still missing.
+      const missingLines = browser ? [] : missing.map(c => `${c.page}: no social image: its card is missing or stale and ${noRender}`);
+      socialSummary = { pages: cards.length, rendered, cached: inCache, committed: cards.filter(c => c.file !== undefined).length - inCache,
+        missing: missingLines, siteImage: storefront.image !== undefined };
     }
     // The crawler files: robots.txt at a host's root (a site under a path has none: crawlers would never read it);
     // the sitemap when the site has an address and is indexed.

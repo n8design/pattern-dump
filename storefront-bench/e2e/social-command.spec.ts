@@ -51,7 +51,7 @@ test("a build after pd social renders none: its cards come from the folder", asy
   await social(root);
   await rm(cacheOf(root), { recursive: true, force: true });
   const report = await build(root);
-  expect(report.socialImages).toEqual({ pages: 3, rendered: 0, cached: 0, committed: 3 });
+  expect(report.socialImages).toEqual({ pages: 3, rendered: 0, cached: 0, committed: 3, missing: [], siteImage: true });
   expect(await cardsIn(join(root, ".out", "site", "_pd", "social"))).toEqual(await cardsIn(join(root, "social")));
 });
 
@@ -61,7 +61,7 @@ test("a title edit makes its card stale: a build renders it, the next pd social 
   const before = await cardsIn(join(root, "social"));
   await save(join(root, "pages", "guide", "install.md"), fm(["title: Installing"]));
   await rm(cacheOf(root), { recursive: true, force: true });
-  expect((await build(root)).socialImages).toEqual({ pages: 3, rendered: 1, cached: 0, committed: 2 });
+  expect((await build(root)).socialImages).toEqual({ pages: 3, rendered: 1, cached: 0, committed: 2, missing: [], siteImage: true });
   const report = await social(root);
   expect(report).toMatchObject({ cards: 3, rendered: 0, fromCache: 1, current: 2, removed: 1 });
   const after = await cardsIn(join(root, "social"));
