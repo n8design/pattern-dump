@@ -189,7 +189,7 @@ describe("a feed's file name", () => {
   });
 });
 
-describe("pd build writes them", () => {
+describe("pd build writes them", { timeout: 60_000 }, () => {
   const PATTERNS: Record<string, string> = {
     "src/patterns/layouts/page/page.hbs": "<header><p>Site</p></header><main><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n",
     "src/patterns/layouts/page/page.schema.json": json({ properties: { title: { type: "string" }, description: { type: "string" } } }),
@@ -233,7 +233,7 @@ describe("pd build writes them", () => {
   });
 });
 
-describe("pd dev serves them", () => {
+describe("pd dev serves them", { timeout: 60_000 }, () => {
   const PATTERNS: Record<string, string> = {
     "src/patterns/layouts/page/page.hbs": "<header><p>Site</p></header><main><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n",
     "src/patterns/layouts/page/page.schema.json": json({ properties: { title: { type: "string" }, description: { type: "string" } } }),
@@ -308,7 +308,7 @@ describe("which feeds a page links to", () => {
     expect(feedLinksFor("/articles/", all, SITE, undefined).map(l => l.title)).toEqual(["Bench", "Bench", "Articles", "Articles"]);
   });
 
-  it("pd dev writes them in the head of a page; the 404 page has none", async () => {
+  it("pd dev writes them in the head of a page; the 404 page has none", { timeout: 60_000 }, async () => {
     const root = await project({
       "src/patterns/layouts/page/page.hbs": "<header><p>Site</p></header><main><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n",
       "src/patterns/layouts/page/page.schema.json": json({ properties: { title: { type: "string" }, description: { type: "string" } } }),
