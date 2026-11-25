@@ -19,6 +19,11 @@ backticks. Files that change for one reason can share a line:
 `api/version.json` is compared without `serverBundleMtime`, which changes with every build. An entry already on
 the base doesn't count for a later pull request: each change is recorded by the pull request that makes it.
 
+## 2026-11-25: Theme switching without a reload or a flicker
+
+- `_pd/main.js`: a stylesheet theme switch keeps the current sheet until the new one has loaded, `data-theme` names
+  the theme in effect in both modes, and the Stage fetches a preview with a picked theme baked in.
+
 ## Before the check
 
 The golden was compared by hand until 2026-11-25. Five pull requests since 0.7.0 changed its output, each as
