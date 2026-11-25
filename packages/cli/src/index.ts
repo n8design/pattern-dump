@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @pattern-dump/cli — the `pd` binary. Parsing is pure (./args.ts); this file only runs the result.
-import { checkSitePages, runDev, runAudit, runBuild, runExport, runGraph, runDescribe, runAffected, runMcp } from "@pattern-dump/core";
+import { checkSitePages, runDev, runAudit, runBuild, runExport, runGraph, runDescribe, runAffected, runMcp, runSocial } from "@pattern-dump/core";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -90,6 +90,13 @@ switch (command.kind) {
       ...(command.skipChecks !== undefined ? { skipChecks: command.skipChecks } : {}),
       pdVersion: PD_VERSION,
     })
+      .then(() => process.stdout.write("", () => process.exit(0)))
+      .catch((e) => { console.error("[pd] Error:", e instanceof Error ? e.message : e); process.exit(1); });
+    break;
+
+  case "social":
+    // Explicit exit once written, as for build: the headless server's renderer may leave handles open.
+    runSocial(command.root, command.configPath, PD_VERSION)
       .then(() => process.stdout.write("", () => process.exit(0)))
       .catch((e) => { console.error("[pd] Error:", e instanceof Error ? e.message : e); process.exit(1); });
     break;

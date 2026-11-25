@@ -11,6 +11,8 @@
   variant with `socialImage`, or turns it off with `socialImage: false`.
 - **Pages without an image get a social image, rendered from the component.** `pd build` renders each one in
   Chromium at 1200 x 630 with the page's title, and fails one whose text doesn't fit.
+- **`pd social` renders the cards into the project, to commit.** A build on a machine without Chromium, such as
+  Cloudflare Pages, then uses them.
 - **Pages with a link-preview image get `twitter:image` too.** It names the same image as `og:image`.
 - **A badly named image in the pages folder fails with the name to use.** `Guest_Access.PNG` is reported with
   `guest-access.png`, since the name becomes part of the URL.

@@ -88,6 +88,17 @@ describe("pd export", () => {
   });
 });
 
+describe("pd social", () => {
+  it("takes --root and --config only, and is in the help", () => {
+    expect(parseCommand(["social"], cwd)).toEqual({ kind: "social", root: cwd });
+    expect(parseCommand(["social", "--root", "site", "--config", "pd.config.ts"], cwd))
+      .toEqual({ kind: "social", root: "/work/project/site", configPath: "/work/project/pd.config.ts" });
+    expect(parseCommand(["social", "--out", "x"], cwd).kind).toBe("error");
+    expect(parseCommand(["social", "--help"], cwd)).toEqual({ kind: "help", topic: "social" });
+    expect(USAGE).toMatch(/^ {2}social +Render the site's social images into the project/m);
+  });
+});
+
 describe("pd init", () => {
   it("reads --with-site and --without-site, and leaves the answer open without either", () => {
     expect(parseCommand(["init", "--with-site"], cwd)).toEqual({ kind: "init", target: cwd, yes: false, storefront: true });

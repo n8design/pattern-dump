@@ -61,8 +61,9 @@ export class BrowserUnavailableError extends Error {}
 
 const INSTALL = "npm install --save-dev playwright, then npx playwright install chromium";
 
-/** The project's Playwright: `playwright`, else `@playwright/test`, resolved from the project's root. */
-export async function loadProjectPlaywright(root: string): Promise<PlaywrightModule> {
+/** The project's Playwright: `playwright`, else `@playwright/test`, resolved from the project's root. `command` names
+ *  who needs it, in the message when there is none. */
+export async function loadProjectPlaywright(root: string, command = "pd build --browser"): Promise<PlaywrightModule> {
   const require = createRequire(join(root, "package.json"));
   for (const name of ["playwright", "@playwright/test"]) {
     let resolved: string;
@@ -71,7 +72,7 @@ export async function loadProjectPlaywright(root: string): Promise<PlaywrightMod
     const chromium = mod.chromium ?? mod.default?.chromium;
     if (chromium) return { chromium };
   }
-  throw new BrowserUnavailableError(`pd build --browser needs Playwright in this project: ${INSTALL}`);
+  throw new BrowserUnavailableError(`${command} needs Playwright in this project: ${INSTALL}`);
 }
 
 /** Chromium from `playwright`, headless; `command` names who asked, in the message when it won't start. */

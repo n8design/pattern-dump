@@ -74,6 +74,7 @@ export { withBasePath } from "./snapshot-writer.js";
 export { loadProjectPagefind, PAGEFIND_INSTALL } from "./storefront/search.js";
 export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
 export type { SocialCard } from "./storefront/social-images.js";
+export { renderSocialImages, type SocialImagesOptions, type SocialImagesReport } from "./social-command.js";
 // Folder overview gallery — public leaves under a group node.
 // Component detail. Widest fan-out in the package — nothing may import it back.
 // Shared timing gate — one flag, so the startup-build and per-save halves cannot drift apart.
@@ -151,6 +152,8 @@ export interface DevServerOptions {
    *  build so a build that runs past midnight holds back the same pages throughout. Without it, each request takes the
    *  clock's day. */
   today?: string;
+  /** `pd social` only: "show" serves the site's scheduled pages as if their day had come; drafts stay left out. */
+  scheduled?: "show";
   /** `pd build` only: the storefront's pages folder is read once and that reading serves every request, since the
    *  folder doesn't change while a build runs. Without it, the reading is kept only until the folder changes (a
    *  file's size or time stamp, a new or deleted file), checked on every request. */
@@ -406,6 +409,7 @@ export async function startDevServer(
   const routeCtx: RouteContext = {
     cfg, state, rendering, tracker, devUiDist, boot, now, live, site, socialCards: new Map(), version: opts.version ?? "0.0.0-dev", ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
     ...(opts.pagesOnce ? { pagesOnce: true } : {}),
+    ...(opts.scheduled ? { scheduled: opts.scheduled } : {}),
     images: async () => { await images.ready(generationNow()); return images.lookup; },
     symbols,
     ...(testHooks ? { settle: () => settleWatcher ? settleWatcher() : Promise.reject(new Error("settle: the watcher is not running yet")) } : {}),
