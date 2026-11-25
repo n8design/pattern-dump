@@ -1,6 +1,6 @@
 // @pattern-dump/core
 // Orchestration: load config, start dev server, run the diagnostics audit.
-import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite, ensureScratchDir } from "@pattern-dump/dev-server";
+import { startDevServer, runDiagnosticsAudit, formatAudit, planExport, writeExport, writeThreadedIncluders, buildRewriteMap, deriveHandle, buildStaticSite, ensureScratchDir, renderSocialImages } from "@pattern-dump/dev-server";
 import { readProjectGraph, graphJson, describeOf, affectedOf } from "@pattern-dump/dev-server";
 import type { DevServerOptions, AuditFormat } from "@pattern-dump/dev-server";
 import { PD_HOSTS, PD_ROUTES, type DiagnosticsGraph, type StorefrontPagesResponse } from "@pattern-dump/contracts";
@@ -182,6 +182,15 @@ export async function runBuild(
     };
     console.log(`[pd build] NOT CHECKED: ${report.skippedChecks.map(c => what[c] ?? c).join(", ")}, as asked (--skip-checks or build.skipChecks)`);
   }
+}
+
+/**
+ * `pd social`: render the site's social images into the project (<site>/social/), to be committed, and print what
+ * it did (dev-server/src/social-command.ts).
+ */
+export async function runSocial(root: string, configPath: string | undefined, pdVersion: string): Promise<void> {
+  const config = await loadConfig(root, configPath);
+  await renderSocialImages(config, root, { pdVersion, log: line => console.log(`[pd social] ${line}`) });
 }
 
 /**
