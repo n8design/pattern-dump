@@ -34,17 +34,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Both builds use the head's scripts and the head's installed dependencies (one lockfile), on this runner. The
-      # base gets a worktree of its own with a copy of every node_modules folder: the root's, and a workspace's own
-      # where npm put a version there. npm links each workspace package relatively
-      # (node_modules/@pattern-dump/core -> ../../packages/core), so the copy runs the base's own code.
+      # Both builds use the head's scripts, on this runner. The base gets a worktree of its own. When the pull request
+      # leaves package-lock.json as it is, the base gets a copy of every node_modules folder (the root's, and a
+      # workspace's own where npm put a version there): npm links each workspace package relatively
+      # (node_modules/@pattern-dump/core -> ../../packages/core), so the copy runs the base's own code with the same
+      # dependencies. When the pull request changes the lockfile, the base installs its own, so an output change the
+      # new dependencies cause shows here instead of being built into both sides.
       - name: Set up the base
         run: |
           cp -R scripts/golden "$RUNNER_TEMP/golden"
           git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
-          find . -name node_modules -type d -prune -not -path "./.git/*" | while read -r d; do
-            if [ -d "$RUNNER_TEMP/base/$(dirname "$d")" ]; then cp -a "$d" "$RUNNER_TEMP/base/$d"; fi
-          done
+          if git diff --quiet "$BASE" HEAD -- package-lock.json; then
+            echo "package-lock.json is unchanged: the base runs with the head's dependencies"
+            find . -name node_modules -type d -prune -not -path "./.git/*" | while read -r d; do
+              if [ -d "$RUNNER_TEMP/base/$(dirname "$d")" ]; then cp -a "$d" "$RUNNER_TEMP/base/$d"; fi
+            done
+          else
+            echo "package-lock.json changes: the base installs its own dependencies"
+            (cd "$RUNNER_TEMP/base" && npm ci)
+          fi
 
       - name: Build the golden at the base, twice
         run: |
