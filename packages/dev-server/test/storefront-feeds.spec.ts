@@ -9,6 +9,8 @@ import { defineConfig, validateConfig } from "@pattern-dump/config";
 import { feedsOf, type SiteFeedSettings } from "../src/storefront/feeds.js";
 import { readPages } from "../src/storefront/pages.js";
 import { buildStaticSite } from "../src/static-build.js";
+import { startDevServer } from "../src/index.js";
+import { request } from "node:http";
 import { save } from "../../../test-support/save.js";
 
 let tmp = "";
@@ -200,5 +202,64 @@ describe("pd build writes them", () => {
     await expect(buildStaticSite(configFor({ url: SITE, feeds: { author: { name: "The bench" } } }), root, { outDir: join(root, "dist"), now }))
       .rejects.toThrow("site.feeds: its feed is /feed.xml, which is index.md's feed too");
     expect(existsSync(join(root, "site"))).toBe(false);
+  });
+});
+
+describe("pd dev serves them", () => {
+  const PATTERNS: Record<string, string> = {
+    "src/patterns/layouts/page/page.hbs": "<header><p>Site</p></header><main><h1>{{title}}</h1>{{{body}}}</main><footer><p>F</p></footer>\n",
+    "src/patterns/layouts/page/page.schema.json": json({ properties: { title: { type: "string" }, description: { type: "string" } } }),
+    "src/styles/x.scss": "",
+  };
+  const config = (feeds: Record<string, unknown> = { format: "both", author: { name: "The bench" } }) => validateConfig(defineConfig({
+    sourceDir: "./src", patternsDir: "./src/patterns", outDir: "./dist", styles: { strategy: "parallel", dir: "./src/styles" },
+    site: { pagesDir: "./pages", outDir: "./site", workbenchUrl: "https://wb.test/", url: SITE, feeds },
+  } as never), "test");
+  const get = (port: number, path: string) => new Promise<{ status: number; type: string; body: string }>((resolve, reject) => {
+    request({ host: "127.0.0.1", port, path, headers: { host: `live.localhost:${port}` } }, res => {
+      let body = "";
+      res.setEncoding("utf8").on("data", (c: string) => { body += c; });
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, type: String(res.headers["content-type"] ?? ""), body }));
+    }).on("error", reject).end();
+  });
+
+  it("the same feeds as pd build, but for the address the browser is on, as the sitemap", async () => {
+    const root = await project(PATTERNS);
+    await buildStaticSite(config(), root, { outDir: join(root, "dist"), now: new Date("2026-11-25T12:00:00Z") });
+    const server = await startDevServer(config(), root, { port: 0, wsPort: 0, live: true, today: "2026-11-25" });
+    try {
+      for (const [path, type] of [["/feed.xml", "application/atom+xml"], ["/rss.xml", "application/rss+xml"],
+        ["/articles/feed.xml", "application/atom+xml"], ["/notes/rss.xml", "application/rss+xml"]] as const) {
+        const res = await get(server.port, path);
+        expect(res.status, path).toBe(200);
+        expect(res.type, path).toBe(`${type}; charset=utf-8`);
+        const built = await readFile(join(root, "site", ...path.split("/").filter(Boolean)), "utf8");
+        expect(res.body.replaceAll(`http://live.localhost:${server.port}/`, SITE), path).toBe(built);
+      }
+      // An .xml address no feed has is the 404 page, as before.
+      expect((await get(server.port, "/guides/feed.xml")).status).toBe(404);
+    } finally { await server.close(); }
+  });
+
+  it("an edited date shows in the next response", async () => {
+    const root = await project(PATTERNS);
+    const server = await startDevServer(config(), root, { port: 0, wsPort: 0, live: true, today: "2026-11-25" });
+    const titles = async () => [...(await get(server.port, "/articles/feed.xml")).body.matchAll(/<entry>\s*<id>[^<]*<\/id>\s*<title type="text">([^<]+)/g)].map(m => m[1]);
+    try {
+      expect(await titles()).toEqual(["New", "Mid", "Old"]);
+      await save(join(root, "pages", "articles", "old.md"), fm(["title: Old", "date: 2026-11-24"]));
+      await expect.poll(titles, { timeout: 10_000 }).toEqual(["Old", "New", "Mid"]);
+    } finally { await server.close(); }
+  });
+
+  it("a feed's problem is the feed's answer, a 500 that names it; the pages still answer", async () => {
+    const root = await project({ ...PATTERNS, ...DATED_HOME });
+    const server = await startDevServer(config({ author: { name: "The bench" } }), root, { port: 0, wsPort: 0, live: true, today: "2026-11-25" });
+    try {
+      const res = await get(server.port, "/feed.xml");
+      expect(res.status).toBe(500);
+      expect(res.body).toBe("site.feeds: its feed is /feed.xml, which is index.md's feed too: give one of them another file name, or turn one off");
+      expect((await get(server.port, "/articles/")).status).toBe(200);
+    } finally { await server.close(); }
   });
 });
