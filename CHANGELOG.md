@@ -7,6 +7,15 @@
 - **A page's images can sit beside its markdown file.** Write `![Alt](./shot.png)` and the image gets the same WebP
   variants, caption and dark version as one from the assets. See [Images beside a page](docs/guide/storefront.md#images-beside-a-page).
 - **A page's `image` can be a relative path too.** `image: ./share.png` names the link-preview image beside the page.
+- **A site can name a social image component.** `site.socialImages.component` names it; a folder or page picks a
+  variant with `socialImage`, or turns it off with `socialImage: false`.
+- **Pages without an image get a social image, rendered from the component.** `pd build` renders each one in
+  Chromium at 1200 x 630 with the page's title, and fails one whose text doesn't fit.
+- **`pd social` renders the cards into the project, to commit.** A build on a machine without Chromium, such as
+  Cloudflare Pages, then uses them.
+- **A build that can't make a social image says so for every page it affects.** The page gets the site image, and
+  the build ends with a `NO SOCIAL IMAGE` line.
+- **`pd dev` renders social images on request.** The head and the card can be checked before a build.
 - **Pages with a link-preview image get `twitter:image` too.** It names the same image as `og:image`.
 - **A badly named image in the pages folder fails with the name to use.** `Guest_Access.PNG` is reported with
   `guest-access.png`, since the name becomes part of the URL.

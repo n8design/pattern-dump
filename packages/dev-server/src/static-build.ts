@@ -22,7 +22,8 @@ import {
 } from "@pattern-dump/contracts";
 import { startDevServer } from "./index.js";
 import { buildShellHtml } from "./http-utils.js";
-import { imageCacheDir } from "./image-route.js";
+import { imageCacheDir, socialCacheDir } from "./image-route.js";
+import { socialDir } from "./storefront/social-images.js";
 import { loadPatternPackages } from "./packages.js";
 import { resolveServerConfig, shadowedAssetRoots } from "./server-config.js";
 import { createSnapshotWriter } from "./snapshot-writer.js";
@@ -31,7 +32,8 @@ import { isPageImageUrl } from "./storefront/page-images.js";
 import { crawlStorefront, hostTransport } from "./storefront/crawl.js";
 import { checkLinks, linkedWorkbenchRoutes } from "./storefront/links.js";
 import { checkPageBasics } from "./storefront/page-basics.js";
-import { launchChromium, loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule, type PwBrowser } from "./storefront/browser-checks.js";
+import { BrowserUnavailableError, launchChromium, loadProjectPlaywright, runBrowserChecks, VIEWPORTS, type PlaywrightModule, type PwBrowser } from "./storefront/browser-checks.js";
+import { CARD_CHROMIUM_ARGS, renderCards } from "./storefront/social-render.js";
 import { PageCheckError, runPagesA11y, type PageA11yFinding } from "@pattern-dump/a11y";
 import { llmsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { checkClasses } from "./storefront/class-check.js";
@@ -109,6 +111,11 @@ export interface StaticBuildReport {
   classes?: { severity: "warning" | "error"; warnings: string[] };
   /** llms.txt, at the site's root: how many pages it lists. Absent when none is written (storefront.llms). */
   llms?: { pages: number };
+  /** The site's social images (social-images.ts): the pages with a card, and where each card came from (rendered by
+   *  this build, the cache, the committed folder). `missing`: one line per page whose card is missing or stale and
+   *  couldn't be rendered (no Playwright, or no Chromium); each such page takes the site's image, `siteImage` says
+   *  whether there is one. Absent without site.socialImages. */
+  socialImages?: { pages: number; rendered: number; cached: number; committed: number; missing: string[]; siteImage: boolean };
   /** `--browser`: one line per image whose chosen variant doesn't fit the box it is laid out in. */
   images?: { warnings: string[] };
   /** The storefront's drafts left out of the build (a draft, and each page under a draft folder's index.md), by
@@ -204,6 +211,8 @@ async function buildOnce(
     ...cfg.assetRoots.map(path => ({ kind: "the asset folder", path })),
     ...(storefront ? [{ kind: "the pages folder", path: storefront.pagesDir }] : []),
     ...(storefront?.head ? [{ kind: "the site's head file", path: storefront.head }] : []),
+    // The cards pd social committed: read for a page whose card has their hash (social-images.ts).
+    ...(storefront?.socialImages ? [{ kind: "the social images folder", path: socialDir(storefront.pagesDir) }] : []),
   ];
   /** Refuses an output root that is, holds, or sits inside anything the build reads. */
   const clearOfInputs = (name: string, out: string): void => {
@@ -269,7 +278,14 @@ async function buildOnce(
   }
 
   // --browser: the project's Playwright, loaded before anything is built, so a missing one stops the build at once.
-  const playwright = opts.browser && storefront ? await (opts.loadPlaywright ?? loadProjectPlaywright)(project) : undefined;
+  const loadPlaywright = opts.loadPlaywright ?? loadProjectPlaywright;
+  const playwright = opts.browser && storefront ? await loadPlaywright(project) : undefined;
+  // Social images are rendered with it too, and without --browser when the project has it: none is no stop then.
+  const cardPlaywright = playwright ?? (storefront?.socialImages
+    ? await loadPlaywright(project).catch((e: unknown) => { if (e instanceof BrowserUnavailableError) return undefined; throw e; })
+    : undefined);
+  /** Why a card can't be rendered, in the words of the warning for each page that lacks one. */
+  let noRender = "Playwright isn't installed: run pd social, or install Playwright";
   // Search: the project's Pagefind, also before anything is built, so a missing one the site asks for stops at once.
   const pagefind = storefront ? await searchPagefind(storefront.search, project, opts.loadPagefind) : undefined;
   /** What each page gives the index, by route, as the crawl serves it. */
@@ -282,7 +298,8 @@ async function buildOnce(
   // A storefront page's notes, once each however often the page is fetched: the report's notes.
   const storefrontNotes = new Set<string>();
   const server = await startDevServer(config, root, {
-    port: 0, live: false, now, today, pagesOnce: true, ...(skipped.has("html") ? { validateHtml: false } : {}),
+    // The version is part of every social image's hash, so pd dev and pd build name a card alike.
+    port: 0, live: false, now, today, pagesOnce: true, version: opts.pdVersion, ...(skipped.has("html") ? { validateHtml: false } : {}),
     ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
     onStorefrontNote: note => { storefrontNotes.add(note); },
     ...(pagefind ? { onSearchRecord: (r: SearchRecord) => { searchRecords.set(r.route, r); } } : {}),
@@ -320,6 +337,49 @@ async function buildOnce(
     // A site published under a path is asked for under it, as a browser asks: everything is checked as it is served.
     const sfBase = storefront?.basePath ?? "/";
     const sfGet = storefront ? hostTransport(server.port, storefront.host, sfBase) : null;
+
+    // Social images, before the crawl (social-images.ts, social-render.ts): each page's head asked for once, so the
+    // server works out its card; the ones whose bytes are nowhere yet rendered in Chromium into the cache. The crawl's
+    // heads then name each card, and the crawl writes it. A card with a problem stops the build here.
+    let socialSummary: StaticBuildReport["socialImages"];
+    if (storefront?.socialImages && sfGet) {
+      const listed = await sfGet(PD_ROUTES.pages);
+      if (listed.status === 200) {
+        for (const p of (await listed.json() as StorefrontPagesResponse).pages) await sfGet(p.route);
+      }
+      const cards = server.socialCards();
+      const cacheDir = socialCacheDir(cfg.cwd);
+      const missing = cards.filter(c => c.file === undefined);
+      let rendered = 0;
+      if (missing.length && cardPlaywright) {
+        // A Chromium that won't start is a stop only with --browser, which needs it anyway.
+        browser ??= await launchChromium(cardPlaywright, opts.browser ? "pd build --browser" : "pd build", CARD_CHROMIUM_ARGS)
+          .catch(async (e: unknown) => {
+            if (opts.browser || !(e instanceof BrowserUnavailableError)) throw e;
+            // Its first line, as launchChromium names it: "pd build couldn't start Chromium (<reason>): ...".
+            const reason = /couldn't start Chromium \((.*)\): /.exec(e.message)?.[1] ?? e.message;
+            noRender = `Chromium didn't start (${reason}): run pd social, or npx playwright install chromium`;
+            return undefined;
+          });
+      }
+      if (missing.length && browser) {
+        const made = await renderCards(missing, { browser, get: sfGet });
+        if (made.problems.length) {
+          throw new Error(`pd build: the site's social images have problems, so nothing was written:\n${made.problems.map(p => `  - ${p}`).join("\n")}`);
+        }
+        const cache = createImageCache(cacheDir, "png");
+        for (const [hash, png] of made.images) await cache.write(hash, png);
+        rendered = missing.filter(c => made.images.has(c.hash)).length;
+        log(`… social images: ${made.images.size} rendered in Chromium`);
+      }
+      const inCache = cards.filter(c => c.file?.startsWith(cacheDir)).length;
+      // D1: a card that is nowhere and couldn't be rendered. The build goes on; the page's head takes the site's image
+      // (it names a card only when its bytes are there), and the build says so, page by page.
+      // With a browser every missing card was rendered (or the build stopped); without one, each is still missing.
+      const missingLines = browser ? [] : missing.map(c => `${c.page}: no social image: its card is missing or stale and ${noRender}`);
+      socialSummary = { pages: cards.length, rendered, cached: inCache, committed: cards.filter(c => c.file !== undefined).length - inCache,
+        missing: missingLines, siteImage: storefront.image !== undefined };
+    }
     // The crawler files: robots.txt at a host's root (a site under a path has none: crawlers would never read it);
     // the sitemap when the site has an address and is indexed.
     const sfFiles: string[] = storefront ? [...(sfBase === "/" ? [PD_ROUTES.robots] : []), PD_ROUTES.notFound,
@@ -445,7 +505,7 @@ async function buildOnce(
       let imageWarnings: string[] | undefined;
       const browserWarnings: string[] = [];
       if (playwright) {
-        browser ??= await launchChromium(playwright);
+        browser ??= await launchChromium(playwright, "pd build --browser", storefront.socialImages ? CARD_CHROMIUM_ARGS : undefined);
         const checked = await runBrowserChecks({ pages, get: sfGet, browser, basePath: sfBase, ...(searchFiles ? { search: { files: searchFiles, word: searchWord([...searchRecords.values()]) } } : {}) });
         if (checked.errors.length) {
           throw new Error(`pd build: the site has problems in a browser, so nothing was written:\n${checked.errors.map(e => `  - ${e}`).join("\n")}`);
@@ -680,6 +740,7 @@ async function buildOnce(
       if (classSummary) report.classes = classSummary;
       if (a11ySummary) report.accessibility = a11ySummary;
       if (imageSummary) report.images = imageSummary;
+      if (socialSummary) report.socialImages = socialSummary;
       const { drafts, scheduled } = model;
       if (drafts.length) report.drafts = drafts;
       if (model.draftsByDefaults.length) {
@@ -715,6 +776,12 @@ async function buildOnce(
       }
     }
     await createImageCache(imageCacheDir(cfg.cwd)).sweep(used);
+    // And the social image cache, the cards written to the site (/_pd/social/<route>/card.<hash>.png).
+    if (storefront?.socialImages) {
+      const cards = await readdir(join(storefront.outDir, "_pd", "social"), { recursive: true }).catch(() => [] as string[]);
+      const keep = new Set(cards.map(f => /(?:^|[\\/])card\.([0-9a-f]{10})\.png$/.exec(String(f))?.[1]).filter((h): h is string => h !== undefined));
+      await createImageCache(socialCacheDir(cfg.cwd), "png").sweep(keep);
+    }
 
     // Deliberately no 404.html shell: every route has its own index.html, and a host that served the
     // shell for a missing preview would boot a second workbench inside the preview iframe.

@@ -21,7 +21,7 @@ import type { GitDates } from "./storefront/git-dates.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { basename, extname, join, relative } from "node:path";
 import { readFile } from "node:fs/promises";
-import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, type DiscoveryMap, type DiscoveryResult, type ProjectGraphJson, type StorefrontPage } from "@pattern-dump/contracts";
+import { PD_GENERATION_HEADER, PD_HOSTS, PD_PROTOCOL_HEADER, PD_PROTOCOL_VERSION, PD_ROUTE_PREFIX, PD_ROUTES, socialImageUrl, type DiscoveryMap, type DiscoveryResult, type ProjectGraphJson, type StorefrontPage } from "@pattern-dump/contracts";
 import type {
   ApiError, AuditResponse, ComponentDetailResponse, ComponentTree, DiagnosticsGraph, FolderOverview, ImageLookup,
   RuleTiers, ShellClientConfig, StorefrontPagesResponse, ThemeSummary, VersionInfo,
@@ -51,6 +51,9 @@ import { aggregateRequires, normalizeScriptId } from "./requires.js";
 import { compiledScript, ScriptMissing } from "./scripts.js";
 import { contentHash } from "./content-hash.js";
 import { serveImageVariant } from "./image-route.js";
+import { cardDirs, serveSocialImage } from "./social-route.js";
+import type { DevCardRenderer } from "./social-dev.js";
+import { cardFile, cardHash, type SocialCard } from "./storefront/social-images.js";
 import { stampCss, stampHtml, type HashOf } from "./storefront/asset-stamps.js";
 import { layoutIndex } from "./storefront/layout-index.js";
 import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.js";
@@ -92,7 +95,8 @@ const pagesCaches = new WeakMap<RouteContext, PagesCache>();
 /** The website's pages as this server serves them: pd dev shows drafts and scheduled pages; pd build leaves them out,
  *  as if their files weren't there. */
 async function readStorefrontPages(ctx: RouteContext, sf: NonNullable<RouteContext["cfg"]["storefront"]>, discoveryMap?: DiscoveryMap): ReturnType<typeof readPages> {
-  const { key, read } = await sitePagesRead(sf, { live: ctx.live, today: ctx.today ?? todayOf(ctx.now()), ...(discoveryMap ? { discoveryMap } : {}) });
+  const { key, read } = await sitePagesRead(sf, { live: ctx.live, today: ctx.today ?? todayOf(ctx.now()), ...(discoveryMap ? { discoveryMap } : {}),
+    ...(ctx.scheduled ? { scheduled: ctx.scheduled } : {}) });
   // Not read again for every request (pages-cache.ts): once in pd build, and in pd dev until the folder changes.
   let cache = pagesCaches.get(ctx);
   if (!cache) { cache = createPagesCache(sf.pagesDir, ctx.pagesOnce === true); pagesCaches.set(ctx, cache); }
@@ -162,6 +166,12 @@ export function mcpHandlerFor(ctx: RouteContext): McpHandler {
 
 export interface RouteContext {
   readonly cfg: ResolvedConfig;
+  /** pd dev only: renders a social image on request (social-dev.ts). */
+  readonly cardRenderer?: DevCardRenderer;
+  /** pd social only: scheduled pages are shown, drafts still left out (DevServerOptions.scheduled). */
+  readonly scheduled?: "show";
+  /** Each site page's card, by route, as its head last worked it out (social-images.ts): DevServer.socialCards. */
+  readonly socialCards: Map<string, SocialCard>;
   /** Pattern Dump's version, as the MCP server names itself (DevServerOptions.version). */
   readonly version: string;
   readonly state: ServerState;
@@ -492,6 +502,9 @@ async function routeRequest(
       }
       return;
     }
+
+    // --- A site page's social image (social-route.ts) ---
+    if (pathname.startsWith(PD_ROUTE_PREFIX.social)) return await serveSocialImage(pathname, res, cfg, ctx);
 
     // --- Responsive image variants (image-route.ts) ---
     if (pathname.startsWith(PD_ROUTE_PREFIX.images)) {
@@ -874,6 +887,23 @@ async function routeRequest(
         lang: cfg.storefront.lang, siteIndex: cfg.storefront.index, basePath: cfg.storefront.basePath,
         ...(cfg.storefront.head !== undefined ? { siteHead: { path: cfg.storefront.head, name: cfg.storefront.headName ?? cfg.storefront.head } } : {}),
         ...(cfg.storefront.image !== undefined ? { siteImage: cfg.storefront.image } : {}),
+        ...(cfg.storefront.socialImages ? {
+          socialComponent: cfg.storefront.socialImages.component,
+          // The card's hash, over its document stamped as this host serves it; its URL when its bytes are there.
+          socialCard: async (cardRoute: string, document: string, about: { page: string; variant: string; values: Record<string, unknown> }) => {
+            const stamped = await stampHtml(document, hashOfFor(req, ctx), cfg.storefront!.basePath);
+            const hash = cardHash(stamped, ctx.version);
+            const file = await cardFile(cardRoute, hash, cardDirs(cfg)!);
+            ctx.socialCards.set(cardRoute, { route: cardRoute, ...about, hash, document: stamped, ...(file !== undefined ? { file } : {}) });
+            if (file !== undefined) return { path: socialImageUrl(cardRoute, hash) };
+            // pd dev: a card it can render is named now and rendered when it is asked for (social-route.ts); one it
+            // can't is the page's warning, as pd build's report says it (D1).
+            if (!ctx.cardRenderer) return {};
+            const why = await ctx.cardRenderer.unavailable();
+            return why === undefined ? { path: socialImageUrl(cardRoute, hash) }
+              : { note: `warning: ${about.page}: no social image: its card is missing or stale and ${why}` };
+          },
+        } : {}),
         ...(ctx.images ? { images: ctx.images } : {}),
         ...(ctx.symbols ? { symbols: () => ctx.symbols!.index() } : {}),
         themes: { names: themesDir ? [...state.themeCss.keys()] : [], switch: cfg.themeSwitch },

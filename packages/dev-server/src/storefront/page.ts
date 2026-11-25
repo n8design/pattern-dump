@@ -32,6 +32,7 @@ import { basename } from "node:path";
 import { renderDoc, type DocRegions, type ProseImages, type SymbolImages } from "../markdown.js";
 import { readSchema, unreadableSchemas, type ObjectSchema, type PlacedProblem } from "./declared-values.js";
 import { ASSEMBLY_KEYS, checkPageFrontmatter, RESERVED_KEYS } from "./frontmatter-contract.js";
+import { CARD, cardDocument, cardValues, checkSocialComponent, missingFields, missingFieldMessage, sectionOf, variantData } from "./social-images.js";
 import { DEFAULT_LAYOUT, NOT_FOUND_FILE, type PageFile, type PageModel } from "./pages.js";
 import { renderError } from "./pages-cache.js";
 import { designFiles } from "./design-files.js";
@@ -92,6 +93,13 @@ export interface PageAssembly {
   image(path: string, as?: { written: string; beside?: string }): Promise<PageImageCheck>;
   /** storefront.image: the image of every page that names none. */
   siteImage?: string;
+  /** site.socialImages.component: the component social images are rendered from (social-images.ts). */
+  socialComponent?: string;
+  /** A card's URL path (/_pd/social/…) from its document (social-images.ts cardDocument), when its bytes are there to
+   *  serve (or pd dev will render them when asked); without a path the page takes the site's image, and `note` says
+   *  why. Without it, no page gets a card. */
+  socialCard?: (route: string, document: string, about: { page: string; variant: string; values: Record<string, unknown> }) =>
+    Promise<{ path?: string; note?: string }>;
   /** storefront.head: the site's own head file, by its absolute path and as the config names it. */
   siteHead?: { path: string; name: string };
   /** The path the site is published under ("/project/"), put in front of its references on the way out
@@ -484,7 +492,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   if (brokenSchemas.length) { siteWide = brokenSchemas; return fail(brokenSchemas); }
 
   const problems: string[] = [...generatedProblems];
-  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags, a.shown);
+  const checked = await checkPageFrontmatter(page, a.discoveryMap, model.categories, model.tags, a.shown, a.socialComponent);
   problems.push(...checked.problems.map(p => `${p.file}${p.line !== undefined ? `:${p.line}` : ""}: ${p.message}`));
   if (isNotFound && checked.build.redirectFrom) {
     const line = page.frontmatter.lines["redirectFrom"];
@@ -494,6 +502,12 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const site = await checkSite(a.site, a.discoveryMap, paths.pages, { folders: paths.folders, leftOut: model.drafts });
   siteWide = site.problems;
   problems.push(...site.problems);
+  // The social image component, like partials/base: a problem with it is every page's.
+  if (a.socialComponent !== undefined) {
+    const social = await checkSocialComponent(a.socialComponent, a.discoveryMap);
+    siteWide = [...siteWide, ...social];
+    problems.push(...social);
+  }
 
   // The link-preview image: the page's own, else the site's. A bad site image is the whole site's problem.
   const imageCheck = checked.build.image !== undefined ? await a.image(checked.build.image, checked.build.imageAs)
@@ -872,13 +886,34 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
   const siteTitle = typeof site.values["title"] === "string" ? site.values["title"] : undefined;
   const description = typeof checked.values["description"] === "string" ? checked.values["description"] : undefined;
   const article = isNotFound ? undefined : articleOf(route, model, checked.build.date, checked.build.updated);
+  // The social image (social-images.ts): for a page with no image of its own, rendered from the component, in place
+  // of the site's image. Only with the site's address: without it no tag would name it.
+  let socialImage: PageImage | undefined;
+  if (a.socialComponent !== undefined && a.socialCard && !isNotFound && a.siteUrl !== undefined
+    && checked.build.image === undefined && checked.build.socialImage !== false) {
+    const variantId = checked.build.socialImage ? `${a.socialComponent}~${checked.build.socialImage}` : a.socialComponent;
+    const values = cardValues({ title, description, section: sectionOf(route, model), date: checked.build.date, site: site.values },
+      await variantData(variantId, a.discoveryMap));
+    const missing = await missingFields(a.socialComponent, values, a.discoveryMap);
+    if (missing.length) return fail(missing.map(f => missingFieldMessage(page.path, f, variantId, a.socialComponent!)));
+    let body: string;
+    try {
+      body = (await a.render({ component: variantId, data: values, sampleData: false, images: "site" })).html;
+    } catch (e) {
+      return fail([`${page.path}: the social image (${variantId}) doesn't render: ${renderError(e)}`]);
+    }
+    const card = await a.socialCard(route, cardDocument({ lang: a.lang ?? "en", head: await a.head(variantId, body, []), body }),
+      { page: page.path, variant: variantId, values });
+    if (card.path !== undefined) socialImage = { path: card.path, format: "png", width: CARD.width, height: CARD.height };
+    if (card.note !== undefined) notes.push(card.note);
+  }
   const head = [
     `<title>${escapeHtml(siteTitle && siteTitle !== title ? `${title} · ${siteTitle}` : title)}</title>`,
     ...(description ? [`<meta name="description" content="${escapeAttr(description)}">`] : []),
     // The 404 page is served at every address that has none: no address of its own, never indexed.
     ...seoTags({
       route, title, description, siteTitle, siteUrl: isNotFound ? undefined : a.siteUrl,
-      image: imageCheck?.ok ? imageCheck.image : undefined,
+      image: socialImage ?? (imageCheck?.ok ? imageCheck.image : undefined),
       index: !isNotFound && a.siteIndex !== false && checked.build.index !== false, article,
     }),
     ...(a.siteUrl !== undefined && !isNotFound

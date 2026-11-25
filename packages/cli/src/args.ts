@@ -14,6 +14,7 @@ export type Command =
   | { kind: "dev"; root: string; configPath?: string; port?: number; wsPort?: number }
   | { kind: "audit"; root: string; configPath?: string; format: AuditFormat; strict?: boolean }
   | { kind: "export"; root: string; configPath?: string; out?: string }
+  | { kind: "social"; root: string; configPath?: string }
   | { kind: "graph"; root: string; configPath?: string; json: boolean }
   | { kind: "mcp"; root: string; configPath?: string }
   | { kind: "describe"; root: string; configPath?: string; id: string; json: boolean }
@@ -28,7 +29,7 @@ export type Command =
   | { kind: "version" }
   | { kind: "error"; message: string };
 
-const COMMANDS = ["init", "dev", "audit", "build", "export", "graph", "describe", "affected", "mcp"] as const;
+const COMMANDS = ["init", "dev", "audit", "build", "social", "export", "graph", "describe", "affected", "mcp"] as const;
 
 /** `--root` and `--config` resolve against the invoking cwd, independently of each other: a config
  *  may live outside the root it opens (a read-only project you don't own). The config's own paths
@@ -138,6 +139,12 @@ export function parseCommand(argv: string[], cwd: string): Command {
         // A comma-separated list; empty skips none (over build.skipChecks in the config).
         ...(values["skip-checks"] !== undefined ? { skipChecks: values["skip-checks"].split(",").map(c => c.trim()).filter(Boolean) } : {}),
       };
+    }
+
+    if (cmd === "social") {
+      const { values } = parseArgs({ args: rest, strict: true, allowPositionals: false, options: { ...rootAndConfig } });
+      if (values.help) return { kind: "help", topic: cmd };
+      return { kind: "social", ...base(values, cwd) };
     }
 
     const { values } = parseArgs({
@@ -291,6 +298,11 @@ export const USAGE = `Usage: pd <command> [options]
     --skip-checks=a11y,html  Leave checks out, for a quick local build: a11y, the site pages'
                        accessibility; html, the components' markup against HTML's content model.
                        The report says so. Default: every check runs (build.skipChecks)
+
+  social   Render the site's social images into the project (social/ beside the pages), to commit,
+           so a build without Chromium uses them. Uses the project's own Playwright
+    --root <path>      A specific project root
+    --config <path>    Use a config file outside the root
 
   export   Write the subject's flattened families back out in corrected form
     --root <path>      Export a specific project root (read-only)

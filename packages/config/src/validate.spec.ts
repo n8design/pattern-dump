@@ -592,3 +592,25 @@ describe("storefrontBasePath — the path the site is published under", () => {
     expect(storefrontBasePath(undefined)).toBe("/");
   });
 });
+
+describe("site.socialImages", () => {
+  const withSocial = (socialImages: unknown) => ({ ...valid, storefront: { ...valid.storefront, socialImages } });
+
+  it("takes a component's id; whether it exists is checked with the site's pages", () => {
+    expect(configProblems(withSocial({ component: "components/social-image" }))).toEqual([]);
+    expect(configProblems(withSocial({ component: "social-image" }))).toEqual([]);
+    expect(validateConfig(withSocial({ component: "components/social-image" }), "test").storefront?.socialImages)
+      .toEqual({ component: "components/social-image" });
+  });
+
+  it("names what is wrong with it", () => {
+    expect(configProblems(withSocial("components/social-image"))).toEqual([`"site.socialImages" must be an object`]);
+    expect(configProblems(withSocial({}))).toEqual([`missing required "site.socialImages.component"`]);
+    expect(configProblems(withSocial({ componnet: "x" }))).toEqual([
+      `missing required "site.socialImages.component" (found "site.socialImages.componnet": did you mean "site.socialImages.component"?)`]);
+    for (const component of [3, "", "/components/social-image", "components/social-image/", "components//x", "components/../x", "components/social-image~guide"]) {
+      expect(configProblems(withSocial({ component })), String(component))
+        .toEqual([`"site.socialImages.component" must be a component's id, such as "components/social-image"`]);
+    }
+  });
+});

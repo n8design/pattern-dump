@@ -73,6 +73,10 @@ export { buildStaticSite } from "./static-build.js";
 export { withBasePath } from "./snapshot-writer.js";
 export { loadProjectPagefind, PAGEFIND_INSTALL } from "./storefront/search.js";
 export type { StaticBuildOptions, StaticBuildReport } from "./static-build.js";
+export type { SocialCard } from "./storefront/social-images.js";
+export { renderSocialImages, type SocialImagesOptions, type SocialImagesReport } from "./social-command.js";
+// What a loadPlaywright passed in throws for "not installed": a page then takes the site image (D1), never a stop.
+export { BrowserUnavailableError } from "./storefront/browser-checks.js";
 // Folder overview gallery — public leaves under a group node.
 // Component detail. Widest fan-out in the package — nothing may import it back.
 // Shared timing gate — one flag, so the startup-build and per-save halves cannot drift apart.
@@ -98,6 +102,9 @@ import { watchedRoots } from "./watch-roots.js";
 // The watcher + HMR broadcast path — the sole consumer of hotreloader.
 import { startWatching, type WatchHandle } from "./watch.js";
 import { createGitDates } from "./storefront/git-dates.js";
+import type { SocialCard } from "./storefront/social-images.js";
+import { createDevCardRenderer } from "./social-dev.js";
+import type { PlaywrightModule } from "./storefront/browser-checks.js";
 import { readPages } from "./storefront/pages.js";
 import { projectPagefindEntry, type SearchRecord } from "./storefront/search.js";
 // The style index — class ownership attributed from compiled CSS + source maps, and the SCSS
@@ -149,6 +156,11 @@ export interface DevServerOptions {
    *  build so a build that runs past midnight holds back the same pages throughout. Without it, each request takes the
    *  clock's day. */
   today?: string;
+  /** `pd dev` only: where social images get Playwright from, to be rendered on request (social-dev.ts). Default: the
+   *  project's own (loadProjectPlaywright). */
+  loadPlaywright?: (root: string) => Promise<PlaywrightModule>;
+  /** `pd social` only: "show" serves the site's scheduled pages as if their day had come; drafts stay left out. */
+  scheduled?: "show";
   /** `pd build` only: the storefront's pages folder is read once and that reading serves every request, since the
    *  folder doesn't change while a build runs. Without it, the reading is kept only until the folder changes (a
    *  file's size or time stamp, a new or deleted file), checked on every request. */
@@ -184,6 +196,9 @@ export interface DevServer {
   schemaProblems(): Promise<string[]>;
   /** For pd build, not part of the HTTP contract: every symbol image, what can't be used, and what to say about it. */
   symbols(): Promise<SymbolReport>;
+  /** For pd build and pd social, not part of the HTTP contract: each site page's social image, by route, as its head
+   *  last worked it out (social-images.ts). A page gets one in here when it is served. */
+  socialCards(): SocialCard[];
 }
 
 export interface StyleGuideSources {
@@ -399,8 +414,9 @@ export async function startDevServer(
   let settleWatcher: (() => Promise<void>) | null = null;
   const testHooks = live && process.env["PD_TEST_HOOKS"] === "1";
   const routeCtx: RouteContext = {
-    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, version: opts.version ?? "0.0.0-dev", ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
+    cfg, state, rendering, tracker, devUiDist, boot, now, live, site, socialCards: new Map(), version: opts.version ?? "0.0.0-dev", ...(dates ? { dates } : {}), ...(opts.today !== undefined ? { today: opts.today } : {}),
     ...(opts.pagesOnce ? { pagesOnce: true } : {}),
+    ...(opts.scheduled ? { scheduled: opts.scheduled } : {}),
     images: async () => { await images.ready(generationNow()); return images.lookup; },
     symbols,
     ...(testHooks ? { settle: () => settleWatcher ? settleWatcher() : Promise.reject(new Error("settle: the watcher is not running yet")) } : {}),
@@ -408,6 +424,8 @@ export async function startDevServer(
     ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
     ...(opts.onStorefrontNote ? { onStorefrontNote: opts.onStorefrontNote } : {}),
     ...(opts.onSearchRecord ? { onSearchRecord: opts.onSearchRecord } : {}),
+    // pd dev renders a site's social images on request (social-dev.ts); pd build renders them before its crawl.
+    ...(live && cfg.storefront?.socialImages ? { cardRenderer: createDevCardRenderer(cfg, () => httpPort, opts.loadPlaywright) } : {}),
   };
   const httpServer = createServer((req, res) => { void handleRequest(req, res, routeCtx); });
 
@@ -469,12 +487,14 @@ export async function startDevServer(
       return { stylesheets: [...state.perComponentCss.values(), state.baseCss, ...state.themeCss.values()], templates };
     },
     symbols: () => symbols.report(),
+    socialCards: () => [...routeCtx.socialCards.values()],
     async schemaProblems() {
       return unreadableSchemas((await currentDiscovery(state, patternRoots)).discoveryMap, displayPath);
     },
     async close() {
       await watcher?.close();
       await hotreloader.close();
+      await routeCtx.cardRenderer?.close();
       await new Promise<void>((res, rej) =>
         httpServer.close((err) => (err ? rej(err) : res()))
       );

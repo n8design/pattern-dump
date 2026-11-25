@@ -27,10 +27,11 @@ export type HashOf = (path: string) => Promise<string | undefined>;
 const SERVED = String.raw`\/(?:_pd|assets)\/[^"'()\s?#]+|\/(?:[a-z0-9-]+\/)*[a-z0-9-]+\.(?:png|jpe?g|gif|webp|svg)`;
 
 /** `path` or `path?v=…`: the path, when the reference may be stamped; otherwise null. An image variant
- *  (/_pd/images/…) is already named by its key, and looking its stamp up would encode it: never stamped. */
+ *  (/_pd/images/…) and a social image (/_pd/social/…) are already named by their key, and looking a stamp up would
+ *  encode or render it: never stamped. */
 function stampable(ref: string): string | null {
   const m = new RegExp(`^(${SERVED})(?:\\?v=[^"'()\\s#&]*)?$`).exec(ref);
-  return m && !m[1]!.startsWith(PD_ROUTE_PREFIX.images) ? m[1]! : null;
+  return m && !m[1]!.startsWith(PD_ROUTE_PREFIX.images) && !m[1]!.startsWith(PD_ROUTE_PREFIX.social) ? m[1]! : null;
 }
 
 async function replaceAsync(text: string, re: RegExp, fn: (m: RegExpExecArray) => Promise<string>): Promise<string> {

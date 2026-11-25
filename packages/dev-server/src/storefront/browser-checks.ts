@@ -35,15 +35,20 @@ export interface PlaywrightModule {
   chromium: { launch(options?: { headless?: boolean; args?: string[] }): Promise<PwBrowser> };
 }
 /** The part of a Playwright browser this uses. Whoever launches it closes it. */
-export interface PwBrowser { newContext(o: { viewport: { width: number; height: number }; deviceScaleFactor: number }): Promise<PwContext>; close(): Promise<void> }
-interface PwContext {
+export interface PwBrowser {
+  newContext(o: { viewport: { width: number; height: number }; deviceScaleFactor: number; reducedMotion?: "reduce" }): Promise<PwContext>;
+  close(): Promise<void>;
+}
+export interface PwContext {
   route(url: string, handler: (route: PwRoute) => Promise<void>): Promise<void>;
   newPage(): Promise<PwPage>;
   close(): Promise<void>;
 }
-interface PwRoute { request(): { url(): string }; fulfill(o: { status: number; headers?: Record<string, string>; body: Buffer }): Promise<void>; abort(): Promise<void> }
-interface PwPage {
+export interface PwRoute { request(): { url(): string }; fulfill(o: { status: number; headers?: Record<string, string>; body: Buffer }): Promise<void>; abort(): Promise<void> }
+export interface PwPage {
   goto(url: string, o?: { waitUntil?: "load" }): Promise<unknown>;
+  screenshot(o: { type: "png"; fullPage?: boolean; clip?: { x: number; y: number; width: number; height: number };
+    animations?: "disabled"; caret?: "hide"; scale?: "css" }): Promise<Buffer>;
   fill(selector: string, value: string): Promise<void>;
   press(selector: string, key: string): Promise<void>;
   waitForTimeout(ms: number): Promise<void>;
@@ -56,8 +61,9 @@ export class BrowserUnavailableError extends Error {}
 
 const INSTALL = "npm install --save-dev playwright, then npx playwright install chromium";
 
-/** The project's Playwright: `playwright`, else `@playwright/test`, resolved from the project's root. */
-export async function loadProjectPlaywright(root: string): Promise<PlaywrightModule> {
+/** The project's Playwright: `playwright`, else `@playwright/test`, resolved from the project's root. `command` names
+ *  who needs it, in the message when there is none. */
+export async function loadProjectPlaywright(root: string, command = "pd build --browser"): Promise<PlaywrightModule> {
   const require = createRequire(join(root, "package.json"));
   for (const name of ["playwright", "@playwright/test"]) {
     let resolved: string;
@@ -66,7 +72,7 @@ export async function loadProjectPlaywright(root: string): Promise<PlaywrightMod
     const chromium = mod.chromium ?? mod.default?.chromium;
     if (chromium) return { chromium };
   }
-  throw new BrowserUnavailableError(`pd build --browser needs Playwright in this project: ${INSTALL}`);
+  throw new BrowserUnavailableError(`${command} needs Playwright in this project: ${INSTALL}`);
 }
 
 /** Chromium from `playwright`, headless; `command` names who asked, in the message when it won't start. */
