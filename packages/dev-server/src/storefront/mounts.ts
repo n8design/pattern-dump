@@ -10,9 +10,11 @@
 
 import { lstat, readdir, realpath, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
+import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
+import { assetFile } from "../asset-file.js";
 import { containedFile } from "../contained-file.js";
 import type { SiteMountConfig } from "../server-config.js";
-import { collisionOf, describeClaim, type Claim } from "./site-output.js";
+import { collisionOf, describeClaim, forMounts, type Claim } from "./site-output.js";
 
 /** A file a mount publishes: its path in the site (/htwoo-core/index.html), the file it is read from (links
  *  followed), and its path in the mount's folder, with "/" (index.html). */
@@ -92,8 +94,28 @@ export function mountCollisions(files: readonly MountedFile[], claims: readonly 
   return problems;
 }
 
+/** The project's asset folders, as the server config has them: where /assets/ is served from (asset-file.ts). */
+export interface AssetRoots { roots: readonly string[]; names: readonly string[] }
+
+/**
+ * The project assets served at any of `paths` (site paths, decoded), each with its file as shown from `root`: the
+ * places under /assets/ a mounted file can't take (site-output.ts, forMounts). Found with pd dev's own lookup, so the
+ * build and pd dev agree on every path, the single-root mirror included.
+ */
+export async function assetsAt(paths: Iterable<string>, assets: AssetRoots, root: string): Promise<{ path: string; file: string }[]> {
+  const found: { path: string; file: string }[] = [];
+  // The lookup answers with the real path (links followed), so it is shown from the root's real path too.
+  const realRoot = await realpath(root).catch(() => root);
+  for (const path of new Set(paths)) {
+    if (!path.startsWith(PD_ROUTE_PREFIX.assets)) continue;
+    const file = await assetFile(path.split("/").map(encodeURIComponent).join("/"), assets.roots, assets.names);
+    if (file !== null) found.push({ path, file: relative(realRoot, file).split(sep).join("/") });
+  }
+  return found;
+}
+
 /** The mount problems that stop pd build: a missing folder, a link out of its mount, a collision. */
-export async function mountProblems(mounts: readonly SiteMountConfig[], root: string, claims: readonly Claim[]): Promise<{
+export async function mountProblems(mounts: readonly SiteMountConfig[], root: string, claims: readonly Claim[], assets: AssetRoots): Promise<{
   files: MountedFile[]; problems: string[];
 }> {
   const read = await readMounts(mounts, root);
@@ -103,7 +125,7 @@ export async function mountProblems(mounts: readonly SiteMountConfig[], root: st
       ...read.missing.map(m => `site.mounts: ${m.name}, published at ${m.to}, doesn't exist: build it before the site `
         + `(the other tool's build runs first), or remove the mount`),
       ...read.problems,
-      ...mountCollisions(read.files, claims),
+      ...mountCollisions(read.files, forMounts(claims, await assetsAt(read.files.map(f => f.path), assets, root))),
     ],
   };
 }

@@ -76,8 +76,8 @@ import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { isPageImageUrl, pageImageFile } from "./storefront/page-images.js";
 import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
-import { mountedFile, mountProblems, readMounts, sitemapRoutes } from "./storefront/mounts.js";
-import { claimsOf, collisionOf, describeClaim } from "./storefront/site-output.js";
+import { assetsAt, mountedFile, mountProblems, readMounts, sitemapRoutes } from "./storefront/mounts.js";
+import { claimsOf, collisionOf, describeClaim, forMounts } from "./storefront/site-output.js";
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import type { SearchRecord } from "./storefront/search.js";
@@ -338,7 +338,8 @@ async function answerMount(req: IncomingMessage, res: ServerResponse, ctx: Route
   const sitePath = `${found.mount.to}${found.rel}`;
   const { feedSettings, siteFeeds } = siteFeedsOf(req, ctx, model);
   const feeds = feedSettings ? (await siteFeeds()).feeds.map(f => ({ address: f.address, source: f.feed.source })) : [];
-  const clash = collisionOf(claimsOf(model, feeds), sitePath);
+  const assets = { roots: ctx.cfg.assetRoots, names: ctx.cfg.assetRootNames };
+  const clash = collisionOf(forMounts(claimsOf(model, feeds), await assetsAt([sitePath], assets, ctx.cfg.cwd)), sitePath);
   if (clash) {
     warnOnce(`site.mounts: ${found.mount.name}/${found.rel} would be published at ${sitePath}, which is ${describeClaim(clash)}: `
       + `pd dev serves the site's, and pd build stops on it; remove the file from the mount, or publish the mount at another route`);
@@ -911,7 +912,7 @@ async function routeRequest(
         // (mounts.ts), checked against every file the site writes (site-output.ts).
         if (!ctx.live && storefront.mounts.length) {
           const claims = claimsOf(model, (feeds?.feeds ?? []).map(f => ({ address: f.address, source: f.feed.source })));
-          const mounted = await mountProblems(storefront.mounts, cfg.cwd, claims);
+          const mounted = await mountProblems(storefront.mounts, cfg.cwd, claims, { roots: cfg.assetRoots, names: cfg.assetRootNames });
           if (mounted.problems.length) { json(res, 500, { error: mounted.problems.join("\n") } satisfies ApiError); return; }
         }
         for (const note of feeds?.notes ?? []) ctx.onStorefrontNote?.(note);

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **A mount can publish under `/assets/` where the project has no asset of that name.** Only a project asset at the
+  same path is a collision, in `pd build` and `pd dev`; see [Mounts](docs/guide/storefront.md#mounts).
+
 ## 0.10.0 (2026-11-26)
 
 ### Upgrading from 0.9.0

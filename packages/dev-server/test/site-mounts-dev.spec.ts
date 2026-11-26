@@ -54,8 +54,10 @@ async function files(dir: string): Promise<string[]> {
 const TYPES: Record<string, string> = {
   "tool/index.html": "text/html", "tool/style.css": "text/css", "tool/app.js": "application/javascript",
   "tool/logo.png": "image/png", "tool/sitemap.xml": "application/xml", "root/favicon.ico": "image/x-icon",
-  "root/manifest.webmanifest": "application/manifest+json", "root/123456/x.css": "text/css",
+  "root/manifest.webmanifest": "application/manifest+json", "root/123456/x.css": "text/css", "assets-css/x.css": "text/css",
 };
+/** Each mount's folder in the bench, and where it is published (from the site's root, without the leading "/"). */
+const MOUNTS = { tool: "tool/", other: "other/", root: "", "assets-css": "assets/css/" } as const;
 
 for (const base of ["/", "/bench/"]) {
   describe(`every mounted file, byte for byte, with the site at ${base}`, () => {
@@ -64,8 +66,7 @@ for (const base of ["/", "/bench/"]) {
       const server = await serve(dir, config({ url: `https://mounts.example.test${base}` }));
       try {
         let compared = 0;
-        for (const name of ["tool", "other", "root"]) {
-          const to = name === "root" ? "" : `${name}/`;
+        for (const [name, to] of Object.entries(MOUNTS)) {
           for (const rel of await files(join(dir, name))) {
             const res = await get(server.port, `${base}${to}${rel}`);
             expect(res.status, `${name}/${rel}`).toBe(200);
@@ -75,7 +76,7 @@ for (const base of ["/", "/bench/"]) {
             compared++;
           }
         }
-        expect(compared).toBe(11);
+        expect(compared).toBe(12);
         // A folder's address is its index.html; without its "/" it forwards there, under the site's path.
         expect(sha((await get(server.port, `${base}tool/guide/`)).body)).toBe(sha(await readFile(join(dir, "tool", "guide", "index.html"))));
         const bare = await get(server.port, `${base}tool/guide`);
@@ -142,6 +143,24 @@ describe("a file in the place of the site's own", () => {
         "[dev-server] site.mounts: ../root/about/index.html would be published at /about/index.html, which is the page /about/: "
           + "pd dev serves the site's, and pd build stops on it; remove the file from the mount, or publish the mount at another route",
         "[dev-server] site.mounts: ../root/notes/feed.xml would be published at /notes/feed.xml, which is notes/index.md's feed: "
+          + "pd dev serves the site's, and pd build stops on it; remove the file from the mount, or publish the mount at another route",
+      ]);
+    } finally { await server.close(); }
+  });
+
+  it("a project asset at a mounted file's path under /assets/: the asset, with one warning; other /assets/ paths as before", { timeout: 60_000 }, async () => {
+    const dir = await copy();
+    await save(join(dir, "site", "assets", "css", "x.css"), ".project { color: red; }\n");
+    await save(join(dir, "site", "assets", "other.css"), ".other { color: blue; }\n");
+    const warn = vi.spyOn(console, "warn");
+    const server = await serve(dir, { ...config(), ...validateConfig({ ...benchConfig, assets: { strategy: "central", dir: "./assets" } }, "test") });
+    try {
+      for (let i = 0; i < 2; i++) expect((await get(server.port, "/assets/css/x.css")).body.toString()).toBe(".project { color: red; }\n");
+      expect((await get(server.port, "/assets/other.css")).body.toString()).toBe(".other { color: blue; }\n");
+      const missing = await get(server.port, "/assets/css/missing.css");
+      expect([missing.status, missing.body.toString()]).toEqual([404, "Asset not found"]);
+      expect(warn.mock.calls.map(c => String(c[0])).filter(l => l.includes("site.mounts"))).toEqual([
+        "[dev-server] site.mounts: ../assets-css/x.css would be published at /assets/css/x.css, which is the project asset assets/css/x.css: "
           + "pd dev serves the site's, and pd build stops on it; remove the file from the mount, or publish the mount at another route",
       ]);
     } finally { await server.close(); }

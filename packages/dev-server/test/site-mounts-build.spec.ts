@@ -46,9 +46,10 @@ async function hashes(dir: string): Promise<Map<string, string>> {
   }
   return out;
 }
-const MOUNTS = ["tool", "other", "root"] as const;
+/** Each mount's folder in the bench, and where it is published (from the site's root, without the leading "/"). */
+const MOUNTS = { tool: "tool/", other: "other/", root: "", "assets-css": "assets/css/" } as const;
 
-describe("a site with three mounts", () => {
+describe("a site with four mounts", () => {
   let dir = "", report: Awaited<ReturnType<typeof build>>, out = new Map<string, string>();
   beforeAll(async () => {
     dir = await copy();
@@ -58,17 +59,16 @@ describe("a site with three mounts", () => {
 
   it("writes every mounted file at its route, byte for byte", async () => {
     let compared = 0;
-    for (const name of MOUNTS) {
-      const to = name === "root" ? "" : `${name}/`;
+    for (const [name, to] of Object.entries(MOUNTS)) {
       for (const [rel, hash] of await hashes(join(dir, name))) {
         expect(out.get(`${to}${rel}`), `${name}/${rel}`).toBe(hash);
         compared++;
       }
     }
-    // tool: 7 files with its logo; other: 1; root: 3 with its favicon.
-    expect(compared).toBe(11);
+    // tool: 7 files with its logo; other: 1; root: 3 with its favicon; assets-css: 1, under /assets/.
+    expect(compared).toBe(12);
     for (const path of ["tool/index.html", "tool/style.css", "tool/app.js", "tool/logo.png", "tool/sitemap.xml", "favicon.ico",
-      "manifest.webmanifest", "123456/x.css", "other/index.html"]) expect(out.has(path), path).toBe(true);
+      "manifest.webmanifest", "123456/x.css", "other/index.html", "assets/css/x.css"]) expect(out.has(path), path).toBe(true);
   });
 
   it("writes the site's own files beside them", () => {
@@ -77,7 +77,7 @@ describe("a site with three mounts", () => {
   });
 
   it("reports each mount's files and size", () => {
-    expect(report.mounts?.map(m => [m.to, m.files])).toEqual([["/tool/", 7], ["/other/", 1], ["/", 3]]);
+    expect(report.mounts?.map(m => [m.to, m.files])).toEqual([["/tool/", 7], ["/other/", 1], ["/", 3], ["/assets/css/", 1]]);
     expect(report.mounts?.every(m => m.bytes > 0)).toBe(true);
   });
 
@@ -128,6 +128,11 @@ describe("what stops the build, with both paths named, writing nothing", () => {
   it("a file two mounts publish", { timeout: 120_000 }, () =>
     fails(d => save(join(d, "root", "tool", "style.css"), "x"),
       `site.mounts: ../root/tool/style.css would be published at /tool/style.css, which clashes with ../tool/style.css, published at /tool/style.css: ${tail}`));
+
+  it("a file in a project asset's place under /assets/", { timeout: 120_000 }, () =>
+    fails(d => save(join(d, "site", "assets", "css", "x.css"), ".project { color: red; }\n"),
+      `site.mounts: ../assets-css/x.css would be published at /assets/css/x.css, which is the project asset assets/css/x.css: ${tail}`,
+      validateConfig({ ...benchConfig, assets: { strategy: "central", dir: "./assets" } }, "test")));
 
   it("a missing folder", { timeout: 120_000 }, () =>
     fails(d => rm(join(d, "other"), { recursive: true }),

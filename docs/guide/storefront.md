@@ -1744,8 +1744,9 @@ Byte for byte
 
 Collisions stop the build
 : A mounted file can't take the place of a file the site writes: a page, an old route a page forwards from
-  (`redirectFrom`), a feed, `sitemap.xml`, `robots.txt`, `llms.txt`, `404.html`, or anything under `/_pd/`,
-  `/assets/` or `/preview/`. Nor can it take another mount's file. The build stops and names both files, and nothing
+  (`redirectFrom`), a feed, `sitemap.xml`, `robots.txt`, `llms.txt`, `404.html`, anything under `/_pd/` or
+  `/preview/`, or a project asset under `/assets/`. Under `/assets/` only an asset's own path is taken, so a mount
+  can publish at `/assets/css/` beside the project's assets. Nor can it take another mount's file. The build stops and names both files, and nothing
   is written. A file also collides where a folder of the same name is: a mounted `about` against the page `/about/`.
 
 A missing folder stops the build
@@ -1788,6 +1789,9 @@ A mount at the workbench's path
 
 A missing folder, in `pd dev`
 : `site.mounts: ../docs/htwoo-core, published at /htwoo-core/, doesn't exist: its addresses are the 404 page until it does; build it, and the next request serves it (pd build stops without it)`
+
+A file in a project asset's place
+: `site.mounts: <file> would be published at /assets/css/x.css, which is the project asset assets/css/x.css: remove the file from the mount, or publish the mount at another route`
 
 A file in the place of one the site writes, in `pd dev`
 : `site.mounts: <file> would be published at <path>, which is the page /about/: pd dev serves the site's, and pd build stops on it; remove the file from the mount, or publish the mount at another route`
