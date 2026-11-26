@@ -1184,7 +1184,11 @@ shown at each viewport. The template writes the image with the `{{pd-image}}` he
 - `alt=` is required. A decorative image says so with `alt=""`; a call without `alt=` is a problem in the
   component's schema check, and a missing value when the page renders fails the page.
 - `loading="eager"` loads it at once: for the image at the top of a page.
-- An image is never made wider than it is: widths above its own are left out.
+- `class=` is written on the `<img>`, escaped like every attribute, and on the `<img>` inside a `<picture>` with a dark
+  version too: `{{pd-image image alt=alt class="slide-image"}}`.
+- An image is never made wider than it is: widths above its own are left out. When its own width falls between two
+  of the slot's widths, it gets a variant at its own width, so the largest one shown is the original: a 602 px image in
+  a slot of 480 and 960 gets 480w and 602w. The same holds for images in a page's markdown and beside a page.
 - An SVG in the assets is written as one file at its own size (from its `width` and `height`, or its `viewBox`).
 - `{{pd-image}}` is a Handlebars helper; a Mustache template can't use it.
 
