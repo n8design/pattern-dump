@@ -14,9 +14,9 @@
   },
   "dependencies": {
     "@pattern-dump/contracts": "*",
-    "autoprefixer": "^10.4.0",
+    "autoprefixer": "^10.7.0",
     "esbuild": "^0.28.2",
-    "postcss": "^8.4.0",
+    "postcss": "^8.5.33",
     "sass": "^1.77.0",
     "sharp": "0.35.5"
   },
