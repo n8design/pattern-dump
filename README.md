@@ -15,7 +15,7 @@ one, as static files for any host.
 
 Built by Stefan Bauer (n8d), creator of hTWOo.
 
-> **0.9.** Pattern Dump is complete enough to use, but breaking changes are still possible between minor versions.
+> **0.10.** Pattern Dump is complete enough to use, but breaking changes are still possible between minor versions.
 > The [changelog](CHANGELOG.md) names each one, and [Upgrade](https://pattern-dump.design/guide/upgrade/) says what
 > to change.
 
