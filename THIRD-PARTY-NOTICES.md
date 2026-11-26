@@ -126,5 +126,5 @@ The npm package declares its dependencies, and npm installs them with their own 
 - **axe-core** (Deque Systems), **MPL-2.0**: https://github.com/dequelabs/axe-core. Used by the accessibility checks
   (`packages/a11y`), as installed.
 - **libvips** binaries (`@img/sharp-libvips-*`), **LGPL-3.0-or-later**: https://github.com/lovell/sharp-libvips. Optional
-  dependencies of **sharp** (Apache-2.0), which encodes the storefront's images; installed as prebuilt binaries, not
+  dependencies of **sharp** (Apache-2.0), which encodes the site's images; installed as prebuilt binaries, not
   linked into or copied into this package. An install with `--omit=optional` leaves them out.
