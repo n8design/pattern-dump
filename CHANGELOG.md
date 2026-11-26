@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 (2026-11-26)
+
+### Upgrading from 0.9.0
+
+- **A skin's `partials/head` may no longer write a feed link.** Pattern Dump links each page's feeds itself. Remove
+  the link, and set `site.feeds` for the feeds.
+- **The build names such a link and stops.** The message is `partials/head: <link rel="alternate"
+  type="application/atom+xml"> is written by Pattern Dump on every page; a head partial must not write it`.
+- **The project's `themes.switch` now wins over a pattern package's.** `pd dev` says so at start when the two differ.
+- **The theme picker lists themes by name.** Set `themes.order` to put some first.
 
 ### Added
 
@@ -24,8 +33,6 @@
 - **`site.dates` sets the style of those dates.** It takes the options of `Intl.DateTimeFormat` for a day; the default
   is the long style, "November 1, 2026" in `en`.
 - **A social image gets its date as text too.** Only a card that shows `dateText` renders again.
-- **A date with a time, or written email style, names the day to write.** The day is the one written, in the value's
-  own offset. Hugo's `lastmod`, `publishDate` and `expiryDate` say what they are here.
 - **The starter writes `lang: "en"` in its config.** It decides how the site writes dates, so it is where people look.
 - **A site can have feeds, Atom or RSS.** With `site.feeds`, each folder with `sort: date` gets one, and the site one
   across them. See [Feeds](docs/guide/storefront.md#feeds).
@@ -44,6 +51,11 @@
 - **`themes.order` sets the theme picker's order.** The themes it names come first, the rest sorted by name. See
   [Order](docs/guide/themes.md#order).
 - **`{{pd-image}}` takes a `class`.** It is written on the `<img>`, also inside a `<picture>` with a dark version.
+
+### Changed
+
+- **A date with a time, or written email style, now names the day to write.** It was a problem before too, with a
+  message that named no day. Hugo's `lastmod`, `publishDate` and `expiryDate` say what they are here.
 
 ### Fixed
 
