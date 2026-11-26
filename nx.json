@@ -18,5 +18,6 @@
       ],
       "cache": false
     }
-  }
+  },
+  "affected": { "legacy": true }
 }
