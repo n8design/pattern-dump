@@ -50,7 +50,7 @@
   missing folder is one warning, and its route works once the folder is built.
 - **`themes.order` sets the theme picker's order.** The themes it names come first, the rest sorted by name. See
   [Order](docs/guide/themes.md#order).
-- **`{{pd-image}}` takes a `class`.** It is written on the `<img>`, also inside a `<picture>` with a dark version.
+- **`{{pd-image}}` takes a `class`.** It is written on the `<img>`, escaped; an empty one is left out.
 
 ### Changed
 
