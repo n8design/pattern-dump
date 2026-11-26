@@ -12,7 +12,7 @@ import { validateConfig, type PatternDumpConfig } from "@pattern-dump/config";
 import type { StorefrontPagesResponse } from "@pattern-dump/contracts";
 import { buildStaticSite, startDevServer } from "../src/index.js";
 import { readPages } from "../src/storefront/pages.js";
-import { claimsOf, collisionOf, describeClaim, unclaimed, type Claim } from "../src/storefront/site-output.js";
+import { claimsOf, collisionOf, describeClaim, forMounts, unclaimed, type Claim } from "../src/storefront/site-output.js";
 import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
 
@@ -141,5 +141,21 @@ describe("every file a build of the bench writes is claimed", () => {
     for (const kind of ["file", "folder", "page", "forward", "image", "feed"] as const) {
       expect(unclaimed(claims.filter(c => c.kind !== kind), files).length, kind).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("the claims a mounted file is checked against (forMounts)", () => {
+  const claims = forMounts(claimsOf(MODEL), [{ path: "/assets/css/site.css", file: "assets/css/site.css" }]);
+  it("claims /assets/ file by file: a project asset's exact path, and nothing else under it", () => {
+    expect(describeClaim(collisionOf(claims, "/assets/css/site.css")!)).toBe("the project asset assets/css/site.css");
+    for (const free of ["/assets/css/x.css", "/assets/css/site.css.map", "/assets/x.js"]) expect(collisionOf(claims, free), free).toBeUndefined();
+  });
+  it("keeps the name /assets itself, and every other folder whole", () => {
+    expect(describeClaim(collisionOf(claims, "/assets")!)).toBe("in assets/, which Pattern Dump writes");
+    expect(describeClaim(collisionOf(claims, "/_pd/x.css")!)).toBe("in _pd/, which Pattern Dump writes");
+    expect(describeClaim(collisionOf(claims, "/preview/x/index.html")!)).toBe("in preview/, which Pattern Dump writes");
+  });
+  it("leaves the site's own list as it is: everything under /assets/ is still Pattern Dump's for a feed", () => {
+    expect(describeClaim(collisionOf(claimsOf(MODEL), "/assets/css/x.css")!)).toBe("in assets/, which Pattern Dump writes");
   });
 });

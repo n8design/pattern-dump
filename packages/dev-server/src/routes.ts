@@ -76,8 +76,8 @@ import { isOwnHost, ownHosts } from "./own-hosts.js";
 import { checkPageImage } from "./storefront/page-image.js";
 import { isPageImageUrl, pageImageFile } from "./storefront/page-images.js";
 import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
-import { mountedFile, mountProblems, readMounts, sitemapRoutes } from "./storefront/mounts.js";
-import { claimsOf, collisionOf, describeClaim } from "./storefront/site-output.js";
+import { assetsAt, mountedFile, mountProblems, readMounts, sitemapRoutes } from "./storefront/mounts.js";
+import { claimsOf, collisionOf, describeClaim, forMounts } from "./storefront/site-output.js";
 import { redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import type { SearchRecord } from "./storefront/search.js";
@@ -197,8 +197,9 @@ export interface RouteContext {
   readonly pagesOnce?: boolean;
   /** The current live-reload generation (PD_GENERATION_HEADER); absent when headless. */
   readonly generation?: () => string;
-  /** Set by `pd build`: storefront pages link into the workbench at this address. See DevServerOptions. */
-  readonly storefrontWorkbenchUrl?: string;
+  /** Set by `pd build`: storefront pages link into the workbench at this address, or to none (false). See
+   *  DevServerOptions. */
+  readonly storefrontWorkbenchUrl?: string | false;
   /** Set by `pd build`: where a storefront page's notes go. Without it they go to the terminal. */
   readonly onStorefrontNote?: (note: string) => void;
   /** Set by `pd build`: where what a storefront page gives the search index goes. */
@@ -338,7 +339,8 @@ async function answerMount(req: IncomingMessage, res: ServerResponse, ctx: Route
   const sitePath = `${found.mount.to}${found.rel}`;
   const { feedSettings, siteFeeds } = siteFeedsOf(req, ctx, model);
   const feeds = feedSettings ? (await siteFeeds()).feeds.map(f => ({ address: f.address, source: f.feed.source })) : [];
-  const clash = collisionOf(claimsOf(model, feeds), sitePath);
+  const assets = { roots: ctx.cfg.assetRoots, names: ctx.cfg.assetRootNames };
+  const clash = collisionOf(forMounts(claimsOf(model, feeds), await assetsAt([sitePath], assets, ctx.cfg.cwd)), sitePath);
   if (clash) {
     warnOnce(`site.mounts: ${found.mount.name}/${found.rel} would be published at ${sitePath}, which is ${describeClaim(clash)}: `
       + `pd dev serves the site's, and pd build stops on it; remove the file from the mount, or publish the mount at another route`);
@@ -911,7 +913,7 @@ async function routeRequest(
         // (mounts.ts), checked against every file the site writes (site-output.ts).
         if (!ctx.live && storefront.mounts.length) {
           const claims = claimsOf(model, (feeds?.feeds ?? []).map(f => ({ address: f.address, source: f.feed.source })));
-          const mounted = await mountProblems(storefront.mounts, cfg.cwd, claims);
+          const mounted = await mountProblems(storefront.mounts, cfg.cwd, claims, { roots: cfg.assetRoots, names: cfg.assetRootNames });
           if (mounted.problems.length) { json(res, 500, { error: mounted.problems.join("\n") } satisfies ApiError); return; }
         }
         for (const note of feeds?.notes ?? []) ctx.onStorefrontNote?.(note);
@@ -973,12 +975,16 @@ async function routeRequest(
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
       const ownWorkbench = `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`;
-      // site.workbenchUrl for templates: the configured one in pd build, this process's workbench in pd dev.
-      const siteWorkbenchUrl = ctx.storefrontWorkbenchUrl ?? (ctx.live ? ownWorkbench : undefined);
+      // Where page links go: the configured address in pd build (none for a site without one), else this process's
+      // workbench. site.workbenchUrl for templates: the same, but undefined in a headless server given no address.
+      const noWorkbench = ctx.storefrontWorkbenchUrl === false;
+      const configured = ctx.storefrontWorkbenchUrl === false ? undefined : ctx.storefrontWorkbenchUrl;
+      const linkWorkbenchUrl = noWorkbench ? undefined : configured ?? ownWorkbench;
+      const siteWorkbenchUrl = noWorkbench ? undefined : configured ?? (ctx.live ? ownWorkbench : undefined);
       const page = await assemblePage(target, model, {
         discoveryMap, handleMap: discovery.handleMap, shown: createDisplayPath(cwd, cfg.packages),
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
-        workbenchUrl: ctx.storefrontWorkbenchUrl ?? ownWorkbench,
+        ...(linkWorkbenchUrl !== undefined ? { workbenchUrl: linkWorkbenchUrl } : {}),
         ...(siteWorkbenchUrl !== undefined ? { siteWorkbenchUrl } : {}),
         head: (layoutId, html, placed) => pageStylesheets(cfg, state, discovery, layoutId, html, placed),
         symbolSets: roots => pageSymbolSets(cfg, discovery, roots),

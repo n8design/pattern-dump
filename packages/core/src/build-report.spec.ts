@@ -55,3 +55,15 @@ describe("pd build's report: mounts", () => {
     expect(buildReportLines(base, undefined).some(l => l.includes("mounts"))).toBe(false);
   });
 });
+
+describe("pd build's report: a workbench it doesn't build", () => {
+  const nowb: StaticBuildReport = { ...base, workbench: false };
+  it("names where the pages link to it", () => {
+    expect(buildReportLines(nowb, "https://wb.example.test/")[0])
+      .toBe("[pd build] workbench: not built (build.workbench: false); the pages link to it at https://wb.example.test/");
+  });
+  it("says the pages link to none without site.workbenchUrl", () => {
+    expect(buildReportLines(nowb, undefined)[0])
+      .toBe("[pd build] workbench: not built (build.workbench: false), and the pages link to none (no site.workbenchUrl)");
+  });
+});

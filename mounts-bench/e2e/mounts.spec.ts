@@ -37,7 +37,7 @@ test("a mounted page with links from the root loads its image and runs its scrip
 test("the root files load, with pd dev's content types", async ({ page }, info) => {
   const prefix = info.project.name === "mounts-static-base" ? "/bench" : "";
   await page.goto(`${prefix}/`);
-  for (const [path, type] of [["/favicon.ico", "image/x-icon"], ["/manifest.webmanifest", "application/manifest+json"], ["/123456/x.css", "text/css"]]) {
+  for (const [path, type] of [["/favicon.ico", "image/x-icon"], ["/manifest.webmanifest", "application/manifest+json"], ["/123456/x.css", "text/css"], ["/assets/css/x.css", "text/css"]]) {
     const res = await page.request.get(`${new URL(page.url()).origin}${prefix}${path}`);
     expect(res.status(), path).toBe(200);
     // A static host's types are its own (here the suite's file server); pd dev's are Pattern Dump's.

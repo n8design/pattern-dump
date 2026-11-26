@@ -1,6 +1,6 @@
 # Mounts bench
 
-The fixture for site mounts (`site.mounts`): a small site in `site/`, and three folders beside it that stand for
+The fixture for site mounts (`site.mounts`): a small site in `site/`, and four folders beside it that stand for
 another tool's finished files, each published at a route of the site.
 
 | Folder | Published at | What it stands for |
@@ -8,6 +8,7 @@ another tool's finished files, each published at a route of the site.
 | `tool/` | `/tool/` | A tool's built output: pages, CSS, a script, an image and its own `sitemap.xml` |
 | `other/` | `/other/` | A second tool's output |
 | `root/` | `/` | Files a site needs at its root: a favicon, a web manifest, a font provider's CSS at `/123456/x.css` |
+| `assets-css/` | `/assets/css/` | A stylesheet published under `/assets/`, where the site serves no project asset of that name |
 
 The mount folders sit beside the project (`from: "../tool"`), outside it, as built documentation usually does.
 

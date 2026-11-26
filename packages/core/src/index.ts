@@ -133,7 +133,9 @@ export function buildReportLines(report: StaticBuildReport, workbenchUrl: string
   const lines: string[] = [];
   const mb = (report.bytes / 1024 / 1024).toFixed(1);
   if (report.workbench === false) {
-    lines.push(`[pd build] workbench: not built (build.workbench: false); the pages link to it at ${workbenchUrl ?? "site.workbenchUrl"}`);
+    lines.push(workbenchUrl === undefined
+      ? "[pd build] workbench: not built (build.workbench: false), and the pages link to none (no site.workbenchUrl)"
+      : `[pd build] workbench: not built (build.workbench: false); the pages link to it at ${workbenchUrl}`);
   } else {
     lines.push(`[pd build] ${report.components} components → ${report.files} files, ${mb} MB in ${report.ms} ms`);
     lines.push(`[pd build] ${report.outDir}  (served from ${report.basePath})`);

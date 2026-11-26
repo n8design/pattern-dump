@@ -11,7 +11,7 @@
 //
 // Paths are the site's, from its root, without the base path: the file a static host serves for a URL.
 
-import { PD_ROUTES } from "@pattern-dump/contracts";
+import { PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
 import type { PageModel } from "./pages.js";
 
 /** One place in the site's output that Pattern Dump writes. A file's `path` is the file's (/guide/index.html); a
@@ -21,7 +21,11 @@ export type Claim =
   | { kind: "page" | "forward"; path: string; route: string }
   | { kind: "feed" | "mount"; path: string; source: string }
   | { kind: "image" | "file"; path: string }
-  | { kind: "folder"; path: string };
+  | { kind: "folder"; path: string }
+  // For a mounted file (forMounts): a project asset served at `path`, from `file` (as shown, from the project's root);
+  // and the assets folder's own name, which a file can't have.
+  | { kind: "asset"; path: string; file: string }
+  | { kind: "asset-folder"; path: string };
 
 /** The files every site may have at its root, whether this build writes them or not. */
 const ROOT_FILES = [PD_ROUTES.sitemap, PD_ROUTES.robots, "/llms.txt", PD_ROUTES.notFound, "/.nojekyll"];
@@ -55,7 +59,22 @@ export function claimsOf(model: Pick<PageModel, "pages" | "images">, feeds: read
 export function collisionOf(claims: readonly Claim[], path: string): Claim | undefined {
   return claims.find(c => c.kind === "folder"
     ? path.startsWith(c.path) || c.path === `${path}/`
-    : c.path === path || c.path.startsWith(`${path}/`) || path.startsWith(`${c.path}/`));
+    : c.kind === "asset-folder" ? c.path === `${path}/`
+      : c.path === path || c.path.startsWith(`${path}/`) || path.startsWith(`${c.path}/`));
+}
+
+/**
+ * The claims a mounted file is checked against: `claims` (claimsOf), with /assets/ claimed file by file instead of
+ * whole. A mount may publish under /assets/ where no project asset is served (FEAT-SITE-MOUNTS decision 3: only a
+ * file PD writes can't be overwritten); `assets` are the project assets served at the mounted files' paths, each
+ * found with the lookup pd dev's /assets/ route uses (asset-file.ts). The name /assets itself stays PD's.
+ */
+export function forMounts(claims: readonly Claim[], assets: readonly { path: string; file: string }[]): Claim[] {
+  return [
+    ...claims.filter(c => !(c.kind === "folder" && c.path === PD_ROUTE_PREFIX.assets)),
+    { kind: "asset-folder", path: PD_ROUTE_PREFIX.assets },
+    ...assets.map((a): Claim => ({ kind: "asset", path: a.path, file: a.file })),
+  ];
 }
 
 /** What a claim is, in a message: "the page /guide/", "the site's sitemap.xml", "in _pd/, which Pattern Dump writes". */
@@ -66,13 +85,14 @@ export function describeClaim(c: Claim): string {
     case "mount": return `${c.source}, a mounted file`;
     case "image": return `the image ${c.path}`;
     case "file": return `the site's ${c.path.slice(1)}`;
-    case "folder": return `in ${c.path.slice(1, -1)}/, which Pattern Dump writes`;
+    case "folder": case "asset-folder": return `in ${c.path.slice(1, -1)}/, which Pattern Dump writes`;
+    case "asset": return `the project asset ${c.file}`;
   }
 }
 
 /** Whether a file at `path` is one Pattern Dump claims: a claimed file, or a file under a claimed folder. */
 export const isClaimed = (claims: readonly Claim[], path: string): boolean =>
-  claims.some(c => c.kind === "folder" ? path.startsWith(c.path) : c.path === path);
+  claims.some(c => c.kind === "folder" ? path.startsWith(c.path) : c.kind !== "asset-folder" && c.path === path);
 
 /** The files of `paths` (site paths) that no claim covers, in order. The build writes only claimed files: one that
  *  isn't is a kind of output missing from claimsOf, so another tool's file could take its place unnoticed. */
