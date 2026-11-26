@@ -26,7 +26,7 @@ pattern-dump/
 ├── package.json            # workspace root: packages/*, apps/*, skins/*, the two benches
 ├── nx.json                 # local cache + task graph
 ├── tsconfig.base.json      # ESM, path aliases for @pattern-dump/*
-├── vitest.workspace.ts     # Vitest across all packages
+├── vitest.config.ts        # Vitest across all packages (test.projects)
 ├── eslint.config.js        # one ESLint flat config for every project
 ├── CONTRIBUTING.md
 ├── docs/
