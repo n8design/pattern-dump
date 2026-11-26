@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- **A site that builds no workbench no longer needs `site.workbenchUrl`.** Without it, `robots.txt` has no line for
+  one, and an example's caption has no workbench link. A `pattern:` link then stops the build, naming it; see
+  [Building](docs/guide/storefront.md#building).
 - **A mount can publish under `/assets/` where the project has no asset of that name.** Only a project asset at the
   same path is a collision, in `pd build` and `pd dev`; see [Mounts](docs/guide/storefront.md#mounts).
 

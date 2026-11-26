@@ -67,3 +67,46 @@ describe("pd build — build.workbench: false", () => {
       .rejects.toThrow("pd build: build.workbench is false and the project has no site, so there is nothing to build");
   }, 60_000);
 });
+
+describe("pd build without site.workbenchUrl", () => {
+  const { workbenchUrl: _, ...siteWithout } = benchConfig.site!;
+  const without = (workbench: boolean): PatternDumpConfig =>
+    validateConfig({ ...benchConfig, build: { workbench }, site: siteWithout }, "test");
+  // The bench's one link into the workbench (pages/guides/setup.md), taken out for a site that links none.
+  const unlink = async (root: string) => {
+    const page = join(root, "pages", "guides", "setup.md");
+    const text = await readFile(page, "utf8");
+    expect(text).toContain("[callout](pattern:components/callout)");
+    await save(page, text.replace("[callout](pattern:components/callout)", "callout"));
+  };
+
+  it("builds a site that builds no workbench and links to none: no workbench in robots.txt, examples without a workbench link", async () => {
+    const root = await benchCopy();
+    await unlink(root);
+    const report = await build(root, join(root, "..", "nowb-nourl"), without(false));
+    expect(report.workbench).toBe(false);
+    const site = join(root, ".out", "site");
+    expect(await readFile(join(site, "robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /preview/\n\nSitemap: https://bench.example.test/sitemap.xml\n");
+    // An example is the site's own preview, and its caption names the component without a link into a workbench.
+    const home = await readFile(join(site, "index.html"), "utf8");
+    expect(home).toContain('<iframe src="/preview/components/callout"');
+    expect(home).toContain('<figcaption><span class="doc-example-id">components/callout</span></figcaption>');
+    expect(home).not.toContain("in the workbench");
+    // The build's own server is never an address in the site.
+    for (const page of ["index.html", "guides/setup/index.html"]) expect(await readFile(join(site, page), "utf8")).not.toContain("pd.localhost");
+  }, 60_000);
+
+  it("stops on a link into the workbench, naming it", async () => {
+    const root = await benchCopy();
+    await expect(build(root, join(root, "..", "nowb-link"), without(false))).rejects.toThrow(
+      "pattern:components/callout: a link into the workbench, and the site has no site.workbenchUrl: set it to the address "
+        + "the workbench is published at, or link to the component another way");
+  }, 60_000);
+
+  it("still needs it when the workbench is built", async () => {
+    const root = await benchCopy();
+    await unlink(root);
+    await expect(build(root, join(root, "..", "wb-nourl"), without(true))).rejects.toThrow(
+      "pd build: site.workbenchUrl is required to build the site: its pages link into the workbench at that address");
+  }, 60_000);
+});

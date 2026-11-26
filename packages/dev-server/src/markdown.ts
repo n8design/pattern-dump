@@ -52,7 +52,7 @@ import { SYMBOLS_FOLDER, symbolId, type SymbolEntry, type SymbolSource } from ".
 export type DocEmbed =
   | { embed: "inline" }
   | {
-    embed: "frame"; workbenchUrl: string; problems: string[]; placed?: DocPlacing; headings?: PageHeading[];
+    embed: "frame"; workbenchUrl?: string; problems: string[]; placed?: DocPlacing; headings?: PageHeading[];
     /** The page's images, checked and written with their variants (proseImages below). Without it, as markdown writes them. */
     prose?: ProseImages;
     /** Ids the page already has besides its headings (its layout's): a heading's anchor never takes one. */
@@ -231,8 +231,15 @@ function _resolvePatternLinks(
       // Check the full variant id — pattern:atoms/button~ghost is unresolved if
       // button~ghost isn't in the map (variant typos surface instead of falling back silently).
       const fullId = variant ? `${compId}~${variant}` : compId;
-      if (discoveryMap.has(fullId)) {
-        const base = embed.embed === "frame" ? embed.workbenchUrl : "/";
+      if (discoveryMap.has(fullId) && embed.embed === "frame" && embed.workbenchUrl === undefined) {
+        // A site with no site.workbenchUrl (it builds no workbench) has no address to link to: never a broken link.
+        embed.problems.push(`pattern:${fullId}: a link into the workbench, and the site has no site.workbenchUrl: set it to `
+          + `the address the workbench is published at, or link to the component another way`);
+        child.attrSet("href", "#");
+        child.attrPush(["class", "pattern-link--unresolved"]);
+        child.attrPush(["aria-disabled", "true"]);
+      } else if (discoveryMap.has(fullId)) {
+        const base = embed.embed === "frame" ? embed.workbenchUrl! : "/";
         child.attrSet("href", base + compId + (variant ? "#" + variant : ""));
         child.attrPush(["class", "pattern-link"]);
         child.attrPush(["data-pattern-id", compId]);
@@ -492,11 +499,14 @@ async function _resolveFence(
         return;
       }
       const height = declared.height === undefined ? "" : ` height="${declared.height}"`;
-      const workbench = embed.workbenchUrl + compId + (variant ? `#${variant}` : "");
+      // The link to the component in the workbench, when the site has one (site.workbenchUrl); the example itself is
+      // the site's own preview either way.
+      const workbench = embed.workbenchUrl === undefined ? undefined : embed.workbenchUrl + compId + (variant ? `#${variant}` : "");
       out.set(idx, `<figure class="doc-example">\n`
         + `<iframe src="${escapeAttr(`/preview/${fullId}`)}" title="${escapeAttr(fullId)}" loading="lazy"${height}></iframe>\n`
         + _frameVariants(compId, variant, discoveryMap)
-        + `<figcaption><span class="doc-example-id">${escapeHtml(fullId)}</span> <a href="${escapeAttr(workbench)}">Open ${escapeHtml(fullId)} in the workbench</a></figcaption>\n`
+        + `<figcaption><span class="doc-example-id">${escapeHtml(fullId)}</span>`
+        + `${workbench === undefined ? "" : ` <a href="${escapeAttr(workbench)}">Open ${escapeHtml(fullId)} in the workbench</a>`}</figcaption>\n`
         + `</figure>\n`);
       return;
     }

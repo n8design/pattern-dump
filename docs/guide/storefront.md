@@ -134,7 +134,7 @@ On a site page this is a frame with the component's own preview, not a copy of i
 component is styled by its own CSS and nothing on the page can restyle it. With JavaScript on, the frame
 fits the preview's height. Beside the frame are a list of the component's variants, each a link to its
 preview, and a link that opens the component in the workbench (in `pd dev`, this server's workbench; in a
-build, `site.workbenchUrl`). With JavaScript off, the frame keeps the browser's default height (or the
+build, `site.workbenchUrl`, and none on a site without one). With JavaScript off, the frame keeps the browser's default height (or the
 height its component declares, below) and the links still work.
 
 #### The height an example starts at
@@ -200,7 +200,7 @@ up unless given `--no-system-theme`: a `system` theme as the default, and the sk
 (`src/styles/base/colors.scss`) following the viewer too.
 
 A `pattern:` link, such as `[the callout](pattern:components/callout)`, links to the component in the
-workbench.
+workbench. A site without `site.workbenchUrl` has no workbench to link to, and `pd build` stops on such a link.
 
 ### Placing components
 
@@ -481,7 +481,7 @@ A layout receives:
 | each declared key | The page's value, or `null` when the page does not set it |
 | `body` | The page's markdown, rendered. Include it unescaped, `{{{body}}}`: it is the only value safe to, because the markdown renderer escapes everything an author writes. Every other value is included escaped, `{{…}}`. A layout can name another key for it ([below](#a-page-or-template-as-a-layout)) |
 | `nav` | The navigation: `{ route, title, description?, current?, children? }` per entry, `current: true` on the page's own entry. A page with `nav: false` in its frontmatter is not in it |
-| `site` | The values of `site.globals` |
+| `site` | The values of `site.globals`, and `site.workbenchUrl`: this server's workbench in `pd dev`, the configured address in a build, and undefined in a build without one |
 | `page` | What Pattern Dump derives for the page, when the layout declares it (below) |
 
 ```hbs
@@ -491,6 +491,12 @@ A layout receives:
   <div class="page-body">{{{body}}}</div>
 </article>
 {{/partials-base}}
+```
+
+A link to the workbench in a template is kept for a site that has one:
+
+```hbs
+{{#if site.workbenchUrl}}<a href="{{site.workbenchUrl}}">Style guide</a>{{/if}}
 ```
 
 A layout's sample data (`<name>.json`) is what its workbench preview shows. It never reaches a page: a
@@ -1706,7 +1712,9 @@ site/
   .nojekyll
 ```
 
-`site.workbenchUrl` is required to build, since built pages link to the workbench at its own address.
+A build that writes the workbench needs `site.workbenchUrl`, since its pages link to the workbench at that address.
+A site with `build.workbench: false` can leave it out: its pages then link to no workbench, and `robots.txt` has no
+line for one.
 
 ### Mounts
 

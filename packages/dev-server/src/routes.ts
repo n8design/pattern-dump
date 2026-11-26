@@ -197,8 +197,9 @@ export interface RouteContext {
   readonly pagesOnce?: boolean;
   /** The current live-reload generation (PD_GENERATION_HEADER); absent when headless. */
   readonly generation?: () => string;
-  /** Set by `pd build`: storefront pages link into the workbench at this address. See DevServerOptions. */
-  readonly storefrontWorkbenchUrl?: string;
+  /** Set by `pd build`: storefront pages link into the workbench at this address, or to none (false). See
+   *  DevServerOptions. */
+  readonly storefrontWorkbenchUrl?: string | false;
   /** Set by `pd build`: where a storefront page's notes go. Without it they go to the terminal. */
   readonly onStorefrontNote?: (note: string) => void;
   /** Set by `pd build`: where what a storefront page gives the search index goes. */
@@ -974,12 +975,16 @@ async function routeRequest(
       // URL; pd build passes that URL in, for the built site.
       const port = /:(\d+)$/.exec(req.headers.host ?? "")?.[1];
       const ownWorkbench = `http://${PD_HOSTS.workbench}${port ? `:${port}` : ""}/`;
-      // site.workbenchUrl for templates: the configured one in pd build, this process's workbench in pd dev.
-      const siteWorkbenchUrl = ctx.storefrontWorkbenchUrl ?? (ctx.live ? ownWorkbench : undefined);
+      // Where page links go: the configured address in pd build (none for a site without one), else this process's
+      // workbench. site.workbenchUrl for templates: the same, but undefined in a headless server given no address.
+      const noWorkbench = ctx.storefrontWorkbenchUrl === false;
+      const configured = ctx.storefrontWorkbenchUrl === false ? undefined : ctx.storefrontWorkbenchUrl;
+      const linkWorkbenchUrl = noWorkbench ? undefined : configured ?? ownWorkbench;
+      const siteWorkbenchUrl = noWorkbench ? undefined : configured ?? (ctx.live ? ownWorkbench : undefined);
       const page = await assemblePage(target, model, {
         discoveryMap, handleMap: discovery.handleMap, shown: createDisplayPath(cwd, cfg.packages),
         composition: await compositionFor(state, discovery, patternDirs), render, site: ctx.site.get(),
-        workbenchUrl: ctx.storefrontWorkbenchUrl ?? ownWorkbench,
+        ...(linkWorkbenchUrl !== undefined ? { workbenchUrl: linkWorkbenchUrl } : {}),
         ...(siteWorkbenchUrl !== undefined ? { siteWorkbenchUrl } : {}),
         head: (layoutId, html, placed) => pageStylesheets(cfg, state, discovery, layoutId, html, placed),
         symbolSets: roots => pageSymbolSets(cfg, discovery, roots),

@@ -80,8 +80,9 @@ export interface PageAssembly {
   borrowed?(roots: readonly string[]): Promise<string[]>;
   /** storefront.site from the config. */
   site: Record<string, unknown> | undefined;
-  /** Where links into the workbench start, ending with "/". */
-  workbenchUrl: string;
+  /** Where links into the workbench start, ending with "/". Absent in pd build for a site without site.workbenchUrl
+   *  (it builds no workbench): a link into the workbench is then the page's problem, and an example has no link. */
+  workbenchUrl?: string;
   /** What templates get as `site.workbenchUrl`: pd dev's own workbench, or the configured site.workbenchUrl in pd
    *  build (which a site needs). Absent for a headless check of the pages (checkSitePages). */
   siteWorkbenchUrl?: string;
@@ -579,7 +580,7 @@ export async function assemblePage(route: string, model: PageModel, a: PageAssem
       (id, variant) => a.render({ component: id, variant }).then(r => r.html),
       a.discoveryMap,
       {
-        embed: "frame", workbenchUrl: a.workbenchUrl, problems: docProblems, headings, takenIds, ...(prose ? { prose } : {}), ...(symbols ? { symbols } : {}),
+        embed: "frame", ...(a.workbenchUrl !== undefined ? { workbenchUrl: a.workbenchUrl } : {}), problems: docProblems, headings, takenIds, ...(prose ? { prose } : {}), ...(symbols ? { symbols } : {}),
         // Components placed with values (pd- tags): checked against their schemas, rendered into the page.
         placed: { lineOffset: frontmatterBodyOffset(source), problems: placedProblems, deps, regions },
       },

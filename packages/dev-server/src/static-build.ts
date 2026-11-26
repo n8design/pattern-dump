@@ -244,7 +244,9 @@ async function buildOnce(
     if (buildWorkbench && (inside(sfOut, outDir) || inside(outDir, sfOut))) {
       throw new Error(`pd build: site.outDir ${sfOut} and --out ${outDir} overlap: the site and the workbench each need a folder of their own`);
     }
-    if (!storefront.workbenchUrl) {
+    // Pages link into the workbench at site.workbenchUrl, so a build that writes one needs its address. A site that
+    // builds none may have none: a link into the workbench is then the page's error (markdown.ts).
+    if (buildWorkbench && !storefront.workbenchUrl) {
       throw new Error("pd build: site.workbenchUrl is required to build the site: its pages link into the workbench at that address");
     }
     // A workbench published on the storefront's own host is linked at its path, so it must be built for that
@@ -310,7 +312,8 @@ async function buildOnce(
   const server = await startDevServer(config, root, {
     // The version is part of every social image's hash, so pd dev and pd build name a card alike.
     port: 0, live: false, now, today, pagesOnce: true, version: opts.pdVersion, ...(skipped.has("html") ? { validateHtml: false } : {}),
-    ...(storefront?.workbenchUrl ? { storefrontWorkbenchUrl: storefront.workbenchUrl } : {}),
+    // A site without site.workbenchUrl (it builds no workbench) links to none, never to this build's own server.
+    ...(storefront ? { storefrontWorkbenchUrl: storefront.workbenchUrl ? storefront.workbenchUrl : false } : {}),
     onStorefrontNote: note => { storefrontNotes.add(note); },
     ...(pagefind ? { onSearchRecord: (r: SearchRecord) => { searchRecords.set(r.route, r); } } : {}),
   });
@@ -423,26 +426,32 @@ async function buildOnce(
     if (storefront && sfGet && sfCrawl) {
       const { pages: list } = await (await sfGet(PD_ROUTES.pages)).json() as StorefrontPagesResponse;
       const pages = [...list.map(p => p.route), PD_ROUTES.notFound];
-      const wbUrl = storefront.workbenchUrl!.endsWith("/") ? storefront.workbenchUrl! : `${storefront.workbenchUrl!}/`;
-      const tree = await (await fetch(`${origin}${PD_ROUTES.tree}`)).json() as ComponentTree;
-      const routes = new Set<string>([""]);
-      const walk = (nodes: TreeNode[]): void => nodes.forEach(n => { routes.add(n.path); walk(n.children ?? []); });
-      walk(tree.roots);
-      const variants = new Map<string, string[]>();
-      for (const route of linkedWorkbenchRoutes(sfCrawl.documents, pages, wbUrl)) {
-        if (!routes.has(route)) continue;
-        const res = await fetch(`${origin}${componentUrl(route)}`);
-        if (res.status !== 200) continue;
-        const names = (await res.json() as ComponentDetailResponse).variants.map(v => v.name);
-        variants.set(route, names);
-        if (names.length) routes.add(`${route}/variants`);
+      // The workbench the pages link into, when the site has one (site.workbenchUrl): its routes and the variants
+      // the pages name, for the link check.
+      let workbench: { url: string; routes: Set<string>; variants: Map<string, string[]> } | undefined;
+      if (storefront.workbenchUrl) {
+        const wbUrl = storefront.workbenchUrl.endsWith("/") ? storefront.workbenchUrl : `${storefront.workbenchUrl}/`;
+        const tree = await (await fetch(`${origin}${PD_ROUTES.tree}`)).json() as ComponentTree;
+        const routes = new Set<string>([""]);
+        const walk = (nodes: TreeNode[]): void => nodes.forEach(n => { routes.add(n.path); walk(n.children ?? []); });
+        walk(tree.roots);
+        const variants = new Map<string, string[]>();
+        for (const route of linkedWorkbenchRoutes(sfCrawl.documents, pages, wbUrl)) {
+          if (!routes.has(route)) continue;
+          const res = await fetch(`${origin}${componentUrl(route)}`);
+          if (res.status !== 200) continue;
+          const names = (await res.json() as ComponentDetailResponse).variants.map(v => v.name);
+          variants.set(route, names);
+          if (names.length) routes.add(`${route}/variants`);
+        }
+        workbench = { url: wbUrl, routes, variants };
       }
       const links = checkLinks({
         // The crawl records a stamped reference with its ?v=; what is written, and what a link names, is the path.
         built: new Set([...sfCrawl.urls.map(u => u.split("?")[0]!), ...mountedPaths]), documents: sfCrawl.documents, pages,
         ...(storefront.url !== undefined ? { siteUrl: storefront.url.endsWith("/") ? storefront.url : `${storefront.url}/` } : {}),
         basePath: sfBase,
-        workbench: { url: wbUrl, routes, variants },
+        ...(workbench ? { workbench } : {}),
       });
       if (links.problems.length) {
         throw new Error(`pd build: the site has broken links, so nothing was written:\n${links.problems.map(p => `  - ${p}`).join("\n")}`);

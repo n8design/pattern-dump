@@ -170,8 +170,9 @@ export interface DevServerOptions {
    *  (RendererOptions.validateHtml), so no component has HTML diagnostics. Default true. */
   validateHtml?: boolean;
   /** `pd build` only: where storefront pages link into the workbench — the built workbench's address
-   *  (storefront.workbenchUrl). Without it, pages link to this process's own workbench on pd.localhost. */
-  storefrontWorkbenchUrl?: string;
+   *  (storefront.workbenchUrl), or false for a site that has none (build.workbench: false and no workbenchUrl): its
+   *  pages then link to no workbench. Without it, pages link to this process's own workbench on pd.localhost. */
+  storefrontWorkbenchUrl?: string | false;
   /** `pd build` only: receives each note a storefront page gives (a suffixed heading anchor), for the build
    *  report. Without it, notes are printed to the terminal. */
   onStorefrontNote?: (note: string) => void;
@@ -423,7 +424,7 @@ export async function startDevServer(
     symbols,
     ...(testHooks ? { settle: () => settleWatcher ? settleWatcher() : Promise.reject(new Error("settle: the watcher is not running yet")) } : {}),
     ...(live ? { generation: () => hotreloader.generation() } : {}),
-    ...(opts.storefrontWorkbenchUrl ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
+    ...(opts.storefrontWorkbenchUrl || opts.storefrontWorkbenchUrl === false ? { storefrontWorkbenchUrl: opts.storefrontWorkbenchUrl } : {}),
     ...(opts.onStorefrontNote ? { onStorefrontNote: opts.onStorefrontNote } : {}),
     ...(opts.onSearchRecord ? { onSearchRecord: opts.onSearchRecord } : {}),
     // pd dev renders a site's social images on request (social-dev.ts); pd build renders them before its crawl.
