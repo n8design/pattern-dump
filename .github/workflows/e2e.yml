@@ -17,13 +17,14 @@ concurrency:
 
 jobs:
   e2e:
-    # On the oldest Node the package supports (engines: the latest 22.x is past its 22.22 floor) and on the
-    # current one. A failure on one leg does not cancel the other: which version fails is the finding.
+    # On the oldest Node the package supports (engines: the latest 22.x is past its 22.22 floor), on 24, and
+    # on 26, the newest LTS: every release line a user can be on until 22 is dropped. A failure on one leg does
+    # not cancel the others: which version fails is the finding.
     name: e2e (Node ${{ matrix.node }})
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        node: [22, 24, 26]
     # Pinned: ubuntu-latest moved to 26.04, which the Playwright in use (1.60) cannot install browsers
     # on. Moving off the pin goes with a Playwright upgrade and a re-recorded E2E baseline.
     runs-on: ubuntu-24.04
