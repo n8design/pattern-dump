@@ -59,12 +59,12 @@
     "e2e:mounts": "nx run mounts-bench:e2e --outputStyle=static"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.11.3",
+    "@axe-core/playwright": "4.14.1",
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@playwright/test": "1.60.0",
     "autoprefixer": "^10.7.0",
-    "axe-core": "4.11.4",
+    "axe-core": "4.14.1",
     "chokidar": "^3.6.0",
     "esbuild": "^0.28.2",
     "eslint": "^9.0.0",
