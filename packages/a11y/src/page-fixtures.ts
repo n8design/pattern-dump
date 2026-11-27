@@ -105,7 +105,6 @@ export const PAGE_FIXTURES: PageFixture[] = [
   { ruleId: "aria-prohibited-attr", fail: page(`<div aria-label="X">Text</div>`), pass: page(`<nav aria-label="X"><a href="/a/">A</a></nav>`) },
   { ruleId: "aria-conditional-attr", fail: page(`<form><label>C <input type="checkbox" aria-checked="true"></label></form>`),
     pass: page(`<form><label>C <input type="checkbox"></label></form>`) },
-  { ruleId: "aria-roledescription", fail: page(`<div aria-roledescription="thing">X</div>`), pass: page(`<button aria-roledescription="thing">X</button>`) },
   { ruleId: "aria-command-name", fail: page(`<div role="button" tabindex="0"></div>`), pass: page(`<div role="button" tabindex="0">Go</div>`) },
   { ruleId: "aria-input-field-name", fail: page(`<div role="textbox" tabindex="0"></div>`), pass: page(`<div role="textbox" tabindex="0" aria-label="Name"></div>`) },
   { ruleId: "aria-toggle-field-name", fail: page(`<div role="switch" aria-checked="false" tabindex="0"></div>`),

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Pattern Dump now checks accessibility with axe-core 4.14.1.** A site can get findings it didn't have before, and
+  a build can stop on a new error; see [The accessibility check](docs/guide/storefront.md#the-accessibility-check).
+- **`pd build --browser` checks that every tab has a name.** The new axe rule is `aria-tab-name`.
+- **`label-content-name-mismatch` is now a stable axe rule and may give different results.** It checks that a
+  control's accessible name contains its visible label, with `--browser`.
+- **Experimental and deprecated axe rules no longer run, so a site may see fewer findings.** Among them are
+  `landmark-complementary-is-top-level` and `aria-roledescription`. `target-size` stays: it is WCAG 2.2 AA 2.5.8.
+
 ## 0.10.1 (2026-11-26)
 
 ### Fixed

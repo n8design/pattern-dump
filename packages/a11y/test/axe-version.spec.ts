@@ -32,8 +32,8 @@ describe("assertAxeVersion", () => {
   });
 
   it("stops for any other, naming both", () => {
-    expect(() => assertAxeVersion("4.14.1")).toThrow(AxeVersionError);
-    expect(() => assertAxeVersion("4.14.1")).toThrow(
-      `axe-core 4.14.1 is installed, but the accessibility rule tiers were proven on ${ruleTiers.axeVersion}: install axe-core ${ruleTiers.axeVersion}`);
+    expect(() => assertAxeVersion("4.99.0")).toThrow(AxeVersionError);
+    expect(() => assertAxeVersion("4.99.0")).toThrow(
+      `axe-core 4.99.0 is installed, but the accessibility rule tiers were proven on ${ruleTiers.axeVersion}: install axe-core ${ruleTiers.axeVersion}`);
   });
 });

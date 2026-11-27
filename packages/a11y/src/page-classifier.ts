@@ -8,6 +8,13 @@
 import { PAGE_TAGS, runAxeOnPage } from "./page.js";
 import { PAGE_FIXTURES } from "./page-fixtures.js";
 
+/** Rules axe leaves out by default that PD runs anyway, each with why. Every entry must still be a rule of PAGE_TAGS
+ *  that axe leaves out: a stale entry stops the run. */
+export const KEEP_OFF_BY_DEFAULT: Record<string, string> = {
+  // axe switches it off by default, but PAGE_TAGS asks for wcag22aa and this rule is that criterion (2.5.8).
+  "target-size": "WCAG 2.2 AA 2.5.8, Target Size (Minimum)",
+};
+
 type Verdict = "jsdom" | "browser" | "fixture";
 
 /** One rule's verdict, and why. */
@@ -20,13 +27,21 @@ export async function classifyPageRule(ruleId: string, fail: string, pass: strin
   return { verdict: "browser", why: fv === 0 ? "the failing page is incomplete" : pv > 0 ? "the passing page is a violation" : "incomplete results" };
 }
 
-export async function classifyPages(): Promise<{ axeVersion: string; jsdom: string[]; browser: string[]; why: Record<string, string> }> {
-  const { axeVersion, ruleIds } = await runAxeOnPage("<!DOCTYPE html><html lang=\"en\"><head><title>x</title></head><body></body></html>", []);
+export async function classifyPages(): Promise<{
+  axeVersion: string; jsdom: string[]; browser: string[]; leftOut: string[]; why: Record<string, string>;
+}> {
+  const tagged = await runAxeOnPage("<!DOCTYPE html><html lang=\"en\"><head><title>x</title></head><body></body></html>", []);
+  const { axeVersion } = tagged;
+  for (const id of Object.keys(KEEP_OFF_BY_DEFAULT)) {
+    if (!tagged.offByDefault.includes(id)) throw new Error(`${id} in KEEP_OFF_BY_DEFAULT is not a rule axe-core ${axeVersion} leaves out by default under ${PAGE_TAGS.join(", ")}; remove it`);
+  }
+  const leftOut = tagged.offByDefault.filter(id => !(id in KEEP_OFF_BY_DEFAULT)).sort();
+  const ruleIds = tagged.ruleIds.filter(id => !leftOut.includes(id));
   const jsdom: string[] = [];
   const why: Record<string, string> = {};
   const wrong: string[] = [];
   for (const { ruleId, fail, pass } of PAGE_FIXTURES) {
-    if (!ruleIds.includes(ruleId)) throw new Error(`${ruleId} is not an axe-core ${axeVersion} rule under ${PAGE_TAGS.join(", ")}; update page-fixtures.ts`);
+    if (!ruleIds.includes(ruleId)) throw new Error(`${ruleId} is not an axe-core ${axeVersion} rule PD runs under ${PAGE_TAGS.join(", ")}; update page-fixtures.ts`);
     const r = await classifyPageRule(ruleId, fail, pass);
     why[ruleId] = r.why;
     if (r.verdict === "jsdom") jsdom.push(ruleId);
@@ -35,5 +50,6 @@ export async function classifyPages(): Promise<{ axeVersion: string; jsdom: stri
   if (wrong.length) throw new Error(`fix these fixtures in page-fixtures.ts:\n${wrong.map(w => `  - ${w}`).join("\n")}`);
   const browser = ruleIds.filter(id => !jsdom.includes(id));
   for (const id of browser) why[id] ??= "no fixture";
-  return { axeVersion, jsdom: jsdom.sort(), browser: browser.sort(), why };
+  for (const id of Object.keys(KEEP_OFF_BY_DEFAULT)) why[id] = `${why[id]}; kept though axe leaves it out: ${KEEP_OFF_BY_DEFAULT[id]}`;
+  return { axeVersion, jsdom: jsdom.sort(), browser: browser.sort(), leftOut, why };
 }

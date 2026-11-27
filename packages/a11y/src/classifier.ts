@@ -1,100 +1,14 @@
-// Rule classifier — probes each axe candidate rule against a failing fixture in jsdom.
-// Outputs rule-tiers.generated.json. Run via: nx run a11y:classify (or npm run classify).
-// Re-run after axe bumps — the diff shows which rules changed tiers.
-import { createRequire } from "node:module";
+// Writes rule-tiers.generated.json (and the coverage doc) from the component classifier (component-classifier.ts).
+// Run: npm run classify --workspace @pattern-dump/a11y (bundled into dist/ with esbuild, then run with node), and
+// after every axe-core bump: the diff shows which rules changed tiers.
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import { JSDOM } from "jsdom";
-
-// axe-core ships as CJS; use createRequire for reliable ESM interop.
-const require = createRequire(import.meta.url);
-const axe = require("axe-core") as typeof import("axe-core");
-
-// ─── Fixture table ────────────────────────────────────────────────────────────
-// One deliberately-failing fixture per candidate rule (from the jsdom rule-split spike).
-const CANDIDATES: { ruleId: string; fixture: string }[] = [
-  { ruleId: "image-alt",            fixture: '<img src="x.jpg">' },
-  { ruleId: "label",                fixture: '<input type="text">' },
-  { ruleId: "button-name",          fixture: "<button></button>" },
-  { ruleId: "link-name",            fixture: '<a href="#"></a>' },
-  { ruleId: "aria-required-attr",   fixture: '<div role="checkbox"></div>' },
-  { ruleId: "aria-valid-attr",      fixture: '<div aria-xyz="true"></div>' },
-  { ruleId: "aria-valid-attr-value",fixture: '<div role="textbox" aria-expanded="maybe"></div>' },
-  { ruleId: "autocomplete-valid",   fixture: '<input autocomplete="foo">' },
-  { ruleId: "duplicate-id",         fixture: '<div id="d1"></div><div id="d1"></div>' },
-  { ruleId: "aria-hidden-focus",    fixture: '<div aria-hidden="true"><button>x</button></div>' },
-  { ruleId: "duplicate-id-aria",    fixture: '<span id="x"></span><span id="x"></span><input aria-labelledby="x">' },
-  { ruleId: "color-contrast",       fixture: '<p style="color:#bbb;background:#fff">Low contrast</p>' },
-];
-
-type Verdict = "jsdom-clean" | "needs-rendering" | "investigate";
-
-interface ClassifierResult {
-  ruleId: string;
-  verdict: Verdict;
-  violations: number;
-  incomplete: number;
-}
-
-async function classifyRule(ruleId: string, fixture: string): Promise<ClassifierResult> {
-  // url required so axe can read location.origin without hitting a null-ref in node mode.
-  const dom = new JSDOM(
-    `<!DOCTYPE html><html lang="en"><body><main>${fixture}</main></body></html>`,
-    { url: "http://localhost" }
-  );
-  // No axe.reset() — we never change axe config between probes, and reset() crashes in node/jsdom
-  // when called without a live global window (spike finding: no setup/teardown cycling).
-  const results = await axe.run(
-    dom.window.document.querySelector("main")!,
-    { runOnly: { type: "rule", values: [ruleId] } }
-  );
-  const violations = results.violations.length;
-  const incomplete = results.incomplete.length;
-  let verdict: Verdict;
-  if (violations > 0) {
-    verdict = "jsdom-clean";
-  } else if (incomplete > 0) {
-    verdict = "needs-rendering";
-  } else {
-    verdict = "investigate";
-  }
-  return { ruleId, verdict, violations, incomplete };
-}
+import { CANDIDATES, classifyComponents } from "./component-classifier.js";
 
 async function main() {
-  // Pre-check: every fixture's ruleId must exist in the installed axe version.
-  const liveRuleIds = new Set(axe.getRules().map((r: { ruleId: string }) => r.ruleId));
-  const axeVersion = (axe as unknown as { version: string }).version ?? "unknown";
-  for (const { ruleId } of CANDIDATES) {
-    if (!liveRuleIds.has(ruleId)) {
-      throw new Error(
-        `Rule "${ruleId}" no longer exists in axe-core ${axeVersion}. ` +
-        `Update CANDIDATES in classifier.ts to reflect the current rule set.`
-      );
-    }
-  }
-
-  console.log(`Classifying ${CANDIDATES.length} rules against axe-core ${axeVersion}…`);
-
-  const results: ClassifierResult[] = [];
-  for (const { ruleId, fixture } of CANDIDATES) {
-    const r = await classifyRule(ruleId, fixture);
-    results.push(r);
-    console.log(`  ${r.verdict.padEnd(16)} ${ruleId}`);
-  }
-
-  // Fail loudly if anything is in "investigate" — don't emit an artifact with unknowns.
-  const investigate = results.filter(r => r.verdict === "investigate");
-  if (investigate.length > 0) {
-    throw new Error(
-      `${investigate.length} rule(s) in "investigate" bucket: ${investigate.map(r => r.ruleId).join(", ")}. ` +
-      `Add specific fixtures for these rules before committing the artifact.`
-    );
-  }
-
-  const alwaysOn = results.filter(r => r.verdict === "jsdom-clean").map(r => r.ruleId);
-  const needsRendering = results.filter(r => r.verdict === "needs-rendering").map(r => r.ruleId);
+  const { axeVersion, results, alwaysOn, needsRendering } = await classifyComponents();
+  console.log(`Classified ${CANDIDATES.length} rules against axe-core ${axeVersion}:`);
+  for (const r of results) console.log(`  ${r.verdict.padEnd(16)} ${r.ruleId}`);
 
   const artifact = {
     _note: "Generated by packages/a11y/src/classifier.ts: do not hand-edit. Re-run: nx run a11y:classify",
@@ -105,7 +19,8 @@ async function main() {
     investigate: [] as string[],
   };
 
-  const outPath = join(dirname(fileURLToPath(import.meta.url)), "rule-tiers.generated.json");
+  // Into src/ and docs/ from either folder: the bundle runs from dist/, a sibling of src/.
+  const outPath = fileURLToPath(new URL("../src/rule-tiers.generated.json", import.meta.url));
   writeFileSync(outPath, JSON.stringify(artifact, null, 2) + "\n");
 
   // Coverage doc — human-readable, honest statement of what PD checks automatically.
@@ -147,7 +62,7 @@ async function main() {
     `Manual review against WCAG 2.1 AA remains necessary.`,
   ].join("\n");
 
-  const coveragePath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "docs", "development", "a11y-coverage.generated.md");
+  const coveragePath = fileURLToPath(new URL("../../../docs/development/a11y-coverage.generated.md", import.meta.url));
   writeFileSync(coveragePath, coverageDoc + "\n");
 
   console.log(`\nWrote ${outPath}`);

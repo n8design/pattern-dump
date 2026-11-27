@@ -4,6 +4,8 @@ import { JSDOM } from "jsdom";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { classifyComponents } from "../src/component-classifier.js";
+import ruleTiers from "../src/rule-tiers.generated.json" with { type: "json" };
 
 const require = createRequire(import.meta.url);
 const axe = require("axe-core") as typeof import("axe-core");
@@ -33,6 +35,14 @@ async function probe(ruleId: string, fixture: string) {
     { runOnly: { type: "rule", values: [ruleId] } }
   );
 }
+
+describe("the component rule tiers", () => {
+  it("are what the classifier says for the installed axe-core: re-run classify after an axe bump", async () => {
+    const now = await classifyComponents();
+    expect({ axeVersion: ruleTiers.axeVersion, alwaysOn: ruleTiers.alwaysOn, needsRendering: ruleTiers.needsRendering })
+      .toEqual({ axeVersion: now.axeVersion, alwaysOn: now.alwaysOn, needsRendering: now.needsRendering });
+  });
+});
 
 describe("classifier verdicts", () => {
   for (const { ruleId, fixture, expectedVerdict } of FIXTURES) {
