@@ -19,6 +19,15 @@ backticks. Files that change for one reason can share a line:
 `api/version.json` is compared without `serverBundleMtime`, which changes with every build. An entry already on
 the base doesn't count for a later pull request: each change is recorded by the pull request that makes it.
 
+## 2026-11-27: axe-core 4.14.1
+
+- `_pd/axe-core.js`: the bundled axe-core is 4.14.1.
+- `_pd/rule-tiers.json`: the component rule tiers name axe-core 4.14.1 and a new date; the rule lists are unchanged.
+- `api/component/atoms/a11y-invalid/index.json`, `api/component/atoms/tbflat/tbflat-a/index.json`,
+  `api/component/atoms/tbflat/tbflat-b/index.json`, `api/component/atoms/tbflat/tbflat-c/index.json`,
+  `api/component/atoms/tbflat/tbflat-drift/index.json`, `api/component/atoms/tbflat/tbflat-sibling/index.json`: each
+  accessibility finding's `helpUrl` points at the axe 4.14 rule pages instead of 4.11. Nothing else in them changed.
+
 ## 2026-11-25: Theme switching without a reload or a flicker
 
 - `_pd/main.js`: a stylesheet theme switch keeps the current sheet until the new one has loaded, `data-theme` names

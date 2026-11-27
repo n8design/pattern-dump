@@ -1943,6 +1943,10 @@ pd build: the site has accessibility problems, so nothing was written:
   - /guides/: the page has 2 <h1> headings: one names the page, the others are <h2> or lower
 ```
 
+The rules are the ones axe runs for those tags by default: experimental and deprecated rules are left out. The one
+exception is `target-size`, which axe turns off by default but which is WCAG 2.2 AA criterion 2.5.8; `--browser`
+runs it.
+
 The check runs without a browser, so it leaves out what only a rendered page can tell: colour contrast, and axe's
 rules that need layout (`--browser`, below, runs those). The project's own [`pd audit`](cli.md) checks each component
 on its own; this check is the assembled page. In `pd dev`, a page without one `<main>` and one `<h1>` is a warning in
