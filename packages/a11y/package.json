@@ -22,7 +22,7 @@
   },
   "scripts": {
     "build": "esbuild src/index.ts src/page-worker.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outdir=dist",
-    "classify": "node --experimental-strip-types src/classifier.ts",
+    "classify": "esbuild src/classifier.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/classifier.js && node dist/classifier.js",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
