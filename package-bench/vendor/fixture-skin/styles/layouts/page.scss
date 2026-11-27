@@ -1,3 +1,9 @@
 .sk-page {
   padding: 1rem;
 }
+
+// A pattern example's variant links, stacked in a list: each one tall enough to tap (WCAG 2.5.8, target size).
+.doc-example-variants a {
+  display: inline-block;
+  min-block-size: 1.5rem;
+}
