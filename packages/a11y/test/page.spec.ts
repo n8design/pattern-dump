@@ -1,7 +1,7 @@
 // axe on a whole page (page.ts): the page rule tiers are what the classifier says for the installed axe-core (so an
 // axe bump without a re-run fails here), the severity mapping, and the findings on a page with known faults.
 import { describe, expect, it } from "vitest";
-import { classifyPages } from "../src/page-classifier.js";
+import { classifyPages, KEEP_OFF_BY_DEFAULT } from "../src/page-classifier.js";
 import { page } from "../src/page-fixtures.js";
 import { pageRuleTiers, runAxeOnPage, runPageA11y, severityOf } from "../src/page.js";
 
@@ -10,6 +10,15 @@ describe("the page rule tiers", () => {
     const now = await classifyPages();
     expect({ axeVersion: pageRuleTiers.axeVersion, jsdom: pageRuleTiers.jsdom, browser: pageRuleTiers.browser })
       .toEqual({ axeVersion: now.axeVersion, jsdom: now.jsdom, browser: now.browser });
+  }, 120_000);
+
+  it("leave out what axe leaves out by default (experimental, deprecated, switched off), except the kept list", async () => {
+    const now = await classifyPages();
+    const listed = [...pageRuleTiers.jsdom, ...pageRuleTiers.browser];
+    expect(now.leftOut).toEqual(expect.arrayContaining(["aria-roledescription", "landmark-complementary-is-top-level", "td-has-header"]));
+    for (const id of now.leftOut) expect(listed).not.toContain(id);
+    expect(Object.keys(KEEP_OFF_BY_DEFAULT)).toEqual(["target-size"]);
+    expect(pageRuleTiers.browser).toContain("target-size");
   }, 120_000);
 
   it("leave what jsdom can't decide to the browser: contrast, one main, one h1", () => {

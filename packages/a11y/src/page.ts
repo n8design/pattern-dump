@@ -23,9 +23,11 @@ export const PAGE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"
 interface AxeNode { target: unknown[]; html: string; failureSummary?: string }
 interface AxeResult { id: string; impact?: string | null; tags: string[]; help: string; helpUrl: string; nodes: AxeNode[] }
 
-/** axe's raw results for `html` with `rules` (all of PAGE_TAGS when empty), and the rules those tags hold. */
+/** axe's raw results for `html` with `rules` (all of PAGE_TAGS when empty), the rules those tags hold, and which of
+ *  those axe leaves out by default: tagged experimental or deprecated, or switched off. */
 export async function runAxeOnPage(html: string, rules: string[]): Promise<{
-  violations: AxeResult[]; incomplete: AxeResult[]; axeVersion: string; ruleIds: string[]; toolOptions: { iframes?: boolean };
+  violations: AxeResult[]; incomplete: AxeResult[]; axeVersion: string; ruleIds: string[]; offByDefault: string[];
+  toolOptions: { iframes?: boolean };
 }> {
   const dom = new JSDOM(html, { url: "http://site.invalid/", runScripts: "outside-only", pretendToBeVisual: true });
   // A canvas jsdom can't draw on: axe probes for one and carries on without it.
@@ -34,14 +36,21 @@ export async function runAxeOnPage(html: string, rules: string[]): Promise<{
     dom.window.eval(source());
     const axe = (dom.window as unknown as { axe: {
       run(context: unknown, options: unknown): Promise<{ violations: AxeResult[]; incomplete: AxeResult[]; toolOptions: { iframes?: boolean } }>;
-      getRules(tags: string[]): Array<{ ruleId: string }>; version: string;
+      getRules(tags: string[]): Array<{ ruleId: string; tags: string[] }>; version: string;
+      _audit?: { rules?: Array<{ id: string; enabled: boolean }> };
     } }).axe;
-    const ruleIds = axe.getRules(PAGE_TAGS).map(r => r.ruleId);
+    const listed = axe.getRules(PAGE_TAGS);
+    const ruleIds = listed.map(r => r.ruleId);
+    // Whether a rule is on by default is only in axe's internal audit (getRules doesn't say), so stop if it moves.
+    const audit = axe._audit?.rules;
+    if (!audit) throw new Error(`axe-core ${axe.version} has no _audit.rules: page.ts can't tell which rules are off by default`);
+    const off = new Set(audit.filter(r => !r.enabled).map(r => r.id));
+    const offByDefault = listed.filter(r => off.has(r.ruleId) || r.tags.includes("experimental") || r.tags.includes("deprecated")).map(r => r.ruleId);
     const options = rules.length ? { runOnly: { type: "rule", values: rules } } : { runOnly: { type: "tag", values: PAGE_TAGS } };
     // No frames: jsdom's never answer axe's ping, which then waits half a second per page that has one. A frame's
     // content is never checked here either way; frame-title reads the element in this document.
     const r = await axe.run(dom.window.document, { ...options, resultTypes: ["violations", "incomplete"], iframes: false });
-    return { violations: r.violations, incomplete: r.incomplete, axeVersion: axe.version, ruleIds, toolOptions: r.toolOptions };
+    return { violations: r.violations, incomplete: r.incomplete, axeVersion: axe.version, ruleIds, offByDefault, toolOptions: r.toolOptions };
   } finally {
     dom.window.close();
   }
