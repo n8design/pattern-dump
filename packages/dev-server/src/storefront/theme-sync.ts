@@ -37,7 +37,7 @@ export function syncPreviewThemes(doc: Document, names: readonly string[], mode:
   const built = new WeakMap<Document, string | null>();
 
   const apply = (frame: HTMLIFrameElement): void => {
-    let preview: Document | null = null;
+    let preview: Document | null;
     try { preview = frame.contentDocument; } catch { return; }
     // Only a preview document (it names its component), never the blank one a frame has before it loads.
     if (!preview || !preview.body || !preview.body.hasAttribute("data-component-id")) return;

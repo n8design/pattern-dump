@@ -77,7 +77,7 @@ export async function readAssetStylesheets(
   for (const entry of entries) {
     const file = entry.includes("://") ? null : await assetFile(`${PD_ROUTE_PREFIX.assets}${encodeURI(entry)}`, roots, names);
     if (!file) { out.push({ entry, file: null }); continue; }
-    let text = "";
+    let text: string;
     try { text = await read(file); } catch { out.push({ entry, file: null }); continue; }
     out.push({ entry, file, classes: cssTextClasses(text, file) });
   }

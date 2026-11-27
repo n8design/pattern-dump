@@ -215,7 +215,7 @@ export async function writeThreadedIncluders(
   for (const id of [...includerIds].sort()) {
     const hbsPath = discoveryMap.get(id)?.hbsPath;
     if (!hbsPath) continue;
-    let src = "";
+    let src: string;
     try { src = await readFile(hbsPath, "utf-8"); } catch { continue; }
     const res = rewriteIncludes(src, map);
     if (res.rewrites === 0) continue; // no site matched (stale usedBy) — do not emit an unchanged copy

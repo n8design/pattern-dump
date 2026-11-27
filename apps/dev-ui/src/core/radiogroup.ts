@@ -13,7 +13,7 @@ export function setupRadiogroupKeyboard(group: HTMLElement): void {
     const radios = [...group.querySelectorAll<HTMLButtonElement>("[role='radio']")];
     const focused = radios.indexOf(document.activeElement as HTMLButtonElement);
     if (focused === -1) return;
-    let next = -1;
+    let next: number;
     if      (e.key === "ArrowRight" || e.key === "ArrowDown")  { next = (focused + 1) % radios.length; }
     else if (e.key === "ArrowLeft"  || e.key === "ArrowUp")    { next = (focused - 1 + radios.length) % radios.length; }
     else if (e.key === " " || e.key === "Enter") { radios[focused].click(); e.preventDefault(); return; }

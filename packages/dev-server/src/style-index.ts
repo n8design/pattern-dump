@@ -449,7 +449,7 @@ export async function buildAllStyleData(
   const baseCssBucket = new Set<string>();
   baseCssByRoot.push([]);
 
-  let entryFiles: string[] = [];
+  let entryFiles: string[];
   if (styleRoot.entries && styleRoot.entries.length > 0) {
     // Configured styles.entry: compile ONLY these (resolved absolute by the caller), in the order
     // given. A configured list is the cascade order, so it is never re-sorted.

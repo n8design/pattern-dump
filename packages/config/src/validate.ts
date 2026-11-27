@@ -493,7 +493,7 @@ function checkFeeds(feeds: unknown, problems: string[]): void {
     problems.push(`"site.feeds.author.name": an Atom feed needs an author: set site.feeds.author to { name: "<who writes the site>" }, or format: "rss"`);
   }
   if (author && typeof author.uri === "string") {
-    let ok = false;
+    let ok: boolean;
     try { ok = /^https?:$/.test(new URL(author.uri).protocol); } catch { ok = false; }
     if (!ok) problems.push(`"site.feeds.author.uri" must be an absolute http(s) URL, such as "https://example.com/about/"`);
   }
