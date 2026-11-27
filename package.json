@@ -43,9 +43,9 @@
     "test": "nx run-many -t test --outputStyle=static",
     "lint": "nx run-many -t lint --outputStyle=static",
     "typecheck": "nx run-many -t typecheck --outputStyle=static",
-    "e2e": "nx run dev-ui:e2e",
-    "e2e:storefront": "nx run storefront-bench:e2e",
-    "e2e:package-bench": "nx run package-bench:e2e",
+    "e2e": "nx run dev-ui:e2e --outputStyle=static",
+    "e2e:storefront": "nx run storefront-bench:e2e --outputStyle=static",
+    "e2e:package-bench": "nx run package-bench:e2e --outputStyle=static",
     "dev:check": "node scripts/check-server-fresh.mjs",
     "test:scripts": "node --test scripts/ci/burn-in.test.mjs scripts/no-em-dash.test.mjs scripts/e2e-specs.test.mjs scripts/commitlint.test.mjs scripts/changelog.test.mjs scripts/changelog-density.test.mjs scripts/golden-check.test.mjs",
     "burn-in": "node scripts/ci/burn-in.mjs",
@@ -55,8 +55,8 @@
     "affected": "nx affected -t build test lint typecheck --outputStyle=static",
     "dev": "npm run dev --workspace test-bench",
     "prepare": "husky",
-    "e2e:skin-experimental": "nx run skin-experimental:e2e",
-    "e2e:mounts": "nx run mounts-bench:e2e"
+    "e2e:skin-experimental": "nx run skin-experimental:e2e --outputStyle=static",
+    "e2e:mounts": "nx run mounts-bench:e2e --outputStyle=static"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.3",
