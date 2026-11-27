@@ -26,6 +26,6 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "classify-pages": "vite-node src/classify-pages.ts"
+    "classify-pages": "esbuild src/classify-pages.ts --bundle --platform=node --format=esm --packages=external --external:@pattern-dump/* --outfile=dist/classify-pages.js && node dist/classify-pages.js"
   }
 }
