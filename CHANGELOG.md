@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- **Old `.html` addresses can now forward to a page with `redirectFrom`.** Write the file's path, such as
+  `/how-to/old.html`; see [Redirects](docs/guide/storefront.md#redirects).
+
 ### Changed
 
 - **Pattern Dump now checks accessibility with axe-core 4.14.1.** A site can get findings it didn't have before, and
