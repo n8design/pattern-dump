@@ -8,6 +8,8 @@
   margin: var(--pp-dlg-gap, 1rem);
 }
 
-.pp-dialog-body {
+// A selector list: Sass writes it over two lines.
+.pp-dialog-body,
+.pp-dialog-foot {
   padding: var(--pp-dlg-gap);
 }

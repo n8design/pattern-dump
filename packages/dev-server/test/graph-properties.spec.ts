@@ -105,7 +105,7 @@ describe("custom properties in the graph", () => {
 
   it("a property used once with and once without a fallback warns, naming the use without one", () => {
     expect(propertyUndeclaredDiagnostics("atoms/dialog", undefined, graph, []).map(d => d.message)).toEqual([
-      expect.stringMatching(/^var\(--pp-dlg-gap\) in \.pp-dialog-body has no fallback and reads a custom property/),
+      expect.stringMatching(/^var\(--pp-dlg-gap\) in \.pp-dialog-body, \.pp-dialog-foot has no fallback and reads a custom property/),
     ]);
   });
 
@@ -135,13 +135,13 @@ describe("custom properties in the graph", () => {
     // The allow list applies (--pp-runtime), and a property with a fallback everywhere (--pp-dlg-width) is no warning.
     expect(style.undeclared).toEqual([
       { component: "atoms/badge", property: "--pp-undeclared", selectors: [".pp-badge"] },
-      { component: "atoms/dialog", property: "--pp-dlg-gap", selectors: [".pp-dialog-body"] },
+      { component: "atoms/dialog", property: "--pp-dlg-gap", selectors: [".pp-dialog-body, .pp-dialog-foot"] },
     ]);
     const md = formatAudit(audit, "md", { style });
     expect(md).toContain("## Custom properties declared nowhere (PROPERTY_UNDECLARED: warnings, not in the defect count)\n\n"
       + "2 properties in 2 components.\n\n"
       + "- atoms/badge reads `--pp-undeclared` without a fallback in `.pp-badge`, and nothing declares it\n"
-      + "- atoms/dialog reads `--pp-dlg-gap` without a fallback in `.pp-dialog-body`, and nothing declares it\n");
+      + "- atoms/dialog reads `--pp-dlg-gap` without a fallback in `.pp-dialog-body, .pp-dialog-foot`, and nothing declares it\n");
     expect(formatAudit(audit, "text", { style })).toContain(
       "Custom properties declared nowhere (PROPERTY_UNDECLARED: warnings, not in the defect count): 2 properties in 2 components\n"
       + "  atoms/badge reads --pp-undeclared without a fallback in .pp-badge, and nothing declares it\n");

@@ -21,6 +21,7 @@ describe("INLINE_STYLE", () => {
     expect(inlineStyles(`<i {{#if c}}style="{{#if c.d}}--cols: {{c.d}};{{/if}}"{{/if}}></i>`)).toEqual([]);
     expect(inlineStyles(`<i style="{{styles}}"></i><i style="{{{raw}}}"></i>`)).toEqual([]);
     expect(inlineStyles(`<i data-style="width: 1px"></i>`)).toEqual([]);
+    expect(inlineStyles(`<i\n  style="width: 1px;\n    height:\n 2px"></i>`)).toEqual([{ declarations: ["width: 1px", "height: 2px"], line: 2, column: 3 }]);
   });
 
   it("is a warning on the render, naming the template and the declarations, one per attribute", async () => {

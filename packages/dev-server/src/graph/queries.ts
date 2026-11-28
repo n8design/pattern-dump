@@ -164,7 +164,8 @@ export function undeclaredPropertiesOf(graph: ProjectGraph, id: string, allow: r
   const allowed = nameMatcher(allow);
   return propertiesOf(graph, id).flatMap(p => {
     if (p.declaredBy.length > 0 || allowed(p.name)) return [];
-    const selectors = [...new Set([...p.own, ...p.context].filter(u => u.fallback === undefined).map(u => u.selector))].sort(cmp);
+    // A selector list as Sass compiles it has a line break after each comma: one line, for a message and a list item.
+    const selectors = [...new Set([...p.own, ...p.context].filter(u => u.fallback === undefined).map(u => u.selector.replace(/\s+/g, " ")))].sort(cmp);
     return selectors.length ? [{ property: p.name, selectors }] : [];
   });
 }

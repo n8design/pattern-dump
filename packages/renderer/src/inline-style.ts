@@ -9,7 +9,7 @@
 // no declaration to judge and is left alone.
 
 export interface InlineStyle {
-  /** The declarations that set something other than a custom property, as written, trimmed. */
+  /** The declarations that set something other than a custom property, as written, trimmed, each on one line. */
   declarations: string[];
   line: number;
   column: number;
@@ -47,7 +47,8 @@ export function inlineStyles(template: string): InlineStyle[] {
       if (colon < 0) continue;
       const prop = text.slice(0, colon).trim();
       if (prop === "" || PROPERTY.test(prop)) continue;
-      found.push(value.slice(d.start, d.end).trim());
+      // One line, as a message has it: an attribute written over several lines keeps its words.
+      found.push(value.slice(d.start, d.end).trim().replace(/\s+/g, " "));
     }
     if (found.length === 0) continue;
     // Where the attribute starts: after the space (or the `}}`) the match begins with.
