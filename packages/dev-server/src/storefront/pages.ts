@@ -84,6 +84,10 @@ export interface PageEntryFields {
 /** A page held back until a later day: its path in the pages folder, and the first day it is built (YYYY-MM-DD). */
 export interface ScheduledPage { path: string; until: string }
 
+/** Whether a page is in the navigation: nav: false leaves it out (a folder's index.md: its entry, and so its
+ *  children). Any other value is listed; one that is not true or false is the page's problem (frontmatter-contract.ts). */
+export const listed = (f: PageFile): boolean => f.frontmatter.values["nav"] !== "false";
+
 /** The UTC date of `clock`, YYYY-MM-DD: the day a page's `date` is compared with, the same on every machine. */
 export const todayOf = (clock: Date): string => clock.toISOString().slice(0, 10);
 
@@ -368,9 +372,6 @@ export async function readPages(pagesDir: string, opts: {
   const homeWeight = weightOf(home);
   const top = ordered("/", home ? [{ route: "/", segment: "index", ...(homeWeight !== undefined ? { weight: homeWeight } : {}) }] : []);
 
-  // nav: false leaves a page out (a folder's index.md: its entry, and so its children). Any other value is listed;
-  // one that is not true or false is the page's problem (frontmatter-contract.ts).
-  const listed = (f: PageFile): boolean => f.frontmatter.values["nav"] !== "false";
   const nav: StorefrontNavItem[] = [];
   // The nav's two levels in their order, each page whether listed or not: the order of `pages`, so nav: false
   // moves no page there (llms.txt follows it).

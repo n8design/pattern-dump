@@ -1,10 +1,14 @@
 // Declared navigations: `storefront.site.navigations`, named lists of links a skin shows (a footer's, a
 // sidebar's), beside the nav the storefront builds from the pages folder.
 //
-// The shape is Pattern Dump's, not the skin's. Each entry is exactly one of three forms, at any depth:
-//   { page: "guides/setup.md", label? }   a page, by its path in the pages folder; labelled with its title
-//   { href, label }                         an external link: http(s):, mailto:, or a path from the root
-//   { label, children: [...] }              a group
+// The shape is Pattern Dump's, not the skin's. Each entry is exactly one of four forms, at any depth:
+//   { page: "guides/setup.md", label? }    a page, by its path in the pages folder; labelled with its title
+//   { page, label?, children }              a page that is a parent too: `children` is a list of entries, or
+//                                           "folder" on a folder's index.md, its pages in navigation order
+//   { href, label }                          an external link: http(s):, mailto:, or a path from the root
+//   { label, children: [...] }               a group
+// "folder" is one level deep, as the nav is: a subfolder is its index.md, a link with nothing below it. A page
+// with nav: false is not listed; drafts are not either, in a build, since they are not pages there.
 // The skin's schema only lists the names it uses: `partials/base` declares
 // `site.properties.navigations.properties.<name>`, each an empty schema (a description at most), and
 // `required` for the names it must have. A shape declared there is a skin error; a configured name the skin
@@ -13,16 +17,19 @@
 // is reported once (page.ts marks them, the build lists them once).
 //
 // Resolved per page: { label, route | href, current?, ancestor?, children? }, `current` on the entry of the
-// page being rendered, `ancestor` on every group above it. An external link is never current.
+// page being rendered, `ancestor` on every entry with children above it. An external link is never current.
 
 import { suggest } from "@pattern-dump/config";
 import type { StorefrontNavEntry } from "@pattern-dump/config";
 import type { PropertySchema } from "./declared-values.js";
-import type { PageModel } from "./pages.js";
+import { listed as inNav, type PageModel } from "./pages.js";
 
 export const NAVIGATIONS_KEY = "navigations";
 const AT = "site.globals.navigations";
 const KEYS = ["page", "href", "label", "children"];
+/** `children: "folder"`: the folder's pages, on its index.md. */
+const FOLDER = "folder";
+const isIndex = (path: string): boolean => path === "index.md" || path.endsWith("/index.md");
 
 /** One entry of a navigation as a layout gets it. */
 export interface NavLink {
@@ -100,7 +107,7 @@ function checkEntries(entries: unknown[], at: string, pagePaths: ReadonlySet<str
 }
 
 function checkEntry(entry: unknown, at: string, pagePaths: ReadonlySet<string>): string[] {
-  const FORMS = `{ page }, { href, label } or { label, children }`;
+  const FORMS = `{ page }, { page, children }, { href, label } or { label, children }`;
   if (!isObject(entry)) return [`${at} must be an entry, one of ${FORMS} (got ${show(entry)})`];
   const problems: string[] = [];
   for (const key of Object.keys(entry)) {
@@ -108,34 +115,38 @@ function checkEntry(entry: unknown, at: string, pagePaths: ReadonlySet<string>):
     const near = suggest(key, KEYS);
     problems.push(`${at}: "${key}" is not a key of a navigation entry${near ? `: did you mean "${near}"?` : ""}`);
   }
-  const forms = (["page", "href", "children"] as const).filter(k => Object.hasOwn(entry, k));
-  if (forms.length !== 1) {
-    problems.push(forms.length
-      ? `${at} has ${forms.map(k => `"${k}"`).join(" and ")}: an entry is one of ${FORMS}`
-      : `${at} needs "page", "href" or "children": an entry is one of ${FORMS}`);
+  const has = (k: string) => Object.hasOwn(entry, k);
+  if (has("href") && (has("page") || has("children"))) {
+    const both = (["page", "href", "children"] as const).filter(has);
+    problems.push(`${at} has ${both.map(k => `"${k}"`).join(" and ")}: an entry is one of ${FORMS}`);
+    return problems;
+  }
+  if (!has("page") && !has("href") && !has("children")) {
+    problems.push(`${at} needs "page", "href" or "children": an entry is one of ${FORMS}`);
     return problems;
   }
   const label = entry["label"];
   if (label !== undefined && typeof label !== "string") problems.push(`${at}.label must be text (got ${show(label)})`);
-  const form = forms[0];
-  if (form === "page") {
-    const page = entry["page"];
+  const page = entry["page"];
+  if (has("page")) {
     if (typeof page !== "string") problems.push(`${at}.page must be the path of a page in the pages folder, such as "about.md" (got ${show(page)})`);
     else if (!pagePaths.has(page)) {
       const near = suggest(page, [...pagePaths]);
       problems.push(`${at}: "${page}" is not a page in the pages folder${near ? `: did you mean "${near}"?` : ""}`);
     }
-  } else {
-    if (label === undefined) problems.push(`${at} needs a "label"`);
-    if (form === "href") {
-      const href = entry["href"];
-      if (typeof href !== "string") problems.push(`${at}.href must be text (got ${show(href)})`);
-      else if (!isAllowedHref(href)) problems.push(`${at}.href ${show(href)} must start with https:, http: or mailto:, or be a path from the site's root (/…)`);
-    } else {
-      const children = entry["children"];
-      if (!Array.isArray(children)) problems.push(`${at}.children must be a list of entries (got ${show(children)})`);
-      else problems.push(...checkEntries(children, `${at}.children`, pagePaths));
-    }
+  } else if (label === undefined) problems.push(`${at} needs a "label"`);
+  if (has("href")) {
+    const href = entry["href"];
+    if (typeof href !== "string") problems.push(`${at}.href must be text (got ${show(href)})`);
+    else if (!isAllowedHref(href)) problems.push(`${at}.href ${show(href)} must start with https:, http: or mailto:, or be a path from the site's root (/…)`);
+  }
+  if (has("children")) {
+    const children = entry["children"];
+    if (children === FOLDER) {
+      if (!has("page")) problems.push(`${at}.children is "folder", which lists a folder's pages: it needs the folder's index.md as "page", such as { page: "guides/index.md", children: "folder" }`);
+      else if (typeof page === "string" && !isIndex(page)) problems.push(`${at}.children is "folder", which lists a folder's pages: it works only on a folder's index.md, and "${page}" is not one`);
+    } else if (!Array.isArray(children)) problems.push(`${at}.children must be a list of entries, or "folder" on a folder's index.md (got ${show(children)})`);
+    else problems.push(...checkEntries(children, `${at}.children`, pagePaths));
   }
   return problems;
 }
@@ -146,14 +157,22 @@ export function resolveNavigations(
 ): Record<string, NavLink[] | null> {
   const byPath = new Map([...model.files.values()].map(f => [f.path, f.route]));
   const titleOf = new Map(model.pages.map(p => [p.route, p.title]));
+  const pageLink = (r: string, label?: string): NavLink =>
+    ({ label: label ?? titleOf.get(r) ?? r, route: r, ...(r === route ? { current: true as const } : {}) });
+  // A folder's pages, in navigation order, without those nav: false leaves out; a subfolder is its index.md.
+  const folderOf = (folder: string): NavLink[] => (model.folders.get(folder)?.children ?? [])
+    .filter(r => { const f = model.files.get(r); return f !== undefined && inNav(f); })
+    .map(r => pageLink(r));
+  const withChildren = (link: NavLink, children: NavLink[]): NavLink =>
+    ({ ...link, children, ...(children.some(c => c.current || c.ancestor) ? { ancestor: true as const } : {}) });
   const resolve = (entries: StorefrontNavEntry[]): NavLink[] => entries.map(e => {
     if ("page" in e) {
-      const r = byPath.get(e.page)!;
-      return { label: e.label ?? titleOf.get(r) ?? r, route: r, ...(r === route ? { current: true as const } : {}) };
+      const link = pageLink(byPath.get(e.page)!, e.label);
+      if (!("children" in e)) return link;
+      return withChildren(link, e.children === FOLDER ? folderOf(link.route!) : resolve(e.children));
     }
     if ("href" in e) return { label: e.label, href: e.href };
-    const children = resolve(e.children);
-    return { label: e.label, children, ...(children.some(c => c.current || c.ancestor) ? { ancestor: true as const } : {}) };
+    return withChildren({ label: e.label }, resolve(e.children));
   });
   return Object.fromEntries(listed.map(name => [name, Object.hasOwn(navigations, name) ? resolve(navigations[name]!) : null]));
 }

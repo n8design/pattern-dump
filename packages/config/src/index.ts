@@ -412,11 +412,14 @@ export interface SiteCategory {
 /**
  * One entry of a declared navigation (`site.globals.navigations.<name>`):
  * - a page, by its path in the pages folder (`"guides/setup.md"`), labelled with its title unless `label`;
+ * - a page that is a parent too: `children` is a list of entries, or `"folder"` on a folder's `index.md`, which
+ *   lists the folder's pages in navigation order, one level deep (a subfolder is its `index.md`);
  * - an external link: `href` is `https:`, `http:` or `mailto:`, or a path from the site's root (`/feed.xml`);
- * - a group: a `label` and its `children`, entries of any of the three kinds.
+ * - a group: a `label` and its `children`, entries of any of these kinds.
  */
 export type SiteNavEntry =
   | { page: string; label?: string }
+  | { page: string; label?: string; children: SiteNavEntry[] | "folder" }
   | { href: string; label: string }
   | { label: string; children: SiteNavEntry[] };
 
