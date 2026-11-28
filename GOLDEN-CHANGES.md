@@ -19,6 +19,14 @@ backticks. Files that change for one reason can share a line:
 `api/version.json` is compared without `serverBundleMtime`, which changes with every build. An entry already on
 the base doesn't count for a later pull request: each change is recorded by the pull request that makes it.
 
+## 2026-11-28: The workbench's query conditions in `em`
+
+- `_pd/main.css`: the narrow layout's media query is (max-width: 56.25em) instead of 900px, and the Nav Rail's
+  accessibility label switches at 9.375em and 5em instead of 150px and 80px. At the default 16 px text each
+  is the same width as before; with a larger text size the breakpoints move with it.
+- `_pd/main.js`: the workbench opens the Inspector on first load unless `matchMedia("(max-width: 56.25em)")` matches,
+  the CSS's own query, instead of when `innerWidth` is over 900. The bundle gains `NARROW_QUERY` and `isNarrow`.
+
 ## 2026-11-28: Redirects from old `.html` files
 
 - `_pd/main.js`: the workbench bundles `staticPathFor`, which gains one line: a path ending in `.html` is a file of

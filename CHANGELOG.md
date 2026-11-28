@@ -14,6 +14,8 @@
 
 ### Changed
 
+- **The workbench's layout now follows the browser's text size.** With larger text, it switches to the narrow
+  layout sooner, and the Inspector starts closed when it wouldn't fit.
 - **Pattern Dump now checks accessibility with axe-core 4.14.1.** A site can get findings it didn't have before, and
   a build can stop on a new error; see [The accessibility check](docs/guide/storefront.md#the-accessibility-check).
 - **`pd build --browser` checks that every tab has a name.** The new axe rule is `aria-tab-name`.
