@@ -48,6 +48,12 @@ export interface StylesConfig {
    * merely noisy, attribution — name the one design-system entry here.
    */
   entry?: string | string[];
+  /**
+   * Custom properties a component's rules may read with no declaration in any stylesheet or theme: ones a script
+   * sets, or the site that uses the design system. Names, or a prefix ending in `*` (`"--dlg-*"`). Any other
+   * property a component uses and nothing declares is a warning on its Diagnostics tab (PROPERTY_UNDECLARED).
+   */
+  allowProperties?: string[];
 }
 
 export interface ThemesConfig {

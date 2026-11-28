@@ -1,0 +1,23 @@
+// Two components' rules in one file, as hTWOo's 03-organism/cards/_cards.scss.
+@use "../base/colors";
+@use "../base/mixins";
+
+.pp-doccard {
+  border: 1px solid colors.$neutral-200;
+
+  &:focus-within {
+    @include mixins.focus-ring;
+  }
+
+  .pp-avatar {
+    box-shadow: 0 0 0 2px var(--pp-body-bg);
+  }
+}
+
+.pp-doccard-link {
+  color: var(--pp-link, var(--pp-neutral-light));
+}
+
+.pp-tile {
+  padding: var(--pp-gap);
+}

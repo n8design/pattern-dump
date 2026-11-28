@@ -284,6 +284,28 @@ components by name alone, such as `atoms/_badge.scss` next to both `00-atoms/bad
 
 Theme values belong in themes, see [themes.md](themes.md).
 
+### Custom properties
+
+Pattern Dump reads which custom properties each component uses from the compiled CSS, so a `var()` that a mixin
+or a Sass variable writes counts for the rule that includes it. A use belongs to the class the rule styles, and
+the component is the one whose template writes that class. A rule such as `.tile .card` uses a property only
+inside another class: that is a use in context, kept apart from the card's own uses. Every stylesheet and every
+theme that declares a property (`--x: …` or `@property --x`) is recorded too. The project graph holds all of this
+(`pd graph --json`, and `graph.json` in a build) as `property` nodes, `uses-property` edges from a class (from the
+stylesheet, for a rule with no class) and `declares` edges from a stylesheet. A theme is a stylesheet with the
+source `theme`. Values are not in the graph: they change with every theme, and the compiled theme has them.
+
+A property a component uses that no stylesheet or theme declares is a warning on the component's **Diagnostics**
+tab, one per property:
+
+```text
+var(<property>) in the rules for <classes> reads a custom property that no stylesheet or theme declares: declare it in a theme or stylesheet, or, if a script or the site that uses the design system sets it, list it in styles.allowProperties
+```
+
+`<property>` is the name, `<classes>` the classes whose rules read it. A property a script sets, or the site that
+uses the design system, belongs in `styles.allowProperties`
+([configuration.md](configuration.md#styles)), and the warning goes away.
+
 ### What a preview contains
 
 Every preview is a complete HTML document built by the server, in this order:

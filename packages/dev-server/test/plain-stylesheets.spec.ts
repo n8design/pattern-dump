@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdir, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cssTextClasses, inlineStyleClasses, linkedStylesheets, readAssetStylesheets } from "../src/plain-stylesheets.js";
+import { cssTextClasses, inlineStyleClasses, linkedStylesheets, readAssetStylesheets, styleAttributeProperties } from "../src/plain-stylesheets.js";
 import { save } from "../../../test-support/save.js";
 
 let assets = "";
@@ -67,5 +67,14 @@ describe("readAssetStylesheets", () => {
     if (vendor.file === null) throw new Error("not read");
     expect([...vendor.classes.defines.keys()]).toEqual(["vendor-grid"]);
     expect([...vendor.classes.mentions.keys()]).toEqual(["button"]);
+  });
+});
+
+describe("styleAttributeProperties", () => {
+  it("names the custom properties a template's style attributes set, through Handlebars blocks and values", () => {
+    const hbs = `<h1 style="--title-em: {{em title}}">x</h1>\n<menu {{#if cols}}style="{{#if cols.d}}--cols-desk: {{ cols.d }};{{/if}} color: red"{{/if}}>`
+      + `<p style='--b: 1; --a: 2'></p>`;
+    expect(styleAttributeProperties(hbs)).toEqual(["--a", "--b", "--cols-desk", "--title-em"]);
+    expect(styleAttributeProperties(`<p class="x">none</p>`)).toEqual([]);
   });
 });

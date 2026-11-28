@@ -1,0 +1,8 @@
+// A rule with no class: the stylesheet itself reads and declares.
+:root {
+  --pp-gap: 0.5rem;
+}
+
+body {
+  margin: var(--pp-gap);
+}

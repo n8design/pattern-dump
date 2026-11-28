@@ -17,12 +17,13 @@ export type GraphOrigin = { project: true } | { package: string };
 // The kinds and values the graph has, as lists, so a test can ask that a fixture has each one and a new one can't be
 // added without it (graph-fixtures.spec.ts). The types below are these lists'.
 
-export const GRAPH_NODE_KINDS = ["component", "variant", "stylesheet", "module", "class", "page", "asset"] as const;
+export const GRAPH_NODE_KINDS = ["component", "variant", "stylesheet", "module", "class", "page", "asset", "property"] as const;
 export const GRAPH_EDGE_KINDS = [
   "includes", "variant-of", "styled-by", "defines", "mentions", "borrows", "imports", "renders", "places", "requires",
+  "uses-property", "declares",
 ] as const;
 export const COMPONENT_ROLES = ["component", "layout", "partial", "view"] as const;
-export const STYLESHEET_SOURCES = ["scss", "css", "asset", "inline", "external"] as const;
+export const STYLESHEET_SOURCES = ["scss", "css", "asset", "inline", "external", "theme"] as const;
 export const PLACES_HOW = ["tag", "pattern", "view", "card"] as const;
 export const RENDERS_SOURCES = ["own", "folder", "default", "generated"] as const;
 
@@ -57,10 +58,11 @@ export interface StylesheetNode {
   id: `stylesheet:${string}`;
   kind: "stylesheet";
   origin: GraphOrigin;
-  /** The component it belongs to, or null (a shared module, an assets.css file, a remote sheet). */
+  /** The component it belongs to, or null (a shared module, an assets.css file, a theme, a remote sheet). */
   component: string | null;
-  /** A Sass or CSS file of a styles folder, an `assets.css` file, a template's `<style>`, or a sheet on another host
-   *  (an `assets.css` URL, a template's own `<link>`), which is never read. */
+  /** A Sass or CSS file of a styles folder, an `assets.css` file, a template's `<style>` and `style` attributes, a
+   *  theme (`*.theme.scss`), or a sheet on another host (an `assets.css` URL, a template's own `<link>`), which is
+   *  never read. */
   source: StylesheetSource;
   /** Its file, or its URL for an external one; for an inline one, the template. */
   file: string;
@@ -100,7 +102,14 @@ export interface AssetNode {
   type: "script" | "svg";
 }
 
-export type GraphNode = ComponentNode | VariantNode | StylesheetNode | ModuleNode | ClassNode | PageNode | AssetNode;
+/** A custom property (`property:--neutralLight`): one a rule reads with var(), or one a stylesheet or theme declares.
+ *  Its value is not in the graph: it changes per theme, and the compiled theme has it. */
+export interface PropertyNode {
+  id: `property:--${string}`;
+  kind: "property";
+}
+
+export type GraphNode = ComponentNode | VariantNode | StylesheetNode | ModuleNode | ClassNode | PageNode | AssetNode | PropertyNode;
 export type GraphNodeKind = GraphNode["kind"];
 // Each list is exactly its union: a kind in one and not the other fails the typecheck.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
@@ -130,9 +139,22 @@ export interface PlacesEdge extends EdgeBase { kind: "places"; how: typeof PLACE
 /** A component requires a script or an SVG set (`requireScript`, `requireAssets`). */
 export interface RequiresEdge extends EdgeBase { kind: "requires"; key: "requireScript" | "requireAssets" }
 
+/**
+ * A rule reads a custom property (`var(--x)`, one in a fallback too), from the class it styles: the class of the
+ * selector's rightmost compound that has one (`.card > div` styles inside `.card`). From the stylesheet for a rule
+ * with no class (`:root`, `body`). `context`: the rule styles the class only inside another one (`.tile .card`), and
+ * `within` names the classes before it; a class can have both an own use and uses in context of one property. The
+ * first selector that reads it. Read from the compiled CSS, so a var() a mixin or a Sass variable writes counts.
+ */
+export interface UsesPropertyEdge extends EdgeBase { kind: "uses-property"; selector: string; context: boolean; within?: string[] }
+/** A stylesheet or theme declares a custom property (`--x: ...` in any rule, or `@property --x`; a template's own
+ *  `style` attribute, with the selector `[style]`), with the first selector that does and the at-rule it sits in (as css-tokens.ts reads it: none, `@media (prefers-color-scheme:
+ *  dark)`, `@supports`, or another). */
+export interface DeclaresEdge extends EdgeBase { kind: "declares"; selector: string; context: "plain" | "media-dark" | "supports" | "other" }
+
 export type GraphEdge =
   | IncludesEdge | VariantOfEdge | StyledByEdge | DefinesEdge | MentionsEdge | BorrowsEdge | ImportsEdge
-  | RendersEdge | PlacesEdge | RequiresEdge;
+  | RendersEdge | PlacesEdge | RequiresEdge | UsesPropertyEdge | DeclaresEdge;
 export type GraphEdgeKind = GraphEdge["kind"];
 const edgeKindsMatch: Same<GraphEdgeKind, typeof GRAPH_EDGE_KINDS[number]> = true;
 void nodeKindsMatch; void edgeKindsMatch;

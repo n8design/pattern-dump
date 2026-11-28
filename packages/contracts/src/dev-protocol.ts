@@ -115,8 +115,10 @@ export type DiagnosticKind =
                          // or a property, at any depth, is named like a registered helper
   | "HELPER_SHADOW"      // a warning: the template's bare {{name}} calls a registered helper, so the data field of that
                          // name (at any depth) is never read there
-  | "STYLE_BORROWED";    // info: the template uses a class another component owns, without including that component,
+  | "STYLE_BORROWED"     // info: the template uses a class another component owns, without including that component,
                          // so that component's stylesheet is linked too (one per borrowed owner)
+  | "PROPERTY_UNDECLARED"; // a warning: a rule for a class the template writes reads a custom property that no
+                         // stylesheet or theme PD reads declares, and styles.allowProperties doesn't list (one per property)
 
 /** Fields every diagnostic carries, whichever engine produced it. */
 interface DiagnosticBase {

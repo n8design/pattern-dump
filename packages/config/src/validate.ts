@@ -27,6 +27,7 @@ const SHAPE: Shape = {
       strategy: { values: ["parallel"], unsupported: ["co-located"] },
       dir: "string",
       entry: "string-or-strings",
+      allowProperties: "strings",
     },
     required: ["dir"],
   },

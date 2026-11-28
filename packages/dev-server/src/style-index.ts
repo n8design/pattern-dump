@@ -21,6 +21,7 @@ import { SourceMapConsumer } from "source-map";
 import * as sass from "sass";
 import { collectScssFiles, sassPackageOptions } from "@pattern-dump/build";
 import { collapseComponentId, stripOrderPrefixes } from "@pattern-dump/discovery";
+import { addAtRuleProperty, addRuleProperties, emptyPropertyFacts, type PropertyFacts } from "./css-tokens.js";
 import { verboseTiming } from "./timing.js";
 
 // ---- Serialising top-level CSS nodes into buckets ----
@@ -192,6 +193,9 @@ export interface StylesheetClasses {
   defines: Map<string, string>;
   /** Without the classes the same stylesheet defines: styling its own class in context is no coupling. */
   mentions: Map<string, string>;
+  /** The custom properties its rules read and declare (css-tokens.ts), from the compiled rules: a var() a mixin
+   *  wrote counts for the rule that includes it. */
+  properties: PropertyFacts;
 }
 
 export interface AllStyleData {
@@ -269,36 +273,64 @@ export function missingDocumentBase(stylesDir: string, base: readonly string[] |
  * patch). Column-offset fixes, nested-selector edge cases, and resolveScssToComponent
  * changes land here once and apply to both code paths automatically.
  */
+/** Whether a rule's own declarations read or declare a custom property. */
+const touchesProperties = (rule: postcss.Rule): boolean =>
+  (rule.nodes ?? []).some(n => n.type === "decl" && (n.prop.startsWith("--") || /\bvar\(/i.test(n.value)));
+
 export function extractClassesFromCompiled(
   consumer: SourceMapConsumer,
   root: postcss.Root,
   entryFile: string,
   stylesDir: string,
   componentIds: Set<string>,
-  /** Collects each origin stylesheet's defined and mentioned classes, when given (the full build). */
+  /** Collects each origin stylesheet's defined and mentioned classes, and the custom properties its rules read and
+   *  declare, when given (the full build). */
   sheets?: Map<string, StylesheetClasses>,
 ): { classMap: Map<string, string>; baseModules: BaseProvenanceIndex; ranks: Map<string, number> } {
   const classMap = new Map<string, string>();
   const baseModules: BaseProvenanceIndex = new Map();
   const ranks = new Map<string, number>();
-  root.walkRules(rule => {
-    const { defines, mentions } = selectorClasses(rule.selector);
-    if (defines.length === 0 && mentions.length === 0) return;
-    const pos = rule.source?.start;
-    if (!pos) return;
+  /** The authoring file of a rule or at-rule, from its start in the source map. */
+  const originOf = (node: postcss.Node): string | null => {
+    const pos = node.source?.start;
+    if (!pos) return null;
     const original = consumer.originalPositionFor({ line: pos.line, column: pos.column - 1 });
-    if (!original.source) return;
-    const originPath = original.source.startsWith("file://")
+    if (!original.source) return null;
+    return original.source.startsWith("file://")
       ? fileURLToPath(original.source)
       : resolve(dirname(entryFile), original.source);
+  };
+  const sheetOf = (originPath: string, resolved: string | null): StylesheetClasses => {
+    let sheet = sheets!.get(originPath);
+    if (!sheet) {
+      sheet = { root: stylesDir, component: resolved, defines: new Map(), mentions: new Map(), properties: emptyPropertyFacts() };
+      sheets!.set(originPath, sheet);
+    }
+    return sheet;
+  };
+  // `@property --x` declares a property; it has no selector, so no class.
+  if (sheets) {
+    root.walkAtRules("property", at => {
+      const originPath = originOf(at);
+      if (originPath) addAtRuleProperty(at, sheetOf(originPath, resolveScssToComponent(originPath, stylesDir, componentIds)).properties);
+    });
+  }
+  root.walkRules(rule => {
+    const { defines, mentions } = selectorClasses(rule.selector);
+    // A rule with no class still reads and declares custom properties (`:root`, `body`): the full build keeps those.
+    const classless = defines.length === 0 && mentions.length === 0;
+    if (classless && (!sheets || !touchesProperties(rule))) return;
+    const originPath = originOf(rule);
+    if (!originPath) return;
     const resolved = resolveScssToComponent(originPath, stylesDir, componentIds);
     const owner = resolved ?? "__base__";
     if (sheets) {
-      let sheet = sheets.get(originPath);
-      if (!sheet) { sheet = { root: stylesDir, component: resolved, defines: new Map(), mentions: new Map() }; sheets.set(originPath, sheet); }
+      const sheet = sheetOf(originPath, resolved);
       for (const name of defines) if (!sheet.defines.has(name)) sheet.defines.set(name, rule.selector);
       for (const name of mentions) if (!sheet.mentions.has(name)) sheet.mentions.set(name, rule.selector);
+      addRuleProperties(rule, sheet.properties);
     }
+    if (classless) return;
     // Base-class provenance: keep the authoring partial (barrel-retaining) when the origin
     // resolves to no component. Discarded here before; retained now for styleModules.
     const modulePath = resolved === null ? resolveSharedModulePath(originPath, stylesDir, true) : null;
@@ -408,6 +440,16 @@ export interface StyleDataRoot {
   dir: string;
   entries?: string[];
   base?: readonly string[];
+}
+
+/** A stylesheet's property facts in a fixed order: uses by property, class and context, declarations by name. */
+export function sortedFacts(facts: PropertyFacts): PropertyFacts {
+  const key = (u: PropertyFacts["uses"][number]): string => `${u.property}\u0000${u.class ?? ""}\u0000${u.within.join(" ")}`;
+  const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+  return {
+    uses: [...facts.uses].sort((a, b) => cmp(key(a), key(b))),
+    declares: new Map([...facts.declares].sort(([a], [b]) => cmp(a, b))),
+  };
 }
 
 /**
@@ -577,7 +619,7 @@ export async function buildAllStyleData(
     const sheet = stylesheets.get(path)!;
     const byName = (m: Map<string, string>) => new Map([...m].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
     const mentions = new Map([...sheet.mentions].filter(([name]) => !sheet.defines.has(name)));
-    sortedSheets.set(path, { ...sheet, defines: byName(sheet.defines), mentions: byName(mentions) });
+    sortedSheets.set(path, { ...sheet, defines: byName(sheet.defines), mentions: byName(mentions), properties: sortedFacts(sheet.properties) });
   }
 
   if (verboseTiming) console.timeEnd("[dev-server:timing] full classOwnerIndex build");

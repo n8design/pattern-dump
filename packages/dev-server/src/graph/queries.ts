@@ -145,3 +145,36 @@ export function auditStyleOf(graph: ProjectGraph, ids: Iterable<string>): AuditS
   }
   return style;
 }
+
+/** One custom property component (or variant) `id` uses, through the classes its template writes: its own uses
+ *  (the rule styles the class), its uses in context (only inside other classes, `within`), and the stylesheets and
+ *  themes that declare it (none: declared nowhere PD reads). */
+export interface ComponentProperty {
+  name: string;
+  own: Array<{ class: string; selector: string }>;
+  context: Array<{ class: string; selector: string; within: string[] }>;
+  declaredBy: Array<{ file: string; source: StylesheetNode["source"]; selector: string }>;
+}
+
+/** The custom properties component (or variant) `id` uses, by name: one query for the Relationships tab, Kiosk and
+ *  the MCP. A data variant writes its base's classes, so it has its base's. Empty for an id the graph doesn't have. */
+export function propertiesOf(graph: ProjectGraph, id: string): ComponentProperty[] {
+  const byName = new Map<string, ComponentProperty>();
+  for (const b of edgesOf(graph, componentNodeId(id), "borrows", "out")) {
+    const cls = discoveryIdOf(b.to);
+    for (const e of edgesOf(graph, b.to, "uses-property", "out") as Array<Extract<GraphEdge, { kind: "uses-property" }>>) {
+      const name = discoveryIdOf(e.to);
+      let p = byName.get(name);
+      if (!p) {
+        const declaredBy = (edgesOf(graph, e.to, "declares", "in") as Array<Extract<GraphEdge, { kind: "declares" }>>).map(d => {
+          const sheet = graph.nodes.get(d.from) as StylesheetNode;
+          return { file: sheet.file, source: sheet.source, selector: d.selector };
+        });
+        byName.set(name, p = { name, own: [], context: [], declaredBy });
+      }
+      if (e.context) p.context.push({ class: cls, selector: e.selector, within: e.within ?? [] });
+      else p.own.push({ class: cls, selector: e.selector });
+    }
+  }
+  return [...byName.values()].sort((a, b) => cmp(a.name, b.name));
+}
