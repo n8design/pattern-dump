@@ -6,9 +6,10 @@
 // headless shell ignores that preference, and setting the size through the DevTools protocol gave a wrong layout
 // in the Kiosk spike, so neither is used here.
 import { chromium, expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { save } from "../../../test-support/save.js";
 import { gotoComponent } from "./helpers.js";
 
 const profiles: string[] = [];
@@ -17,7 +18,7 @@ async function openWithTextSize(baseURL: string, fontSize: number, width: number
   const dir = await mkdtemp(path.join(tmpdir(), "pd-text-size-"));
   profiles.push(dir);
   await mkdir(path.join(dir, "Default"), { recursive: true });
-  await writeFile(path.join(dir, "Default", "Preferences"),
+  await save(path.join(dir, "Default", "Preferences"),
     JSON.stringify({ webkit: { webprefs: { default_font_size: fontSize } } }));
   const context = await chromium.launchPersistentContext(dir, {
     channel: "chromium",
