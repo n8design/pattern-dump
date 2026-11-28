@@ -165,6 +165,28 @@ test("accessible name is 'Accessibility' regardless of label width state", async
   await expect(page.locator(".a11y-picker-summary")).toHaveAttribute("aria-label", "Accessibility");
 });
 
+test("the visible label shortens at 9.375em and hides at 5em of the picker's own font size", async ({ page }) => {
+  // At the default 16px text these are the former 150px and 80px, so nothing moves. text-size.spec.ts checks 20px.
+  await gotoComponent(page, "atoms/button");
+  const picker = page.locator(".a11y-picker");
+  expect(await picker.evaluate((el) => getComputedStyle(el).fontSize)).toBe("16px");
+  const full = page.locator(".a11y-label-full");
+  const short = page.locator(".a11y-label-short");
+  const setWidth = (px: number) => picker.evaluate((el, w) => { (el as HTMLElement).style.width = `${w}px`; }, px);
+  await setWidth(151);
+  await expect(full).toBeVisible();
+  await expect(short).toBeHidden();
+  await setWidth(150);
+  await expect(full).toBeHidden();
+  await expect(short).toBeVisible();
+  await setWidth(81);
+  await expect(short).toBeVisible();
+  await setWidth(80);
+  await expect(short).toBeHidden();
+  await expect(full).toBeHidden();
+  await expect(page.locator(".a11y-picker-summary")).toHaveAttribute("aria-label", "Accessibility");
+});
+
 // ── auto-open: one-shot on ?cvd= arrival ─────────────────────────────────────
 
 test("?cvd= arrival auto-opens the a11y panel; user can collapse it", async ({ page }) => {

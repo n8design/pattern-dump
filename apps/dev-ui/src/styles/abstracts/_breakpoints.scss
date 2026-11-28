@@ -1,4 +1,5 @@
 // $bp-narrow: the one breakpoint where the right panel auto-collapses.
-// px is permitted in media/container query conditions per the units rule.
-// stylelint-disable-next-line unit-disallowed-list
-$bp-narrow: 900px;
+// In em, so it follows the browser's text size: 56.25em is 900px at the default 16px.
+// bootstrap.ts asks the same question with matchMedia (app/breakpoints.ts, NARROW_QUERY);
+// app/breakpoints.spec.ts fails when the compiled query and that string differ.
+$bp-narrow: 56.25em;

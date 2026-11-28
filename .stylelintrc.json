@@ -5,17 +5,9 @@
       ["px"],
       {
         "severity": "error",
-        "message": "Use rem/em for type, vw/vh for chrome, fr/auto for grid. px only for hairline borders/outlines/radii/shadows and in media/container query conditions.",
+        "message": "Use rem/em for type, vw/vh for chrome, fr/auto for grid. px only for hairline borders/outlines/radii/shadows; query conditions use em, so breakpoints follow the user's text size.",
         "ignoreProperties": {
           "px": ["/^border/", "/^outline/", "box-shadow", "text-shadow", "/^--pd-mark/", "/^--pd-drag/"]
-        },
-        "ignoreMediaFeatureNames": {
-          "px": [
-            "min-width", "max-width", "width",
-            "min-height", "max-height", "height",
-            "min-inline-size", "max-inline-size", "inline-size",
-            "min-block-size", "max-block-size", "block-size"
-          ]
         }
       }
     ],

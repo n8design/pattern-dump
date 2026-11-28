@@ -30,6 +30,7 @@ import { initFullpage, openFullpage } from "../stage/fullpage.js";
 import { initSplitters } from "../stage/splitters.js";
 import { initDprTracking, initViewport } from "../stage/viewport.js";
 import { initLayoutToggle } from "../stage/layout-toggle.js";
+import { isNarrow } from "./breakpoints.js";
 import { connectHmr } from "./hmr.js";
 import { generationOf } from "../core/generation.js";
 import { auditAvailable, installStaticFetch, runtime } from "../core/runtime.js";
@@ -55,7 +56,7 @@ export async function init(): Promise<void> {
 
   // Wide viewport: panel open by default on first load (no stored preference yet).
   const isFirstLoad = localStorage.getItem(STORAGE_KEY) === null;
-  if (isFirstLoad && window.innerWidth > 900) {
+  if (isFirstLoad && !isNarrow()) {
     dom.mainEl.dataset.panelOpen = "";  // visual default before hydrate sets it in the store
   }
 
@@ -146,7 +147,7 @@ export async function init(): Promise<void> {
   });
 
   // On first load with no stored state, default the right panel to open on wide viewports.
-  if (isFirstLoad && window.innerWidth > 900) {
+  if (isFirstLoad && !isNarrow()) {
     store.setLocal({ dockVisibility: { ...store.local.dockVisibility, rightPanelOpen: true } });
   }
 
