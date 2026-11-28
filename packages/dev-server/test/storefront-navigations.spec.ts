@@ -1,10 +1,14 @@
 // Declared navigations (storefront/navigations.ts): storefront.site.navigations, whose shape is Pattern
 // Dump's. Every entry is checked at any depth, the skin only lists the names it uses, and each navigation is
 // resolved per page, with the current entry and every group above it marked.
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import type { StorefrontNavEntry } from "@pattern-dump/config";
 import { checkNavigations, isAllowedHref, listedNavigations, resolveNavigations } from "../src/storefront/navigations.js";
-import type { PageModel } from "../src/storefront/pages.js";
+import { readPages, type PageModel } from "../src/storefront/pages.js";
+import { save } from "../../../test-support/save.js";
 
 const OWNER = "partials/base";
 const PAGES = new Set(["index.md", "about.md", "guides/index.md", "guides/setup.md", "guides/deep/index.md", "guides/deep/more.md"]);
@@ -42,13 +46,40 @@ describe("checkNavigations — the entries, at any depth", () => {
     expect(isAllowedHref("HTTPS://example.test/")).toBe(true);
   });
 
-  it("refuses a label alone, two forms at once, a missing label, and an unknown key, suggesting the one meant", () => {
-    expect(check({ footer: [{ label: "Alone" }, { page: "about.md", href: "/x" }, { href: "/x" }, { page: "about.md", lable: "About" }, "about.md"] })).toEqual([
-      `site.globals.navigations.footer[0] needs "page", "href" or "children": an entry is one of { page }, { href, label } or { label, children }`,
-      `site.globals.navigations.footer[1] has "page" and "href": an entry is one of { page }, { href, label } or { label, children }`,
+  // A page with children is a form of its own now; a page with an href, or an href with children, is still two.
+  it("refuses a label alone, a page or children with an href, a missing label, and an unknown key, suggesting the one meant", () => {
+    expect(check({ footer: [{ label: "Alone" }, { page: "about.md", href: "/x" }, { href: "/x" }, { page: "about.md", lable: "About" }, "about.md", { href: "/x", label: "X", children: [] }] })).toEqual([
+      `site.globals.navigations.footer[0] needs "page", "href" or "children": an entry is one of { page }, { page, children }, { href, label } or { label, children }`,
+      `site.globals.navigations.footer[1] has "page" and "href": an entry is one of { page }, { page, children }, { href, label } or { label, children }`,
       `site.globals.navigations.footer[2] needs a "label"`,
       `site.globals.navigations.footer[3]: "lable" is not a key of a navigation entry: did you mean "label"?`,
-      `site.globals.navigations.footer[4] must be an entry, one of { page }, { href, label } or { label, children } (got "about.md")`,
+      `site.globals.navigations.footer[4] must be an entry, one of { page }, { page, children }, { href, label } or { label, children } (got "about.md")`,
+      `site.globals.navigations.footer[5] has "href" and "children": an entry is one of { page }, { page, children }, { href, label } or { label, children }`,
+    ]);
+  });
+
+  it("accepts a page that is a parent too: with a list, and with \"folder\" on a folder's index.md", () => {
+    expect(check({
+      footer: [
+        { page: "guides/index.md", children: [{ page: "guides/setup.md" }, { href: "/feed.xml", label: "Feed" }] },
+        { page: "guides/index.md", label: "Guides", children: "folder" },
+        { page: "index.md", children: "folder" },
+        { label: "More", children: [{ page: "guides/deep/index.md", children: "folder" }] },
+      ],
+    })).toEqual([]);
+  });
+
+  it("refuses \"folder\" anywhere but on a folder's index.md, and children that are neither a list nor \"folder\"", () => {
+    expect(check({ footer: [
+      { page: "guides/setup.md", children: "folder" },
+      { label: "Guides", children: "folder" },
+      { page: "guides/index.md", children: "folders" },
+      { page: "guides/index.md", children: [{ page: "guides/setup.md", children: "folder" }] },
+    ] })).toEqual([
+      `site.globals.navigations.footer[0].children is "folder", which lists a folder's pages: it works only on a folder's index.md, and "guides/setup.md" is not one`,
+      `site.globals.navigations.footer[1].children is "folder", which lists a folder's pages: it needs the folder's index.md as "page", such as { page: "guides/index.md", children: "folder" }`,
+      `site.globals.navigations.footer[2].children must be a list of entries, or "folder" on a folder's index.md (got "folders")`,
+      `site.globals.navigations.footer[3].children[0].children is "folder", which lists a folder's pages: it works only on a folder's index.md, and "guides/setup.md" is not one`,
     ]);
   });
 
@@ -134,5 +165,73 @@ describe("resolveNavigations", () => {
 
   it("gives a listed navigation the config does not set null", () => {
     expect(resolveNavigations({ footer: [] }, ["footer", "sidebar"], model, "/")).toEqual({ footer: [], sidebar: null });
+  });
+});
+
+describe("resolveNavigations — a page with children", () => {
+  // A real pages folder, so "folder" lists what readPages lists: its order, a subfolder by its index.md.
+  let dir = "";
+  let model: PageModel;
+  const write = async (files: Record<string, string>) => {
+    for (const [rel, fm] of Object.entries(files)) {
+      await mkdir(dirname(join(dir, rel)), { recursive: true });
+      await save(join(dir, rel), `---\n${fm}\n---\nText.\n`);
+    }
+  };
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "pd-nav-folders-"));
+    await write({
+      "index.md": "title: Home",
+      "about.md": "title: About",
+      "how-to/index.md": "title: How to",
+      "how-to/start.md": "title: Start\norder: 1",
+      "how-to/hidden.md": "title: Hidden\norder: 2\nnav: false",
+      "how-to/theme.md": "title: Theme\norder: 3",
+      "how-to/deep/index.md": "title: Deep\norder: 4",
+      "how-to/deep/below.md": "title: Below",
+    });
+    model = await readPages(dir);
+  });
+  afterAll(async () => { if (dir) await rm(dir, { recursive: true, force: true }); });
+
+  const nav = (entries: StorefrontNavEntry[], route: string) => resolveNavigations({ footer: entries }, ["footer"], model, route)["footer"];
+  const folder: StorefrontNavEntry = { page: "how-to/index.md", label: "How To's", children: "folder" };
+
+  it("gives a page with a list of children its route and its children", () => {
+    expect(nav([{ page: "how-to/index.md", children: [{ page: "about.md" }, { href: "/feed.xml", label: "Feed" }] }], "/")).toEqual([
+      { label: "How to", route: "/how-to/", children: [{ label: "About", route: "/about/" }, { label: "Feed", href: "/feed.xml" }] },
+    ]);
+  });
+
+  it("lists the folder's pages in their order, without nav: false, a subfolder by its index.md and nothing below it", () => {
+    expect(nav([folder], "/")).toEqual([
+      { label: "How To's", route: "/how-to/", children: [
+        { label: "Start", route: "/how-to/start/" },
+        { label: "Theme", route: "/how-to/theme/" },
+        { label: "Deep", route: "/how-to/deep/" },
+      ] },
+    ]);
+  });
+
+  it("marks a current child and the entry above it as its ancestor", () => {
+    expect(nav([folder], "/how-to/theme/")).toEqual([
+      { label: "How To's", route: "/how-to/", ancestor: true, children: [
+        { label: "Start", route: "/how-to/start/" },
+        { label: "Theme", route: "/how-to/theme/", current: true },
+        { label: "Deep", route: "/how-to/deep/" },
+      ] },
+    ]);
+  });
+
+  it("marks the entry itself current on its own page, with no child current", () => {
+    const [entry] = nav([folder], "/how-to/")!;
+    expect(entry).toMatchObject({ route: "/how-to/", current: true });
+    expect(entry).not.toHaveProperty("ancestor");
+    expect(entry!.children!.some(c => c.current)).toBe(false);
+  });
+
+  it("marks no ancestor for a page below a subfolder: the folder's listing is one level deep", () => {
+    const [entry] = nav([folder], "/how-to/deep/below/")!;
+    expect(entry).not.toHaveProperty("ancestor");
   });
 });

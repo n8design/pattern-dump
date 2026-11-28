@@ -5,7 +5,11 @@
       {{#each site.navigations.footer}}
       <li{{#if ancestor}} class="is-ancestor"{{/if}}>
         {{#if children}}
+        {{#if route}}
+        <a class="site-footer-group" href="{{route}}"{{#if current}} aria-current="page"{{/if}}>{{label}}</a>
+        {{else}}
         <span class="site-footer-group">{{label}}</span>
+        {{/if}}
         <ul>
           {{#each children}}
           <li><a href="{{#if route}}{{route}}{{else}}{{href}}{{/if}}"{{#if current}} aria-current="page"{{/if}}>{{label}}</a></li>
