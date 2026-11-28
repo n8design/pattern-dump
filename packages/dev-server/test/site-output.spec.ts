@@ -17,7 +17,7 @@ import benchConfig from "../../../storefront-bench/pattern-dump.config.js";
 import { save } from "../../../test-support/save.js";
 
 const MODEL = {
-  pages: [{ route: "/" }, { route: "/guide/", redirectFrom: ["/start/"] }, { route: "/tags/design/" }],
+  pages: [{ route: "/" }, { route: "/guide/", redirectFrom: ["/start/", "/how-to/start.html"] }, { route: "/tags/design/" }],
   images: ["guide/shot.png"],
 } as unknown as Parameters<typeof claimsOf>[0];
 const FEEDS = [{ address: "/articles/feed.xml", source: "articles/index.md" }];
@@ -28,7 +28,7 @@ describe("claimsOf", () => {
       "file /sitemap.xml", "file /robots.txt", "file /llms.txt", "file /404.html", "file /.nojekyll",
       "folder /_pd/", "folder /assets/", "folder /preview/", "folder /_pagefind/",
       "page /index.html", "page /guide/index.html", "page /tags/design/index.html",
-      "forward /start/index.html",
+      "forward /start/index.html", "forward /how-to/start.html",
       "image /guide/shot.png",
       "feed /articles/feed.xml",
     ]);
@@ -43,6 +43,7 @@ describe("collisionOf", () => {
     expect(hit("/sitemap.xml")).toBe("file /sitemap.xml");
     expect(hit("/guide/index.html")).toBe("page /guide/index.html");
     expect(hit("/start/index.html")).toBe("forward /start/index.html");
+    expect(hit("/how-to/start.html")).toBe("forward /how-to/start.html");
     expect(hit("/guide/shot.png")).toBe("image /guide/shot.png");
     expect(hit("/articles/feed.xml")).toBe("feed /articles/feed.xml");
     expect(hit("/.nojekyll")).toBe("file /.nojekyll");
@@ -62,7 +63,8 @@ describe("collisionOf", () => {
   });
 
   it("nothing for a path that only starts like a claim", () => {
-    for (const path of ["/_pdx.css", "/guides/index.html", "/guide-two/index.html", "/guide/other.png", "/assets.txt", "/htwoo/index.html"]) {
+    for (const path of ["/_pdx.css", "/guides/index.html", "/guide-two/index.html", "/guide/other.png", "/assets.txt", "/htwoo/index.html",
+      "/how-to/start/index.html", "/guide.html"]) {
       expect(hit(path), path).toBeUndefined();
     }
   });

@@ -40,6 +40,32 @@ describe("redirectProblems", () => {
     }
   });
 
+  it("checks an old route that is a file like one that is a folder: two claims, a reserved prefix, the workbench", () => {
+    expect(redirectProblems(site(
+      file("a.md", "/a/", "title: A\nredirectFrom: /how-to/x.html\n"),
+      file("b.md", "/b/", "title: B\nredirectFrom: [/how-to/x.html]\n"),
+    ))).toEqual([`b.md:3: redirectFrom "/how-to/x.html" is also claimed by a.md: one old route forwards to one page`]);
+    expect(redirectProblems(site(file("a.md", "/a/", "title: A\nredirectFrom: /preview/x.html\n"))))
+      .toEqual([`a.md:3: redirectFrom "/preview/x.html" is under /preview/, which Pattern Dump serves itself`]);
+    expect(redirectProblems(site(file("a.md", "/a/", "title: A\nredirectFrom: /workbench/x.html\n")), "/workbench/"))
+      .toEqual([`a.md:3: redirectFrom "/workbench/x.html" is under /workbench/, where the workbench is published on this host (site.workbenchUrl), so the workbench would overwrite it there`]);
+  });
+
+  it("refuses a file that is the site's 404 page or a route's own index.html", () => {
+    expect(redirectProblems(site(file("a.md", "/a/", "title: A\nredirectFrom: [/404.html, /old/index.html, /index.html]\n")))).toEqual([
+      `a.md:3: redirectFrom "/404.html" is the site's 404 page, which Pattern Dump writes`,
+      `a.md:3: redirectFrom "/old/index.html" is the file of the route /old/: list "/old/" instead`,
+      `a.md:3: redirectFrom "/index.html" is the file of the route /: list "/" instead`,
+    ]);
+  });
+
+  it("takes a file next to a page's folder: /about.html and /about/ are two files", () => {
+    expect(redirectProblems(site(
+      file("about.md", "/about/", "title: About\n"),
+      file("a.md", "/a/", "title: A\nredirectFrom: [/about.html, /how-to/x.html]\n"),
+    ))).toEqual([]);
+  });
+
   it("leaves a badly shaped old route to the page's own check", () => {
     expect(redirectProblems(site(file("a.md", "/a/", "title: A\nredirectFrom: [old, /old]\n")))).toEqual([]);
   });

@@ -844,8 +844,9 @@ export interface StorefrontPage {
    *  index.md it came from: `{ "tags": "services/index.md", "related.limit": "services/europe/index.md" }`. A
    *  query's options are named one by one. Absent when it took none (its layout is in `layoutFrom`). */
   defaultsFrom?: Record<string, string>;
-  /** Old routes that forward to this page (frontmatter `redirectFrom`), each root-relative and slash-wrapped.
-   *  `pd build` writes a forwarding page at each. Absent when the page has none. */
+  /** Old routes that forward to this page (frontmatter `redirectFrom`), each root-relative: slash-wrapped (a folder,
+   *  `/old/`), or a file ending in `.html` (`/old.html`). `pd build` writes a forwarding page at each, in the folder's
+   *  index.html or at the file's own path. Absent when the page has none. */
   redirectFrom?: string[];
 }
 
@@ -981,6 +982,9 @@ export function staticPathFor(liveUrl: string): string {
   // A feed (/feed.xml, /articles/feed.xml, or the name a feed is given): a file under its own name. A route never
   // ends in one.
   if (/\/[^/]+\.xml$/.test(path)) return path.slice(1);
+  // An old route that is a file (redirectFrom: /how-to/old.html): the forwarding page at that path, not a folder of it.
+  // A route never ends in one; a path ending in "/" falls through, as before.
+  if (/\/[^/]+\.html$/.test(path)) return path.slice(1);
   // Anything else is a shell route: one index.html per route, so deep links load without rewrites.
   const route = path.replace(/^\/+|\/+$/g, "");
   return route ? `${route}/index.html` : "index.html";

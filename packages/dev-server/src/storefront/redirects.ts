@@ -3,7 +3,7 @@
 // forwards at once (meta refresh, which search engines take as a permanent redirect), names its target as
 // canonical, is never indexed, and links to the target for a reader whose browser does not forward.
 
-import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
+import { PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
 import { escapeAttr, escapeHtml } from "../http-utils.js";
 import type { PageFile } from "./pages.js";
 
@@ -16,11 +16,15 @@ export function redirectsOf(f: PageFile): string[] {
 /** Old routes that can't be one: those the server answers itself. */
 const RESERVED = [PD_ROUTE_PREFIX.preview, "/_pd/", PD_ROUTE_PREFIX.assets, "/api/", PD_ROUTE_PREFIX.source];
 
+/** An old route that is a file (/old/page.html), not a folder: the forwarding page is written at that path itself. */
+export const isFileRoute = (route: string): boolean => /\/[^/]+\.html$/.test(route);
+
 /**
  * The problems of the site's redirects as a whole, one line each with the file and line it is set on: an old
  * route that is a page, one two pages both claim, one the server answers itself, one at or under the path of a
- * workbench published on the same host (`workbenchPath`, from sameHostWorkbenchPath). (A chain can't arise:
- * every target is a page, and no old route may be one.)
+ * workbench published on the same host (`workbenchPath`, from sameHostWorkbenchPath), and a file that is a page's
+ * own (/guide/index.html) or the site's 404.html. (A chain can't arise: every target is a page, and no old route
+ * may be one.) A file next to a page's folder (/guide.html beside /guide/) is another file, so it is free.
  */
 export function redirectProblems(files: ReadonlyMap<string, PageFile>, workbenchPath?: string): string[] {
   const problems: string[] = [];
@@ -28,7 +32,14 @@ export function redirectProblems(files: ReadonlyMap<string, PageFile>, workbench
   for (const f of files.values()) {
     const at = `${f.path}${f.frontmatter.lines["redirectFrom"] !== undefined ? `:${f.frontmatter.lines["redirectFrom"]}` : ""}`;
     for (const old of redirectsOf(f)) {
-      if (typeof old !== "string" || !old.startsWith("/") || !old.endsWith("/")) continue; // a shape problem of the page's own
+      const file = typeof old === "string" && old.startsWith("/") && isFileRoute(old);
+      if (typeof old !== "string" || !old.startsWith("/") || !(old.endsWith("/") || file)) continue; // a shape problem of the page's own
+      if (old === PD_ROUTES.notFound) { problems.push(`${at}: redirectFrom "${old}" is the site's 404 page, which Pattern Dump writes`); continue; }
+      if (file && old.endsWith("/index.html")) {
+        const folder = old.slice(0, -"index.html".length);
+        problems.push(`${at}: redirectFrom "${old}" is the file of the route ${folder}: list "${folder}" instead`);
+        continue;
+      }
       const page = files.get(old);
       if (page) { problems.push(`${at}: redirectFrom "${old}" is the page ${page.path}: a route can't both be a page and forward to one`); continue; }
       const reserved = RESERVED.find(r => old.startsWith(r));

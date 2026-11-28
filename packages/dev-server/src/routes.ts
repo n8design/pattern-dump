@@ -78,7 +78,7 @@ import { isPageImageUrl, pageImageFile } from "./storefront/page-images.js";
 import { sitemapEntries, sitemapXml, storefrontRobotsTxt, workbenchRobotsTxt } from "./storefront/site-files.js";
 import { assetsAt, mountedFile, mountProblems, readMounts, sitemapRoutes } from "./storefront/mounts.js";
 import { claimsOf, collisionOf, describeClaim, forMounts } from "./storefront/site-output.js";
-import { redirectStub } from "./storefront/redirects.js";
+import { isFileRoute, redirectStub } from "./storefront/redirects.js";
 import { assemblePage } from "./storefront/page.js";
 import type { SearchRecord } from "./storefront/search.js";
 import { pageBorrowedStyles, pageStylesheets, pageSymbolSets } from "./storefront/page-head.js";
@@ -960,8 +960,10 @@ async function routeRequest(
       }
       // A page route is a folder path; /about is /about/, as a static host serves it.
       const route = /\.[a-z0-9]+$/i.test(pathname) ? null : pathname.endsWith("/") ? pathname : `${pathname}/`;
-      // An old route a page lists in redirectFrom: the page that forwards to it, as pd build writes it.
-      const movedTo = route === null ? undefined : redirectsOf(model).get(route);
+      // An old route a page lists in redirectFrom: the page that forwards to it, as pd build writes it. One that is a
+      // file (/how-to/old.html) is asked for by that path; nothing else answers it, as pd build refuses a collision.
+      const old = isFileRoute(pathname) ? pathname : route;
+      const movedTo = old === null ? undefined : redirectsOf(model).get(old);
       if (movedTo && !model.problems.length) {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(redirectStub({ route: movedTo.route, title: movedTo.title, siteUrl, lang: cfg.storefront.lang }));
