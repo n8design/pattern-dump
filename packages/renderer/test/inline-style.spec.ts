@@ -24,6 +24,27 @@ describe("INLINE_STYLE", () => {
     expect(inlineStyles(`<i\n  style="width: 1px;\n    height:\n 2px"></i>`)).toEqual([{ declarations: ["width: 1px", "height: 2px"], line: 2, column: 3 }]);
   });
 
+  it("reads real attributes of opening tags only, quoted or not: not comments, other attributes or script text", () => {
+    expect(inlineStyles(`<div title='example style="width: 300px"'></div>`)).toEqual([]);
+    expect(inlineStyles(`<!-- <div style="width: 1px"> -->{{!-- <i style="width: 2px"> --}}{{! <b style="width: 3px"> }}`)).toEqual([]);
+    expect(inlineStyles(`<script>const t = '<i style="width: 1px">';</script><style>i{}</style>`)).toEqual([]);
+    expect(inlineStyles(`<div style=width:300px></div>`)).toEqual([{ declarations: ["width:300px"], line: 1, column: 6 }]);
+    expect(inlineStyles(`<div\nhidden style = "color: red"/>`)).toEqual([{ declarations: ["color: red"], line: 2, column: 8 }]);
+  });
+
+  it("masks Handlebars before reading: a quote inside an expression doesn't end the value", () => {
+    expect(inlineStyles(`<i style="--x: {{default x "1"}}; width: 300px"></i>`))
+      .toEqual([{ declarations: ["width: 300px"], line: 1, column: 4 }]);
+    expect(inlineStyles(`<i class="{{#if a}}x{{/if}}" {{#if s}}style="height: {{h "a>b"}}"{{/if}}></i>`))
+      .toEqual([{ declarations: [`height: {{h "a>b"}}`], line: 1, column: 39 }]);
+  });
+
+  it("leaves CSS comments out: a comment is no property name, and its ; or : splits nothing", () => {
+    expect(inlineStyles(`<i style="/* API */ --x: 1"></i>`)).toEqual([]);
+    expect(inlineStyles(`<i style="--x: 1 /* not; width: 1px */"></i>`)).toEqual([]);
+    expect(inlineStyles(`<i style="/* a: b; */ width: 2px"></i>`)).toEqual([{ declarations: ["width: 2px"], line: 1, column: 4 }]);
+  });
+
   it("is a warning on the render, naming the template and the declarations, one per attribute", async () => {
     const out = await render({ component: "atoms/inline-style", data: { side: 4, styles: "color: red" } });
     expect(out.meta?.diagnostics?.filter(d => d.kind === "INLINE_STYLE")).toEqual([

@@ -11,7 +11,7 @@ export { itemsWrittenAsText, type ItemAsText } from "./item-text";
 export { checkSchemaExtensions, QUERY_OPTIONS, readExampleHeight, readLayoutMarker, readPreviewMode, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
 export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
 export { helperShadows, type HelperShadow } from "./helper-shadow";
-export { inlineStyles, type InlineStyle } from "./inline-style";
+export { inlineStyles, styleAttributes, type InlineStyle, type StyleAttribute } from "./inline-style";
 export { parseJson, type ParsedJson } from "./json";
 import { helperShadows } from "./helper-shadow";
 import { inlineStyles } from "./inline-style";

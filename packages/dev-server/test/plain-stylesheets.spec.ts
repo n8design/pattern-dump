@@ -77,4 +77,10 @@ describe("styleAttributeProperties", () => {
     expect(styleAttributeProperties(hbs)).toEqual(["--a", "--b", "--cols-desk", "--title-em"]);
     expect(styleAttributeProperties(`<p class="x">none</p>`)).toEqual([]);
   });
+
+  it("reads the attributes INLINE_STYLE reads: past a quoted helper argument and a CSS comment, not in a comment", () => {
+    expect(styleAttributeProperties(`<i style="width: {{default w "1"}}px; --late: 1"></i>`)).toEqual(["--late"]);
+    expect(styleAttributeProperties(`<i style="/* API */ --x: 1"></i><i style=--bare:2></i>`)).toEqual(["--bare", "--x"]);
+    expect(styleAttributeProperties(`<!-- <i style="--commented: 1"> --><i title='style="--quoted: 1"'></i>`)).toEqual([]);
+  });
 });
