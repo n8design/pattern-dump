@@ -84,6 +84,13 @@ describe("custom properties in the graph", () => {
     expect(fg.declaredBy.map(d => d.file)).toEqual(["themes/blue.theme.scss", "themes/red.theme.scss"]);
   });
 
+  it("a template's own style attribute declares what it sets: no warning for a rule that reads it", async () => {
+    expect(json.edges).toContainEqual({
+      kind: "declares", from: "stylesheet:inline:atoms/grid", to: "property:--pp-cols", selector: "[style]", context: "plain",
+    });
+    expect(propertyUndeclaredDiagnostics("atoms/grid", undefined, graph, [])).toEqual([]);
+  });
+
   it("a property declared nowhere is a warning on the component, and styles.allowProperties silences it", async () => {
     const badge = propertiesOf(graph, "atoms/badge");
     expect(badge.map(p => [p.name, p.declaredBy.length])).toEqual([["--pp-runtime", 0], ["--pp-undeclared", 0]]);

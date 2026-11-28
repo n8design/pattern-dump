@@ -12,7 +12,7 @@ import {
 } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "../composition.js";
 import type { AllStyleData } from "../style-index.js";
-import { inlineStyleClasses, linkedStylesheets, type AssetStylesheet, type SheetClasses } from "../plain-stylesheets.js";
+import { inlineStyleClasses, linkedStylesheets, styleAttributeProperties, type AssetStylesheet, type SheetClasses } from "../plain-stylesheets.js";
 import type { PropertyFacts } from "../css-tokens.js";
 import { templateClasses } from "../css-closure.js";
 
@@ -182,11 +182,14 @@ export function buildGraph(inputs: GraphInputs): ProjectGraph {
     // A data variant writes its base's classes; its base's <style> and links are the base's, not its own.
     if (!entry.ownMarkup) continue;
     const inline = inlineStyleClasses(hbs, entry.hbsPath);
-    if (inline) {
+    // The properties its own style attributes set: declared by the template, so a var() reading one is no warning.
+    const attributes = styleAttributeProperties(hbs);
+    if (inline || attributes.length) {
       const sheetId = `stylesheet:inline:${id}`;
       node({ id: sheetId as `stylesheet:${string}`, kind: "stylesheet", origin: origin(entry.source), component: id, source: "inline", file: display(entry.hbsPath) });
       edge({ kind: "styled-by", from, to: sheetId });
-      sheetEdges(sheetId, inline);
+      if (inline) sheetEdges(sheetId, inline);
+      for (const name of attributes) edge({ kind: "declares", from: sheetId, to: propertyNode(name), selector: "[style]", context: "plain" });
     }
     for (const href of linkedStylesheets(hbs)) {
       const sheetId = `stylesheet:${href}`;

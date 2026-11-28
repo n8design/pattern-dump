@@ -60,8 +60,9 @@ export interface StylesheetNode {
   origin: GraphOrigin;
   /** The component it belongs to, or null (a shared module, an assets.css file, a theme, a remote sheet). */
   component: string | null;
-  /** A Sass or CSS file of a styles folder, an `assets.css` file, a template's `<style>`, a theme (`*.theme.scss`), or
-   *  a sheet on another host (an `assets.css` URL, a template's own `<link>`), which is never read. */
+  /** A Sass or CSS file of a styles folder, an `assets.css` file, a template's `<style>` and `style` attributes, a
+   *  theme (`*.theme.scss`), or a sheet on another host (an `assets.css` URL, a template's own `<link>`), which is
+   *  never read. */
   source: StylesheetSource;
   /** Its file, or its URL for an external one; for an inline one, the template. */
   file: string;
@@ -146,8 +147,8 @@ export interface RequiresEdge extends EdgeBase { kind: "requires"; key: "require
  * first selector that reads it. Read from the compiled CSS, so a var() a mixin or a Sass variable writes counts.
  */
 export interface UsesPropertyEdge extends EdgeBase { kind: "uses-property"; selector: string; context: boolean; within?: string[] }
-/** A stylesheet or theme declares a custom property (`--x: ...` in any rule, or `@property --x`), with the first
- *  selector that does and the at-rule it sits in (as css-tokens.ts reads it: none, `@media (prefers-color-scheme:
+/** A stylesheet or theme declares a custom property (`--x: ...` in any rule, or `@property --x`; a template's own
+ *  `style` attribute, with the selector `[style]`), with the first selector that does and the at-rule it sits in (as css-tokens.ts reads it: none, `@media (prefers-color-scheme:
  *  dark)`, `@supports`, or another). */
 export interface DeclaresEdge extends EdgeBase { kind: "declares"; selector: string; context: "plain" | "media-dark" | "supports" | "other" }
 

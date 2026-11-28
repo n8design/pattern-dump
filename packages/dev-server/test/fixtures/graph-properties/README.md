@@ -10,6 +10,7 @@ The custom properties in the graph (`uses-property`, `declares`), on a project s
 - `.pp-doccard .pp-avatar` styles the avatar only inside the document card: a use in context.
 - `themes/blue.theme.scss` is a bare `:root` theme and `themes/red.theme.scss` a `[data-theme]` one; `--pp-focus` is
   declared only in red.
+- `atoms/grid` sets `--pp-cols` in its own `style` attribute, as hTWOo's checkbox group sets `--cols-desk`.
 - `--pp-undeclared` is declared nowhere, and `--pp-runtime` is set by a script (the ignore list in the specs).
 
 Used by `graph-properties.spec.ts`. Nothing here is copied from anywhere: every file is written for this fixture.

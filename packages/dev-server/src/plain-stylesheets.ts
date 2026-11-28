@@ -9,6 +9,7 @@ import { PD_ROUTE_PREFIX } from "@pattern-dump/contracts";
 import { assetFile } from "./asset-file.js";
 import { addAtRuleProperty, addRuleProperties, emptyPropertyFacts, type PropertyFacts } from "./css-tokens.js";
 import { selectorClasses, sortedFacts } from "./style-index.js";
+import { inlineProperties } from "./storefront/css-vocabulary.js";
 
 /** The classes a stylesheet's rules define and mention, each with the first selector that names it, sorted by class.
  *  A class the sheet defines is no mention of its own. */
@@ -54,6 +55,17 @@ export function inlineStyleTexts(hbs: string): string[] {
 export function inlineStyleClasses(hbs: string, from: string): SheetClasses | null {
   const texts = inlineStyleTexts(hbs);
   return texts.length === 0 ? null : cssTextClasses(texts.join("\n"), from);
+}
+
+/** The custom properties a template's own `style` attributes set (`style="--cols: {{n}}"`), sorted. A Handlebars
+ *  expression inside is blanked first, so a value it writes, or a block around a declaration, leaves the name. */
+export function styleAttributeProperties(hbs: string): string[] {
+  const found = new Set<string>();
+  for (const m of hbs.matchAll(/(?:\s|\}\})style\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
+    const text = (m[1] ?? m[2] ?? "").replace(/\{\{[\s\S]*?\}\}/g, expr => " ".repeat(expr.length));
+    for (const p of inlineProperties(text)) found.add(p);
+  }
+  return [...found].sort();
 }
 
 /** The stylesheets a template links itself (`<link rel="stylesheet" href>`), as written, sorted. A link whose
