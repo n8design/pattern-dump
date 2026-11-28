@@ -117,8 +117,11 @@ export type DiagnosticKind =
                          // name (at any depth) is never read there
   | "STYLE_BORROWED"     // info: the template uses a class another component owns, without including that component,
                          // so that component's stylesheet is linked too (one per borrowed owner)
-  | "PROPERTY_UNDECLARED"; // a warning: a rule for a class the template writes reads a custom property that no
-                         // stylesheet or theme PD reads declares, and styles.allowProperties doesn't list (one per property)
+  | "PROPERTY_UNDECLARED" // a warning: a rule for a class the template writes reads a custom property without a
+                         // fallback that no stylesheet or theme PD reads declares, and styles.allowProperties doesn't
+                         // list (one per property)
+  | "INLINE_STYLE";      // a warning: a style attribute in the template sets something other than custom properties
+                         // (one per attribute, naming its declarations); custom properties alone are the component's API
 
 /** Fields every diagnostic carries, whichever engine produced it. */
 interface DiagnosticBase {
@@ -256,6 +259,7 @@ export const AUDIT_SCOPE: AuditScope = {
   covered: [
     { name: "HTML content model", detail: "invalid nesting and content that isn't permitted where it appears (html-validate)." },
     { name: "Structural accessibility", detail: "labels, accessible names, ARIA attributes, roles and image alternatives (the axe-core rules that don't need layout)." },
+    { name: "Inline styles", detail: "a `style` attribute in a template that sets anything other than custom properties (INLINE_STYLE). Setting custom properties inline is the component's API and fine." },
     { name: "Schema", detail: "missing required fields and values of the wrong type, checked against each component's `<name>.schema.json`." },
     { name: "Discovery", detail: "a component left out of the tree by a handle collision, reported as a HANDLE_COLLISION defect naming the handle and the component that keeps it." },
     { name: "Render outcome", detail: "whether each component rendered, rendered empty or failed. It is reported with the component, not counted as a defect." },

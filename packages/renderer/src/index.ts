@@ -11,8 +11,10 @@ export { itemsWrittenAsText, type ItemAsText } from "./item-text";
 export { checkSchemaExtensions, QUERY_OPTIONS, readExampleHeight, readLayoutMarker, readPreviewMode, readProseSlot, type ProseSlot, type SchemaExtensionContext, type SchemaExtensionProblem } from "./schema-extensions";
 export { checkSchemaHelperNames, isHelperNameProblem, type SchemaHelperNameProblem } from "./schema-helper-names";
 export { helperShadows, type HelperShadow } from "./helper-shadow";
+export { inlineStyles, type InlineStyle } from "./inline-style";
 export { parseJson, type ParsedJson } from "./json";
 import { helperShadows } from "./helper-shadow";
+import { inlineStyles } from "./inline-style";
 import { parseJson } from "./json";
 import { tagShapeProblems } from "./tag-shape";
 import { checkSchemaExtensions } from "./schema-extensions";
@@ -704,6 +706,21 @@ export const createRenderer: CreateRenderer = (options: RendererOptions) => {
           + `to read the field, or give the field another name`,
         location: { file: display(entry.hbsPath), line: s.line, column: s.column },
       });
+    }
+
+    // A style attribute that sets more than custom properties (inline-style.ts): the template's own text.
+    if (templateHbsPath) {
+      for (const s of inlineStyles(templateSrc)) {
+        diagnostics.push({
+          kind: "INLINE_STYLE",
+          severity: "warning",
+          source: "render",
+          message: `the style attribute sets ${s.declarations.join("; ")}, which ${s.declarations.length === 1 ? "isn't a custom property" : "aren't custom properties"}: `
+            + `in a template, an inline style is the component's API and sets custom properties only (style="--name: value", read `
+            + `by its stylesheet); move the rest into the stylesheet`,
+          location: { file: display(templateHbsPath), line: s.line, column: s.column },
+        });
+      }
     }
 
     const meta: RenderMeta | undefined = diagnostics.length > 0

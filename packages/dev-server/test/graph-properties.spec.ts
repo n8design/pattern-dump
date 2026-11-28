@@ -150,5 +150,10 @@ describe("custom properties in the graph", () => {
     expect(rollup.undeclaredTotals).toEqual({ properties: 2, components: 2 });
     expect(audit.occurrences.filter(o => o.ruleId === "PROPERTY_UNDECLARED")).toEqual([]);
     expect(rollup.totals.defects).toBe(audit.occurrences.length);
+    // INLINE_STYLE is a finding: it comes from the template, which the hash covers. The grid's style attribute sets
+    // a custom property only, so it has none; the dialog's sets max-height too.
+    const inline = audit.occurrences.filter(o => o.ruleId === "INLINE_STYLE");
+    expect(inline.map(o => [o.component, o.message.split(",")[0]])).toEqual([["atoms/dialog", "the style attribute sets max-height: 50vh"]]);
+    expect(rollup.rulesByBlast).toContainEqual(expect.objectContaining({ engine: "render", ruleId: "INLINE_STYLE", components: 1, occurrences: 1 }));
   }, 60_000);
 });
