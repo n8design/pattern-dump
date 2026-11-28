@@ -22,12 +22,38 @@ export interface InlineStyle {
   column: number;
 }
 
-/** One `style` attribute of a template: its value as written, the same with every Handlebars expression and CSS
- *  comment blanked (`masked`, offsets kept), and where the attribute starts. */
-export interface StyleAttribute { value: string; masked: string; line: number; column: number }
+/** One `style` attribute of a template: its value as written; the same with every Handlebars expression and CSS
+ *  comment blanked (`masked`); the value as written with only its CSS comments blanked (`text`); offsets kept in
+ *  both. And where the attribute starts. */
+export interface StyleAttribute { value: string; masked: string; text: string; line: number; column: number }
 
 const PROPERTY = /^--[\w-]+$/;
-const CSS_COMMENT = /\/\*[\s\S]*?(?:\*\/|$)/g;
+
+/** `css` with its comments blanked to spaces (line breaks kept, so offsets stay): a scan that knows quoted strings
+ *  and backslash escapes, so `'/*'` in a string is text, not a comment. An unclosed comment runs to the end. */
+function blankCssComments(css: string): string {
+  let out = "", quote = "";
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i]!;
+    if (quote) {
+      out += c;
+      if (c === "\\" && i + 1 < css.length) out += css[++i]!;
+      else if (c === quote) quote = "";
+      continue;
+    }
+    if (c === "\\" && i + 1 < css.length) { out += c + css[++i]!; continue; }
+    if (c === "\"" || c === "'") { quote = c; out += c; continue; }
+    if (c === "/" && css[i + 1] === "*") {
+      const end = css.indexOf("*/", i + 2);
+      const stop = end < 0 ? css.length : end + 2;
+      out += css.slice(i, stop).replace(/[^\n]/g, " ");
+      i = stop - 1;
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
 
 /** `text` with each match of `re` replaced by spaces of its length; line breaks are kept, so offsets and lines stay. */
 const blank = (text: string, re: RegExp): string => text.replace(re, m => m.replace(/[^\n]/g, " "));
@@ -79,7 +105,16 @@ export function styleAttributes(template: string): StyleAttribute[] {
         end = j;
         i = j;
       }
-      if (name === "style") out.push({ value: template.slice(start, end), masked: blank(masked.slice(start, end), CSS_COMMENT), ...at(nameStart) });
+      // CSS comments are found with the expressions already blanked, so a quote inside one ({{d "1"}}) is no string;
+      // `text` is the value as written with the same comments blanked.
+      if (name === "style") {
+        const value = template.slice(start, end);
+        const exprMasked = masked.slice(start, end);
+        const noComments = blankCssComments(exprMasked);
+        let text = "";
+        for (let k = 0; k < value.length; k++) text += noComments[k] === " " && exprMasked[k] !== " " ? " " : value[k]!;
+        out.push({ value, masked: noComments, text, ...at(nameStart) });
+      }
     }
     tag.lastIndex = Math.max(tag.lastIndex, i);
   }
@@ -92,7 +127,8 @@ function declarations(masked: string): Array<{ start: number; end: number }> {
   let depth = 0, quote = "", start = 0;
   for (let i = 0; i <= masked.length; i++) {
     const c = masked[i];
-    if (quote) { if (c === quote) quote = ""; continue; }
+    if (quote) { if (c === "\\") i++; else if (c === quote) quote = ""; continue; }
+    if (c === "\\") { i++; continue; }
     if (c === "\"" || c === "'") quote = c;
     else if (c === "(") depth++;
     else if (c === ")") depth = Math.max(0, depth - 1);
@@ -105,8 +141,6 @@ function declarations(masked: string): Array<{ start: number; end: number }> {
 export function inlineStyles(template: string): InlineStyle[] {
   const out: InlineStyle[] = [];
   for (const a of styleAttributes(template)) {
-    // As written, CSS comments left out: what the message quotes.
-    const shown = blank(a.value, CSS_COMMENT);
     const found: string[] = [];
     for (const d of declarations(a.masked)) {
       const text = a.masked.slice(d.start, d.end);
@@ -115,7 +149,7 @@ export function inlineStyles(template: string): InlineStyle[] {
       const prop = text.slice(0, colon).trim();
       if (prop === "" || PROPERTY.test(prop)) continue;
       // One line, as a message has it: an attribute written over several lines keeps its words.
-      found.push(shown.slice(d.start, d.end).trim().replace(/\s+/g, " "));
+      found.push(a.text.slice(d.start, d.end).trim().replace(/\s+/g, " "));
     }
     if (found.length) out.push({ declarations: found, line: a.line, column: a.column });
   }

@@ -43,6 +43,10 @@ describe("INLINE_STYLE", () => {
     expect(inlineStyles(`<i style="/* API */ --x: 1"></i>`)).toEqual([]);
     expect(inlineStyles(`<i style="--x: 1 /* not; width: 1px */"></i>`)).toEqual([]);
     expect(inlineStyles(`<i style="/* a: b; */ width: 2px"></i>`)).toEqual([{ declarations: ["width: 2px"], line: 1, column: 4 }]);
+    // A comment opener inside a quoted string is text: the string ends, and what follows is read.
+    expect(inlineStyles(`<i style="--label: '/*'; width: 300px"></i>`)).toEqual([{ declarations: ["width: 300px"], line: 1, column: 4 }]);
+    expect(inlineStyles(`<i style='--q: "a\\"/*"; color: red'></i>`)).toEqual([{ declarations: ["color: red"], line: 1, column: 4 }]);
+    expect(inlineStyles(`<i style="--x: {{d 'it"s'}}; /* note */ width: 1px"></i>`)).toEqual([{ declarations: ["width: 1px"], line: 1, column: 4 }]);
   });
 
   it("is a warning on the render, naming the template and the declarations, one per attribute", async () => {
