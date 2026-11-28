@@ -4,8 +4,8 @@ Pattern Dump is a design system workbench and site builder: Handlebars component
 
 ## Checks and tests (CONTRIBUTING.md)
 
-- Never suggest making a test pass by weakening its assertion, or disabling a lint rule to get green. An out-of-date test is updated to current behaviour; a real bug gets the code fixed.
-- Tests that watch files or reload pages assert state, not events, and wait for the outcome, never for a fixed time. No fixed ports, no sleeps; files are written through `save()`.
+- Never suggest making a test pass by weakening its assertion. A failing check gets its cause fixed, or a narrowly scoped disable with a written reason. An out-of-date test is updated to current behaviour; a real bug gets the code fixed.
+- Tests that watch files or reload pages assert state, not events, and wait for the outcome, never for a fixed time. No fixed ports, no sleeps; files are written through `save()`, `saveInTwoSteps()` only to test the editor-style save.
 - Commits follow Conventional Commits, one concern each, with the checks passing at every commit. No tool attribution trailers.
 - A change to the built output (the golden files) must be explained in GOLDEN-CHANGES.md.
 
@@ -15,11 +15,11 @@ Pattern Dump is a design system workbench and site builder: Handlebars component
 - A shape that crosses a package boundary changes in `@pattern-dump/contracts` first. The dependency direction is fixed; `dev-ui` imports only contracts.
 - `@pattern-dump/discovery` is the only source of file paths; no code rebuilds `<id>/<name>.hbs`.
 - `render()` stays pure.
-- The preview is an honest page: the workbench injects nothing into a preview document.
+- The preview is an honest page: the shell adds no wrapper, stylesheet, inline style or reset to a preview document, and styles only its own furniture.
 
 ## Workbench UI and CSS (docs/development/styling.md)
 
-- OOCSS naming, never BEM; bare adjective classes for state, no `is-` or `has-` prefix.
+- OOCSS naming, never BEM. State comes from the DOM first: native state, then ARIA that is there for assistive tech; a bare adjective class or `data-*` only for app-only state, never with an `is-` or `has-` prefix. No `aria-*` attribute as a styling hook.
 - Cascade layers, `:where()` for defaults, no `!important`.
 - Units: `rem`/`em` for type and text spacing, `em` in media and container query conditions, `fr`/`auto`/`%` for grids, `px` only for hairline borders.
 - Container queries for component layout; media queries only for viewport concerns.
