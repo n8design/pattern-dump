@@ -19,7 +19,7 @@ Pattern Dump is a design system workbench and site builder: Handlebars component
 
 ## Workbench UI and CSS (docs/development/styling.md)
 
-- OOCSS naming, never BEM. State comes from the DOM first: native state, then ARIA that is there for assistive tech; a bare adjective class or `data-*` only for app-only state, never with an `is-` or `has-` prefix. No `aria-*` attribute as a styling hook.
+- OOCSS naming, never BEM. State comes from the DOM first: native state, then ARIA that is there for assistive tech; a bare adjective class or `data-*` only for app-only state, never with an `is-` or `has-` prefix. Never add an `aria-*` attribute only to style it.
 - Cascade layers, `:where()` for defaults, no `!important`.
 - Units: `rem`/`em` for type and text spacing, `em` in media and container query conditions, `fr`/`auto`/`%` for grids, `px` only for hairline borders.
 - Container queries for component layout; media queries only for viewport concerns.
