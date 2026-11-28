@@ -75,6 +75,7 @@ both must be the same ([pattern-packages.md](pattern-packages.md#making-a-packag
 | `styles.strategy` | `"parallel"` | Optional. Styles live in a separate tree mirroring the patterns, the only layout supported so far |
 | `styles.dir` | string | The SCSS tree |
 | `styles.entry` | string or string[] | Compile only these files (relative to `styles.dir`). Without it, every `.scss` not starting with `_` is compiled. Name one design-system bundle here rather than several overlapping ones |
+| `styles.allowProperties` | string[] | Custom properties a component may read with no declaration in any stylesheet or theme: ones a script sets, or the site that uses the design system. Names, or a prefix ending in `*` (`"--dlg-*"`). Any other is a `PROPERTY_UNDECLARED` warning on the component ([authoring.md](authoring.md#custom-properties)) |
 
 ### documentBase
 

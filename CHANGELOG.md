@@ -4,6 +4,9 @@
 
 ### Added
 
+- **The graph now knows which custom properties each component uses, and who declares them.** A property
+  nothing declares is a warning, silenced by `styles.allowProperties`; see
+  [Custom properties](docs/guide/authoring.md#custom-properties).
 - **Old `.html` addresses can now forward to a page with `redirectFrom`.** Write the file's path, such as
   `/how-to/old.html`; see [Redirects](docs/guide/storefront.md#redirects).
 - **A navigation entry can be a page and a parent at once.** `children: "folder"` on a folder's `index.md` lists its
