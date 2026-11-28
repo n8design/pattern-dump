@@ -10,6 +10,7 @@
 
 import postcss from "postcss";
 import selectorParser from "postcss-selector-parser";
+import { varReads } from "../css-tokens.js";
 
 /** A var() without a fallback: the property it reads, and where (1-based). */
 export interface VarUse { name: string; line: number; column: number }
@@ -23,26 +24,10 @@ export interface CssVocabulary {
 const SASS_NAME = /#\{/;
 const NAME = /^--[\w-]+$/;
 
-/** Every var() in `text` without a fallback, by its offset: a scan that matches parentheses, so a var() inside
- *  another's fallback, or inside calc(), is found too. Quoted strings are skipped. */
+/** Every var() in `text` without a fallback, by its offset: a var() inside another's fallback, or inside calc(), is
+ *  found too; quoted strings are skipped (css-tokens.ts, varReads, which the graph reads fallbacks with). */
 export function varUses(source: string): { name: string; offset: number }[] {
-  const out: { name: string; offset: number }[] = [];
-  // A string's contents blanked, offsets kept: nothing in quotes is a var() or a parenthesis.
-  const text = source.replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g, q => `${q[0]}${" ".repeat(q.length - 2)}${q[0]}`);
-  const re = /\bvar\(/gi;
-  for (let m = re.exec(text); m; m = re.exec(text)) {
-    let depth = 1, i = m.index + m[0].length, comma = -1;
-    for (; i < text.length && depth > 0; i++) {
-      const c = text[i]!;
-      if (c === "(") depth++;
-      else if (c === ")") depth--;
-      else if (c === "," && depth === 1 && comma < 0) comma = i;
-    }
-    const end = comma >= 0 ? comma : i - 1;
-    const name = text.slice(m.index + m[0].length, end).trim();
-    if (comma < 0 && NAME.test(name) && !SASS_NAME.test(name)) out.push({ name, offset: m.index });
-  }
-  return out;
+  return varReads(source).filter(r => r.fallback === undefined && !SASS_NAME.test(r.name)).map(r => ({ name: r.name, offset: r.offset }));
 }
 
 /** The classes a selector names. */

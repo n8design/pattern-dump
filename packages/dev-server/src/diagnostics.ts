@@ -117,9 +117,11 @@ export function styleBorrowedDiagnostics(componentId: string, variant: string | 
 
 /**
  * PROPERTY_UNDECLARED, one warning per custom property a component uses (graph/queries.ts, propertiesOf: a rule for a
- * class its template writes reads it, on its own or in context) that no stylesheet or theme declares, and `allow`
- * (styles.allowProperties) doesn't list. Without a declaration the var() falls back to its fallback, or to nothing.
- * Like STYLE_BORROWED, on the component's detail only: the audit's hash leaves CSS out.
+ * class its template writes reads it, on its own or in context) without a fallback, that no stylesheet or theme
+ * declares, and `allow` (styles.allowProperties) doesn't list. A var() with a fallback (`var(--x, 30rem)`) is an API
+ * property with a default, as the site check has it (storefront/property-check.ts): when every use has one, no
+ * warning; otherwise the warning names the rules that read it without one. Like STYLE_BORROWED, on the component's
+ * detail only: the audit's hash leaves CSS out.
  */
 export function propertyUndeclaredDiagnostics(
   componentId: string, variant: string | undefined, graph: ProjectGraph, allow: readonly string[],
@@ -127,14 +129,16 @@ export function propertyUndeclaredDiagnostics(
   const variantId = variant ? `${componentId}~${variant}` : undefined;
   const id = variantId && graph.nodes.has(`variant:${variantId}`) ? variantId : componentId;
   const allowed = nameMatcher(allow);
-  return propertiesOf(graph, id).filter(p => p.declaredBy.length === 0 && !allowed(p.name)).map(p => {
-    const classes = [...new Set([...p.own, ...p.context].map(u => `.${u.class}`))].sort();
-    return {
+  return propertiesOf(graph, id).flatMap(p => {
+    if (p.declaredBy.length > 0 || allowed(p.name)) return [];
+    const selectors = [...new Set([...p.own, ...p.context].filter(u => u.fallback === undefined).map(u => u.selector))].sort();
+    if (selectors.length === 0) return [];
+    return [{
       kind: "PROPERTY_UNDECLARED" as const, severity: "warning" as const, source: "render" as const,
-      message: `var(${p.name}) in the rules for ${classes.join(", ")} reads a custom property that no stylesheet or theme `
-        + `declares: declare it in a theme or stylesheet, or, if a script or the site that uses the design system sets it, `
-        + `list it in styles.allowProperties`,
-    };
+      message: `var(${p.name}) in ${selectors.join(", ")} has no fallback and reads a custom property that no stylesheet or `
+        + `theme declares: give it a fallback (var(${p.name}, ...)), declare it in a theme or stylesheet, or, if a script `
+        + `or the site that uses the design system sets it, list it in styles.allowProperties`,
+    }];
   });
 }
 

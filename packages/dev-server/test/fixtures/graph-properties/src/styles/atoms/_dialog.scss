@@ -1,0 +1,13 @@
+// A width with a default, as hTWOo's dialog has var(--hoo-dlg-width, ...): an API property, no warning.
+.pp-dialog {
+  width: var(--pp-dlg-width, 30rem);
+}
+
+// One property read with a default in one rule and without one in another: a warning on the rule without.
+.pp-dialog-title {
+  margin: var(--pp-dlg-gap, 1rem);
+}
+
+.pp-dialog-body {
+  padding: var(--pp-dlg-gap);
+}

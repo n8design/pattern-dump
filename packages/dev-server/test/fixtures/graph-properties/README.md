@@ -11,6 +11,8 @@ The custom properties in the graph (`uses-property`, `declares`), on a project s
 - `themes/blue.theme.scss` is a bare `:root` theme and `themes/red.theme.scss` a `[data-theme]` one; `--pp-focus` is
   declared only in red.
 - `atoms/grid` sets `--pp-cols` in its own `style` attribute, as hTWOo's checkbox group sets `--cols-desk`.
+- `atoms/dialog` reads `--pp-dlg-width` with a fallback only (an API property with a default, no warning) and
+  `--pp-dlg-gap` once with a fallback and once without (a warning, on the rule without one).
 - `--pp-undeclared` is declared nowhere, and `--pp-runtime` is set by a script (the ignore list in the specs).
 
 Used by `graph-properties.spec.ts`. Nothing here is copied from anywhere: every file is written for this fixture.

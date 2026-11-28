@@ -79,7 +79,13 @@ export function buildGraph(inputs: GraphInputs): ProjectGraph {
   const nodes = new Map<string, GraphNode>();
   const edges = new Map<string, GraphEdge>();
   const node = (n: GraphNode): void => { if (!nodes.has(n.id)) nodes.set(n.id, n); };
-  const edge = (e: GraphEdge): void => { const k = edgeKey(e); if (!edges.has(k)) edges.set(k, e); };
+  const edge = (e: GraphEdge): void => {
+    const k = edgeKey(e);
+    const prev = edges.get(k);
+    if (!prev) edges.set(k, e);
+    // A use with a fallback in one stylesheet and without one in another is a use without one, where it has none.
+    else if (prev.kind === "uses-property" && prev.fallback !== undefined && e.kind === "uses-property" && e.fallback === undefined) edges.set(k, e);
+  };
   const origin = (source: string | undefined): GraphOrigin => (source ? { package: source } : { project: true });
   const classNode = (name: string): string => {
     const id = `class:${name}`;
@@ -102,7 +108,7 @@ export function buildGraph(inputs: GraphInputs): ProjectGraph {
       const context = u.within.length > 0;
       edge({
         kind: "uses-property", from: u.class === null ? sheetId : classNode(u.class), to: propertyNode(u.property),
-        selector: u.selector, context, ...(context ? { within: u.within } : {}),
+        selector: u.selector, context, ...(context ? { within: u.within } : {}), ...(u.fallback !== undefined ? { fallback: u.fallback } : {}),
       });
     }
     for (const [name, d] of facts.declares) edge({ kind: "declares", from: sheetId, to: propertyNode(name), selector: d.selector, context: d.context });

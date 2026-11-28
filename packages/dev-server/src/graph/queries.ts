@@ -148,11 +148,12 @@ export function auditStyleOf(graph: ProjectGraph, ids: Iterable<string>): AuditS
 
 /** One custom property component (or variant) `id` uses, through the classes its template writes: its own uses
  *  (the rule styles the class), its uses in context (only inside other classes, `within`), and the stylesheets and
- *  themes that declare it (none: declared nowhere PD reads). */
+ *  themes that declare it (none: declared nowhere PD reads). A use's `fallback`: the default its var() gives, as
+ *  written ("Adjust with --x, default 30rem"); absent when a read there has none. */
 export interface ComponentProperty {
   name: string;
-  own: Array<{ class: string; selector: string }>;
-  context: Array<{ class: string; selector: string; within: string[] }>;
+  own: Array<{ class: string; selector: string; fallback?: string }>;
+  context: Array<{ class: string; selector: string; within: string[]; fallback?: string }>;
   declaredBy: Array<{ file: string; source: StylesheetNode["source"]; selector: string }>;
 }
 
@@ -172,8 +173,9 @@ export function propertiesOf(graph: ProjectGraph, id: string): ComponentProperty
         });
         byName.set(name, p = { name, own: [], context: [], declaredBy });
       }
-      if (e.context) p.context.push({ class: cls, selector: e.selector, within: e.within ?? [] });
-      else p.own.push({ class: cls, selector: e.selector });
+      const fallback = e.fallback !== undefined ? { fallback: e.fallback } : {};
+      if (e.context) p.context.push({ class: cls, selector: e.selector, within: e.within ?? [], ...fallback });
+      else p.own.push({ class: cls, selector: e.selector, ...fallback });
     }
   }
   return [...byName.values()].sort((a, b) => cmp(a.name, b.name));
