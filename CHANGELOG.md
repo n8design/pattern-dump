@@ -4,6 +4,11 @@
 
 ### Added
 
+- **`pd audit` lists the custom properties nothing declares, with their own total.** They stay out of the defect
+  count; see [`pd audit`](docs/guide/cli.md#pd-audit).
+- **A template's `style` attribute that sets more than custom properties is a warning.** `INLINE_STYLE` names the
+  declarations; see [Custom properties](docs/guide/authoring.md#custom-properties).
+
 - **The graph now knows which custom properties each component uses, and who declares them.** A property
   nothing declares is a warning, silenced by `styles.allowProperties`; see
   [Custom properties](docs/guide/authoring.md#custom-properties).
@@ -16,6 +21,9 @@
   without a link" shows it without its link.
 
 ### Changed
+
+- **A `var()` with a fallback no longer warns that its property is undeclared.** `var(--x, 30rem)` is an API
+  property with a default; the graph keeps the fallback. See [Custom properties](docs/guide/authoring.md#custom-properties).
 
 - **The workbench's layout now follows the browser's text size.** With larger text, it switches to the narrow
   layout sooner, and the Inspector starts closed when it wouldn't fit.

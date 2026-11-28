@@ -145,8 +145,12 @@ export interface RequiresEdge extends EdgeBase { kind: "requires"; key: "require
  * with no class (`:root`, `body`). `context`: the rule styles the class only inside another one (`.tile .card`), and
  * `within` names the classes before it; a class can have both an own use and uses in context of one property. The
  * first selector that reads it. Read from the compiled CSS, so a var() a mixin or a Sass variable writes counts.
+ * `fallback`: the default every read of it gives there (`var(--x, 30rem)`: `30rem`), the literal text, not computed;
+ * absent when one read has none, and `selector` is then the first rule that reads it without one.
  */
-export interface UsesPropertyEdge extends EdgeBase { kind: "uses-property"; selector: string; context: boolean; within?: string[] }
+export interface UsesPropertyEdge extends EdgeBase {
+  kind: "uses-property"; selector: string; context: boolean; within?: string[]; fallback?: string;
+}
 /** A stylesheet or theme declares a custom property (`--x: ...` in any rule, or `@property --x`; a template's own
  *  `style` attribute, with the selector `[style]`), with the first selector that does and the at-rule it sits in (as css-tokens.ts reads it: none, `@media (prefers-color-scheme:
  *  dark)`, `@supports`, or another). */

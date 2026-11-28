@@ -295,16 +295,34 @@ theme that declares a property (`--x: …` or `@property --x`) is recorded too. 
 stylesheet, for a rule with no class) and `declares` edges from a stylesheet. A theme is a stylesheet with the
 source `theme`. Values are not in the graph: they change with every theme, and the compiled theme has them.
 
-A property a component uses that no stylesheet or theme declares is a warning on the component's **Diagnostics**
-tab, one per property:
+A `var()` with a fallback, such as `var(--hoo-dlg-width, 30rem)`, makes the property optional with a default: it is
+the component's API, and nothing has to declare it. The graph keeps the fallback as written on the `uses-property`
+edge (`"fallback": "30rem"`). It is the literal text, not a computed value. When one rule reads the property without
+a fallback, the edge has none.
+
+A property a component reads without a fallback, that no stylesheet or theme declares, is a warning on the
+component's **Diagnostics** tab, one per property:
 
 ```text
-var(<property>) in the rules for <classes> reads a custom property that no stylesheet or theme declares: declare it in a theme or stylesheet, or, if a script or the site that uses the design system sets it, list it in styles.allowProperties
+var(<property>) in <selectors> has no fallback and reads a custom property that no stylesheet or theme declares: give it a fallback (var(<property>, ...)), declare it in a theme or stylesheet, or, if a script or the site that uses the design system sets it, list it in styles.allowProperties
 ```
 
-`<property>` is the name, `<classes>` the classes whose rules read it. A property a script sets, or the site that
-uses the design system, belongs in `styles.allowProperties`
-([configuration.md](configuration.md#styles)), and the warning goes away.
+`<property>` is the name, `<selectors>` the rules that read it without a fallback. A property a script sets, or the
+site that uses the design system, belongs in `styles.allowProperties`
+([configuration.md](configuration.md#styles)), and the warning goes away. `pd audit` lists the same warnings beside
+its findings, with their own total ([cli.md](cli.md#pd-audit)).
+
+A `style` attribute in a template sets custom properties only: `style="--hoo-dlg-width: 75vw"` is the component's
+API, and it declares the property for the rules that read it. A `style` attribute that sets anything else, such as
+`style="width: 300px"`, is a warning (`INLINE_STYLE`) at the attribute, one per attribute:
+
+```text
+the style attribute sets <declarations>, which isn't a custom property: in a template, an inline style is the component's API and sets custom properties only (style="--name: value", read by its stylesheet); move the rest into the stylesheet
+```
+
+`<declarations>` are the ones that aren't custom properties, as written; with several, the message says "aren't
+custom properties". A value a Handlebars expression writes keeps its property's name (`width: {{w}}px` warns), and an
+attribute an expression writes whole (`style="{{styles}}"`) is left alone.
 
 ### What a preview contains
 

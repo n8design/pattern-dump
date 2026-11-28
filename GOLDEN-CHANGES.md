@@ -19,6 +19,25 @@ backticks. Files that change for one reason can share a line:
 `api/version.json` is compared without `serverBundleMtime`, which changes with every build. An entry already on
 the base doesn't count for a later pull request: each change is recorded by the pull request that makes it.
 
+## 2026-11-28: Custom property findings in the audit, and inline styles as API only
+
+- `api/graph.json`: the two `uses-property` edges from `class:df-button--primary` carry their fallbacks as written,
+  `"fallback": "#2563eb"` (`--buttonPrimaryBackground`) and `"fallback": "#fff"` (`--buttonPrimaryText`). The edge
+  to `--tb-accent` has none: `.tb-themed` reads it without one. No node or edge is added or removed.
+- `api/component/atoms/theme-demo/index.json`: the `PROPERTY_UNDECLARED` message is the new one. It names the rule
+  that reads `--tb-accent` without a fallback (`.tb-themed`) and suggests a fallback first. Nothing else changed.
+- `api/component/atoms/contrast-fail/index.json`, `api/component/atoms/cvd-reference/index.json`,
+  `api/component/atoms/font-demo/index.json`, `api/component/atoms/linker/index.json`,
+  `api/component/atoms/white-noise/index.json`, `api/component/organisms/card/index.json`: each gains one
+  `INLINE_STYLE` warning. Their templates have a `style` attribute that sets more than custom properties
+  (`padding: 8px` on the card, `height: 60rem` on the linker, colours and fonts on the others). test-bench wrote
+  them to test other things; they stay as they are.
+- `api/audit.json`: the six `INLINE_STYLE` findings above (14 occurrences become 20) and their rule
+  `render:INLINE_STYLE`. `style` gains `undeclared`, with one entry: `atoms/theme-demo` reads `--tb-accent` in
+  `.tb-themed`. The other findings and style couplings are unchanged.
+- `_pd/main.js`, `_pd/main.css`: the Audit tab lists the custom properties declared nowhere after the style
+  couplings, with their total in muted text.
+
 ## 2026-11-28: Custom properties in the graph
 
 - `api/graph.json`: the graph gains 6 `property` nodes, the 5 themes as stylesheet nodes with the source `theme`, 3

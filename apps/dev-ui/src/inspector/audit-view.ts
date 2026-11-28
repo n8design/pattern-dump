@@ -172,6 +172,25 @@ export function renderAuditView(rollup: AuditRollup): HTMLElement {
     }
     if (rows.childElementCount === 0) section.appendChild(el("p", "audit-empty", "None."));
     else section.appendChild(rows);
+
+    // Custom properties declared nowhere (PROPERTY_UNDECLARED): warnings beside the findings, with their own total,
+    // never in the defect count (the findings are CSS-invariant; these are CSS).
+    section.appendChild(el("h3", "audit-h", "Custom properties declared nowhere (PROPERTY_UNDECLARED: warnings, not in the defect count)"));
+    const t = rollup.undeclaredTotals ?? { properties: rollup.style.undeclared.length, components: 0 };
+    section.appendChild(el("p", "audit-undeclared-total",
+      `${t.properties} ${t.properties === 1 ? "property" : "properties"} in ${t.components} ${t.components === 1 ? "component" : "components"}`));
+    const undeclared = el("ul", "audit-rules audit-undeclared");
+    for (const u of rollup.style.undeclared) {
+      const li = el("li", "audit-rule");
+      const sentence = el("span", "audit-finding-msg");
+      const selectors = el("span");
+      u.selectors.forEach((s, i) => { if (i > 0) selectors.append(", "); selectors.append(el("code", "audit-rule-id", s)); });
+      sentence.append(componentLink(u.component), " reads ", el("code", "audit-rule-id", u.property), " without a fallback in ",
+        selectors, ", and nothing declares it");
+      li.appendChild(sentence);
+      undeclared.appendChild(li);
+    }
+    if (undeclared.childElementCount > 0) section.appendChild(undeclared);
   }
 
   // Scope — NOT optional. The number is only meaningful next to what it excludes. Collapsible, open

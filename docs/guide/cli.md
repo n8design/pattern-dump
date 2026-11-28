@@ -101,6 +101,8 @@ system:
 - render errors;
 - data and schema checks (`UNFILLED_REQUIRED`, `SHAPE_MISMATCH`, `DATA_INVALID`, `SCHEMA_INVALID`, `HELPER_SHADOW`);
 - HTML validation;
+- inline styles: a `style` attribute in a template that sets anything other than custom properties
+  (`INLINE_STYLE`, see [Custom properties](authoring.md#custom-properties));
 - structural accessibility checks (axe-core rules that don't need layout or colour);
 - discovery: a component left out of the tree by a handle collision is an entry with a `HANDLE_COLLISION` defect,
   naming the handle and the component that keeps it.
@@ -108,6 +110,13 @@ system:
 Each variant is an entry of its own, `atoms/button~secondary`, in the report and in a rule's count of components: a
 data overlay is checked with its data, a variant with markup of its own from its template. A handle collision is
 also named in the terminal, on the Console, and on that component's Diagnostics tab.
+
+After the findings, the report lists the style couplings: what each component borrows from another
+([authoring.md](authoring.md#styles)) and whose classes its stylesheets style. Next to them are the custom
+properties declared nowhere (`PROPERTY_UNDECLARED`): each component, the property and the rules that read it without
+a fallback, with a total of their own. Both are read from the stylesheets, and the findings never depend on CSS: a
+stylesheet change re-audits nothing. So neither is in the defect count or the clean percentage, and `--strict`
+doesn't fail on them. In the JSON report they are `style` and `undeclaredTotals`.
 
 | Option | Description |
 |---|---|

@@ -5,6 +5,7 @@ import type {
   AuditStyle, ClassNode, GraphEdge, GraphEdgeKind, LayoutPageUse, PageNode, RelationshipsAvailable, StyleCoupling, StylesheetNode,
 } from "@pattern-dump/contracts";
 import { componentNodeId, discoveryIdOf, type ProjectGraph } from "./build.js";
+import { nameMatcher } from "../storefront/css-vocabulary.js";
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const sortedUnique = (xs: Iterable<string>): string[] => [...new Set(xs)].sort(cmp);
@@ -134,25 +135,49 @@ export function borrowedOf(graph: ProjectGraph, id: string, componentId = id.spl
   return [...byOwner].sort(([a], [b]) => a.localeCompare(b)).map(([owner, classes]) => ({ owner, classes: [...classes].sort() }));
 }
 
-/** The style couplings of components `ids` (AuditStyle), for the audit: what each borrows, and whose classes its
- *  stylesheets style. Sorted by component. */
-export function auditStyleOf(graph: ProjectGraph, ids: Iterable<string>): AuditStyle {
-  const style: AuditStyle = { borrowed: [], couplings: [] };
+/** The style couplings of components `ids` (AuditStyle), for the audit: what each borrows, whose classes its
+ *  stylesheets style, and the custom properties it reads that nothing declares (`allow`: styles.allowProperties). A
+ *  variant's undeclared properties are listed only where they differ from its base's (a data variant has its base's).
+ *  Sorted by component. */
+export function auditStyleOf(graph: ProjectGraph, ids: Iterable<string>, allow: readonly string[] = []): AuditStyle {
+  const style: AuditStyle = { borrowed: [], couplings: [], undeclared: [] };
+  const key = (list: UndeclaredProperty[]): string => JSON.stringify(list);
   for (const id of [...ids].sort(cmp)) {
     if (!graph.nodes.has(componentNodeId(id))) continue;
     for (const b of borrowedOf(graph, id)) style.borrowed.push({ component: id, ...b });
     for (const c of couplings(graph, id, "out")) style.couplings.push({ from: id, ...c });
+    const undeclared = undeclaredPropertiesOf(graph, id, allow);
+    if (id.includes("~") && key(undeclared) === key(undeclaredPropertiesOf(graph, id.split("~")[0]!, allow))) continue;
+    for (const u of undeclared) style.undeclared.push({ component: id, ...u });
   }
   return style;
 }
 
+/** A custom property a component reads without a fallback that nothing declares: the rules that read it so. */
+export interface UndeclaredProperty { property: string; selectors: string[] }
+
+/** The custom properties component (or variant) `id` reads (propertiesOf) without a fallback, that no stylesheet or
+ *  theme declares and `allow` (styles.allowProperties, names or prefixes with `*`) doesn't list, each with the rules
+ *  that read it without one, sorted. A property every use gives a fallback is an API property with a default. The
+ *  one rule behind PROPERTY_UNDECLARED on the component's detail and in the audit. */
+export function undeclaredPropertiesOf(graph: ProjectGraph, id: string, allow: readonly string[]): UndeclaredProperty[] {
+  const allowed = nameMatcher(allow);
+  return propertiesOf(graph, id).flatMap(p => {
+    if (p.declaredBy.length > 0 || allowed(p.name)) return [];
+    // A selector list as Sass compiles it has a line break after each comma: one line, for a message and a list item.
+    const selectors = [...new Set([...p.own, ...p.context].filter(u => u.fallback === undefined).map(u => u.selector.replace(/\s+/g, " ")))].sort(cmp);
+    return selectors.length ? [{ property: p.name, selectors }] : [];
+  });
+}
+
 /** One custom property component (or variant) `id` uses, through the classes its template writes: its own uses
  *  (the rule styles the class), its uses in context (only inside other classes, `within`), and the stylesheets and
- *  themes that declare it (none: declared nowhere PD reads). */
+ *  themes that declare it (none: declared nowhere PD reads). A use's `fallback`: the default its var() gives, as
+ *  written ("Adjust with --x, default 30rem"); absent when a read there has none. */
 export interface ComponentProperty {
   name: string;
-  own: Array<{ class: string; selector: string }>;
-  context: Array<{ class: string; selector: string; within: string[] }>;
+  own: Array<{ class: string; selector: string; fallback?: string }>;
+  context: Array<{ class: string; selector: string; within: string[]; fallback?: string }>;
   declaredBy: Array<{ file: string; source: StylesheetNode["source"]; selector: string }>;
 }
 
@@ -172,8 +197,9 @@ export function propertiesOf(graph: ProjectGraph, id: string): ComponentProperty
         });
         byName.set(name, p = { name, own: [], context: [], declaredBy });
       }
-      if (e.context) p.context.push({ class: cls, selector: e.selector, within: e.within ?? [] });
-      else p.own.push({ class: cls, selector: e.selector });
+      const fallback = e.fallback !== undefined ? { fallback: e.fallback } : {};
+      if (e.context) p.context.push({ class: cls, selector: e.selector, within: e.within ?? [], ...fallback });
+      else p.own.push({ class: cls, selector: e.selector, ...fallback });
     }
   }
   return [...byName.values()].sort((a, b) => cmp(a.name, b.name));

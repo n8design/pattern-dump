@@ -25,8 +25,7 @@ import { join } from "node:path";
 import type { CompositionRegistry } from "./composition.js";
 import { borrowedStyleMessage } from "./css-closure.js";
 import type { ProjectGraph } from "./graph/build.js";
-import { borrowedOf, propertiesOf } from "./graph/queries.js";
-import { nameMatcher } from "./storefront/css-vocabulary.js";
+import { borrowedOf, undeclaredPropertiesOf, type UndeclaredProperty } from "./graph/queries.js";
 import { recordPartialLookups } from "./partial-lookups.js";
 import { runA11yProducer } from "@pattern-dump/a11y";
 import type {
@@ -117,25 +116,29 @@ export function styleBorrowedDiagnostics(componentId: string, variant: string | 
 
 /**
  * PROPERTY_UNDECLARED, one warning per custom property a component uses (graph/queries.ts, propertiesOf: a rule for a
- * class its template writes reads it, on its own or in context) that no stylesheet or theme declares, and `allow`
- * (styles.allowProperties) doesn't list. Without a declaration the var() falls back to its fallback, or to nothing.
- * Like STYLE_BORROWED, on the component's detail only: the audit's hash leaves CSS out.
+ * class its template writes reads it, on its own or in context) without a fallback, that no stylesheet or theme
+ * declares, and `allow` (styles.allowProperties) doesn't list. A var() with a fallback (`var(--x, 30rem)`) is an API
+ * property with a default, as the site check has it (storefront/property-check.ts): when every use has one, no
+ * warning; otherwise the warning names the rules that read it without one (graph/queries.ts, undeclaredPropertiesOf).
+ * Like STYLE_BORROWED, on the component's detail, not in the corpus audit's findings: the audit's hash leaves CSS out
+ * by design (componentContentHash). pd audit lists them beside its findings, with their own total (AuditStyle).
  */
 export function propertyUndeclaredDiagnostics(
   componentId: string, variant: string | undefined, graph: ProjectGraph, allow: readonly string[],
 ): Diagnostic[] {
   const variantId = variant ? `${componentId}~${variant}` : undefined;
   const id = variantId && graph.nodes.has(`variant:${variantId}`) ? variantId : componentId;
-  const allowed = nameMatcher(allow);
-  return propertiesOf(graph, id).filter(p => p.declaredBy.length === 0 && !allowed(p.name)).map(p => {
-    const classes = [...new Set([...p.own, ...p.context].map(u => `.${u.class}`))].sort();
-    return {
-      kind: "PROPERTY_UNDECLARED" as const, severity: "warning" as const, source: "render" as const,
-      message: `var(${p.name}) in the rules for ${classes.join(", ")} reads a custom property that no stylesheet or theme `
-        + `declares: declare it in a theme or stylesheet, or, if a script or the site that uses the design system sets it, `
-        + `list it in styles.allowProperties`,
-    };
-  });
+  return undeclaredPropertiesOf(graph, id, allow).map(u => ({
+    kind: "PROPERTY_UNDECLARED" as const, severity: "warning" as const, source: "render" as const,
+    message: propertyUndeclaredMessage(u),
+  }));
+}
+
+/** PROPERTY_UNDECLARED's message, as the component's detail says it. */
+export function propertyUndeclaredMessage(u: UndeclaredProperty): string {
+  return `var(${u.property}) in ${u.selectors.join(", ")} has no fallback and reads a custom property that no stylesheet `
+    + `or theme declares: give it a fallback (var(${u.property}, ...)), declare it in a theme or stylesheet, or, if a `
+    + `script or the site that uses the design system sets it, list it in styles.allowProperties`;
 }
 
 // ---- Diagnostics graph ----

@@ -117,8 +117,11 @@ export type DiagnosticKind =
                          // name (at any depth) is never read there
   | "STYLE_BORROWED"     // info: the template uses a class another component owns, without including that component,
                          // so that component's stylesheet is linked too (one per borrowed owner)
-  | "PROPERTY_UNDECLARED"; // a warning: a rule for a class the template writes reads a custom property that no
-                         // stylesheet or theme PD reads declares, and styles.allowProperties doesn't list (one per property)
+  | "PROPERTY_UNDECLARED" // a warning: a rule for a class the template writes reads a custom property without a
+                         // fallback that no stylesheet or theme PD reads declares, and styles.allowProperties doesn't
+                         // list (one per property)
+  | "INLINE_STYLE";      // a warning: a style attribute in the template sets something other than custom properties
+                         // (one per attribute, naming its declarations); custom properties alone are the component's API
 
 /** Fields every diagnostic carries, whichever engine produced it. */
 interface DiagnosticBase {
@@ -256,6 +259,7 @@ export const AUDIT_SCOPE: AuditScope = {
   covered: [
     { name: "HTML content model", detail: "invalid nesting and content that isn't permitted where it appears (html-validate)." },
     { name: "Structural accessibility", detail: "labels, accessible names, ARIA attributes, roles and image alternatives (the axe-core rules that don't need layout)." },
+    { name: "Inline styles", detail: "a `style` attribute in a template that sets anything other than custom properties (INLINE_STYLE). Setting custom properties inline is the component's API and fine." },
     { name: "Schema", detail: "missing required fields and values of the wrong type, checked against each component's `<name>.schema.json`." },
     { name: "Discovery", detail: "a component left out of the tree by a handle collision, reported as a HANDLE_COLLISION defect naming the handle and the component that keeps it." },
     { name: "Render outcome", detail: "whether each component rendered, rendered empty or failed. It is reported with the component, not counted as a defect." },
@@ -282,13 +286,17 @@ export interface AuditComponentRollup {
  *  `buildAuditRollup`; `md`/`text`/`json` (and the workbench facet) are renderers over this object,
  *  never independent string builders. A CI consumer reading the `json` gets `scope` (what the audit covers)
  *  and `headline` alongside the count, never a bare number. */
-/** The style couplings of the audited components, from the project graph: information beside the findings, never a
- *  defect, never in a count. `borrowed`: a template writes a class another component's stylesheet owns, without
+/** The style couplings of the audited components, from the project graph: beside the findings, never a defect, never
+ *  in the defect count. `borrowed`: a template writes a class another component's stylesheet owns, without
  *  including that component (so its stylesheet is linked too: STYLE_BORROWED). `couplings`: a component's stylesheet
- *  styles another component's class in context (a rename of that class breaks it). Sorted by component. */
+ *  styles another component's class in context (a rename of that class breaks it). `undeclared`: a custom property a
+ *  component reads without a fallback that no stylesheet or theme declares and styles.allowProperties doesn't list
+ *  (PROPERTY_UNDECLARED), with the rules that read it so; a warning, with its own total in the report, never in the
+ *  defect count (the audit's findings are CSS-invariant, and this is CSS). Sorted by component. */
 export interface AuditStyle {
   borrowed: Array<{ component: ComponentId; owner: ComponentId; classes: string[] }>;
   couplings: Array<{ from: ComponentId } & StyleCoupling>;
+  undeclared: Array<{ component: ComponentId; property: string; selectors: string[] }>;
 }
 
 export interface AuditRollup {
@@ -303,6 +311,9 @@ export interface AuditRollup {
   scope: AuditScope;
   /** The style couplings, when the caller had the project graph (pd audit, the workbench's /api/audit). */
   style?: AuditStyle;
+  /** The total of `style.undeclared`, with it: the properties declared nowhere and the components that read them.
+   *  Its own number, never part of `totals`. */
+  undeclaredTotals?: { properties: number; components: number };
 }
 
 /** Build the structured rollup from the graph — the numbers exist as data here, not only as strings.
@@ -348,7 +359,10 @@ export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: s
     rulesByBlast,
     perComponent,
     scope: AUDIT_SCOPE,
-    ...(opts.style ? { style: opts.style } : {}),
+    ...(opts.style ? {
+      style: opts.style,
+      undeclaredTotals: { properties: opts.style.undeclared.length, components: new Set(opts.style.undeclared.map(u => u.component)).size },
+    } : {}),
   };
 }
 

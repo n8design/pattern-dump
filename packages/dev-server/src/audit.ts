@@ -72,6 +72,8 @@ export async function runDiagnosticsAudit(
   await surfaceFlattening(discovery.discoveryMap, registry, cwd);
   // The style couplings beside the findings, from the project graph of the same discovery (graph/standalone.ts), as
   // the workbench's /api/audit has them: never findings, never counted.
-  const style = auditStyleOf(await buildProjectGraph(cfg, { live: true, discovery, composition: registry }), auditedComponentIds(discovery));
+  const style = auditStyleOf(
+    await buildProjectGraph(cfg, { live: true, discovery, composition: registry }), auditedComponentIds(discovery), cfg.allowProperties,
+  );
   return { graph, style, reaudited, reused, artifactPath: graphArtifactPath(cwd), ...(imageWarning ? { imageWarning } : {}) };
 }

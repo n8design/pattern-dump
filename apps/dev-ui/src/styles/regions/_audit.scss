@@ -13,7 +13,8 @@
 
 .audit-loading,
 .audit-error,
-.audit-empty {
+.audit-empty,
+.audit-undeclared-total {
   margin: 0;
   color: var(--pd-ink-muted);
 }

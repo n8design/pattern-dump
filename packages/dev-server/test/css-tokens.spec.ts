@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { compileSassFile } from "@pattern-dump/build";
-import { baseTokens, propertyFacts, selectorAnchors, varNames } from "../src/css-tokens.js";
+import { baseTokens, propertyFacts, selectorAnchors, varNames, varReads } from "../src/css-tokens.js";
 
 const entries = (css: string) => Object.fromEntries(baseTokens(css).tokens);
 
@@ -71,6 +71,20 @@ describe("varNames", () => {
   });
 });
 
+describe("varReads", () => {
+  it("gives each var() its fallback as written, trimmed; none without a comma", () => {
+    expect(varReads("var(--w, 30rem) var(--a, var(--b)) var(--c,) var(--d)").map(({ name, fallback }) => ({ name, fallback }))).toEqual([
+      { name: "--w", fallback: "30rem" },
+      { name: "--a", fallback: "var(--b)" },
+      { name: "--b", fallback: undefined },
+      { name: "--c", fallback: "" },
+      { name: "--d", fallback: undefined },
+    ]);
+    expect(varReads("calc(var(--x, calc(1px + 2px)) * 2)")).toEqual([{ name: "--x", offset: 5, fallback: "calc(1px + 2px)" }]);
+    expect(varReads(`content: "var(--quoted)"`)).toEqual([]);
+  });
+});
+
 describe("selectorAnchors", () => {
   it("keys a rule to the class of its rightmost compound that has one, the classes before it as context", () => {
     expect(selectorAnchors(".card")).toEqual([{ classes: ["card"], within: [] }]);
@@ -111,9 +125,24 @@ describe("propertyFacts", () => {
     expect(facts.uses).toEqual([
       { property: "--gap", class: null, within: [], selector: ":root" },
       { property: "--gap", class: "card", within: [], selector: ".card" },
-      { property: "--fg", class: "card", within: [], selector: ".card" },
+      { property: "--fg", class: "card", within: [], selector: ".card", fallback: "var(--fallback)" },
       { property: "--fallback", class: "card", within: [], selector: ".card" },
       { property: "--gap", class: "card", within: ["tile"], selector: ".tile .card" },
+    ]);
+  });
+
+  it("keeps a use's fallback while every read has one; a read without one takes it away, at that rule", () => {
+    const uses = propertyFacts([
+      ".a { width: var(--w, 30rem); }",
+      ".a:hover { width: var(--w, 40rem); }",
+      ".b { gap: var(--g, 1rem); }",
+      ".b:hover { gap: var(--g); }",
+      ".c { gap: var(--h, 1rem) var(--h); }",
+    ].join("\n"), "/x/b.css").uses;
+    expect(uses).toEqual([
+      { property: "--w", class: "a", within: [], selector: ".a", fallback: "30rem" },
+      { property: "--g", class: "b", within: [], selector: ".b:hover" },
+      { property: "--h", class: "c", within: [], selector: ".c" },
     ]);
   });
 

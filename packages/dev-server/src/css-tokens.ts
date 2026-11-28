@@ -154,8 +154,9 @@ function follow(split: Map<string, TokenValue>, name: string, mode: "light" | "d
 // all (`:root`, `body`) keys the use to the stylesheet itself (`class: null`).
 
 /** One place a rule reads a property: the class it styles (null: a rule with no class), and the classes it does so
- *  inside, empty for an own use. */
-export interface PropertyUse { property: string; class: string | null; within: string[]; selector: string }
+ *  inside, empty for an own use. `fallback`: the default every read of it there gives (`var(--x, 30rem)`: `30rem`),
+ *  as written; absent when one read has none, and `selector` is then the first rule that reads it without one. */
+export interface PropertyUse { property: string; class: string | null; within: string[]; selector: string; fallback?: string }
 
 /** What a stylesheet's rules read and declare. `uses`: one per property, class and context, the first selector. */
 export interface PropertyFacts {
@@ -170,9 +171,32 @@ const PROPERTY_NAME = /^--[\w-]+$/;
 /** Every custom property a value reads, once each, in order: each `var(--x)`, one inside another's fallback too. A
  *  name Sass would build (`--#{$x}`) never reaches compiled CSS, so none is skipped here. */
 export function varNames(value: string): string[] {
-  const out = new Set<string>();
-  for (const m of value.matchAll(/\bvar\(\s*(--[\w-]+)/gi)) out.add(m[1]!);
-  return [...out];
+  return [...new Set(varReads(value).map(r => r.name))];
+}
+
+/** Every `var()` in `source`, in order, by its offset: the property it reads and its fallback as written, trimmed
+ *  (`var(--x, 30rem)`: `30rem`; `var(--x,)`: the empty string; none without a comma). A scan that matches
+ *  parentheses, so a var() inside another's fallback, or inside calc(), is read too (`var(--a, var(--b))` reads --a
+ *  with a fallback and --b without). Quoted strings are skipped; a name that isn't one (`--#{$x}`) too. */
+export function varReads(source: string): Array<{ name: string; offset: number; fallback?: string }> {
+  const out: Array<{ name: string; offset: number; fallback?: string }> = [];
+  // A string's contents blanked, offsets kept: nothing in quotes is a var() or a parenthesis.
+  const text = source.replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g, q => `${q[0]}${" ".repeat(q.length - 2)}${q[0]}`);
+  const re = /\bvar\(/gi;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    let depth = 1, i = m.index + m[0].length, comma = -1;
+    for (; i < text.length && depth > 0; i++) {
+      const c = text[i]!;
+      if (c === "(") depth++;
+      else if (c === ")") depth--;
+      else if (c === "," && depth === 1 && comma < 0) comma = i;
+    }
+    const close = depth === 0 ? i - 1 : i;
+    const name = text.slice(m.index + m[0].length, comma >= 0 ? comma : close).trim();
+    if (!PROPERTY_NAME.test(name)) continue;
+    out.push({ name, offset: m.index, ...(comma >= 0 ? { fallback: source.slice(comma + 1, close).trim() } : {}) });
+  }
+  return out;
 }
 
 /** Where a selector list's rule applies, per complex selector: the classes it styles and the classes it does so
@@ -211,23 +235,30 @@ export function selectorAnchors(selector: string): Array<{ classes: string[]; wi
  *  on its own). */
 export function addRuleProperties(rule: postcss.Rule, facts: PropertyFacts): void {
   const seen = useKeys(facts);
-  const read: string[] = [];
+  // Each property the rule reads, in order, with its fallback: null once one read has none.
+  const read = new Map<string, string | null>();
   let context: DeclarationContext | undefined;
   for (const node of rule.nodes ?? []) {
     if (node.type !== "decl") continue;
     if (PROPERTY_NAME.test(node.prop) && !facts.declares.has(node.prop)) {
       facts.declares.set(node.prop, { selector: rule.selector, context: context ??= contextOf(rule) });
     }
-    for (const name of varNames(node.value)) if (!read.includes(name)) read.push(name);
+    for (const r of varReads(node.value)) {
+      const before = read.get(r.name);
+      if (before === undefined) read.set(r.name, r.fallback ?? null);
+      else if (r.fallback === undefined) read.set(r.name, null);
+    }
   }
-  if (read.length === 0) return;
+  if (read.size === 0) return;
   for (const anchor of selectorAnchors(rule.selector)) {
     for (const cls of anchor.classes.length ? anchor.classes : [null]) {
-      for (const property of read) {
+      for (const [property, fallback] of read) {
         const key = `${property}\u0000${cls ?? ""}\u0000${anchor.within.join(" ")}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        facts.uses.push({ property, class: cls, within: anchor.within, selector: rule.selector });
+        const use: PropertyUse = { property, class: cls, within: anchor.within, selector: rule.selector, ...(fallback !== null ? { fallback } : {}) };
+        const prev = seen.get(key);
+        if (!prev) { seen.set(key, use); facts.uses.push(use); continue; }
+        // A later rule that reads it without a fallback makes it a use without one, at that rule.
+        if (prev.fallback !== undefined && fallback === null) { prev.selector = rule.selector; delete prev.fallback; }
       }
     }
   }
@@ -241,12 +272,13 @@ export function addAtRuleProperty(at: postcss.AtRule, facts: PropertyFacts): voi
   }
 }
 
-/** The keys of the uses `facts` holds, so a later rule adds only what is new. Kept per facts object. */
-const keysOf = new WeakMap<PropertyFacts, Set<string>>();
-function useKeys(facts: PropertyFacts): Set<string> {
+/** The uses `facts` holds by key, so a later rule adds only what is new, or takes a use's fallback away. Kept per
+ *  facts object. */
+const keysOf = new WeakMap<PropertyFacts, Map<string, PropertyUse>>();
+function useKeys(facts: PropertyFacts): Map<string, PropertyUse> {
   let keys = keysOf.get(facts);
   if (!keys) {
-    keys = new Set(facts.uses.map(u => `${u.property}\u0000${u.class ?? ""}\u0000${u.within.join(" ")}`));
+    keys = new Map(facts.uses.map(u => [`${u.property}\u0000${u.class ?? ""}\u0000${u.within.join(" ")}`, u]));
     keysOf.set(facts, keys);
   }
   return keys;
