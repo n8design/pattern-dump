@@ -71,6 +71,19 @@ describe("INLINE_STYLE", () => {
     expect(inlineStyles(`<i style="width&colon; 1px"></i>`)).toEqual([{ declarations: ["width&colon; 1px"], line: 1, column: 4 }]);
   });
 
+  it("decodes into contiguous CSS: an encoded name or comment delimiter reads as the browser reads it", () => {
+    expect(inlineStyles(`<i style="&#45;&#45;x: 1"></i>`)).toEqual([]);
+    expect(inlineStyles(`<i style="/&ast; color: red; */ --x: 1"></i>`)).toEqual([]);
+    expect(inlineStyles(`<i style="w&#105;dth: 1px"></i>`)).toEqual([{ declarations: ["w&#105;dth: 1px"], line: 1, column: 4 }]);
+  });
+
+  it("finds comments and text-only elements only outside a tag's attributes", () => {
+    expect(inlineStyles(`<div title="<!--" style="width:1px"></div><!-- end -->`)).toEqual([{ declarations: ["width:1px"], line: 1, column: 19 }]);
+    expect(inlineStyles(`<textarea title=">" style="width:3px"></textarea>`)).toEqual([{ declarations: ["width:3px"], line: 1, column: 21 }]);
+    expect(inlineStyles(`<a title="<textarea>"></a><b style="width:4px"></b>`)).toEqual([{ declarations: ["width:4px"], line: 1, column: 30 }]);
+    expect(inlineStyles(`<textarea><i style="width:5px"></textarea><b style="width:6px"></b>`)).toEqual([{ declarations: ["width:6px"], line: 1, column: 46 }]);
+  });
+
   it("doesn't split inside a custom property's {} or [] block", () => {
     expect(inlineStyles(`<i style="--theme: {color: red; background: blue}; --list: [a; b]"></i>`)).toEqual([]);
     expect(inlineStyles(`<i style="--t: {a; b}; margin: 0"></i>`)).toEqual([{ declarations: ["margin: 0"], line: 1, column: 4 }]);

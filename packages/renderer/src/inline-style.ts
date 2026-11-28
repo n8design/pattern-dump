@@ -5,14 +5,18 @@
 // theme or a site can reach it: INLINE_STYLE, a warning, naming the declarations as written. Read from the template's
 // own text, so the audit's hash (which covers the .hbs) covers it.
 //
-// The template is read as a browser would see its tags, after Handlebars:
-//   - HTML comments, Handlebars comments and the content of `<script>` and `<style>` elements are no markup;
-//   - every Handlebars expression is masked first, so a quote inside one (`{{default x "1"}}`) never ends a value, and
-//     a block around an attribute (`{{#if c}}style="..."{{/if}}`) leaves the attribute;
-//   - only a real attribute of an opening tag counts, quoted or not: `title='style="x"'` is a title.
-// In a style attribute's value, CSS comments are left out, and an expression still reads as blank: a value it writes
-// (`width: {{w}}px`) keeps the property's name, and an attribute an expression writes whole (`style="{{styles}}"`)
-// has no declaration to judge and is left alone.
+// The template is read in the order a browser gets it, Handlebars first:
+//   1. Handlebars comments and expressions are masked across the template (Handlebars runs before any HTML is
+//      parsed), so a quote inside one (`{{default x "1"}}`) never ends a value, and a block around an attribute
+//      (`{{#if c}}style="..."{{/if}}`) leaves the attribute.
+//   2. One pass of HTML's tokenizer states over the result: text, a comment, a tag with its attributes (quoted or
+//      not; an unquoted value runs on through an expression), and the content of the elements whose content is text
+//      (`<script>`, `<style>`, `<textarea>`, `<title>`), which ends only at its end tag. A comment opener or a tag
+//      inside a quoted attribute value is part of that value.
+//   3. Each style value is decoded (character references) into contiguous CSS, with a map back to the source, and
+//      CSS comments are found in it by a scan that knows strings and escapes.
+// An expression in a value reads as blank: a value it writes (`width: {{w}}px`) keeps the property's name, and an
+// attribute an expression writes whole (`style="{{styles}}"`) has no declaration to judge and is left alone.
 
 export interface InlineStyle {
   /** The declarations that set something other than a custom property, as written (CSS comments left out), each on
@@ -22,136 +26,170 @@ export interface InlineStyle {
   column: number;
 }
 
-/** One `style` attribute of a template: its value as written; the same with every Handlebars expression and CSS
- *  comment blanked (`masked`); the value as written with only its CSS comments blanked (`text`); offsets kept in
- *  both. And where the attribute starts. */
-export interface StyleAttribute { value: string; masked: string; text: string; line: number; column: number }
-
-/** A custom property: any declaration name that starts with two dashes, non-ASCII letters and escapes included
- *  (`--größe`, `--\\66 oo`). `--` alone is reserved. */
-const isCustomProperty = (name: string): boolean => name.length > 2 && name.startsWith("--");
-
-/** The character references an attribute value may use, decoded (HTML's named ones a CSS value needs, and every
- *  numeric one). An unknown name is left as written. */
-const NAMED_REFS: Record<string, string> = {
-  quot: "\"", apos: "'", amp: "&", lt: "<", gt: ">", semi: ";", colon: ":", lpar: "(", rpar: ")", lbrace: "{",
-  rbrace: "}", lsqb: "[", rsqb: "]", sol: "/", ast: "*", bsol: "\\", num: "#", comma: ",", nbsp: "\u00a0",
-};
-
-/** `value` with each character reference decoded to its character, padded with spaces before it to the reference's
- *  length, so offsets stay: `&quot;` reads as a quote for the CSS scan, a `;` it decodes to ends a declaration where
- *  the reference ends, and the text as written is still found by offset. */
-function decodeReferences(value: string): string {
-  return value.replace(/&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([a-zA-Z]+));?/g, (ref, dec?: string, hex?: string, name?: string) => {
-    let c: string | undefined;
-    if (dec !== undefined || hex !== undefined) {
-      const code = dec !== undefined ? Number(dec) : parseInt(hex!, 16);
-      c = code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : undefined;
-    } else c = NAMED_REFS[name!];
-    // A character outside the Basic Multilingual Plane is two UTF-16 units: the padding keeps the length either way.
-    return c === undefined || c.length > ref.length ? ref : " ".repeat(ref.length - c.length) + c;
-  });
+/** One `style` attribute of a template: its value as written (`value`); the CSS a browser reads from it, decoded,
+ *  with every Handlebars expression and CSS comment blanked (`masked`); `source(start, end)`, the value as written
+ *  behind `masked`'s offsets `start` to `end`, its CSS comments left out; and where the attribute starts. */
+export interface StyleAttribute {
+  value: string;
+  masked: string;
+  source: (start: number, end: number) => string;
+  line: number;
+  column: number;
 }
 
-/** `css` with its comments blanked to spaces (line breaks kept, so offsets stay): a scan that knows quoted strings
- *  and backslash escapes, so `'/*'` in a string is text, not a comment. An unclosed comment runs to the end. */
-function blankCssComments(css: string): string {
-  let out = "", quote = "";
+/** A custom property: any declaration name that starts with two dashes, non-ASCII letters and escapes included
+ *  (`--größe`, `--\66 oo`). `--` alone is reserved. */
+const isCustomProperty = (name: string): boolean => name.length > 2 && name.startsWith("--");
+
+/** The elements whose content is text, up to their end tag. */
+const RAW_TEXT = new Set(["script", "style", "textarea", "title"]);
+
+/** The character references an attribute value may use (HTML's named ones a CSS value needs, and every numeric
+ *  one). An unknown name is left as written. */
+const NAMED_REFS: Record<string, string> = {
+  quot: "\"", apos: "'", amp: "&", lt: "<", gt: ">", semi: ";", colon: ":", lpar: "(", rpar: ")", lbrace: "{",
+  rbrace: "}", lsqb: "[", rsqb: "]", sol: "/", ast: "*", bsol: "\\", num: "#", comma: ",", hyphen: "-", dash: "-",
+  nbsp: " ",
+};
+const REFERENCE = /&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|([a-zA-Z]+));?/y;
+
+/** `value` decoded into contiguous text, with `map[k]` the offset in `value` where the decoded character `k` starts
+ *  (`map[length]` is `value.length`). */
+function decode(value: string): { text: string; map: number[] } {
+  let text = "";
+  const map: number[] = [];
+  for (let i = 0; i < value.length;) {
+    if (value[i] === "&") {
+      REFERENCE.lastIndex = i;
+      const m = REFERENCE.exec(value);
+      if (m) {
+        let c: string | undefined;
+        if (m[1] !== undefined || m[2] !== undefined) {
+          const code = m[1] !== undefined ? Number(m[1]) : parseInt(m[2]!, 16);
+          c = code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : undefined;
+        } else c = NAMED_REFS[m[3]!];
+        if (c !== undefined) {
+          // A character outside the Basic Multilingual Plane is two UTF-16 units, both from this reference.
+          for (let k = 0; k < c.length; k++) { text += c[k]; map.push(i); }
+          i += m[0].length;
+          continue;
+        }
+      }
+    }
+    text += value[i];
+    map.push(i);
+    i++;
+  }
+  map.push(value.length);
+  return { text, map };
+}
+
+/** Which characters of `css` are inside a comment: a scan that knows quoted strings and backslash escapes, so `'/*'`
+ *  in a string is text. An unclosed comment runs to the end. */
+function commentMask(css: string): boolean[] {
+  const inComment = new Array<boolean>(css.length).fill(false);
+  let quote = "";
   for (let i = 0; i < css.length; i++) {
     const c = css[i]!;
-    if (quote) {
-      out += c;
-      if (c === "\\" && i + 1 < css.length) out += css[++i]!;
-      else if (c === quote) quote = "";
-      continue;
-    }
-    if (c === "\\" && i + 1 < css.length) { out += c + css[++i]!; continue; }
-    if (c === "\"" || c === "'") { quote = c; out += c; continue; }
+    if (quote) { if (c === "\\") i++; else if (c === quote) quote = ""; continue; }
+    if (c === "\\") { i++; continue; }
+    if (c === "\"" || c === "'") { quote = c; continue; }
     if (c === "/" && css[i + 1] === "*") {
       const end = css.indexOf("*/", i + 2);
       const stop = end < 0 ? css.length : end + 2;
-      out += css.slice(i, stop).replace(/[^\n]/g, " ");
+      for (let k = i; k < stop; k++) inComment[k] = true;
       i = stop - 1;
-      continue;
     }
-    out += c;
   }
-  return out;
+  return inComment;
 }
 
-/** `text` with each match of `re` replaced by spaces of its length; line breaks are kept, so offsets and lines stay. */
-const blank = (text: string, re: RegExp): string => text.replace(re, m => m.replace(/[^\n]/g, " "));
-
-/** The template as tags see it: comments, the content of the elements whose content is text (`<script>`, `<style>`,
- *  `<textarea>`, `<title>`), and Handlebars expressions blanked; and which offsets an expression covers (`inExpr`),
- *  so an unquoted attribute value runs on through one. */
-function maskTemplate(template: string): { masked: string; inExpr: boolean[] } {
-  let t = blank(template, /\{\{!--[\s\S]*?--\}\}|\{\{![\s\S]*?\}\}/g);
-  t = blank(t, /<!--[\s\S]*?-->/g);
+/** The template with its Handlebars comments and expressions blanked (line breaks kept, so offsets stay), and which
+ *  offsets an expression covers. */
+function maskHandlebars(template: string): { masked: string; inExpr: boolean[] } {
   const inExpr = new Array<boolean>(template.length).fill(false);
-  t = t.replace(/\{\{\{[\s\S]*?\}\}\}|\{\{[\s\S]*?\}\}/g, (m, offset: number) => {
+  const masked = template.replace(/\{\{!--[\s\S]*?--\}\}|\{\{![\s\S]*?\}\}|\{\{\{[\s\S]*?\}\}\}|\{\{[\s\S]*?\}\}/g, (m: string, offset: number) => {
     for (let k = 0; k < m.length; k++) inExpr[offset + k] = true;
     return m.replace(/[^\n]/g, " ");
   });
-  // The content between the opening tag and its end tag, the tags themselves kept.
-  const masked = t.replace(/(<(script|style|textarea|title)\b[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi,
-    (_, open: string, _n: string, body: string, close: string) => open + body.replace(/[^\n]/g, " ") + close);
   return { masked, inExpr };
+}
+
+/** One style attribute from its value as written and the same with its expressions blanked. */
+function styleAttribute(value: string, exprMasked: string, where: { line: number; column: number }): StyleAttribute {
+  const { text: css, map } = decode(exprMasked);
+  const inComment = commentMask(css);
+  let masked = "";
+  for (let k = 0; k < css.length; k++) masked += inComment[k] && css[k] !== "\n" ? " " : css[k]!;
+  const source = (start: number, end: number): string => {
+    let s = "";
+    for (let k = start; k < end; k++) s += inComment[k] ? " " : value.slice(map[k], map[k + 1]);
+    return s;
+  };
+  return { value, masked, source, ...where };
 }
 
 /** Each `style` attribute of the template's opening tags, in order. */
 export function styleAttributes(template: string): StyleAttribute[] {
-  const { masked, inExpr } = maskTemplate(template);
+  const { masked: t, inExpr } = maskHandlebars(template);
   const out: StyleAttribute[] = [];
-  /** Whitespace that ends something: a blanked expression's spaces don't. */
-  const space = (k: number): boolean => !inExpr[k] && /\s/.test(masked[k]!);
   const at = (offset: number): { line: number; column: number } => {
     const before = template.slice(0, offset).split("\n");
     return { line: before.length, column: before.at(-1)!.length + 1 };
   };
-  const tag = /<[a-zA-Z][\w:-]*/g;
-  for (let m = tag.exec(masked); m; m = tag.exec(masked)) {
-    let i = m.index + m[0].length;
-    // Attributes up to the tag's end: a name, then optionally `=` and a quoted or unquoted value.
-    while (i < masked.length) {
-      while (i < masked.length && /\s/.test(masked[i]!)) i++;
-      if (i >= masked.length || masked[i] === ">" || masked.startsWith("/>", i)) break;
-      const nameStart = i;
-      while (i < masked.length && !/[\s"'>/=]/.test(masked[i]!)) i++;
-      if (i === nameStart) { i++; continue; } // a stray `/`, `"` or `'`: skip it
-      const name = masked.slice(nameStart, i).toLowerCase();
-      let j = i;
-      while (j < masked.length && /\s/.test(masked[j]!)) j++;
-      if (masked[j] !== "=") continue; // an attribute with no value
-      j++;
-      while (j < masked.length && space(j)) j++;
+  /** Whitespace that ends something: a masked expression's blanks don't. */
+  const space = (k: number): boolean => !inExpr[k] && /\s/.test(t[k]!);
+  const n = t.length;
+  let i = 0;
+  while (i < n) {
+    // Text, up to the next `<`; then a comment, a declaration or end tag (skipped), or an opening tag.
+    if (t[i] !== "<") { i++; continue; }
+    if (t.startsWith("<!--", i)) { const end = t.indexOf("-->", i + 4); i = end < 0 ? n : end + 3; continue; }
+    if (t[i + 1] === "!" || t[i + 1] === "?" || t[i + 1] === "/") { const end = t.indexOf(">", i + 2); i = end < 0 ? n : end + 1; continue; }
+    if (!/[a-zA-Z]/.test(t[i + 1] ?? "")) { i++; continue; }
+    let j = i + 1;
+    while (j < n && !/[\s/>]/.test(t[j]!)) j++;
+    const tag = t.slice(i + 1, j).toLowerCase();
+    let selfClosing = false;
+    // The tag's attributes up to its `>`: a name, then optionally `=` and a quoted or unquoted value.
+    while (j < n) {
+      while (j < n && /\s/.test(t[j]!)) j++;
+      if (j >= n) break;
+      if (t[j] === ">") { j++; break; }
+      if (t[j] === "/") { if (t[j + 1] === ">") { selfClosing = true; j += 2; break; } j++; continue; }
+      const nameStart = j;
+      while (j < n && !/[\s"'>/=]/.test(t[j]!)) j++;
+      if (j === nameStart) { j++; continue; } // a stray quote: skip it
+      const name = t.slice(nameStart, j).toLowerCase();
+      let k = j;
+      while (k < n && /\s/.test(t[k]!)) k++;
+      if (t[k] !== "=") continue; // an attribute with no value
+      k++;
+      while (k < n && space(k)) k++;
       let start: number, end: number;
-      const q = masked[j];
+      const q = t[k];
       if (q === "\"" || q === "'") {
-        start = j + 1;
-        end = masked.indexOf(q, start);
-        if (end < 0) end = masked.length;
-        i = end + 1;
+        start = k + 1;
+        end = t.indexOf(q, start);
+        if (end < 0) end = n;
+        j = end + 1;
       } else {
         // Unquoted: up to whitespace or `>` outside an expression (`style=--x:{{x}};width:1px` is one value).
-        start = j;
-        while (j < masked.length && (inExpr[j] || !(space(j) || masked[j] === ">"))) j++;
-        end = j;
-        i = j;
+        start = k;
+        while (k < n && (inExpr[k] || !(space(k) || t[k] === ">"))) k++;
+        end = k;
+        j = k;
       }
-      // Character references are decoded and CSS comments found with the expressions already blanked, so a quote
-      // inside one ({{d "1"}}) is no string and `&quot;` is one; `text` is the value as written with the same
-      // comments blanked.
-      if (name === "style") {
-        const value = template.slice(start, end);
-        const exprMasked = decodeReferences(masked.slice(start, end));
-        const noComments = blankCssComments(exprMasked);
-        let text = "";
-        for (let k = 0; k < value.length; k++) text += noComments[k] === " " && exprMasked[k] !== " " ? " " : value[k]!;
-        out.push({ value, masked: noComments, text, ...at(nameStart) });
-      }
+      if (name === "style") out.push(styleAttribute(template.slice(start, end), t.slice(start, end), at(nameStart)));
     }
-    tag.lastIndex = Math.max(tag.lastIndex, i);
+    i = j;
+    // A raw-text element's content is text up to its end tag.
+    if (RAW_TEXT.has(tag) && !selfClosing) {
+      const close = new RegExp(`</${tag}[\\s/>]`, "ig");
+      close.lastIndex = i;
+      const m = close.exec(t);
+      i = m ? m.index : n;
+    }
   }
   return out;
 }
@@ -180,14 +218,14 @@ export function inlineStyles(template: string): InlineStyle[] {
     const found: string[] = [];
     for (const d of declarations(a.masked)) {
       const text = a.masked.slice(d.start, d.end);
-      // The first colon that isn't escaped ends the name (`--a\\:b: 1` is the property `--a\\:b`).
+      // The first colon that isn't escaped ends the name (`--a\:b: 1` is the property `--a\:b`).
       let colon = -1;
       for (let k = 0; k < text.length; k++) { if (text[k] === "\\") k++; else if (text[k] === ":") { colon = k; break; } }
       if (colon < 0) continue;
       const prop = text.slice(0, colon).trim();
       if (prop === "" || isCustomProperty(prop)) continue;
-      // One line, as a message has it: an attribute written over several lines keeps its words.
-      found.push(a.text.slice(d.start, d.end).trim().replace(/\s+/g, " "));
+      // As written, one line, as a message has it: an attribute written over several lines keeps its words.
+      found.push(a.source(d.start, d.end).trim().replace(/\s+/g, " "));
     }
     if (found.length) out.push({ declarations: found, line: a.line, column: a.column });
   }
