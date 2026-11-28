@@ -163,14 +163,16 @@
 }
 
 // Responsive label: full → short → icon-only as the rail narrows.
+// In a container query em is the container's own font size (16px here at default settings),
+// so 9.375em and 5em are the former 150px and 80px, and they grow with the user's text size.
 .a11y-label-short { display: none; }
 
-@container (max-width: 150px) {
+@container (max-width: 9.375em) {
   .a11y-label-full  { display: none; }
   .a11y-label-short { display: inline; }
 }
 
-@container (max-width: 80px) {
+@container (max-width: 5em) {
   .a11y-label-short { display: none; }
 }
 

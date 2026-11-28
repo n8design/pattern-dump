@@ -127,7 +127,9 @@ In short (also summarised in [architecture.md](architecture.md#conventions)):
 - **Type & text-spacing → `rem`/`em`** (respects the user's font-size setting).
 - **Grid structure → `fr` / `auto` / `%` / `min-content` / `max-content`**.
 - **Layout/chrome dimensions → `vw` (widths) / `vh` (heights)**, including `min`/`max` bounds.
-- **Hairline borders → `px`**. `px` otherwise **only** inside media/container _query conditions_.
+- **Hairline borders → `px`**, and nowhere else.
+- **Query conditions → `em`**, in media and container queries alike: a `px` breakpoint ignores the
+  browser's text size, an `em` one moves with it, so a reader with larger text gets the narrow layout sooner.
 - **`clamp()` / `min()` / `max()`** for fluid bounds: the resize splitter writes a `vw`/`vh` track
   value bounded by `clamp()`; never authors or stores `px` for layout.
 - **Grid/flex scroll fix:** give scrolling grid/flex children `min-height: 0` / `min-width: 0` so they
@@ -144,7 +146,9 @@ should react to the **container**, not the viewport:
 - **`@container`** (size queries) for region/component-local breakpoints: the panel reflows on _its_
   width, the gallery switches columns on _its_ width.
 - **media queries** only for genuinely viewport/device concerns.
-- `px` is allowed in both kinds of _query conditions_ (breakpoints are pixel-thinking): see §6.
+- Both kinds of _query conditions_ use `em` (see §6). In a media query `em` is the browser's default font
+  size; in a container query it is the container's own font size, so convert from what the container renders.
+- A script that needs the same breakpoint asks `matchMedia` with the same query string, never `innerWidth`.
 
 ---
 
@@ -216,7 +220,7 @@ must be ordered" items need a small **custom plugin** or stay **review**. The sp
 | No `@import` (§1)                                                   | **Stylelint**                         | `at-rule-disallowed-list: ["import"]`                                                                                         |
 | No `!important` (§5)                                                | **Stylelint**                         | `declaration-no-important`                                                                                                    |
 | OOCSS kebab classes; no `is-`/`has-`, no BEM (§2)                   | **Stylelint**                         | `selector-class-pattern` (negative lookahead)                                                                                 |
-| No `px` for layout/type; rem for type (§6, #9)                      | **Stylelint**                         | `unit-disallowed-list` (border/outline/radius/shadow + query-condition exceptions) + `declaration-property-unit-allowed-list` |
+| No `px` for layout/type; rem for type (§6, #9)                      | **Stylelint**                         | `unit-disallowed-list` (border/outline/radius/shadow exceptions only) + `declaration-property-unit-allowed-list`              |
 | Low specificity so layers win (§5)                                  | **Stylelint** (warn)                  | `selector-max-specificity: 0,4,0`                                                                                             |
 | Banning _named_ mirror classes, e.g. a stray `.active` (§3/§4)      | **Stylelint** (opt)                   | `selector-disallowed-list`                                                                                                    |
 | ARIA is _valid_ (refs resolve, roles have required states) (§3)     | **axe**                               | runtime, in the E2E suite                                                                                                     |
