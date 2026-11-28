@@ -6,6 +6,11 @@
 
 - **Old `.html` addresses can now forward to a page with `redirectFrom`.** Write the file's path, such as
   `/how-to/old.html`; see [Redirects](docs/guide/storefront.md#redirects).
+- **A navigation entry can be a page and a parent at once.** `children: "folder"` on a folder's `index.md` lists its
+  pages, so a new one appears with no config edit; see
+  [Declared navigations](docs/guide/storefront.md#declared-navigations).
+- **Skin authors: such an entry has both `route` and `children`.** A template that treats "has children" as "a group
+  without a link" shows it without its link.
 
 ### Changed
 

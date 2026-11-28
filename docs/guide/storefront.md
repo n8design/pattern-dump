@@ -714,8 +714,8 @@ neither.
 ### Declared navigations
 
 Besides the nav built from the pages folder, `site.globals.navigations` holds named lists of links a
-skin shows, such as a footer's. Each entry is a page, an external link or a group, and groups nest to any
-depth:
+skin shows, such as a footer's. Each entry is a page, a page with children, an external link or a group, and
+children nest to any depth:
 
 ```ts
 site: {
@@ -729,15 +729,36 @@ site: {
 },
 ```
 
+A page can be a parent too: `{ page, label?, children }` links the page and lists its children below it. The
+children are a list of entries, or the word `"folder"`, which lists the folder's pages in their navigation order.
+A page added to the folder then appears with no config change.
+
+```ts
+site: {
+  navigations: {
+    footer: [
+      { page: "guides/index.md", children: [{ page: "guides/setup.md" }, { href: "/feed.xml", label: "Feed" }] },
+      { page: "how-to/index.md", label: "How To's", children: "folder" },
+    ],
+  },
+},
+```
+
+`"folder"` works only on a folder's `index.md`, and is one level deep, as the nav is. A subfolder appears as its
+`index.md`, a link with nothing below it. A page with `nav: false` is left out, and so is a draft in `pd build`.
+`children` is either a list or `"folder"`, not both.
+
 The shape is Pattern Dump's, so the skin does not declare it: `partials/base`'s schema only lists the
 names it shows, under `site.properties.navigations.properties`, each with a description at most, and
 `required` for the ones it needs. A name the skin does not list, a page that is not in the pages folder, an
-entry that is none of the three forms or an unknown key is a problem with its place named
+entry that is none of the four forms, `"folder"` on a page that is not an `index.md`, or an unknown key is a problem with its place named
 (`site.globals.navigations.footer[2].children[0]`), reported once for the whole site.
 
 A layout gets `site.navigations.<name>` for every name the skin lists, resolved for the page: entries of
-`{ label, route }`, `{ label, href }` or `{ label, children }`, with `current: true` on the page's own entry
-and `ancestor: true` on every group above it; `null` for a name the config does not set.
+`{ label, route }`, `{ label, route, children }`, `{ label, href }` or `{ label, children }`. The page's own
+entry has `current: true`, and every entry with children above it has `ancestor: true`. A name the config does
+not set is `null`. An entry can have both a `route` and `children`, so a layout that reads "has children" as "is
+a group without a link" loses that link.
 
 ### Collections
 
