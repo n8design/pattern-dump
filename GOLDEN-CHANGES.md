@@ -19,6 +19,11 @@ backticks. Files that change for one reason can share a line:
 `api/version.json` is compared without `serverBundleMtime`, which changes with every build. An entry already on
 the base doesn't count for a later pull request: each change is recorded by the pull request that makes it.
 
+## 2026-11-28: Redirects from old `.html` files
+
+- `_pd/main.js`: the workbench bundles `staticPathFor`, which gains one line: a path ending in `.html` is a file of
+  that name (an old route such as `/how-to/old.html`). The workbench asks for no such path, so it behaves as before.
+
 ## 2026-11-28: ESLint 10
 
 - `_pd/main.js`: three variables in the workbench bundle lose an initial value that no path read (`next` in the
