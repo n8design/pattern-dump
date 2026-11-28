@@ -1,19 +1,22 @@
 // A declared navigation (storefront.site.navigations.footer in the bench's config), as the footer partial
-// renders it, read off the rendered DOM in pd dev and the built root: a page, an external link and a group,
-// the current page's link marked aria-current="page", and the group above it marked.
+// renders it, read off the rendered DOM in pd dev and the built root: a page, an external link, a group and a
+// page listing its folder (children: "folder"), the current page's link marked aria-current="page", and the
+// entry above it marked.
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 
 const nav = (page: Page) => page.locator("nav.site-footer-nav");
 const links = (page: Page) => nav(page).locator("a").evaluateAll(as => as.map(a => [a.getAttribute("href"), a.textContent?.trim()]));
 
-test("the footer navigation renders its pages, its external link and its group", async ({ page }) => {
+test("the footer navigation renders its pages, its external link, its group and its folder", async ({ page }) => {
   await page.goto("/");
   await expect(nav(page)).toHaveAttribute("aria-label", "Footer");
   expect(await links(page)).toEqual([
     ["/about/", "About"], ["https://example.test/source", "Source"], ["/guides/setup/", "Setup"], ["/guides/", "All guides"],
+    ["/articles/", "Articles"], ["/articles/harbour/", "A harbour of cable cars"], ["/articles/plain/", "Plain on purpose"],
   ]);
-  await expect(nav(page).locator(".site-footer-group")).toHaveText("Guides");
+  await expect(nav(page).locator("span.site-footer-group")).toHaveText("Guides");
+  await expect(nav(page).locator("a.site-footer-group")).toHaveText("Articles");
   await expect(nav(page).locator("[aria-current]")).toHaveCount(0);
 });
 
@@ -25,6 +28,21 @@ test("on a page in a group, its link is the current one and its group is marked"
   const group = nav(page).locator("li.is-ancestor");
   await expect(group).toHaveCount(1);
   await expect(group.locator(".site-footer-group")).toHaveText("Guides");
+});
+
+test("on a page of a listed folder, its link is the current one and the folder's entry is marked", async ({ page }) => {
+  await page.goto("/articles/plain/");
+  await expect(nav(page).locator('a[aria-current="page"]')).toHaveText("Plain on purpose");
+  const folder = nav(page).locator("li.is-ancestor");
+  await expect(folder).toHaveCount(1);
+  await expect(folder.locator("a.site-footer-group")).toHaveText("Articles");
+  await expect(folder.locator("a.site-footer-group")).toHaveAttribute("href", "/articles/");
+});
+
+test("on the folder's own page, the folder's entry is the current link", async ({ page }) => {
+  await page.goto("/articles/");
+  await expect(nav(page).locator('a[aria-current="page"]')).toHaveText("Articles");
+  await expect(nav(page).locator("li.is-ancestor")).toHaveCount(0);
 });
 
 test("on a page outside any group, its link is the current one and no group is marked", async ({ page }) => {

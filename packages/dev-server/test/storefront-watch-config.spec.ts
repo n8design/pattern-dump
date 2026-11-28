@@ -103,7 +103,7 @@ describe("the config file in pd dev", () => {
   it("takes a change to a declared navigation live, on every page", async () => {
     const navLabels = async (route: string) =>
       [.../<nav class="site-footer-nav"[\s\S]*?<\/nav>/.exec(await page(route))?.[0].matchAll(/<a [^>]*>([^<]*)<\/a>/g) ?? []].map(m => m[1]);
-    expect(await navLabels("/about/")).toEqual(["About", "Source", "Setup", "All guides"]);
+    expect(await navLabels("/about/")).toEqual(["About", "Source", "Setup", "All guides", "Articles", "A harbour of cable cars", "Plain on purpose"]);
     const footerNav = [{ page: "about.md" }, { href: "https://example.test/code", label: "Code" }];
     const r = await b.step(() => writeConfig(withSite({ footer: "Taken after all.", navigations: { footer: footerNav } })));
     expect(reloads(r.messages)).toEqual([`{"type":"page-changed","route":null}`]);

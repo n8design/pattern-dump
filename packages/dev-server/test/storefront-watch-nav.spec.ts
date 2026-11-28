@@ -103,6 +103,20 @@ describe("an edited page", () => {
     expect(breadcrumbs(await page("/guides/deep/more/leaf/"))).toEqual(["Storefront bench", "Guides", "Deep", "More still"]);
   }, 60_000);
 
+  // The bench's footer lists pages/articles/ with children: "folder", so the folder's pages are its children.
+  it("shows a page added to a folder listed with children: \"folder\" in the footer, and drops it when it goes", async () => {
+    const footer = async (route: string) =>
+      [.../<nav class="site-footer-nav"[\s\S]*?<\/nav>/.exec(await page(route))?.[0].matchAll(/<a [^>]*href="([^"]*)"[^>]*>/g) ?? []]
+        .map(m => m[1]).filter(r => r!.startsWith("/articles/"));
+    expect(await footer("/about/")).toEqual(["/articles/", "/articles/harbour/", "/articles/plain/"]);
+    const added = await b.step(() => save(b.at("pages/articles/new.md"), "---\ntitle: New\ndate: 2026-11-20\n---\nNew.\n"));
+    expect(added.messages.filter(m => m.startsWith(`{"type":"page-changed"`))).toEqual(every);
+    expect(await footer("/about/")).toEqual(["/articles/", "/articles/harbour/", "/articles/new/", "/articles/plain/"]);
+    const removed = await b.step(() => b.remove("pages/articles/new.md"));
+    expect(removed.messages.filter(m => m.startsWith(`{"type":"page-changed"`))).toEqual(every);
+    expect(await footer("/about/")).toEqual(["/articles/", "/articles/harbour/", "/articles/plain/"]);
+  }, 60_000);
+
   it("compares against the last edit, not the start: the next body edit reloads only itself again", async () => {
     expect(await pageChanges("pages/about.md", t => `${t}\nEven more text.\n`)).toEqual(own("/about/"));
   }, 60_000);

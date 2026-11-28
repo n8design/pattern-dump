@@ -51,6 +51,7 @@ export default defineConfig({
           { page: "about.md" },
           { href: "https://example.test/source", label: "Source" },
           { label: "Guides", children: [{ page: "guides/setup.md" }, { page: "guides/index.md", label: "All guides" }] },
+          { page: "articles/index.md", children: "folder" },
         ],
       },
     },
