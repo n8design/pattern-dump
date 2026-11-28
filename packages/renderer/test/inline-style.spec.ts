@@ -49,6 +49,33 @@ describe("INLINE_STYLE", () => {
     expect(inlineStyles(`<i style="--x: {{d 'it"s'}}; /* note */ width: 1px"></i>`)).toEqual([{ declarations: ["width: 1px"], line: 1, column: 4 }]);
   });
 
+  it("knows a custom property by its two dashes: non-ASCII names and escapes too, and an escaped colon in a name", () => {
+    expect(inlineStyles(`<i style="--größe: 1rem; --\\66 oo: 2rem"></i>`)).toEqual([]);
+    expect(inlineStyles(`<i style="--a\\:b: 1; width: 1px"></i>`)).toEqual([{ declarations: ["width: 1px"], line: 1, column: 4 }]);
+    expect(inlineStyles(`<i style="--: 1"></i>`)).toEqual([{ declarations: ["--: 1"], line: 1, column: 4 }]);
+  });
+
+  it("leaves the text of a textarea and a title alone: tag-like text there is no element", () => {
+    expect(inlineStyles(`<textarea><i style="width: 1px"></i></textarea><title><b style="width: 2px"></title>`)).toEqual([]);
+    expect(inlineStyles(`<textarea style="width: 3px"></textarea>`)).toEqual([{ declarations: ["width: 3px"], line: 1, column: 11 }]);
+  });
+
+  it("runs an unquoted value on through an expression", () => {
+    expect(inlineStyles(`<i style=--x:{{x}};width:1px></i>`)).toEqual([{ declarations: ["width:1px"], line: 1, column: 4 }]);
+    expect(inlineStyles(`<i style={{s}}width:2px class="c"></i>`)).toEqual([{ declarations: ["{{s}}width:2px"], line: 1, column: 4 }]);
+  });
+
+  it("decodes character references before reading the CSS, and quotes the declarations as written", () => {
+    expect(inlineStyles(`<i style="--label: &quot;a; color: red&quot;;"></i>`)).toEqual([]);
+    expect(inlineStyles(`<i style="--x: 1&#59; width: 1px"></i>`)).toEqual([{ declarations: ["width: 1px"], line: 1, column: 4 }]);
+    expect(inlineStyles(`<i style="width&colon; 1px"></i>`)).toEqual([{ declarations: ["width&colon; 1px"], line: 1, column: 4 }]);
+  });
+
+  it("doesn't split inside a custom property's {} or [] block", () => {
+    expect(inlineStyles(`<i style="--theme: {color: red; background: blue}; --list: [a; b]"></i>`)).toEqual([]);
+    expect(inlineStyles(`<i style="--t: {a; b}; margin: 0"></i>`)).toEqual([{ declarations: ["margin: 0"], line: 1, column: 4 }]);
+  });
+
   it("is a warning on the render, naming the template and the declarations, one per attribute", async () => {
     const out = await render({ component: "atoms/inline-style", data: { side: 4, styles: "color: red" } });
     expect(out.meta?.diagnostics?.filter(d => d.kind === "INLINE_STYLE")).toEqual([

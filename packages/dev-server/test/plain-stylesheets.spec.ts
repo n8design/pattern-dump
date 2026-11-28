@@ -82,5 +82,6 @@ describe("styleAttributeProperties", () => {
     expect(styleAttributeProperties(`<i style="width: {{default w "1"}}px; --late: 1"></i>`)).toEqual(["--late"]);
     expect(styleAttributeProperties(`<i style="/* API */ --x: 1"></i><i style=--bare:2></i>`)).toEqual(["--bare", "--x"]);
     expect(styleAttributeProperties(`<!-- <i style="--commented: 1"> --><i title='style="--quoted: 1"'></i>`)).toEqual([]);
+    expect(styleAttributeProperties(`<i style=--a:{{a}};--after:2></i><textarea><i style="--text: 1"></textarea>`)).toEqual(["--a", "--after"]);
   });
 });
