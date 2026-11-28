@@ -48,7 +48,7 @@ export async function readHelperRegistrars(helpersPath: string, opts: { bust?: n
   /** The file each registrar came from, by index. */
   const sources: string[] = [];
   const problems: LoadProblem[] = [];
-  let files: string[] = [];
+  let files: string[];
   try {
     const st = await stat(helpersPath);
     if (st.isDirectory()) {
@@ -118,7 +118,7 @@ export async function readGlobalData(dataDirs: string | string[]): Promise<{ dat
   const merged: Record<string, unknown> = {};
   const problems: LoadProblem[] = [];
   for (const dataDir of Array.isArray(dataDirs) ? dataDirs : [dataDirs]) {
-    let files: string[] = [];
+    let files: string[];
     try {
       const entries = await readdir(dataDir, { withFileTypes: true });
       files = entries.filter(e => e.isFile() && e.name.endsWith(".json") && !e.name.startsWith("."))

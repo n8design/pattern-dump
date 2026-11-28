@@ -13,7 +13,7 @@ Pattern Dump is laid out, see the [authoring guide](../guide/authoring.md).
 - **Language:** TypeScript, ESM throughout. No JavaScript source, no CommonJS.
 - **Transpile and bundle:** esbuild. **Type check:** `tsc --noEmit`, as a separate target.
 - **Test:** Vitest (unit and integration), Playwright with axe-core (end-to-end and accessibility).
-- **Lint:** ESLint 9 (one flat config at the root) for TypeScript; Stylelint for SCSS.
+- **Lint:** ESLint 10 (one flat config at the root) for TypeScript; Stylelint for SCSS.
 - **Build and HMR core:** `@pattern-dump/build` and `@pattern-dump/hotreloader`, in-tree: Sass with
   Autoprefixer, esbuild for TypeScript, Chokidar watching, an SCSS dependency graph, and `ws` hot reload.
 

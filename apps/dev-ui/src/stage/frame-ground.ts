@@ -19,7 +19,7 @@ export function documentGround(doc: Document): string | null {
 
 /** Give the Stage's frame the ground of the document it shows now. */
 export function syncFrameGround(frame: HTMLIFrameElement = dom.iframe): void {
-  let ground: string | null = null;
+  let ground: string | null;
   try { ground = frame.contentDocument ? documentGround(frame.contentDocument) : null; } catch { ground = null; }
   if (ground) frame.style.backgroundColor = ground;
   else frame.style.removeProperty("background-color");

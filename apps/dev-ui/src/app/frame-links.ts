@@ -71,7 +71,7 @@ function watchFrameDocument(doc: Document): void {
 /** Wire the Stage frame: its links after each load, and what to do when it navigated away from its document. */
 export function wireFrameLinks(): void {
   dom.iframe.addEventListener("load", () => {
-    let address: string | null = null;
+    let address: string | null;
     let doc: Document | null = null;
     try {
       address = dom.iframe.contentWindow?.location.href ?? null;

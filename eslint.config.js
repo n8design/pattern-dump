@@ -1,8 +1,8 @@
-// ESLint 9 flat config — the single config for the whole workspace.
+// ESLint 10 flat config: the single config for the whole workspace.
 //
 // One root config is enough: every package's script is `eslint src` run with `cwd` set to that
-// package directory, and ESLint 9 walks up to the nearest config. Adding per-package configs
-// would duplicate this for no gain.
+// package directory, and ESLint 10 walks up from each linted file's folder to the nearest config.
+// Adding per-package configs would duplicate this for no gain.
 //
 // Non-type-aware on purpose. `tseslint.configs.recommended` covers the rules this codebase
 // actually needs without requiring a resolvable TS project per package. Type-aware linting
@@ -10,10 +10,11 @@
 // much wider rule set.
 
 import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+export default defineConfig(
   {
     // Build output, vendored trees, and the dogfooding corpus are not ours to lint.
     // test-bench/ is a fixture design system; bench/ and .htwoo-src/ are foreign or generated.
