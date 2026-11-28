@@ -1,10 +1,11 @@
 // The colour tokens of the document base layer, read from compiled CSS (css-tokens.ts): the values a symbol image's
 // standalone file declares. Three shapes real projects compile to, and the cases that must fail instead of guessing.
+// Then the custom properties each rule reads and declares, for the graph.
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { compileSassFile } from "@pattern-dump/build";
-import { baseTokens } from "../src/css-tokens.js";
+import { baseTokens, propertyFacts, selectorAnchors, varNames } from "../src/css-tokens.js";
 
 const entries = (css: string) => Object.fromEntries(baseTokens(css).tokens);
 
@@ -58,5 +59,65 @@ describe("baseTokens", () => {
     expect([...r.unresolved.keys()].sort()).toEqual(["--color-dark-only", "--color-gone", "--color-half", "--color-loop", "--color-loop2"]);
     expect(r.unresolved.get("--color-gone")).toMatch(/--color-nowhere.*not declared/);
     expect(r.unresolved.get("--color-loop")).toMatch(/refers to itself/);
+  });
+});
+
+// ---- The custom properties a rule reads and declares, for the graph ----
+
+describe("varNames", () => {
+  it("names each var() once, one in another's fallback and one in calc() too", () => {
+    expect(varNames("calc(var(--a) + var(--b, var(--c, 1px))) var(--a)")).toEqual(["--a", "--b", "--c"]);
+    expect(varNames("1px solid red")).toEqual([]);
+  });
+});
+
+describe("selectorAnchors", () => {
+  it("keys a rule to the class of its rightmost compound that has one, the classes before it as context", () => {
+    expect(selectorAnchors(".card")).toEqual([{ classes: ["card"], within: [] }]);
+    expect(selectorAnchors(".card.is-on:hover")).toEqual([{ classes: ["card", "is-on"], within: [] }]);
+    expect(selectorAnchors(".tile .card")).toEqual([{ classes: ["card"], within: ["tile"] }]);
+    expect(selectorAnchors(".card > div")).toEqual([{ classes: ["card"], within: [] }]);
+    expect(selectorAnchors(".a + .b ~ .c > span")).toEqual([{ classes: ["c"], within: ["a", "b"] }]);
+  });
+
+  it("leaves a class in a pseudo-class's argument out, and gives a selector with no class none", () => {
+    expect(selectorAnchors(".card:not(.off)")).toEqual([{ classes: ["card"], within: [] }]);
+    expect(selectorAnchors(":root, body")).toEqual([{ classes: [], within: [] }, { classes: [], within: [] }]);
+  });
+});
+
+describe("propertyFacts", () => {
+  const css = [
+    ":root { --gap: 1rem; --x: var(--gap); }",
+    "@media (prefers-color-scheme: dark) { :root { --dark-only: #000; } }",
+    "@property --angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }",
+    ".card { padding: var(--gap); color: var(--fg, var(--fallback)); }",
+    ".card:hover { padding: var(--gap); }",
+    ".tile .card { margin: var(--gap); }",
+    "body { margin: var(--gap); }",
+  ].join("\n");
+  const facts = propertyFacts(css, "/x/a.css");
+
+  it("declares each property once, with the first selector and the at-rule it sits in", () => {
+    expect([...facts.declares]).toEqual([
+      ["--gap", { selector: ":root", context: "plain" }],
+      ["--x", { selector: ":root", context: "plain" }],
+      ["--dark-only", { selector: ":root", context: "media-dark" }],
+      ["--angle", { selector: "@property --angle", context: "plain" }],
+    ]);
+  });
+
+  it("reads each use once per property, class and context, a nested fallback's too", () => {
+    expect(facts.uses).toEqual([
+      { property: "--gap", class: null, within: [], selector: ":root" },
+      { property: "--gap", class: "card", within: [], selector: ".card" },
+      { property: "--fg", class: "card", within: [], selector: ".card" },
+      { property: "--fallback", class: "card", within: [], selector: ".card" },
+      { property: "--gap", class: "card", within: ["tile"], selector: ".tile .card" },
+    ]);
+  });
+
+  it("gives nothing for text that doesn't parse", () => {
+    expect(propertyFacts("}}} .a {", "/x/a.css")).toEqual({ uses: [], declares: new Map() });
   });
 });

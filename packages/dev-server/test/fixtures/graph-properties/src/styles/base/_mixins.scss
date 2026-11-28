@@ -1,0 +1,4 @@
+// A mixin that writes a var() into the rule that includes it.
+@mixin focus-ring {
+  outline: 2px solid var(--pp-focus);
+}

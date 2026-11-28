@@ -1,5 +1,6 @@
-// Custom properties read from compiled CSS: the one walk behind a theme's swatches (themes.ts) and the colour
-// tokens of the document base layer, which a symbol image's standalone file declares (symbols.ts).
+// Custom properties read from compiled CSS: the one walk behind a theme's swatches (themes.ts), the colour tokens of
+// the document base layer, which a symbol image's standalone file declares (symbols.ts), and the properties each
+// rule reads and declares, for the graph (the end of this file).
 //
 // A LEAF: postcss over a string, no files, no server state.
 //
@@ -19,6 +20,7 @@
 // a `var()` to an unknown name, `light-dark()` without two values) is reported, not guessed.
 
 import postcss from "postcss";
+import selectorParser from "postcss-selector-parser";
 
 export type DeclarationContext = "plain" | "media-dark" | "supports" | "other";
 
@@ -40,7 +42,8 @@ export function scopedDeclarations(
   return out;
 }
 
-function contextOf(rule: postcss.Rule): DeclarationContext {
+/** The at-rule a rule (or a nested at-rule) sits in, as a declaration's context. */
+export function contextOf(rule: postcss.Rule | postcss.AtRule): DeclarationContext {
   let context: DeclarationContext = "plain";
   for (let p = rule.parent; p && p.type !== "root"; p = p.parent) {
     if (p.type !== "atrule") continue;
@@ -140,4 +143,125 @@ function follow(split: Map<string, TokenValue>, name: string, mode: "light" | "d
   });
   if (problem === undefined && /\bvar\(/.test(value)) problem = `var() it can't follow: ${own[mode]}`;
   return problem !== undefined ? { problem } : value;
+}
+
+// ---- Which custom properties a stylesheet reads and declares (the graph's uses-property and declares edges) ----
+//
+// Read per compiled rule, so a var() a Sass mixin or variable wrote sits on the selector that includes it. A use is
+// keyed to the class the rule styles: per complex selector, the classes of the rightmost compound that has one
+// (`.card > div` styles inside `.card`); the classes of the compounds before it are its context (`.tile .card`:
+// `.card` within `.tile`). A class in a pseudo-class's argument (`:not(.x)`) is neither. A selector with no class at
+// all (`:root`, `body`) keys the use to the stylesheet itself (`class: null`).
+
+/** One place a rule reads a property: the class it styles (null: a rule with no class), and the classes it does so
+ *  inside, empty for an own use. */
+export interface PropertyUse { property: string; class: string | null; within: string[]; selector: string }
+
+/** What a stylesheet's rules read and declare. `uses`: one per property, class and context, the first selector. */
+export interface PropertyFacts {
+  uses: PropertyUse[];
+  declares: Map<string, { selector: string; context: DeclarationContext }>;
+}
+
+export const emptyPropertyFacts = (): PropertyFacts => ({ uses: [], declares: new Map() });
+
+const PROPERTY_NAME = /^--[\w-]+$/;
+
+/** Every custom property a value reads, once each, in order: each `var(--x)`, one inside another's fallback too. A
+ *  name Sass would build (`--#{$x}`) never reaches compiled CSS, so none is skipped here. */
+export function varNames(value: string): string[] {
+  const out = new Set<string>();
+  for (const m of value.matchAll(/\bvar\(\s*(--[\w-]+)/gi)) out.add(m[1]!);
+  return [...out];
+}
+
+/** Where a selector list's rule applies, per complex selector: the classes it styles and the classes it does so
+ *  inside. `classes` empty: a selector with no class. */
+const anchorCache = new Map<string, Array<{ classes: string[]; within: string[] }>>();
+export function selectorAnchors(selector: string): Array<{ classes: string[]; within: string[] }> {
+  const cached = anchorCache.get(selector);
+  if (cached) return cached;
+  const out: Array<{ classes: string[]; within: string[] }> = [];
+  try {
+    selectorParser(list => {
+      list.each(complex => {
+        const compounds: string[][] = [[]];
+        for (const node of complex.nodes) {
+          if (node.type === "combinator") compounds.push([]);
+          else if (node.type === "class") compounds[compounds.length - 1]!.push(node.value);
+        }
+        let at = compounds.length - 1;
+        while (at >= 0 && compounds[at]!.length === 0) at--;
+        if (at < 0) { out.push({ classes: [], within: [] }); return; }
+        out.push({ classes: [...new Set(compounds[at])], within: [...new Set(compounds.slice(0, at).flat())] });
+      });
+    }).processSync(selector);
+  } catch {
+    // A selector postcss-selector-parser can't read: every class-looking token is styled, none is context.
+    const classes = [...new Set([...selector.matchAll(/\.([\w-]+)/g)].map(m => m[1]!))];
+    out.length = 0;
+    out.push({ classes, within: [] });
+  }
+  if (anchorCache.size >= 20_000) anchorCache.clear();
+  anchorCache.set(selector, out);
+  return out;
+}
+
+/** Add what one rule reads and declares to `facts`: its declarations only, not a nested rule's (each rule is walked
+ *  on its own). */
+export function addRuleProperties(rule: postcss.Rule, facts: PropertyFacts): void {
+  const seen = useKeys(facts);
+  const read: string[] = [];
+  let context: DeclarationContext | undefined;
+  for (const node of rule.nodes ?? []) {
+    if (node.type !== "decl") continue;
+    if (PROPERTY_NAME.test(node.prop) && !facts.declares.has(node.prop)) {
+      facts.declares.set(node.prop, { selector: rule.selector, context: context ??= contextOf(rule) });
+    }
+    for (const name of varNames(node.value)) if (!read.includes(name)) read.push(name);
+  }
+  if (read.length === 0) return;
+  for (const anchor of selectorAnchors(rule.selector)) {
+    for (const cls of anchor.classes.length ? anchor.classes : [null]) {
+      for (const property of read) {
+        const key = `${property}\u0000${cls ?? ""}\u0000${anchor.within.join(" ")}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        facts.uses.push({ property, class: cls, within: anchor.within, selector: rule.selector });
+      }
+    }
+  }
+}
+
+/** An `@property --x` rule declares `--x`. */
+export function addAtRuleProperty(at: postcss.AtRule, facts: PropertyFacts): void {
+  const name = at.params.trim();
+  if (at.name.toLowerCase() === "property" && PROPERTY_NAME.test(name) && !facts.declares.has(name)) {
+    facts.declares.set(name, { selector: `@property ${name}`, context: contextOf(at) });
+  }
+}
+
+/** The keys of the uses `facts` holds, so a later rule adds only what is new. Kept per facts object. */
+const keysOf = new WeakMap<PropertyFacts, Set<string>>();
+function useKeys(facts: PropertyFacts): Set<string> {
+  let keys = keysOf.get(facts);
+  if (!keys) {
+    keys = new Set(facts.uses.map(u => `${u.property}\u0000${u.class ?? ""}\u0000${u.within.join(" ")}`));
+    keysOf.set(facts, keys);
+  }
+  return keys;
+}
+
+/** What a whole stylesheet reads and declares (a theme's compiled CSS, an assets.css file, a template's `<style>`).
+ *  Text that doesn't parse gives nothing. `from` names the input: without it PostCSS draws a random id from
+ *  Math.random, which would move a project helper's seeded sequence (plain-stylesheets.ts). */
+export function propertyFacts(css: string, from: string): PropertyFacts {
+  const facts = emptyPropertyFacts();
+  let root: postcss.Root;
+  try { root = postcss.parse(css, { from }); } catch { return facts; }
+  root.walk(node => {
+    if (node.type === "rule") addRuleProperties(node, facts);
+    else if (node.type === "atrule") addAtRuleProperty(node, facts);
+  });
+  return facts;
 }
