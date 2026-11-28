@@ -155,6 +155,30 @@ describe("no preview theme layer in a page's head", () => {
   }, 120_000);
 });
 
+describe("an old route that is a file (redirectFrom: /how-to/x.html), in pd dev", () => {
+  let port = 0;
+  beforeAll(async () => {
+    const root = await benchCopy("file-redirect");
+    const about = join(root, "pages", "about.md");
+    await save(about, (await readFile(about, "utf8")).replace("title: About\n", "title: About\nredirectFrom: [/how-to/x.html, /about.html]\n"));
+    ({ port } = await serve(root, config));
+  }, 120_000);
+
+  it("answers it with the page that forwards, and /about.html beside the page /about/", async () => {
+    for (const old of ["/how-to/x.html", "/about.html"]) {
+      const r = await get(port, "live.localhost", old);
+      expect(r.status, old).toBe(200);
+      expect(r.body, old).toContain(`<meta http-equiv="refresh" content="0; url=/about/">`);
+      expect(r.body, old).toContain(`<meta name="robots" content="noindex">`);
+    }
+    expect((await get(port, "live.localhost", "/about/")).body).toContain("<title>About · Storefront bench</title>");
+  });
+
+  it("answers a .html path no page claims with the 404 page", async () => {
+    for (const path of ["/how-to/y.html", "/x.html", "/how-to/x.html/"]) expect((await get(port, "live.localhost", path)).status, path).toBe(404);
+  });
+});
+
 describe("pages with problems, in pd dev", () => {
   let root = "";
   let port = 0;

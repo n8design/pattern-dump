@@ -3,6 +3,7 @@
 //
 //   a page, a tag or category page   /guide/            -> the file /guide/index.html
 //   a forward from an old route      /old-name/         -> the file /old-name/index.html
+//                                    /old-name.html     -> that file
 //   a feed                           /articles/feed.xml -> that file
 //   an image beside the pages        guide/shot.png     -> the file /guide/shot.png
 //   the root files                   /sitemap.xml, /robots.txt, /llms.txt, /404.html, /.nojekyll
@@ -13,6 +14,7 @@
 
 import { PD_ROUTE_PREFIX, PD_ROUTES } from "@pattern-dump/contracts";
 import type { PageModel } from "./pages.js";
+import { isFileRoute } from "./redirects.js";
 
 /** One place in the site's output that Pattern Dump writes. A file's `path` is the file's (/guide/index.html); a
  *  folder's ends with "/" and covers everything under it. A page or a forward also has its `route`, a feed its
@@ -32,8 +34,10 @@ const ROOT_FILES = [PD_ROUTES.sitemap, PD_ROUTES.robots, "/llms.txt", PD_ROUTES.
 /** The folders Pattern Dump writes into, whole. */
 const FOLDERS = ["/_pd/", "/assets/", "/preview/", "/_pagefind/"];
 
-/** The file a route is written to: /guide/ -> /guide/index.html, / -> /index.html. */
-const fileOf = (route: string): string => `/${route.replace(/^\/+|\/+$/g, "")}/index.html`.replace(/^\/\//, "/");
+/** The file a route is written to: /guide/ -> /guide/index.html, / -> /index.html; an old route that is a file
+ *  (/old.html, redirects.ts) is written at that path. */
+const fileOf = (route: string): string => isFileRoute(route) ? route
+  : `/${route.replace(/^\/+|\/+$/g, "")}/index.html`.replace(/^\/\//, "/");
 
 /**
  * Every place Pattern Dump writes into the site's output for this page model: the root files, its folders, each

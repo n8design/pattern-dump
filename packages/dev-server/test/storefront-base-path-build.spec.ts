@@ -58,9 +58,15 @@ describe("pd build — a storefront under a path", () => {
   let atRoot: Map<string, string>;
   let underPath: Map<string, string>;
   let report: Awaited<ReturnType<typeof build>>;
+  let rootReport: Awaited<ReturnType<typeof build>>;
   beforeAll(async () => {
     const [a, b] = [await benchCopy(), await benchCopy()];
-    await build(a, config("https://bench.example.test/"));
+    // Old routes that are files (redirectFrom: /how-to/x.html), not folders; the bench itself has none.
+    for (const root of [a, b]) {
+      const about = join(root, "pages", "about.md");
+      await save(about, (await readFile(about, "utf8")).replace("title: About\n", "title: About\nredirectFrom: [/how-to/x.html, /about.html]\n"));
+    }
+    rootReport = await build(a, config("https://bench.example.test/"));
     report = await build(b, config("https://bench.example.test/sub/"));
     [atRoot, underPath] = await Promise.all([files(join(a, ".out", "site")), files(join(b, ".out", "site"))]);
   }, 180_000);
@@ -80,6 +86,22 @@ describe("pd build — a storefront under a path", () => {
     expect(count).toBeGreaterThan(100);
     // The redirect stub forwards under the path.
     expect(underPath.get("setup/index.html")).toContain(`content="0; url=/sub/guides/setup/"`);
+  });
+
+  it("writes an old route that is a file at that path, forwarding, at the root and under the path, not as a page", () => {
+    for (const [built, prefix] of [[atRoot, "/"], [underPath, "/sub/"]] as const) {
+      for (const old of ["how-to/x.html", "about.html"]) {
+        expect(built.get(old), `${prefix}${old}`).toContain(`<meta http-equiv="refresh" content="0; url=${prefix}about/">`);
+        expect(built.get(old)).toContain(`<link rel="canonical" href="https://bench.example.test${prefix}about/">`);
+        expect(built.get(old)).toContain(`<meta name="robots" content="noindex">`);
+        expect(built.has(`${old}/index.html`), `${prefix}${old}/index.html`).toBe(false);
+      }
+      // /about.html beside the page /about/: two files.
+      expect(built.get("about/index.html")).toContain("<title>About · Storefront bench</title>");
+      expect(built.get("sitemap.xml")).not.toMatch(/how-to|about\.html/);
+    }
+    // The bench's 14 pages; the forwards aren't counted.
+    expect([rootReport.storefront?.pages, report.storefront?.pages]).toEqual([14, 14]);
   });
 
   it("carries the path in the sitemap and in canonical URLs", () => {
