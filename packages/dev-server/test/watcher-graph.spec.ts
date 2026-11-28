@@ -1,8 +1,8 @@
 // The project graph follows every save: the next answer after the watcher has handled a file is the graph of the
 // files as they are now. One case per input the graph is built from: a template (includes), a stylesheet (mentions),
-// a page (places), a component's docs (requires) and an assets.css file (defines). The last two change no input
-// object the graph is kept under, only the watch generation (graph/current.ts), so they run on the same copy served
-// as a style guide alone: with a site, the harness's barrier file in the pages folder gives a new page model on every
+// a page (places), a stylesheet's var() (uses-property), a theme (declares), a component's docs (requires) and an
+// assets.css file (defines). The theme, the docs and the assets.css file change no input object the graph is kept
+// under, only the watch generation (graph/current.ts), so they run on the same copy served as a style guide alone: with a site, the harness's barrier file in the pages folder gives a new page model on every
 // step, and the graph is built again whatever the generation says. Observed over /api/graph after Bench.step()
 // (watch-harness.ts), on a copy of storefront-bench.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -78,6 +78,20 @@ describe("the project graph after a save", () => {
     const md = await readFile(guide.at("src/patterns/components/callout/callout.md"), "utf8");
     await guide.step(() => save(guide.at("src/patterns/components/callout/callout.md"), md.replace(/^---\n/, "---\nrequireScript: graph-extra\n")));
     expect((await graph(guide)).edges).toContainEqual(edge(e));
+  });
+
+  it("a stylesheet that reads a custom property", async () => {
+    const e = { kind: "uses-property" as const, from: "class:card", to: "property:--graph-gap" };
+    expect((await graph()).edges).not.toContainEqual(edge(e));
+    await b.step(() => append("src/styles/components/card.scss", `.card { gap: var(--graph-gap); }\n`));
+    expect((await graph()).edges).toContainEqual(edge({ ...e, selector: ".card", context: false }));
+  });
+
+  it("a theme that declares a custom property (a style guide alone)", async () => {
+    const e = { kind: "declares" as const, from: "stylesheet:themes/dark.theme.scss", to: "property:--graph-accent" };
+    expect((await graph(guide)).edges).not.toContainEqual(edge(e));
+    await guide.step(() => guide.edit("themes/dark.theme.scss", `[data-theme="dark"] { --graph-accent: #333; }\n`));
+    expect((await graph(guide)).edges).toContainEqual(edge({ ...e, selector: "[data-theme=dark]", context: "plain" }));
   });
 
   it("an assets.css file that defines a class (a style guide alone)", async () => {

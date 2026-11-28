@@ -55,6 +55,8 @@ export interface ResolvedConfig {
   /** When set, compile only these SCSS entries for the class-owner index; when absent,
    *  buildAllStyleData falls back to the non-underscore glob. */
   readonly stylesEntries: string[] | undefined;
+  /** styles.allowProperties: custom properties a component may read that nothing declares. */
+  readonly allowProperties: readonly string[];
   /** Every theme folder, project first. */
   readonly themeDirs: string[];
   /** The first theme folder (the project's when it declares themes); null when no source has themes. */
@@ -272,6 +274,7 @@ export function resolveServerConfig(
     patternsDir,
     stylesDir,
     stylesEntries,
+    allowProperties: config.styles.allowProperties ?? [],
     themeDirs,
     themesDir: themeDirs[0] ?? null,
     defaultTheme: config.themes?.default ?? themePackages[0]?.manifest.themes?.default,

@@ -13,6 +13,7 @@ import {
 import type { CompositionRegistry } from "../composition.js";
 import type { AllStyleData } from "../style-index.js";
 import { inlineStyleClasses, linkedStylesheets, type AssetStylesheet, type SheetClasses } from "../plain-stylesheets.js";
+import type { PropertyFacts } from "../css-tokens.js";
 import { templateClasses } from "../css-closure.js";
 
 /** A page of the site, as the graph needs it. */
@@ -43,6 +44,9 @@ export interface GraphInputs {
   requires: ReadonlyMap<string, { scripts: readonly string[]; assets: readonly string[] }>;
   /** How a file is named in output: relative to the root, a package's as `<name>/<path>` (display-path.ts). */
   display: (absPath: string) => string;
+  /** The themes, by name in the picker's order: each one's file, the pattern package it comes from (none for the
+   *  project's), and the custom properties its compiled CSS reads and declares. */
+  themes: ReadonlyMap<string, { file: string; source?: string; properties: PropertyFacts }>;
 }
 
 /** The graph in memory: its nodes by id, and each node's edges out and in. */
@@ -53,7 +57,10 @@ export interface ProjectGraph {
 }
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-const edgeKey = (e: GraphEdge): string => `${e.from}\u0000${e.kind}\u0000${e.to}`;
+/** An edge's identity: where it starts, its kind and where it ends; a use of a property in context also by the
+ *  classes it is inside, so a class's own use and each context of one property are edges of their own. */
+const edgeKey = (e: GraphEdge): string =>
+  `${e.from}\u0000${e.kind}\u0000${e.to}${e.kind === "uses-property" && e.context ? `\u0000${e.within!.join(" ")}` : ""}`;
 
 /** The node id of a discovery id: a variant's has `~`. */
 export const componentNodeId = (id: string): string => (id.includes("~") ? `variant:${id}` : `component:${id}`);
@@ -83,9 +90,27 @@ export function buildGraph(inputs: GraphInputs): ProjectGraph {
     }
     return id;
   };
+  const propertyNode = (name: string): `property:--${string}` => {
+    const id = `property:${name}` as `property:--${string}`;
+    node({ id, kind: "property" });
+    return id;
+  };
+  /** A stylesheet's custom properties: each use from the class it styles (from the sheet for a rule with no class),
+   *  each declaration from the sheet. */
+  const propertyEdges = (sheetId: string, facts: PropertyFacts): void => {
+    for (const u of facts.uses) {
+      const context = u.within.length > 0;
+      edge({
+        kind: "uses-property", from: u.class === null ? sheetId : classNode(u.class), to: propertyNode(u.property),
+        selector: u.selector, context, ...(context ? { within: u.within } : {}),
+      });
+    }
+    for (const [name, d] of facts.declares) edge({ kind: "declares", from: sheetId, to: propertyNode(name), selector: d.selector, context: d.context });
+  };
   const sheetEdges = (sheetId: string, classes: SheetClasses): void => {
     for (const [name, selector] of classes.defines) edge({ kind: "defines", from: sheetId, to: classNode(name), selector });
     for (const [name, selector] of classes.mentions) edge({ kind: "mentions", from: sheetId, to: classNode(name), selector });
+    propertyEdges(sheetId, classes.properties);
   };
 
   // Components and variants.
@@ -128,6 +153,13 @@ export function buildGraph(inputs: GraphInputs): ProjectGraph {
       node({ id: `module:${mod}`, kind: "module" });
       edge({ kind: "imports", from: componentNodeId(id), to: `module:${mod}` });
     }
+  }
+
+  // Themes: each a stylesheet of no component, with what it declares (and reads).
+  for (const theme of inputs.themes.values()) {
+    const id = `stylesheet:${display(theme.file)}` as const;
+    node({ id, kind: "stylesheet", origin: origin(theme.source), component: null, source: "theme", file: display(theme.file) });
+    propertyEdges(id, theme.properties);
   }
 
   // assets.css: a local file read for its classes; a URL, or a path to no file, only named.

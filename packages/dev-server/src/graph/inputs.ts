@@ -1,9 +1,11 @@
 // What the graph is built from (build.ts), gathered from what a caller already has: discovery, the include graph and
 // the style data it built, and the site's page model when there is a site. The reading done here is only what none
 // of those holds: the templates' text (through the design-files cache), each page's body for what it places, the
-// assets.css files, and each component's own requires. Shared by pd dev, pd build, pd audit and pd graph.
+// assets.css files, each component's own requires, and each theme's custom properties (from CSS the caller compiled).
+// Shared by pd dev, pd build, pd audit and pd graph.
 
 import { readFile } from "node:fs/promises";
+import { join, sep } from "node:path";
 import type { DiscoveryMap, DiscoveryResult, HandleMap } from "@pattern-dump/contracts";
 import type { CompositionRegistry } from "../composition.js";
 import { createMarkdown } from "../code-blocks.js";
@@ -20,6 +22,8 @@ import { readSchema } from "../storefront/declared-values.js";
 import { declaredQueries, type DeclaredQuery } from "../storefront/query.js";
 import { DEFAULT_VIEW_KEY, resolveView, viewOf, type ResolvedView } from "../storefront/views.js";
 import type { AllStyleData } from "../style-index.js";
+import { propertyFacts, type PropertyFacts } from "../css-tokens.js";
+import { discoverThemeFiles } from "../themes.js";
 import type { GraphInputs, GraphPageInput } from "./build.js";
 import { verboseTiming } from "../timing.js";
 
@@ -34,6 +38,42 @@ export interface GraphSources {
   assetRoots: readonly string[];
   assetRootNames: readonly string[];
   display: (absPath: string) => string;
+  /** The themes, by name in the picker's order (graphThemes). */
+  themes: readonly GraphTheme[];
+}
+
+/** A theme as the graph reads it: its file, the pattern package it comes from (none for the project's), and its
+ *  compiled CSS ("" for one that doesn't compile). */
+export interface GraphTheme { name: string; file: string; source?: string; css: string }
+
+/** Every theme of the theme folders (themes.ts), in the picker's order, with its compiled CSS from `cssOf`: pd dev's
+ *  kept CSS, or a compile of its own (standalone.ts). A theme `cssOf` has nothing for is left out. */
+export async function graphThemes(
+  cfg: { themeDirs: readonly string[]; themeOrder: readonly string[]; packages: readonly { name: string; dir: string }[] },
+  cssOf: (name: string, file: string) => Promise<string | undefined> | string | undefined,
+): Promise<GraphTheme[]> {
+  const out: GraphTheme[] = [];
+  for (const { name, dir } of await discoverThemeFiles([...cfg.themeDirs], cfg.themeOrder)) {
+    const file = join(dir, `${name}.theme.scss`);
+    const css = await cssOf(name, file);
+    if (css === undefined) continue;
+    const source = cfg.packages.find(p => file.startsWith(p.dir + sep))?.name;
+    out.push({ name, file, ...(source ? { source } : {}), css });
+  }
+  return out;
+}
+
+/** Each theme's custom properties, by its file and CSS: a save that changes no theme reads none again. */
+const keptFacts = new Map<string, PropertyFacts>();
+function themeFacts(theme: GraphTheme): PropertyFacts {
+  const key = `${theme.file}\u0000${theme.css}`;
+  let facts = keptFacts.get(key);
+  if (!facts) {
+    if (keptFacts.size >= 200) keptFacts.clear();
+    facts = propertyFacts(theme.css, theme.file);
+    keptFacts.set(key, facts);
+  }
+  return facts;
 }
 
 /** One markdown-it for reading what a body places: the placed-tag rule on, nothing rendered. */
@@ -226,5 +266,6 @@ export async function gatherGraphInputs(s: GraphSources): Promise<GraphInputs> {
     pages,
     requires,
     display: s.display,
+    themes: new Map(s.themes.map(t => [t.name, { file: t.file, ...(t.source ? { source: t.source } : {}), properties: themeFacts(t) }])),
   };
 }

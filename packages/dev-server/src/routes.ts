@@ -35,7 +35,7 @@ import type { ResolvedConfig } from "./server-config.js";
 import { compositionFor, currentDiscovery, type ServerState } from "./server-state.js";
 import { createDisplayPath } from "./display-path.js";
 import { buildGraph, graphJson, type ProjectGraph } from "./graph/build.js";
-import { gatherGraphInputs } from "./graph/inputs.js";
+import { gatherGraphInputs, graphThemes } from "./graph/inputs.js";
 import { auditStyleOf, layoutPagesOf } from "./graph/queries.js";
 import { createMcpHandler, type McpHandler } from "./mcp/server.js";
 import { handleMcpHttp, mcpEndpoint } from "./mcp/http.js";
@@ -61,7 +61,7 @@ import { layoutIndex } from "./storefront/layout-index.js";
 import { withBaseCss, withBaseHtml, withNoindex } from "./storefront/base-path.js";
 import { buildAllStyleData } from "./style-index.js";
 import {
-  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, readDiagnosticsArtifact, refreshDiagnosticsGraph, styleBorrowedDiagnostics,
+  assembleGraph, auditInputs, auditWithHash, checkComponent, persistSlices, propertyUndeclaredDiagnostics, readDiagnosticsArtifact, refreshDiagnosticsGraph, styleBorrowedDiagnostics,
 } from "./diagnostics.js";
 import { testHook } from "./lazy.js";
 import { verboseTiming } from "./timing.js";
@@ -124,6 +124,8 @@ export async function currentGraph(ctx: RouteContext, taken?: DiscoveryResult): 
       discovery, composition, style, pages,
       assetsCss: cfg.assetsCss, assetRoots: cfg.assetRoots, assetRootNames: cfg.assetRootNames,
       display: createDisplayPath(cfg.cwd, cfg.packages),
+      // The themes as compiled at boot and on each save (watch.ts): a theme save moves the watch generation.
+      themes: await graphThemes(cfg, name => state.themeCss.get(name)),
     });
     if (verboseTiming) console.time("[dev-server:timing] graph build");
     const graph = buildGraph(inputs);
@@ -729,9 +731,11 @@ async function routeRequest(
         const quarantineEntry = discovery.quarantineMap.get(componentId);
         const checked = await checkComponent(componentId, variant, render, quarantineEntry);
         const { previewHtml } = checked;
-        // The stylesheets it links by borrowing a class (info, the detail only: diagnostics.ts).
+        // The stylesheets it links by borrowing a class (info), and the custom properties it reads that nothing
+        // declares (warnings): the detail only (diagnostics.ts).
         const diagnostics = quarantineEntry ? checked.diagnostics : [...checked.diagnostics,
-          ...styleBorrowedDiagnostics(componentId, variant, graph)];
+          ...styleBorrowedDiagnostics(componentId, variant, graph),
+          ...propertyUndeclaredDiagnostics(componentId, variant, graph, cfg.allowProperties)];
         // Its layout problems (layout-index.ts): a misplaced x-pd-layout, or a layout name it shares with another.
         if (!quarantineEntry) {
           for (const message of layouts.problemsOf(componentId, createDisplayPath(cwd, cfg.packages))) {
