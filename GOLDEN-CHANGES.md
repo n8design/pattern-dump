@@ -19,6 +19,15 @@ backticks. Files that change for one reason can share a line:
 `api/version.json` is compared without `serverBundleMtime`, which changes with every build. An entry already on
 the base doesn't count for a later pull request: each change is recorded by the pull request that makes it.
 
+## 2026-11-28: Custom properties in the graph
+
+- `api/graph.json`: the graph gains 6 `property` nodes, the 5 themes as stylesheet nodes with the source `theme`, 3
+  `uses-property` edges (from `class:df-button--primary` to two button properties, and from `class:tb-themed` to
+  `--tb-accent`) and 19 `declares` edges from the themes. No node or edge is removed or changed.
+- `api/component/atoms/theme-demo/index.json`: a new `PROPERTY_UNDECLARED` warning. `.tb-themed` reads
+  `--tb-accent`, which only `themes-bare/` declares, and test-bench's config reads `themes/`. Nothing else in the file
+  changed.
+
 ## 2026-11-28: The workbench's query conditions in `em`
 
 - `_pd/main.css`: the narrow layout's media query is (max-width: 56.25em) instead of 900px, and the Nav Rail's
