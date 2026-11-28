@@ -282,7 +282,7 @@ lede: Three folders make a site.
 | `nav` | `false` leaves the page out of the navigation (`nav`, and its folder's `children`) and out of `prev` and `next`, its own and its neighbours'. It still renders, and stays searchable and in the sitemap and `llms.txt`. On a folder's `index.md`, the folder's entry and its pages are left out. `true`, the default, lists it. The layout's `nav`, the navigation itself, is filled as before. See [Pages](#pages) |
 | `image` | Its link-preview image: a raster file (PNG, JPEG, GIF or WebP) in the assets, such as `/assets/images/setup.png`, or beside the page, such as `./setup.png` (see [Images beside a page](#images-beside-a-page)). An SVG, or any file that isn't one of those (read from its bytes, not its name), is a problem. Without it, `site.image` |
 | `index` | `false` keeps the page out of search engines: `noindex`, and no sitemap entry |
-| `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. See [Redirects](#redirects) |
+| `redirectFrom` | Old routes that forward to the page, one or a list: `redirectFrom: [/setup/, /start/]`. An old route can also be a file ending in `.html`. See [Redirects](#redirects) |
 | `date` | The page's date, a real calendar date written `YYYY-MM-DD`: what a listing sorts and shows, and its JSON-LD `datePublished`. Without it, the day git first saw the page. A date after today holds the page back from `pd build` until that day, see [Scheduled pages](#scheduled-pages). See [Collections](#collections) |
 | `updated` | The page's last real change, `YYYY-MM-DD`, set by its author: not before `date`. The only "last changed" date a reader or a search engine sees, see [Dates](#dates) |
 | `tags` | One tag or a list, each lowercase letters, digits and hyphens, none twice: `tags: [css, design-systems]`. When the config declares tags (`site.tags`), each is a declared one (or an old key of one). See [Tags](#tags) |
@@ -1637,6 +1637,17 @@ canonical, and is never indexed. This works on any static host, GitHub Pages inc
 start and end with `/`, and must not be a page, be claimed by two pages, or lie under `/preview/`, `/_pd/`,
 `/assets/`, `/api/` or `/source/`, nor under the path of a workbench on the same host. No page may be there
 either: the workbench would take its place.
+
+An old address can also be a file, such as a page another tool published as `.html`:
+
+```yaml
+redirectFrom: /how-to/how-to-spfx-react.html
+```
+
+`pd build` writes the forwarding page at that file's path, and `pd dev` answers it there. Only `.html` is
+accepted, with no query or fragment. The same checks apply, and the file must not be `/404.html` or a route's
+own `index.html` (list the route instead). It must not take the place of a mounted file either. A file beside a
+page's folder, such as `/about.html` next to `/about/`, is another file and is free.
 
 ## Hosts in `pd dev`
 

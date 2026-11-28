@@ -362,6 +362,23 @@ describe("staticPathFor — every builder's URL maps to one file", () => {
   // The storefront writes through the same mapping, unchanged: a page route is a folder index, and an
   // embedded preview is addressed by its variant id, so the query a static host cannot serve never
   // appears in a storefront page.
+  it("writes an old route that is a file ending in .html at that path (redirectFrom: /how-to/old.html)", () => {
+    expect(staticPathFor("/a/b.html")).toBe("a/b.html");
+    expect(staticPathFor("/x.html")).toBe("x.html");
+    expect(staticPathFor("/how-to/how-to-spfx-react.html")).toBe("how-to/how-to-spfx-react.html");
+  });
+
+  it("maps every path ending in / exactly as before the .html file form", () => {
+    // As on main at 71d051c, before an old route could be a file.
+    const table: Array<[string, string]> = [
+      ["/", "index.html"], ["/about/", "about/index.html"], ["/guides/setup/", "guides/setup/index.html"],
+      ["/a/b/c/d/", "a/b/c/d/index.html"], ["/brand%20blue/", "brand%20blue/index.html"],
+      ["/caf%C3%A9/men%C3%BC/", "caf%C3%A9/men%C3%BC/index.html"], ["/x.html/", "x.html/index.html"],
+      ["/tags/design/", "tags/design/index.html"], ["/how-to/", "how-to/index.html"],
+    ];
+    for (const [url, file] of table) expect(staticPathFor(url), url).toBe(file);
+  });
+
   it("maps storefront page routes and variant-id previews without a change to the mapping", () => {
     expect(staticPathFor("/guides/setup/")).toBe("guides/setup/index.html");
     expect(staticPathFor("/about/")).toBe("about/index.html");

@@ -56,7 +56,7 @@ export interface PageProblem {
 
 /** The page's own search and link-preview keys, checked for their shape (the image file is checked later). */
 export interface BuildKeys {
-  /** Old routes that forward to this page, root-relative and slash-wrapped. */
+  /** Old routes that forward to this page, root-relative: slash-wrapped, or a file ending in ".html". */
   redirectFrom?: string[];
   /** false: noindex, and no sitemap entry. */
   index?: boolean;
@@ -87,8 +87,10 @@ export interface BuildKeys {
   feed?: false | FeedSettings;
 }
 
-/** An old route: root-relative, slash-wrapped, plain segments only (no query, fragment, "." or ".."). */
-const OLD_ROUTE = /^\/(?:(?!\.\.?\/)[^/?#\s]+\/)+$/;
+/** An old route: root-relative, plain segments only (no query, fragment, "." or ".."), and either slash-wrapped (a
+ *  folder, /old/page/) or a file ending in ".html" (/old/page.html). No other extension: adding one later is easy,
+ *  taking one away is not. */
+const OLD_ROUTE = /^\/(?:(?:(?!\.\.?\/)[^/?#\s]+\/)+|(?:(?!\.\.?\/)[^/?#\s]+\/)*[^/?#\s]+\.html)$/;
 /** The same rule as storefront.image in the config. */
 const ASSET_PATH = /^\/assets\/[^?#]+[^/?#]$/;
 
@@ -107,7 +109,8 @@ function checkBuildKeys(values: Record<string, FrontmatterValue>, path: string, 
     const bad = list.filter(r => typeof r !== "string" || !OLD_ROUTE.test(r));
     if (bad.length) {
       at("redirectFrom", `redirectFrom: ${bad.map(r => `"${String(r)}"`).join(", ")} ${bad.length === 1 ? "is" : "are"} not `
-        + `a route: each old route starts and ends with "/", such as "/old/page/", with no query or fragment`);
+        + `a route: each old route starts with "/" and ends with "/" or ".html", such as "/old/page/" or "/old/page.html", `
+        + `with no query or fragment`);
     } else if (list.length) out.redirectFrom = list as string[];
   }
   const toc = values["toc"];

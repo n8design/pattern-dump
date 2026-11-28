@@ -96,6 +96,15 @@ describe("mountCollisions", () => {
     ]);
   });
 
+  it("names a file in the place of an old route that is a file (redirectFrom: /how-to/old.html)", async () => {
+    const moved = claimsOf({ pages: [{ route: "/about/", redirectFrom: ["/how-to/old.html"] }], images: [] } as never);
+    const d = await layout({ "root/how-to/old.html": "", "root/how-to/new.html": "" });
+    const { files } = await readMounts([mount(d, "../root", "/")], join(d, "site"));
+    expect(mountCollisions(files, moved)).toEqual([
+      `site.mounts: ../root/how-to/old.html would be published at /how-to/old.html, which is the page /how-to/old.html: ${tail}`,
+    ]);
+  });
+
   it("names a file two mounts publish at one place, the later one, and a file where another mount has a folder", async () => {
     const d = await layout({ "a/x.css": "", "a/dir/y.css": "", "b/x.css": "", "b/dir": "", "b/z.css": "" });
     const { files } = await readMounts([mount(d, "../a", "/"), mount(d, "../b", "/")], join(d, "site"));

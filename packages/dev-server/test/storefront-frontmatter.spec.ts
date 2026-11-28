@@ -207,11 +207,26 @@ describe("checkPageFrontmatter — the build's own keys: redirectFrom, index, im
     expect(r.build).toEqual({ redirectFrom: ["/old/"], index: true });
   });
 
+  it("takes an old route that is a file ending in .html, at the root or in a folder", async () => {
+    const r = await check("---\ntitle: T\nredirectFrom: [/how-to/how-to-spfx-react.html, /x.html, /old/]\n---\n");
+    expect(r.problems).toEqual([]);
+    expect(r.build).toEqual({ redirectFrom: ["/how-to/how-to-spfx-react.html", "/x.html", "/old/"] });
+  });
+
   it("refuses old routes that are not root-relative, slash-wrapped plain paths, with the line", async () => {
     const r = await check("---\ntitle: T\nredirectFrom: [old/, /old, /a?b/, /a/../b/, /, //x/]\n---\n");
     expect(r.problems).toEqual([P(3, `redirectFrom: "old/", "/old", "/a?b/", "/a/../b/", "/", "//x/" are not a route: `
-      + `each old route starts and ends with "/", such as "/old/page/", with no query or fragment`)]);
+      + `each old route starts with "/" and ends with "/" or ".html", such as "/old/page/" or "/old/page.html", with no query or fragment`)]);
     expect(r.build).toEqual({});
+  });
+
+  it("refuses each file that isn't a plain root-relative .html path, naming both forms", async () => {
+    for (const old of ["/x.htm", "/x.html?y", "/x.html#y", "/../x.html", "x.html", "/a/./x.html", "/.html"]) {
+      const r = await check(`---\ntitle: T\nredirectFrom: "${old}"\n---\n`);
+      expect(r.problems, old).toEqual([P(3, `redirectFrom: "${old}" is not a route: `
+        + `each old route starts with "/" and ends with "/" or ".html", such as "/old/page/" or "/old/page.html", with no query or fragment`)]);
+      expect(r.build, old).toEqual({});
+    }
   });
 
   it("refuses an index that is not true or false", async () => {
