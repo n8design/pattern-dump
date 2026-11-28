@@ -8,8 +8,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fileURLToPath } from "node:url";
 import { defineConfig, validateConfig } from "@pattern-dump/config";
-import { componentUrl, type ComponentDetailResponse, type GraphEdge, type ProjectGraphJson } from "@pattern-dump/contracts";
-import { startDevServer, type DevServer } from "@pattern-dump/dev-server";
+import { buildAuditRollup, componentUrl, type ComponentDetailResponse, type GraphEdge, type ProjectGraphJson } from "@pattern-dump/contracts";
+import { formatAudit, runDiagnosticsAudit, startDevServer, type DevServer } from "@pattern-dump/dev-server";
 import { buildProjectGraph } from "../src/graph/standalone.js";
 import { graphJson, type ProjectGraph } from "../src/graph/build.js";
 import { propertiesOf } from "../src/graph/queries.js";
@@ -129,4 +129,26 @@ describe("custom properties in the graph", () => {
     const card = await (await fetch(`http://127.0.0.1:${server.port}${componentUrl("organisms/cards/doccard")}`)).json() as ComponentDetailResponse;
     expect(card.diagnostics.filter(d => d.kind === "PROPERTY_UNDECLARED")).toEqual([]);
   });
+
+  it("pd audit lists them beside the findings, with component, property and place, and a total of their own", async () => {
+    const { graph: audit, style } = await runDiagnosticsAudit(validateConfig(config, "graph-properties"), root);
+    // The allow list applies (--pp-runtime), and a property with a fallback everywhere (--pp-dlg-width) is no warning.
+    expect(style.undeclared).toEqual([
+      { component: "atoms/badge", property: "--pp-undeclared", selectors: [".pp-badge"] },
+      { component: "atoms/dialog", property: "--pp-dlg-gap", selectors: [".pp-dialog-body"] },
+    ]);
+    const md = formatAudit(audit, "md", { style });
+    expect(md).toContain("## Custom properties declared nowhere (PROPERTY_UNDECLARED: warnings, not in the defect count)\n\n"
+      + "2 properties in 2 components.\n\n"
+      + "- atoms/badge reads `--pp-undeclared` without a fallback in `.pp-badge`, and nothing declares it\n"
+      + "- atoms/dialog reads `--pp-dlg-gap` without a fallback in `.pp-dialog-body`, and nothing declares it\n");
+    expect(formatAudit(audit, "text", { style })).toContain(
+      "Custom properties declared nowhere (PROPERTY_UNDECLARED: warnings, not in the defect count): 2 properties in 2 components\n"
+      + "  atoms/badge reads --pp-undeclared without a fallback in .pp-badge, and nothing declares it\n");
+    // Never in the defect count: the findings are CSS-invariant.
+    const rollup = buildAuditRollup(audit, { style });
+    expect(rollup.undeclaredTotals).toEqual({ properties: 2, components: 2 });
+    expect(audit.occurrences.filter(o => o.ruleId === "PROPERTY_UNDECLARED")).toEqual([]);
+    expect(rollup.totals.defects).toBe(audit.occurrences.length);
+  }, 60_000);
 });

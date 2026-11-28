@@ -684,7 +684,7 @@ async function routeRequest(
         // (rises by exactly 1 per .hbs edit, 0 per .scss edit). Debug envelope field, not the graph.
         // The style couplings beside the findings, from the graph as it is now (never cached with the findings: a
         // stylesheet save re-audits nothing, so they can't live in the slices).
-        const style = auditStyleOf(await currentGraph(ctx, discovery), auditedComponentIds(discovery));
+        const style = auditStyleOf(await currentGraph(ctx, discovery), auditedComponentIds(discovery), ctx.cfg.allowProperties);
         json(res, 200, { ...graph, generatedAt: ctx.now().toISOString(), _liveReaudits: state.liveReauditCount, style } satisfies AuditResponse);
       } catch (e) {
         json(res, 500, { error: e instanceof Error ? e.message : String(e) } satisfies ApiError);

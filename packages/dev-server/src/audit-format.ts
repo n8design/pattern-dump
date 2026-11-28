@@ -53,6 +53,17 @@ function styleLines(style: AuditStyle, bullet: string, code: (s: string) => stri
   return lines;
 }
 
+/** The custom properties declared nowhere, one line each: component, property and the rules that read it without a
+ *  fallback. A warning beside the findings, never in the defect count. */
+function undeclaredLines(style: AuditStyle, bullet: string, code: (s: string) => string): string[] {
+  return style.undeclared.map(u =>
+    `${bullet}${u.component} reads ${code(u.property)} without a fallback in ${u.selectors.map(code).join(", ")}, and nothing declares it`);
+}
+
+/** The section's total: "3 properties in 2 components". */
+const undeclaredTotal = (t: NonNullable<AuditRollup["undeclaredTotals"]>): string =>
+  `${t.properties} ${t.properties === 1 ? "property" : "properties"} in ${t.components} ${t.components === 1 ? "component" : "components"}`;
+
 /** Markdown renderer. The part above the scope is guarded by a same-graph→same-md regression test. */
 function renderAuditMarkdown(r: AuditRollup): string {
   const lines: string[] = [];
@@ -86,6 +97,12 @@ function renderAuditMarkdown(r: AuditRollup): string {
     const style = styleLines(r.style, "- ", s => `\`${s}\``);
     lines.push(...(style.length ? style : ["- (none)"]));
     lines.push("");
+    lines.push("## Custom properties declared nowhere (PROPERTY_UNDECLARED: warnings, not in the defect count)");
+    lines.push("");
+    lines.push(`${undeclaredTotal(r.undeclaredTotals!)}.`);
+    lines.push("");
+    lines.push(...undeclaredLines(r.style, "- ", s => `\`${s}\``));
+    if (r.style.undeclared.length) lines.push("");
   }
   lines.push(...scopeMarkdown(r.scope));
   lines.push("");
@@ -121,6 +138,9 @@ function renderAuditText(r: AuditRollup): string {
     lines.push("Style couplings (information, not defects):");
     const style = styleLines(r.style, "  ", s => s);
     lines.push(...(style.length ? style : ["  (none)"]));
+    lines.push("");
+    lines.push(`Custom properties declared nowhere (PROPERTY_UNDECLARED: warnings, not in the defect count): ${undeclaredTotal(r.undeclaredTotals!)}`);
+    lines.push(...undeclaredLines(r.style, "  ", s => s));
     lines.push("");
   }
   lines.push(...scopeText(r.scope));

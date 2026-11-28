@@ -42,6 +42,18 @@ test.describe("Audit facet — corpus diagnostics", () => {
     await expect(page.locator(`${auditPanel} .audit-style`)).toBeVisible();
   });
 
+  test("lists the custom properties declared nowhere beside the findings, with their own total", async ({ page }) => {
+    await gotoComponent(page, "atoms/button");
+    await openAuditTab(page);
+    const heading = page.locator(`${auditPanel} .audit-h`, { hasText: "Custom properties declared nowhere" });
+    await expect(heading).toBeVisible();
+    await expect(page.locator(`${auditPanel} .audit-undeclared-total`)).toHaveText(/^\d+ propert(y|ies) in \d+ components?$/);
+    // test-bench's atoms/theme-demo reads --tb-accent, which only the bare themes (themes-bare/) declare.
+    const row = page.locator(`${auditPanel} .audit-undeclared > .audit-rule`).filter({ hasText: "atoms/theme-demo" });
+    await expect(row).toHaveText("atoms/theme-demo reads --tb-accent without a fallback in .tb-themed, and nothing declares it");
+    await expect(row.locator("a.audit-link")).toHaveAttribute("href", "/atoms/theme-demo");
+  });
+
   test("renders the rollup: headline, totals, rules-by-blast and per-component pivots", async ({ page }) => {
     await gotoComponent(page, "atoms/button");
     await openAuditTab(page);

@@ -282,13 +282,17 @@ export interface AuditComponentRollup {
  *  `buildAuditRollup`; `md`/`text`/`json` (and the workbench facet) are renderers over this object,
  *  never independent string builders. A CI consumer reading the `json` gets `scope` (what the audit covers)
  *  and `headline` alongside the count, never a bare number. */
-/** The style couplings of the audited components, from the project graph: information beside the findings, never a
- *  defect, never in a count. `borrowed`: a template writes a class another component's stylesheet owns, without
+/** The style couplings of the audited components, from the project graph: beside the findings, never a defect, never
+ *  in the defect count. `borrowed`: a template writes a class another component's stylesheet owns, without
  *  including that component (so its stylesheet is linked too: STYLE_BORROWED). `couplings`: a component's stylesheet
- *  styles another component's class in context (a rename of that class breaks it). Sorted by component. */
+ *  styles another component's class in context (a rename of that class breaks it). `undeclared`: a custom property a
+ *  component reads without a fallback that no stylesheet or theme declares and styles.allowProperties doesn't list
+ *  (PROPERTY_UNDECLARED), with the rules that read it so; a warning, with its own total in the report, never in the
+ *  defect count (the audit's findings are CSS-invariant, and this is CSS). Sorted by component. */
 export interface AuditStyle {
   borrowed: Array<{ component: ComponentId; owner: ComponentId; classes: string[] }>;
   couplings: Array<{ from: ComponentId } & StyleCoupling>;
+  undeclared: Array<{ component: ComponentId; property: string; selectors: string[] }>;
 }
 
 export interface AuditRollup {
@@ -303,6 +307,9 @@ export interface AuditRollup {
   scope: AuditScope;
   /** The style couplings, when the caller had the project graph (pd audit, the workbench's /api/audit). */
   style?: AuditStyle;
+  /** The total of `style.undeclared`, with it: the properties declared nowhere and the components that read them.
+   *  Its own number, never part of `totals`. */
+  undeclaredTotals?: { properties: number; components: number };
 }
 
 /** Build the structured rollup from the graph — the numbers exist as data here, not only as strings.
@@ -348,7 +355,10 @@ export function buildAuditRollup(graph: DiagnosticsGraph, opts: { subjectSha?: s
     rulesByBlast,
     perComponent,
     scope: AUDIT_SCOPE,
-    ...(opts.style ? { style: opts.style } : {}),
+    ...(opts.style ? {
+      style: opts.style,
+      undeclaredTotals: { properties: opts.style.undeclared.length, components: new Set(opts.style.undeclared.map(u => u.component)).size },
+    } : {}),
   };
 }
 
