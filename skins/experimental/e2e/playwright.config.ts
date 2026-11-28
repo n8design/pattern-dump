@@ -3,6 +3,11 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// Plain text in every console line of the servers and the workers: Playwright gives both FORCE_COLOR=1, and Node
+// then colours a pipe. Set here, it reaches the servers (process.env comes after Playwright's default) and the
+// workers (each loads this file again). Not NO_COLOR: FORCE_COLOR beats it, with a warning on stderr.
+process.env["FORCE_COLOR"] = "0";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const demo = path.resolve(__dirname, "..", "demo");
 const repo = path.resolve(__dirname, "..", "..", "..");

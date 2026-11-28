@@ -13,6 +13,7 @@
     "paths": {
       "@pattern-dump/contracts": ["packages/contracts/src/index.ts"],
       "@pattern-dump/config": ["packages/config/src/index.ts"],
+      "@pattern-dump/config/console": ["packages/config/src/console.ts"],
       "@pattern-dump/renderer": ["packages/renderer/src/index.ts"],
       "@pattern-dump/a11y": ["packages/a11y/src/index.ts"],
       "@pattern-dump/dev-server": ["packages/dev-server/src/index.ts"],

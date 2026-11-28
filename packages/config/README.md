@@ -12,3 +12,4 @@ Resolves the project config (TypeScript wins over JSON) and defines `PatternDump
 | Entry point | What it holds |
 |---|---|
 | `src/index.ts` | `PatternDumpConfig`, `defineConfig`, the styles, themes, assets and shell config types |
+| `src/console.ts` (`@pattern-dump/config/console`) | The console lines: each source's label, its colour where the output takes colour, and the severity words |

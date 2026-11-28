@@ -47,7 +47,7 @@
     "e2e:storefront": "nx run storefront-bench:e2e --outputStyle=static",
     "e2e:package-bench": "nx run package-bench:e2e --outputStyle=static",
     "dev:check": "node scripts/check-server-fresh.mjs",
-    "test:scripts": "node --test scripts/ci/burn-in.test.mjs scripts/no-em-dash.test.mjs scripts/e2e-specs.test.mjs scripts/commitlint.test.mjs scripts/changelog.test.mjs scripts/changelog-density.test.mjs scripts/golden-check.test.mjs",
+    "test:scripts": "node --test scripts/ci/burn-in.test.mjs scripts/no-em-dash.test.mjs scripts/e2e-specs.test.mjs scripts/commitlint.test.mjs scripts/changelog.test.mjs scripts/changelog-density.test.mjs scripts/golden-check.test.mjs scripts/plain-test-output.test.mjs",
     "burn-in": "node scripts/ci/burn-in.mjs",
     "pack:pd": "npm run build && node packages/cli/scripts/pack.mjs",
     "verify:install": "node scripts/verify-install.mjs",
